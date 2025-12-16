@@ -829,6 +829,10 @@ class AppDatabase extends _$AppDatabase {
   Future<int> clearPrintedJobs() async {
     return (delete(printJobs)..where((t) => t.status.equals('printed'))).go();
   }
+
+  Future<Customer?> getCustomerById(String id) async {
+    return (select(customers)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
 }
 
 class TransactionWithLines {

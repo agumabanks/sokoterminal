@@ -4,6 +4,8 @@ import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/db/app_database.dart';
 
@@ -93,6 +95,29 @@ class ReceiptService {
     } catch (_) {}
   }
 
+  Future<void> shareWhatsapp(String entryId, {String? phone}) async {
+    final bundle = await _fetchEntry(entryId);
+    if (bundle == null) return;
+    final customer = bundle.entry.customerId == null
+        ? null
+        : await db.getCustomerById(bundle.entry.customerId!);
+    final text = _buildReceiptText(bundle, customer: customer);
+
+    final sanitizedPhone = _sanitizePhone(phone ?? customer?.phone);
+    final uri = Uri.parse(
+      'https://wa.me/${sanitizedPhone ?? ''}?text=${Uri.encodeComponent(text)}',
+    );
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await Share.share(text, subject: 'Receipt ${bundle.entry.id}');
+      }
+    } catch (_) {
+      await Share.share(text, subject: 'Receipt ${bundle.entry.id}');
+    }
+  }
+
   Future<void> printBluetooth(String entryId, {BluetoothDevice? device}) async {
     final bundle = await _fetchEntry(entryId);
     if (bundle == null) {
@@ -157,5 +182,48 @@ class ReceiptService {
 
   Future<LedgerEntryBundle?> _fetchEntry(String id) async {
     return db.fetchLedgerEntryBundle(id);
+  }
+
+  String _buildReceiptText(LedgerEntryBundle bundle, {Customer? customer}) {
+    final entry = bundle.entry;
+    final isRefund = entry.type == 'refund';
+    final sign = isRefund ? '-' : '';
+    final sb = StringBuffer();
+    sb.writeln('Soko24 Receipt');
+    sb.writeln('Type: ${entry.type.toUpperCase()}');
+    sb.writeln('Receipt: ${entry.id}');
+    if (customer != null) {
+      sb.writeln(
+        'Customer: ${customer.name}${customer.phone != null ? ' (${customer.phone})' : ''}',
+      );
+    }
+    sb.writeln('Date: ${entry.createdAt.toLocal()}');
+    sb.writeln('-----');
+    for (final line in bundle.lines) {
+      sb.writeln(
+        '${line.title} x${line.quantity} — UGX $sign${line.lineTotal.toStringAsFixed(0)}',
+      );
+    }
+    sb.writeln('-----');
+    sb.writeln('Total: UGX $sign${entry.total.toStringAsFixed(0)}');
+    if (bundle.payments.isNotEmpty) {
+      sb.writeln('Payments:');
+      for (final p in bundle.payments) {
+        sb.writeln(' - ${p.method}: UGX ${p.amount.toStringAsFixed(0)}');
+      }
+    }
+    sb.writeln('Thank you!');
+    return sb.toString();
+  }
+
+  String? _sanitizePhone(String? phone) {
+    if (phone == null) return null;
+    final digits = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.isEmpty) return null;
+    if (digits.startsWith('0')) {
+      // Assume country code 256 (Uganda) if missing.
+      return '256${digits.substring(1)}';
+    }
+    return digits;
   }
 }

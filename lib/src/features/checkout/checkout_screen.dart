@@ -916,21 +916,42 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: DesignTokens.surfaceWhite),
-              const SizedBox(width: DesignTokens.spaceSm),
-              Text('Sale completed! Receipt #$id'),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'Print',
-            textColor: DesignTokens.surfaceWhite,
-            onPressed: () {
+      _showPostCheckoutActions(context, ref, id);
+    }
+  }
+
+  void _showPostCheckoutActions(
+    BuildContext context,
+    WidgetRef ref,
+    String entryId,
+  ) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: DesignTokens.surfaceWhite),
+            const SizedBox(width: DesignTokens.spaceSm),
+            Text('Sale completed! Receipt #$entryId'),
+          ],
+        ),
+        backgroundColor: DesignTokens.brandAccent,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    BottomSheetModal.show(
+      context: context,
+      title: 'Receipt actions',
+      subtitle: entryId,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () async {
               final printer = ref.read(printQueueServiceProvider);
               if (!printer.printerEnabled) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Printing is disabled in Settings'),
@@ -939,6 +960,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 return;
               }
               if (!printer.hasPreferredPrinter) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
@@ -948,14 +970,37 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 );
                 return;
               }
-              printer.enqueueReceipt(id);
+              await printer.enqueueReceipt(entryId);
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Receipt queued for printing')),
+              );
             },
+            icon: const Icon(Icons.print),
+            label: const Text('Print receipt'),
           ),
-          backgroundColor: DesignTokens.brandAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+          const SizedBox(height: DesignTokens.spaceSm),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.whatsapp),
+            label: const Text('Send via WhatsApp'),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(receiptServiceProvider).sharePdf(entryId);
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Share PDF'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<double?> _cashReceivedFlow(

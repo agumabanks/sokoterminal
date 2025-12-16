@@ -354,8 +354,8 @@ Backend
 - [ ] Consent/opt-out tracking (compliance)
 
 Flutter
-- [ ] One-tap send receipt via SMS/WhatsApp from completed sale
-- [ ] Customer contact card with last interactions + notes
+- [x] One-tap send receipt via WhatsApp from completed sale
+- [~] Customer contact card with last interactions + notes
 
 ---
 

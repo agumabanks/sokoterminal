@@ -132,6 +132,13 @@ class TransactionsScreen extends ConsumerWidget {
                     },
                   ),
                   IconButton(
+                    icon: const Icon(Icons.whatsapp),
+                    tooltip: 'Send WhatsApp',
+                    onPressed: () => ref
+                        .read(receiptServiceProvider)
+                        .shareWhatsapp(entry.id),
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.share),
                     tooltip: 'Share PDF',
                     onPressed: () =>
@@ -276,7 +283,17 @@ class TransactionsScreen extends ConsumerWidget {
                       onPressed: () =>
                           ref.read(receiptServiceProvider).sharePdf(entryId),
                       icon: const Icon(Icons.share),
-                      label: const Text('Share'),
+                      label: const Text('Share PDF'),
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => ref
+                          .read(receiptServiceProvider)
+                          .shareWhatsapp(entryId),
+                      icon: const Icon(Icons.whatsapp),
+                      label: const Text('WhatsApp'),
                     ),
                   ),
                   const SizedBox(width: DesignTokens.spaceSm),
