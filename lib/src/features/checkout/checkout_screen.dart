@@ -13,6 +13,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import 'cart_controller.dart';
 import 'parked_sales_controller.dart';
+import '../receipts/receipt_providers.dart';
 
 final itemsStreamProvider = StreamProvider<List<Item>>((ref) {
   return ref.watch(appDatabaseProvider).watchItems();
@@ -27,7 +28,7 @@ final customersStreamProvider = StreamProvider<List<Customer>>((ref) {
 });
 
 /// Checkout Screen — The primary POS interface for sellers.
-/// 
+///
 /// Redesigned with premium UI following "Steve Jobs standard":
 /// - Clean product/service tiles
 /// - Smooth cart interactions
@@ -95,7 +96,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   padding: DesignTokens.paddingScreen,
                   child: _SearchBar(
                     controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                    onChanged: (v) =>
+                        setState(() => _query = v.trim().toLowerCase()),
                     onScan: () => _openScanner(context),
                     onClear: () {
                       _searchCtrl.clear();
@@ -104,7 +106,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ),
-              
+
               // Products section
               SliverToBoxAdapter(
                 child: Padding(
@@ -118,16 +120,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceMd,
+                ),
                 sliver: itemsAsync.when(
                   data: (items) {
                     final filtered = _query.isEmpty
                         ? items
-                        : items.where((item) => _matchesItem(item, _query)).toList();
+                        : items
+                              .where((item) => _matchesItem(item, _query))
+                              .toList();
                     if (filtered.isEmpty) {
                       return SliverToBoxAdapter(
                         child: _EmptySearchState(
-                          message: _query.isEmpty ? 'No products yet' : 'No matching products',
+                          message: _query.isEmpty
+                              ? 'No products yet'
+                              : 'No matching products',
                         ),
                       );
                     }
@@ -138,21 +146,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         crossAxisSpacing: DesignTokens.spaceSm,
                         childAspectRatio: 0.9,
                       ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final item = filtered[index];
-                          return _ProductTile(
-                            name: item.name,
-                            price: item.price,
-                            stock: item.stockQty,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              ref.read(cartControllerProvider.notifier).addItem(item: item);
-                            },
-                          );
-                        },
-                        childCount: filtered.length,
-                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final item = filtered[index];
+                        return _ProductTile(
+                          name: item.name,
+                          price: item.price,
+                          stock: item.stockQty,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            ref
+                                .read(cartControllerProvider.notifier)
+                                .addItem(item: item);
+                          },
+                        );
+                      }, childCount: filtered.length),
                     );
                   },
                   loading: () => const SliverToBoxAdapter(
@@ -166,7 +173,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ),
-              
+
               // Services section
               SliverToBoxAdapter(
                 child: Padding(
@@ -180,34 +187,39 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceMd,
+                ),
                 sliver: servicesAsync.when(
                   data: (services) {
                     final filtered = _query.isEmpty
                         ? services
-                        : services.where((s) => _matchesService(s, _query)).toList();
+                        : services
+                              .where((s) => _matchesService(s, _query))
+                              .toList();
                     if (filtered.isEmpty) {
                       return SliverToBoxAdapter(
                         child: _EmptySearchState(
-                          message: _query.isEmpty ? 'No services yet' : 'No matching services',
+                          message: _query.isEmpty
+                              ? 'No services yet'
+                              : 'No matching services',
                         ),
                       );
                     }
                     return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final service = filtered[index];
-                          return _ServiceTile(
-                            title: service.title,
-                            price: service.price,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              ref.read(cartControllerProvider.notifier).addService(service: service);
-                            },
-                          );
-                        },
-                        childCount: filtered.length,
-                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final service = filtered[index];
+                        return _ServiceTile(
+                          title: service.title,
+                          price: service.price,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            ref
+                                .read(cartControllerProvider.notifier)
+                                .addService(service: service);
+                          },
+                        );
+                      }, childCount: filtered.length),
                     );
                   },
                   loading: () => const SliverToBoxAdapter(
@@ -221,11 +233,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ),
-              
+
               // Bottom padding
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 100),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           );
 
@@ -237,7 +247,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             customer: cart.customer,
             parkedCount: parked.length,
             onSelectCustomer: () => _selectCustomer(context),
-            onUpdateQuantity: (id, quantity) => cartController.updateQuantity(id, quantity),
+            onUpdateQuantity: (id, quantity) =>
+                cartController.updateQuantity(id, quantity),
             onEditPrice: (line) => _showPriceOverride(context, line),
             onPark: () => _showParkSale(context, ref),
             onCheckout: () => _handleCheckout(context, ref),
@@ -251,14 +262,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             return Row(
               children: [
                 Expanded(flex: 6, child: catalogPane),
-                Container(
-                  width: 1,
-                  color: DesignTokens.grayLight,
-                ),
-                SizedBox(
-                  width: 360,
-                  child: cartPane,
-                ),
+                Container(width: 1, color: DesignTokens.grayLight),
+                SizedBox(width: 360, child: cartPane),
               ],
             );
           }
@@ -330,10 +335,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     setState(() => _query = code.toLowerCase());
 
     final db = ref.read(appDatabaseProvider);
-    final match = await (db.select(db.items)
-          ..where((t) =>
-              t.barcode.equals(code) | t.sku.equals(code) | t.id.equals(code)))
-        .getSingleOrNull();
+    final match =
+        await (db.select(db.items)..where(
+              (t) =>
+                  t.barcode.equals(code) |
+                  t.sku.equals(code) |
+                  t.id.equals(code),
+            ))
+            .getSingleOrNull();
 
     if (match == null) {
       if (!mounted) return;
@@ -375,15 +384,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   final filtered = filter.isEmpty
                       ? customers
                       : customers
-                          .where((c) =>
-                              c.name.toLowerCase().contains(filter) ||
-                              (c.phone ?? '').toLowerCase().contains(filter))
-                          .toList();
+                            .where(
+                              (c) =>
+                                  c.name.toLowerCase().contains(filter) ||
+                                  (c.phone ?? '').toLowerCase().contains(
+                                    filter,
+                                  ),
+                            )
+                            .toList();
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       TextField(
-                        onChanged: (v) => setState(() => filter = v.trim().toLowerCase()),
+                        onChanged: (v) =>
+                            setState(() => filter = v.trim().toLowerCase()),
                         decoration: const InputDecoration(
                           labelText: 'Search customers',
                           prefixIcon: Icon(Icons.search),
@@ -407,7 +421,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       Expanded(
                         child: filtered.isEmpty
                             ? Center(
-                                child: Text('No customers found', style: DesignTokens.textSmall),
+                                child: Text(
+                                  'No customers found',
+                                  style: DesignTokens.textSmall,
+                                ),
                               )
                             : ListView.builder(
                                 itemCount: filtered.length,
@@ -417,7 +434,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                     leading: const Icon(Icons.person_outline),
                                     title: Text(c.name),
                                     subtitle: Text(c.phone ?? c.email ?? ''),
-                                    onTap: () => Navigator.of(sheetContext).pop(c.id),
+                                    onTap: () =>
+                                        Navigator.of(sheetContext).pop(c.id),
                                   );
                                 },
                               ),
@@ -458,13 +476,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     final db = ref.read(appDatabaseProvider);
-    final customer =
-        await (db.select(db.customers)..where((t) => t.id.equals(selectedId))).getSingleOrNull();
+    final customer = await (db.select(
+      db.customers,
+    )..where((t) => t.id.equals(selectedId))).getSingleOrNull();
     cartController.setCustomer(customer);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(customer == null ? 'Customer selected' : 'Customer: ${customer.name}'),
+        content: Text(
+          customer == null ? 'Customer selected' : 'Customer: ${customer.name}',
+        ),
         backgroundColor: DesignTokens.brandAccent,
       ),
     );
@@ -504,7 +525,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) return;
               final id = _uuid.v4();
-              await ref.read(appDatabaseProvider).upsertCustomer(
+              await ref
+                  .read(appDatabaseProvider)
+                  .upsertCustomer(
                     CustomersCompanion.insert(
                       id: Value(id),
                       name: name,
@@ -529,11 +552,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _showPriceOverride(BuildContext context, CartLine line) async {
-    final ok = await requireManagerPin(context, ref, reason: 'Price override: ${line.title}');
+    final ok = await requireManagerPin(
+      context,
+      ref,
+      reason: 'Price override: ${line.title}',
+    );
     if (!context.mounted) return;
     if (!ok) return;
 
-    final priceCtrl = TextEditingController(text: line.price.toStringAsFixed(0));
+    final priceCtrl = TextEditingController(
+      text: line.price.toStringAsFixed(0),
+    );
     final newPrice = await BottomSheetModal.show<double>(
       context: context,
       title: 'Price Override',
@@ -572,7 +601,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     if (newPrice == null) return;
     ref.read(cartControllerProvider.notifier).updatePrice(line.id, newPrice);
-    await ref.read(appDatabaseProvider).recordAuditLog(
+    await ref
+        .read(appDatabaseProvider)
+        .recordAuditLog(
           action: 'price_override',
           payload: {
             'line_id': line.id,
@@ -595,7 +626,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cart = ref.read(cartControllerProvider);
     final parked = ref.read(parkedSalesProvider);
     final cartController = ref.read(cartControllerProvider.notifier);
-    
+
     BottomSheetModal.show(
       context: context,
       title: 'Cart',
@@ -608,7 +639,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           Navigator.pop(context);
           _selectCustomer(context);
         },
-        onUpdateQuantity: (id, quantity) => cartController.updateQuantity(id, quantity),
+        onUpdateQuantity: (id, quantity) =>
+            cartController.updateQuantity(id, quantity),
         onEditPrice: (line) {
           Navigator.pop(context);
           _showPriceOverride(context, line);
@@ -632,11 +664,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<void> _handleCheckout(BuildContext context, WidgetRef ref) async {
     final cart = ref.read(cartControllerProvider);
     if (cart.lines.isEmpty) return;
-    
-    // Show payment method selection
-    final paymentMethod = await BottomSheetModal.show<String>(
+
+    final total = cart.subtotal;
+
+    // Show payment selection (single, split, or credit).
+    final paymentOption = await BottomSheetModal.show<String>(
       context: context,
-      title: 'Select Payment Method',
+      title: 'Payment',
+      subtitle: 'UGX ${total.toStringAsFixed(0)} due',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -660,16 +695,123 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             subtitle: 'Visa, Mastercard',
             onTap: () => Navigator.pop(context, 'card'),
           ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          _PaymentMethodTile(
+            icon: Icons.splitscreen_outlined,
+            title: 'Split payment',
+            subtitle: 'Cash + MoMo + Card (optional credit)',
+            onTap: () => Navigator.pop(context, 'split'),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          _PaymentMethodTile(
+            icon: Icons.handshake_outlined,
+            title: 'Credit / Pay later',
+            subtitle: 'Record as credit sale (customer required)',
+            onTap: () => Navigator.pop(context, 'credit'),
+          ),
         ],
       ),
     );
 
-    if (paymentMethod == null || !context.mounted) return;
+    if (paymentOption == null || !context.mounted) return;
 
-    final id = await ref
-        .read(cartControllerProvider.notifier)
-        .checkout(paymentMethod: paymentMethod);
-    
+    List<CheckoutPayment>? payments;
+    String? note;
+
+    switch (paymentOption) {
+      case 'cash':
+        final received = await _cashReceivedFlow(context, total: total);
+        if (received == null || !context.mounted) return;
+        payments = [CheckoutPayment(method: 'cash', amount: total)];
+        if ((received - total).abs() > 0.01) {
+          final change = (received - total).clamp(0, double.infinity);
+          note =
+              'Cash received UGX ${received.toStringAsFixed(0)} • Change UGX ${change.toStringAsFixed(0)}';
+        }
+        break;
+      case 'mobile_money':
+        final refCode = await _referenceFlow(
+          context,
+          title: 'Mobile Money',
+          hint: 'Transaction ID (optional)',
+        );
+        if (!context.mounted) return;
+        if (refCode == null) return;
+        payments = [
+          CheckoutPayment(
+            method: 'mobile_money',
+            amount: total,
+            externalRef: refCode.trim().isEmpty ? null : refCode.trim(),
+          ),
+        ];
+        break;
+      case 'card':
+        final refCode = await _referenceFlow(
+          context,
+          title: 'Card',
+          hint: 'Card receipt / auth code (optional)',
+        );
+        if (!context.mounted) return;
+        if (refCode == null) return;
+        payments = [
+          CheckoutPayment(
+            method: 'card',
+            amount: total,
+            externalRef: refCode.trim().isEmpty ? null : refCode.trim(),
+          ),
+        ];
+        break;
+      case 'split':
+        payments = await _splitPaymentFlow(
+          context,
+          total: total,
+          hasCustomer: cart.customer != null,
+        );
+        if (!context.mounted) return;
+        break;
+      case 'credit':
+        if (cart.customer == null) {
+          await _selectCustomer(context);
+          if (!context.mounted) return;
+        }
+        final nextCart = ref.read(cartControllerProvider);
+        if (nextCart.customer == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Select a customer to record a credit sale'),
+            ),
+          );
+          return;
+        }
+        final creditNote = await _creditFlow(
+          context,
+          customerName: nextCart.customer!.name,
+          total: total,
+        );
+        if (!context.mounted) return;
+        if (creditNote == null) return;
+        payments = [CheckoutPayment(method: 'credit', amount: total)];
+        note = creditNote.trim().isEmpty ? null : creditNote.trim();
+        break;
+      default:
+        return;
+    }
+
+    if (payments == null || payments.isEmpty || !context.mounted) return;
+
+    String id;
+    try {
+      id = await ref
+          .read(cartControllerProvider.notifier)
+          .checkout(payments: payments, notes: note);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Checkout failed: $e')));
+      return;
+    }
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -680,6 +822,32 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               Text('Sale completed! Receipt #$id'),
             ],
           ),
+          action: SnackBarAction(
+            label: 'Print',
+            textColor: DesignTokens.surfaceWhite,
+            onPressed: () {
+              final printer = ref.read(printQueueServiceProvider);
+              if (!printer.printerEnabled) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Printing is disabled in Settings'),
+                  ),
+                );
+                return;
+              }
+              if (!printer.hasPreferredPrinter) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Choose a printer in Settings to print receipts',
+                    ),
+                  ),
+                );
+                return;
+              }
+              printer.enqueueReceipt(id);
+            },
+          ),
           backgroundColor: DesignTokens.brandAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -687,14 +855,403 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
+  Future<double?> _cashReceivedFlow(
+    BuildContext context, {
+    required double total,
+  }) async {
+    final ctrl = TextEditingController(text: total.toStringAsFixed(0));
+    try {
+      return await BottomSheetModal.show<double>(
+        context: context,
+        title: 'Cash payment',
+        subtitle: 'Total UGX ${total.toStringAsFixed(0)}',
+        child: StatefulBuilder(
+          builder: (sheetContext, setState) {
+            final received = _parseAmount(ctrl.text) ?? 0;
+            final ok = received >= total - 0.01;
+            final change = (received - total).clamp(0, double.infinity);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Amount received',
+                    prefixIcon: Icon(Icons.payments_outlined),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+                Container(
+                  padding: DesignTokens.paddingMd,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.grayLight.withOpacity(0.25),
+                    borderRadius: DesignTokens.borderRadiusMd,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ok ? 'Change' : 'Remaining',
+                          style: DesignTokens.textSmallBold,
+                        ),
+                      ),
+                      Text(
+                        'UGX ${(ok ? change : (total - received).clamp(0, double.infinity)).toStringAsFixed(0)}',
+                        style: DesignTokens.textBodyBold.copyWith(
+                          color: ok
+                              ? DesignTokens.brandAccent
+                              : DesignTokens.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton.icon(
+                  onPressed: ok
+                      ? () => Navigator.of(sheetContext).pop(received)
+                      : null,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Complete sale'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
+  Future<String?> _referenceFlow(
+    BuildContext context, {
+    required String title,
+    required String hint,
+  }) async {
+    final ctrl = TextEditingController();
+    try {
+      return await BottomSheetModal.show<String>(
+        context: context,
+        title: title,
+        subtitle: 'Optional reference',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(
+                labelText: hint,
+                prefixIcon: const Icon(Icons.tag_outlined),
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceLg),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pop(ctrl.text),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
+  Future<String?> _creditFlow(
+    BuildContext context, {
+    required String customerName,
+    required double total,
+  }) async {
+    final noteCtrl = TextEditingController();
+    try {
+      return await BottomSheetModal.show<String>(
+        context: context,
+        title: 'Credit / Pay later',
+        subtitle: customerName,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: DesignTokens.paddingMd,
+              decoration: BoxDecoration(
+                color: DesignTokens.brandAccentLight,
+                borderRadius: DesignTokens.borderRadiusMd,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.handshake_outlined,
+                    color: DesignTokens.brandPrimary,
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: Text(
+                      'Record UGX ${total.toStringAsFixed(0)} as credit for this customer.',
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.brandPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceSm),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Note (optional)',
+                prefixIcon: Icon(Icons.note_outlined),
+              ),
+              minLines: 1,
+              maxLines: 3,
+            ),
+            const SizedBox(height: DesignTokens.spaceLg),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pop(noteCtrl.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandPrimary,
+              ),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Confirm credit sale'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      noteCtrl.dispose();
+    }
+  }
+
+  Future<List<CheckoutPayment>?> _splitPaymentFlow(
+    BuildContext context, {
+    required double total,
+    required bool hasCustomer,
+  }) async {
+    final drafts = <_PaymentDraft>[
+      _PaymentDraft(
+        method: 'cash',
+        amountCtrl: TextEditingController(text: total.toStringAsFixed(0)),
+        refCtrl: TextEditingController(),
+      ),
+    ];
+
+    List<CheckoutPayment>? result;
+    try {
+      result = await BottomSheetModal.show<List<CheckoutPayment>>(
+        context: context,
+        title: 'Split payment',
+        subtitle: 'Total UGX ${total.toStringAsFixed(0)}',
+        maxHeight: 620,
+        child: StatefulBuilder(
+          builder: (sheetContext, setState) {
+            final sum = drafts.fold<double>(
+              0,
+              (p, d) => p + (_parseAmount(d.amountCtrl.text) ?? 0),
+            );
+            final remaining = total - sum;
+            final ok =
+                remaining.abs() < 0.01 &&
+                drafts.isNotEmpty &&
+                drafts.every(
+                  (d) => (_parseAmount(d.amountCtrl.text) ?? 0) > 0,
+                ) &&
+                drafts.every((d) => d.method != 'credit' || hasCustomer);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: DesignTokens.paddingMd,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.grayLight.withOpacity(0.25),
+                    borderRadius: DesignTokens.borderRadiusMd,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Remaining',
+                          style: DesignTokens.textSmallBold,
+                        ),
+                      ),
+                      Text(
+                        'UGX ${remaining.toStringAsFixed(0)}',
+                        style: DesignTokens.textBodyBold.copyWith(
+                          color: remaining.abs() < 0.01
+                              ? DesignTokens.brandAccent
+                              : DesignTokens.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+                ...drafts.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final draft = entry.value;
+                  final showRef = draft.method != 'cash';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+                    padding: DesignTokens.paddingMd,
+                    decoration: BoxDecoration(
+                      color: DesignTokens.surfaceWhite,
+                      borderRadius: DesignTokens.borderRadiusMd,
+                      border: Border.all(color: DesignTokens.grayLight),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: draft.method,
+                                items: _paymentMethods(hasCustomer: hasCustomer)
+                                    .map(
+                                      (m) => DropdownMenuItem(
+                                        value: m.$1,
+                                        child: Text(m.$2),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) => setState(
+                                  () => draft.method = v ?? draft.method,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Method',
+                                  prefixIcon: Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: DesignTokens.spaceSm),
+                            Expanded(
+                              child: TextField(
+                                controller: draft.amountCtrl,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Amount',
+                                  prefixIcon: Icon(Icons.payments_outlined),
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                            if (drafts.length > 1) ...[
+                              const SizedBox(width: DesignTokens.spaceXs),
+                              IconButton(
+                                tooltip: 'Remove',
+                                onPressed: () => setState(() {
+                                  final removed = drafts.removeAt(index);
+                                  removed.dispose();
+                                }),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (showRef) ...[
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          TextField(
+                            controller: draft.refCtrl,
+                            decoration: InputDecoration(
+                              labelText: draft.method == 'credit'
+                                  ? 'Note (optional)'
+                                  : 'Reference (optional)',
+                              prefixIcon: const Icon(Icons.tag_outlined),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: DesignTokens.spaceSm),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    final remainingAmount = remaining.isFinite
+                        ? remaining.clamp(0, total)
+                        : total;
+                    drafts.add(
+                      _PaymentDraft(
+                        method: 'cash',
+                        amountCtrl: TextEditingController(
+                          text: remainingAmount.toStringAsFixed(0),
+                        ),
+                        refCtrl: TextEditingController(),
+                      ),
+                    );
+                  }),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add payment'),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton.icon(
+                  onPressed: ok
+                      ? () {
+                          final payments = drafts.map((d) {
+                            final amount = _parseAmount(d.amountCtrl.text) ?? 0;
+                            final ref = d.refCtrl.text.trim();
+                            return CheckoutPayment(
+                              method: d.method,
+                              amount: amount,
+                              externalRef: ref.isEmpty ? null : ref,
+                            );
+                          }).toList();
+                          Navigator.of(sheetContext).pop(payments);
+                        }
+                      : null,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Complete sale'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      for (final d in drafts) {
+        d.dispose();
+      }
+    }
+
+    return result;
+  }
+
+  double? _parseAmount(String input) {
+    final normalized = input.trim().replaceAll(',', '');
+    return double.tryParse(normalized);
+  }
+
+  List<(String, String)> _paymentMethods({required bool hasCustomer}) {
+    final methods = <(String, String)>[
+      ('cash', 'Cash'),
+      ('mobile_money', 'Mobile Money'),
+      ('card', 'Card'),
+    ];
+    if (hasCustomer) {
+      methods.add(('credit', 'Credit'));
+    }
+    return methods;
+  }
+
   void _showParkSale(BuildContext context, WidgetRef ref) {
     final cart = ref.read(cartControllerProvider);
     if (cart.lines.isEmpty) return;
-    
+
     final labelCtrl = TextEditingController(
-      text: 'Parked ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+      text:
+          'Parked ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
     );
-    
+
     BottomSheetModal.show(
       context: context,
       title: 'Park Sale',
@@ -721,7 +1278,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${cart.lines.length} items', style: DesignTokens.textBody),
+                Text(
+                  '${cart.lines.length} items',
+                  style: DesignTokens.textBody,
+                ),
                 Text(
                   'UGX ${cart.subtotal.toStringAsFixed(0)}',
                   style: DesignTokens.textBodyBold,
@@ -732,7 +1292,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           const SizedBox(height: DesignTokens.spaceLg),
           ElevatedButton.icon(
             onPressed: () {
-              ref.read(parkedSalesProvider.notifier).parkSale(cart, label: labelCtrl.text.trim());
+              ref
+                  .read(parkedSalesProvider.notifier)
+                  .parkSale(cart, label: labelCtrl.text.trim());
               ref.read(cartControllerProvider.notifier).clear();
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -750,7 +1312,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void _showParkedSales(BuildContext context, WidgetRef ref) {
     final parked = ref.read(parkedSalesProvider);
     if (parked.isEmpty) return;
-    
+
     BottomSheetModal.show(
       context: context,
       title: 'Parked Sales',
@@ -790,7 +1352,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 style: DesignTokens.textSmall,
               ),
               onTap: () {
-                final cartState = ref.read(parkedSalesProvider.notifier).resume(sale.id);
+                final cartState = ref
+                    .read(parkedSalesProvider.notifier)
+                    .resume(sale.id);
                 if (cartState != null) {
                   ref.read(cartControllerProvider.notifier).apply(cartState);
                 }
@@ -832,19 +1396,39 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final items = await db.getAllItems();
     if (items.isNotEmpty) return;
     await db.upsertItem(
-      ItemsCompanion.insert(name: 'Coffee', price: 6000, stockQty: const Value(20)),
+      ItemsCompanion.insert(
+        name: 'Coffee',
+        price: 6000,
+        stockQty: const Value(20),
+      ),
     );
     await db.upsertItem(
-      ItemsCompanion.insert(name: 'Snack Box', price: 14000, stockQty: const Value(15)),
+      ItemsCompanion.insert(
+        name: 'Snack Box',
+        price: 14000,
+        stockQty: const Value(15),
+      ),
     );
     await db.upsertItem(
-      ItemsCompanion.insert(name: 'Water Bottle', price: 2000, stockQty: const Value(50)),
+      ItemsCompanion.insert(
+        name: 'Water Bottle',
+        price: 2000,
+        stockQty: const Value(50),
+      ),
     );
     await db.upsertItem(
-      ItemsCompanion.insert(name: 'Sandwich', price: 8500, stockQty: const Value(10)),
+      ItemsCompanion.insert(
+        name: 'Sandwich',
+        price: 8500,
+        stockQty: const Value(10),
+      ),
     );
-    await db.upsertService(ServicesCompanion.insert(title: 'Consultation', price: 30000));
-    await db.upsertService(ServicesCompanion.insert(title: 'Express Delivery', price: 15000));
+    await db.upsertService(
+      ServicesCompanion.insert(title: 'Consultation', price: 30000),
+    );
+    await db.upsertService(
+      ServicesCompanion.insert(title: 'Express Delivery', price: 15000),
+    );
   }
 }
 
@@ -882,8 +1466,13 @@ class _SearchBar extends StatelessWidget {
             onChanged: onChanged,
             decoration: InputDecoration(
               hintText: 'Search products or scan…',
-              hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
-              prefixIcon: const Icon(Icons.search, color: DesignTokens.grayMedium),
+              hintStyle: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: DesignTokens.grayMedium,
+              ),
               suffixIcon: SizedBox(
                 width: hasText ? 96 : 52,
                 child: Row(
@@ -891,12 +1480,18 @@ class _SearchBar extends StatelessWidget {
                   children: [
                     if (hasText)
                       IconButton(
-                        icon: const Icon(Icons.clear, color: DesignTokens.grayMedium),
+                        icon: const Icon(
+                          Icons.clear,
+                          color: DesignTokens.grayMedium,
+                        ),
                         tooltip: 'Clear',
                         onPressed: onClear,
                       ),
                     IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, color: DesignTokens.grayMedium),
+                      icon: const Icon(
+                        Icons.qr_code_scanner,
+                        color: DesignTokens.grayMedium,
+                      ),
                       tooltip: 'Scan',
                       onPressed: onScan,
                     ),
@@ -934,7 +1529,7 @@ class _ProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lowStock = stock != null && stock! < 5;
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -943,7 +1538,7 @@ class _ProductTile extends StatelessWidget {
           color: DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
-          border: lowStock 
+          border: lowStock
               ? Border.all(color: DesignTokens.warning.withOpacity(0.5))
               : null,
         ),
@@ -990,7 +1585,9 @@ class _ProductTile extends StatelessWidget {
                   Text(
                     '$stock',
                     style: DesignTokens.textSmall.copyWith(
-                      color: lowStock ? DesignTokens.warning : DesignTokens.grayMedium,
+                      color: lowStock
+                          ? DesignTokens.warning
+                          : DesignTokens.grayMedium,
                     ),
                   ),
               ],
@@ -1003,11 +1600,7 @@ class _ProductTile extends StatelessWidget {
 }
 
 class _ServiceTile extends StatelessWidget {
-  const _ServiceTile({
-    required this.title,
-    required this.price,
-    this.onTap,
-  });
+  const _ServiceTile({required this.title, required this.price, this.onTap});
 
   final String title;
   final double price;
@@ -1039,9 +1632,7 @@ class _ServiceTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: DesignTokens.spaceMd),
-            Expanded(
-              child: Text(title, style: DesignTokens.textBodyBold),
-            ),
+            Expanded(child: Text(title, style: DesignTokens.textBodyBold)),
             Text(
               'UGX ${price.toStringAsFixed(0)}',
               style: DesignTokens.textBody.copyWith(
@@ -1096,10 +1687,7 @@ class _CartPane extends StatelessWidget {
                     Text('Cart', style: DesignTokens.textTitle),
                     const Spacer(),
                     if (cart.lines.isNotEmpty)
-                      TextButton(
-                        onPressed: onPark,
-                        child: const Text('Park'),
-                      ),
+                      TextButton(onPressed: onPark, child: const Text('Park')),
                   ],
                 ),
                 const SizedBox(height: DesignTokens.spaceSm),
@@ -1113,12 +1701,18 @@ class _CartPane extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline, size: 18, color: DesignTokens.grayMedium),
+                        const Icon(
+                          Icons.person_outline,
+                          size: 18,
+                          color: DesignTokens.grayMedium,
+                        ),
                         const SizedBox(width: DesignTokens.spaceSm),
                         Expanded(
                           child: Text(
                             customer?.name ?? 'Walk-in customer',
-                            style: DesignTokens.textBody.copyWith(color: DesignTokens.grayDark),
+                            style: DesignTokens.textBody.copyWith(
+                              color: DesignTokens.grayDark,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -1136,9 +1730,9 @@ class _CartPane extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const Divider(height: 1),
-          
+
           // Cart items
           Expanded(
             child: cart.lines.isEmpty
@@ -1167,7 +1761,9 @@ class _CartPane extends StatelessWidget {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceSm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: DesignTokens.spaceSm,
+                    ),
                     itemCount: cart.lines.length,
                     itemBuilder: (context, index) {
                       final line = cart.lines[index];
@@ -1175,14 +1771,16 @@ class _CartPane extends StatelessWidget {
                         title: line.title,
                         price: line.price,
                         quantity: line.quantity,
-                        onIncrement: () => onUpdateQuantity(line.id, line.quantity + 1),
-                        onDecrement: () => onUpdateQuantity(line.id, line.quantity - 1),
+                        onIncrement: () =>
+                            onUpdateQuantity(line.id, line.quantity + 1),
+                        onDecrement: () =>
+                            onUpdateQuantity(line.id, line.quantity - 1),
                         onEditPrice: () => onEditPrice(line),
                       );
                     },
                   ),
           ),
-          
+
           // Footer with totals
           Container(
             padding: DesignTokens.paddingMd,
@@ -1214,7 +1812,9 @@ class _CartPane extends StatelessWidget {
                   onPressed: cart.lines.isEmpty ? null : onCheckout,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: DesignTokens.brandAccent,
-                    padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceMd),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: DesignTokens.spaceMd,
+                    ),
                   ),
                   child: Text(
                     'Charge UGX ${cart.subtotal.toStringAsFixed(0)}',
@@ -1285,7 +1885,11 @@ class _CartItem extends StatelessWidget {
                         style: DesignTokens.textSmall,
                       ),
                       const SizedBox(width: DesignTokens.spaceXs),
-                      Icon(Icons.edit, size: 14, color: DesignTokens.grayMedium.withOpacity(0.7)),
+                      Icon(
+                        Icons.edit,
+                        size: 14,
+                        color: DesignTokens.grayMedium.withOpacity(0.7),
+                      ),
                     ],
                   ),
                 ],
@@ -1375,10 +1979,7 @@ class _FloatingCartSummary extends StatelessWidget {
               ),
             ),
             const SizedBox(width: DesignTokens.spaceSm),
-            const Icon(
-              Icons.arrow_forward,
-              color: DesignTokens.surfaceWhite,
-            ),
+            const Icon(Icons.arrow_forward, color: DesignTokens.surfaceWhite),
           ],
         ),
       ),
@@ -1429,14 +2030,28 @@ class _PaymentMethodTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: DesignTokens.grayMedium,
-            ),
+            const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
           ],
         ),
       ),
     );
+  }
+}
+
+class _PaymentDraft {
+  _PaymentDraft({
+    required this.method,
+    required this.amountCtrl,
+    required this.refCtrl,
+  });
+
+  String method;
+  final TextEditingController amountCtrl;
+  final TextEditingController refCtrl;
+
+  void dispose() {
+    amountCtrl.dispose();
+    refCtrl.dispose();
   }
 }
 
@@ -1531,7 +2146,10 @@ class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet> {
               },
               errorBuilder: (context, error, child) {
                 return Center(
-                  child: Text('Camera unavailable', style: DesignTokens.textBody),
+                  child: Text(
+                    'Camera unavailable',
+                    style: DesignTokens.textBody,
+                  ),
                 );
               },
             ),

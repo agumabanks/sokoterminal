@@ -10,6 +10,7 @@ import '../app_providers.dart';
 import '../db/app_database.dart';
 import '../network/pos_dtos.dart';
 import '../network/seller_api.dart';
+import '../telemetry/telemetry.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -29,7 +30,9 @@ class SyncService {
   Future<void>? _pullInFlight;
 
   void start() {
-    _connectivitySub ??= Connectivity().onConnectivityChanged.listen((_) => _pump());
+    _connectivitySub ??= Connectivity().onConnectivityChanged.listen(
+      (_) => _pump(),
+    );
     _retryTimer ??= Timer.periodic(const Duration(minutes: 5), (_) => _pump());
   }
 
@@ -51,9 +54,11 @@ class SyncService {
 
     _isPumping = true;
     try {
-      final List<ConnectivityResult> list = await Connectivity().checkConnectivity();
+      final List<ConnectivityResult> list = await Connectivity()
+          .checkConnectivity();
       final online =
-          list.contains(ConnectivityResult.mobile) || list.contains(ConnectivityResult.wifi);
+          list.contains(ConnectivityResult.mobile) ||
+          list.contains(ConnectivityResult.wifi);
       if (!online) return;
 
       final queue = await db.pendingSyncOps();
@@ -62,8 +67,26 @@ class SyncService {
         try {
           await _dispatch(op);
           await db.markSynced(op.id);
-        } catch (_) {
-          await db.markSyncFailed(op.id, retryCount: op.retryCount + 1);
+        } catch (e) {
+          final errorMsg = _formatSyncError(e);
+          await db.markSyncFailed(
+            op.id,
+            retryCount: op.retryCount + 1,
+            lastError: errorMsg,
+          );
+          final telemetry = Telemetry.instance;
+          if (telemetry != null) {
+            unawaited(
+              telemetry.event(
+                'sync_op_failed',
+                props: {
+                  'op_type': op.opType,
+                  'retry_count': op.retryCount + 1,
+                  'error': errorMsg,
+                },
+              ),
+            );
+          }
         }
       }
 
@@ -98,6 +121,24 @@ class SyncService {
     return delay > max ? max : delay;
   }
 
+  String _formatSyncError(Object error) {
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      final path = error.requestOptions.path;
+      final message =
+          error.message ?? error.error?.toString() ?? 'DioException';
+      final parts = <String>[
+        if (status != null) 'HTTP $status',
+        if (path.isNotEmpty) path,
+        message,
+      ];
+      final out = parts.join(' • ');
+      return out.length > 600 ? out.substring(0, 600) : out;
+    }
+    final out = error.toString();
+    return out.length > 600 ? out.substring(0, 600) : out;
+  }
+
   Future<void> _dispatch(SyncOp op) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
     switch (op.opType) {
@@ -107,7 +148,10 @@ class SyncService {
         if (op.opType == 'item_create') {
           await sellerApi.createProduct(payload);
         } else {
-          final productId = payload['remote_id']?.toString() ?? payload['local_id']?.toString() ?? '';
+          final productId =
+              payload['remote_id']?.toString() ??
+              payload['local_id']?.toString() ??
+              '';
           await sellerApi.updateProduct(productId, payload);
         }
         if (localId != null) {
@@ -115,7 +159,10 @@ class SyncService {
         }
         break;
       case 'item_delete':
-        final productId = payload['remote_id']?.toString() ?? payload['product_id']?.toString() ?? '';
+        final productId =
+            payload['remote_id']?.toString() ??
+            payload['product_id']?.toString() ??
+            '';
         if (productId.isEmpty) {
           throw DioException(
             requestOptions: RequestOptions(path: op.opType),
@@ -139,7 +186,10 @@ class SyncService {
         if (op.opType == 'service_create') {
           await sellerApi.createService(payload);
         } else {
-          final serviceId = payload['remote_id']?.toString() ?? payload['local_id']?.toString() ?? '';
+          final serviceId =
+              payload['remote_id']?.toString() ??
+              payload['local_id']?.toString() ??
+              '';
           await sellerApi.updateService(serviceId, payload);
         }
         if (localId != null) {
@@ -154,8 +204,14 @@ class SyncService {
         }
         break;
       case 'ledger_push':
-        final key = payload['idempotency_key']?.toString() ?? payload['entry_id']?.toString() ?? '';
-        final res = await sellerApi.pushLedgerEntry(payload, idempotencyKey: key);
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['entry_id']?.toString() ??
+            '';
+        final res = await sellerApi.pushLedgerEntry(
+          payload,
+          idempotencyKey: key,
+        );
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
             requestOptions: res.requestOptions,
@@ -172,25 +228,35 @@ class SyncService {
         }
         final entryId = payload['entry_id']?.toString();
         if (entryId != null) {
-          await db.markLedgerSynced(entryId, jsonEncode({
-            'server_entry_id': ack.serverEntryId,
-            'idempotency_key': ack.idempotencyKey,
-            'received_at': ack.receivedAt.toIso8601String(),
-          }));
+          await db.markLedgerSynced(
+            entryId,
+            jsonEncode({
+              'server_entry_id': ack.serverEntryId,
+              'idempotency_key': ack.idempotencyKey,
+              'received_at': ack.receivedAt.toIso8601String(),
+            }),
+          );
         }
         break;
       case 'stock_adjust':
-        await sellerApi.updateProduct(payload['product_id'].toString(), payload);
+        await sellerApi.updateProduct(
+          payload['product_id'].toString(),
+          payload,
+        );
         break;
       case 'cash_movement_push':
-        final key = payload['idempotency_key']?.toString() ?? payload['movement_id']?.toString() ?? '';
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['movement_id']?.toString() ??
+            '';
         if (key.isEmpty) {
           throw DioException(
             requestOptions: RequestOptions(path: op.opType),
             error: 'Missing idempotency_key for cash movement',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final res = await sellerApi.pushCashMovement(body, idempotencyKey: key);
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
@@ -214,7 +280,8 @@ class SyncService {
             error: 'Missing idempotency_key for audit log',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final res = await sellerApi.pushAuditLog(body, idempotencyKey: key);
         if (res.data is! Map<String, dynamic>) {
           throw DioException(

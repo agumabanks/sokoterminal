@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
 
 class ExportScreen extends ConsumerStatefulWidget {
@@ -45,6 +46,7 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
         'id',
         'type',
         'created_at',
+        'customer_id',
         'subtotal',
         'discount',
         'tax',
@@ -56,12 +58,17 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     ];
 
     for (final entry in entries) {
-      final pays = await (db.select(db.payments)..where((t) => t.entryId.equals(entry.id))).get();
-      final paymentStr = pays.map((p) => '${p.method}:${p.amount.toStringAsFixed(0)}').join('|');
+      final pays = await (db.select(
+        db.payments,
+      )..where((t) => t.entryId.equals(entry.id))).get();
+      final paymentStr = pays
+          .map((p) => '${p.method}:${p.amount.toStringAsFixed(0)}')
+          .join('|');
       rows.add([
         entry.id,
         entry.type,
         entry.createdAt.toIso8601String(),
+        entry.customerId ?? '',
         entry.subtotal.toStringAsFixed(2),
         entry.discount.toStringAsFixed(2),
         entry.tax.toStringAsFixed(2),
@@ -79,7 +86,15 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     final db = ref.read(appDatabaseProvider);
     final items = await db.select(db.items).get();
     final rows = <List<String>>[
-      ['id', 'name', 'price', 'stock_qty', 'published_online', 'synced', 'updated_at'],
+      [
+        'id',
+        'name',
+        'price',
+        'stock_qty',
+        'published_online',
+        'synced',
+        'updated_at',
+      ],
     ];
     for (final i in items) {
       rows.add([
@@ -114,13 +129,40 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     await _exportCsv(filename: 'soko-customers.csv', rows: rows);
   }
 
+  Future<void> _exportTelemetry() async {
+    setState(() => _busy = true);
+    try {
+      final file = await Telemetry.getLogFile();
+      final exists = await file.exists();
+      if (!exists) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No telemetry log file found')),
+        );
+        return;
+      }
+      if (await file.length() == 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Telemetry log is empty')));
+        return;
+      }
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'Soko Terminal telemetry logs');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text('Export', style: DesignTokens.textTitle),
-      ),
+      appBar: AppBar(title: Text('Export', style: DesignTokens.textTitle)),
       body: ListView(
         padding: DesignTokens.paddingScreen,
         children: [
@@ -145,7 +187,9 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                   onPressed: _busy ? null : _exportLedger,
                   icon: const Icon(Icons.receipt_long_outlined),
                   label: const Text('Export ledger'),
-                  style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
                 ),
                 const SizedBox(height: DesignTokens.spaceSm),
                 ElevatedButton.icon(
@@ -158,6 +202,12 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                   onPressed: _busy ? null : _exportCustomers,
                   icon: const Icon(Icons.people_alt_outlined),
                   label: const Text('Export customers'),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _exportTelemetry,
+                  icon: const Icon(Icons.bug_report_outlined),
+                  label: const Text('Export diagnostics log'),
                 ),
                 if (_busy) ...[
                   const SizedBox(height: DesignTokens.spaceMd),
@@ -173,7 +223,8 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
 }
 
 String _csvEscape(String value) {
-  final needsQuotes = value.contains(',') || value.contains('\n') || value.contains('"');
+  final needsQuotes =
+      value.contains(',') || value.contains('\n') || value.contains('"');
   if (!needsQuotes) return value;
   final escaped = value.replaceAll('"', '""');
   return '"$escaped"';

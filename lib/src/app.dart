@@ -19,6 +19,7 @@ import 'features/settings/settings_screen.dart';
 import 'features/settings/staff_screen.dart';
 import 'features/settings/sync_health_screen.dart';
 import 'features/settings/export_screen.dart';
+import 'features/settings/print_queue_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/profile/seller_profile_edit_screen.dart';
 import 'features/profile/shop_info_screen.dart';
@@ -49,7 +50,9 @@ class SokoSellerApp extends ConsumerWidget {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
-  final refresh = GoRouterRefreshStream(ref.watch(authControllerProvider.notifier).stream);
+  final refresh = GoRouterRefreshStream(
+    ref.watch(authControllerProvider.notifier).stream,
+  );
 
   return GoRouter(
     initialLocation: '/login',
@@ -68,7 +71,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) => HomeShell(shell: navigationShell),
+        builder: (context, state, navigationShell) =>
+            HomeShell(shell: navigationShell),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -170,6 +174,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const SettingsScreen(),
                   ),
                   GoRoute(
+                    path: 'print-queue',
+                    name: 'print-queue',
+                    builder: (context, state) => const PrintQueueScreen(),
+                  ),
+                  GoRoute(
                     path: 'sync-health',
                     name: 'sync-health',
                     builder: (context, state) => const SyncHealthScreen(),
@@ -187,7 +196,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'seller-profile',
                     name: 'seller-profile',
-                    builder: (context, state) => const SellerProfileEditScreen(),
+                    builder: (context, state) =>
+                        const SellerProfileEditScreen(),
                   ),
                   GoRoute(
                     path: 'shop-info',

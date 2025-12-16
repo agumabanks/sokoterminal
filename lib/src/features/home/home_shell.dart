@@ -12,6 +12,7 @@ import '../settings/staff_pin_controller.dart';
 import '../notifications/notifications_controller.dart';
 import '../../core/sync/sync_service.dart';
 import '../../widgets/pin_prompt_sheet.dart';
+import '../receipts/receipt_providers.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({required this.shell, super.key});
@@ -34,6 +35,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       final sync = ref.read(syncServiceProvider);
       sync.start();
       unawaited(sync.primeOfflineData());
+
+      final printQueue = ref.read(printQueueServiceProvider);
+      printQueue.start();
     });
   }
 
@@ -61,11 +65,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: widget.shell.currentIndex,
-        onTap: (index) => widget.shell.goBranch(index, initialLocation: index == widget.shell.currentIndex),
+        onTap: (index) => widget.shell.goBranch(
+          index,
+          initialLocation: index == widget.shell.currentIndex,
+        ),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.point_of_sale), label: 'Checkout'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Transactions'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: 'Alerts'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.point_of_sale),
+            label: 'Checkout',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long),
+            label: 'Transactions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications_none),
+            label: 'Alerts',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'More'),
         ],
       ),
@@ -85,9 +101,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       final ok = await controller.unlock(pin);
       if (!context.mounted) return;
       if (!ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incorrect PIN')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
       }
     }());
   }

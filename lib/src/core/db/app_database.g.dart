@@ -3211,6 +3211,17 @@ class $SyncOpsTable extends SyncOps with TableInfo<$SyncOpsTable, SyncOp> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3241,6 +3252,7 @@ class $SyncOpsTable extends SyncOps with TableInfo<$SyncOpsTable, SyncOp> {
     payload,
     status,
     retryCount,
+    lastError,
     createdAt,
     lastTriedAt,
   ];
@@ -3287,6 +3299,12 @@ class $SyncOpsTable extends SyncOps with TableInfo<$SyncOpsTable, SyncOp> {
         retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
       );
     }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3331,6 +3349,10 @@ class $SyncOpsTable extends SyncOps with TableInfo<$SyncOpsTable, SyncOp> {
         DriftSqlType.int,
         data['${effectivePrefix}retry_count'],
       )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -3354,6 +3376,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
   final String payload;
   final String status;
   final int retryCount;
+  final String? lastError;
   final DateTime createdAt;
   final DateTime? lastTriedAt;
   const SyncOp({
@@ -3362,6 +3385,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
     required this.payload,
     required this.status,
     required this.retryCount,
+    this.lastError,
     required this.createdAt,
     this.lastTriedAt,
   });
@@ -3373,6 +3397,9 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
     map['payload'] = Variable<String>(payload);
     map['status'] = Variable<String>(status);
     map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || lastTriedAt != null) {
       map['last_tried_at'] = Variable<DateTime>(lastTriedAt);
@@ -3387,6 +3414,9 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
       payload: Value(payload),
       status: Value(status),
       retryCount: Value(retryCount),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
       createdAt: Value(createdAt),
       lastTriedAt: lastTriedAt == null && nullToAbsent
           ? const Value.absent()
@@ -3405,6 +3435,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
       payload: serializer.fromJson<String>(json['payload']),
       status: serializer.fromJson<String>(json['status']),
       retryCount: serializer.fromJson<int>(json['retryCount']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       lastTriedAt: serializer.fromJson<DateTime?>(json['lastTriedAt']),
     );
@@ -3418,6 +3449,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
       'payload': serializer.toJson<String>(payload),
       'status': serializer.toJson<String>(status),
       'retryCount': serializer.toJson<int>(retryCount),
+      'lastError': serializer.toJson<String?>(lastError),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'lastTriedAt': serializer.toJson<DateTime?>(lastTriedAt),
     };
@@ -3429,6 +3461,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
     String? payload,
     String? status,
     int? retryCount,
+    Value<String?> lastError = const Value.absent(),
     DateTime? createdAt,
     Value<DateTime?> lastTriedAt = const Value.absent(),
   }) => SyncOp(
@@ -3437,6 +3470,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
     payload: payload ?? this.payload,
     status: status ?? this.status,
     retryCount: retryCount ?? this.retryCount,
+    lastError: lastError.present ? lastError.value : this.lastError,
     createdAt: createdAt ?? this.createdAt,
     lastTriedAt: lastTriedAt.present ? lastTriedAt.value : this.lastTriedAt,
   );
@@ -3449,6 +3483,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
       retryCount: data.retryCount.present
           ? data.retryCount.value
           : this.retryCount,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       lastTriedAt: data.lastTriedAt.present
           ? data.lastTriedAt.value
@@ -3464,6 +3499,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
           ..write('payload: $payload, ')
           ..write('status: $status, ')
           ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastTriedAt: $lastTriedAt')
           ..write(')'))
@@ -3477,6 +3513,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
     payload,
     status,
     retryCount,
+    lastError,
     createdAt,
     lastTriedAt,
   );
@@ -3489,6 +3526,7 @@ class SyncOp extends DataClass implements Insertable<SyncOp> {
           other.payload == this.payload &&
           other.status == this.status &&
           other.retryCount == this.retryCount &&
+          other.lastError == this.lastError &&
           other.createdAt == this.createdAt &&
           other.lastTriedAt == this.lastTriedAt);
 }
@@ -3499,6 +3537,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
   final Value<String> payload;
   final Value<String> status;
   final Value<int> retryCount;
+  final Value<String?> lastError;
   final Value<DateTime> createdAt;
   final Value<DateTime?> lastTriedAt;
   const SyncOpsCompanion({
@@ -3507,6 +3546,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
     this.payload = const Value.absent(),
     this.status = const Value.absent(),
     this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastTriedAt = const Value.absent(),
   });
@@ -3516,6 +3556,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
     required String payload,
     this.status = const Value.absent(),
     this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastTriedAt = const Value.absent(),
   }) : opType = Value(opType),
@@ -3526,6 +3567,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
     Expression<String>? payload,
     Expression<String>? status,
     Expression<int>? retryCount,
+    Expression<String>? lastError,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? lastTriedAt,
   }) {
@@ -3535,6 +3577,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
       if (payload != null) 'payload': payload,
       if (status != null) 'status': status,
       if (retryCount != null) 'retry_count': retryCount,
+      if (lastError != null) 'last_error': lastError,
       if (createdAt != null) 'created_at': createdAt,
       if (lastTriedAt != null) 'last_tried_at': lastTriedAt,
     });
@@ -3546,6 +3589,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
     Value<String>? payload,
     Value<String>? status,
     Value<int>? retryCount,
+    Value<String?>? lastError,
     Value<DateTime>? createdAt,
     Value<DateTime?>? lastTriedAt,
   }) {
@@ -3555,6 +3599,7 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
       payload: payload ?? this.payload,
       status: status ?? this.status,
       retryCount: retryCount ?? this.retryCount,
+      lastError: lastError ?? this.lastError,
       createdAt: createdAt ?? this.createdAt,
       lastTriedAt: lastTriedAt ?? this.lastTriedAt,
     );
@@ -3578,6 +3623,9 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
     if (retryCount.present) {
       map['retry_count'] = Variable<int>(retryCount.value);
     }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -3595,8 +3643,566 @@ class SyncOpsCompanion extends UpdateCompanion<SyncOp> {
           ..write('payload: $payload, ')
           ..write('status: $status, ')
           ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastTriedAt: $lastTriedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PrintJobsTable extends PrintJobs
+    with TableInfo<$PrintJobsTable, PrintJob> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PrintJobsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _jobTypeMeta = const VerificationMeta(
+    'jobType',
+  );
+  @override
+  late final GeneratedColumn<String> jobType = GeneratedColumn<String>(
+    'job_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _referenceIdMeta = const VerificationMeta(
+    'referenceId',
+  );
+  @override
+  late final GeneratedColumn<String> referenceId = GeneratedColumn<String>(
+    'reference_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _retryCountMeta = const VerificationMeta(
+    'retryCount',
+  );
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+    'retry_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  static const VerificationMeta _lastTriedAtMeta = const VerificationMeta(
+    'lastTriedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastTriedAt = GeneratedColumn<DateTime>(
+    'last_tried_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _printedAtMeta = const VerificationMeta(
+    'printedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> printedAt = GeneratedColumn<DateTime>(
+    'printed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    jobType,
+    referenceId,
+    status,
+    retryCount,
+    lastError,
+    createdAt,
+    lastTriedAt,
+    printedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'print_jobs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PrintJob> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('job_type')) {
+      context.handle(
+        _jobTypeMeta,
+        jobType.isAcceptableOrUnknown(data['job_type']!, _jobTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_jobTypeMeta);
+    }
+    if (data.containsKey('reference_id')) {
+      context.handle(
+        _referenceIdMeta,
+        referenceId.isAcceptableOrUnknown(
+          data['reference_id']!,
+          _referenceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_referenceIdMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+        _retryCountMeta,
+        retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('last_tried_at')) {
+      context.handle(
+        _lastTriedAtMeta,
+        lastTriedAt.isAcceptableOrUnknown(
+          data['last_tried_at']!,
+          _lastTriedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('printed_at')) {
+      context.handle(
+        _printedAtMeta,
+        printedAt.isAcceptableOrUnknown(data['printed_at']!, _printedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PrintJob map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PrintJob(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      jobType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}job_type'],
+      )!,
+      referenceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reference_id'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      retryCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retry_count'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      lastTriedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_tried_at'],
+      ),
+      printedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}printed_at'],
+      ),
+    );
+  }
+
+  @override
+  $PrintJobsTable createAlias(String alias) {
+    return $PrintJobsTable(attachedDatabase, alias);
+  }
+}
+
+class PrintJob extends DataClass implements Insertable<PrintJob> {
+  final int id;
+  final String jobType;
+  final String referenceId;
+  final String status;
+  final int retryCount;
+  final String? lastError;
+  final DateTime createdAt;
+  final DateTime? lastTriedAt;
+  final DateTime? printedAt;
+  const PrintJob({
+    required this.id,
+    required this.jobType,
+    required this.referenceId,
+    required this.status,
+    required this.retryCount,
+    this.lastError,
+    required this.createdAt,
+    this.lastTriedAt,
+    this.printedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['job_type'] = Variable<String>(jobType);
+    map['reference_id'] = Variable<String>(referenceId);
+    map['status'] = Variable<String>(status);
+    map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastTriedAt != null) {
+      map['last_tried_at'] = Variable<DateTime>(lastTriedAt);
+    }
+    if (!nullToAbsent || printedAt != null) {
+      map['printed_at'] = Variable<DateTime>(printedAt);
+    }
+    return map;
+  }
+
+  PrintJobsCompanion toCompanion(bool nullToAbsent) {
+    return PrintJobsCompanion(
+      id: Value(id),
+      jobType: Value(jobType),
+      referenceId: Value(referenceId),
+      status: Value(status),
+      retryCount: Value(retryCount),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      createdAt: Value(createdAt),
+      lastTriedAt: lastTriedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastTriedAt),
+      printedAt: printedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(printedAt),
+    );
+  }
+
+  factory PrintJob.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PrintJob(
+      id: serializer.fromJson<int>(json['id']),
+      jobType: serializer.fromJson<String>(json['jobType']),
+      referenceId: serializer.fromJson<String>(json['referenceId']),
+      status: serializer.fromJson<String>(json['status']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastTriedAt: serializer.fromJson<DateTime?>(json['lastTriedAt']),
+      printedAt: serializer.fromJson<DateTime?>(json['printedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'jobType': serializer.toJson<String>(jobType),
+      'referenceId': serializer.toJson<String>(referenceId),
+      'status': serializer.toJson<String>(status),
+      'retryCount': serializer.toJson<int>(retryCount),
+      'lastError': serializer.toJson<String?>(lastError),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastTriedAt': serializer.toJson<DateTime?>(lastTriedAt),
+      'printedAt': serializer.toJson<DateTime?>(printedAt),
+    };
+  }
+
+  PrintJob copyWith({
+    int? id,
+    String? jobType,
+    String? referenceId,
+    String? status,
+    int? retryCount,
+    Value<String?> lastError = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> lastTriedAt = const Value.absent(),
+    Value<DateTime?> printedAt = const Value.absent(),
+  }) => PrintJob(
+    id: id ?? this.id,
+    jobType: jobType ?? this.jobType,
+    referenceId: referenceId ?? this.referenceId,
+    status: status ?? this.status,
+    retryCount: retryCount ?? this.retryCount,
+    lastError: lastError.present ? lastError.value : this.lastError,
+    createdAt: createdAt ?? this.createdAt,
+    lastTriedAt: lastTriedAt.present ? lastTriedAt.value : this.lastTriedAt,
+    printedAt: printedAt.present ? printedAt.value : this.printedAt,
+  );
+  PrintJob copyWithCompanion(PrintJobsCompanion data) {
+    return PrintJob(
+      id: data.id.present ? data.id.value : this.id,
+      jobType: data.jobType.present ? data.jobType.value : this.jobType,
+      referenceId: data.referenceId.present
+          ? data.referenceId.value
+          : this.referenceId,
+      status: data.status.present ? data.status.value : this.status,
+      retryCount: data.retryCount.present
+          ? data.retryCount.value
+          : this.retryCount,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastTriedAt: data.lastTriedAt.present
+          ? data.lastTriedAt.value
+          : this.lastTriedAt,
+      printedAt: data.printedAt.present ? data.printedAt.value : this.printedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrintJob(')
+          ..write('id: $id, ')
+          ..write('jobType: $jobType, ')
+          ..write('referenceId: $referenceId, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastTriedAt: $lastTriedAt, ')
+          ..write('printedAt: $printedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    jobType,
+    referenceId,
+    status,
+    retryCount,
+    lastError,
+    createdAt,
+    lastTriedAt,
+    printedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PrintJob &&
+          other.id == this.id &&
+          other.jobType == this.jobType &&
+          other.referenceId == this.referenceId &&
+          other.status == this.status &&
+          other.retryCount == this.retryCount &&
+          other.lastError == this.lastError &&
+          other.createdAt == this.createdAt &&
+          other.lastTriedAt == this.lastTriedAt &&
+          other.printedAt == this.printedAt);
+}
+
+class PrintJobsCompanion extends UpdateCompanion<PrintJob> {
+  final Value<int> id;
+  final Value<String> jobType;
+  final Value<String> referenceId;
+  final Value<String> status;
+  final Value<int> retryCount;
+  final Value<String?> lastError;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> lastTriedAt;
+  final Value<DateTime?> printedAt;
+  const PrintJobsCompanion({
+    this.id = const Value.absent(),
+    this.jobType = const Value.absent(),
+    this.referenceId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastTriedAt = const Value.absent(),
+    this.printedAt = const Value.absent(),
+  });
+  PrintJobsCompanion.insert({
+    this.id = const Value.absent(),
+    required String jobType,
+    required String referenceId,
+    this.status = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastTriedAt = const Value.absent(),
+    this.printedAt = const Value.absent(),
+  }) : jobType = Value(jobType),
+       referenceId = Value(referenceId);
+  static Insertable<PrintJob> custom({
+    Expression<int>? id,
+    Expression<String>? jobType,
+    Expression<String>? referenceId,
+    Expression<String>? status,
+    Expression<int>? retryCount,
+    Expression<String>? lastError,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastTriedAt,
+    Expression<DateTime>? printedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (jobType != null) 'job_type': jobType,
+      if (referenceId != null) 'reference_id': referenceId,
+      if (status != null) 'status': status,
+      if (retryCount != null) 'retry_count': retryCount,
+      if (lastError != null) 'last_error': lastError,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastTriedAt != null) 'last_tried_at': lastTriedAt,
+      if (printedAt != null) 'printed_at': printedAt,
+    });
+  }
+
+  PrintJobsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? jobType,
+    Value<String>? referenceId,
+    Value<String>? status,
+    Value<int>? retryCount,
+    Value<String?>? lastError,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? lastTriedAt,
+    Value<DateTime?>? printedAt,
+  }) {
+    return PrintJobsCompanion(
+      id: id ?? this.id,
+      jobType: jobType ?? this.jobType,
+      referenceId: referenceId ?? this.referenceId,
+      status: status ?? this.status,
+      retryCount: retryCount ?? this.retryCount,
+      lastError: lastError ?? this.lastError,
+      createdAt: createdAt ?? this.createdAt,
+      lastTriedAt: lastTriedAt ?? this.lastTriedAt,
+      printedAt: printedAt ?? this.printedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (jobType.present) {
+      map['job_type'] = Variable<String>(jobType.value);
+    }
+    if (referenceId.present) {
+      map['reference_id'] = Variable<String>(referenceId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastTriedAt.present) {
+      map['last_tried_at'] = Variable<DateTime>(lastTriedAt.value);
+    }
+    if (printedAt.present) {
+      map['printed_at'] = Variable<DateTime>(printedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrintJobsCompanion(')
+          ..write('id: $id, ')
+          ..write('jobType: $jobType, ')
+          ..write('referenceId: $referenceId, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastTriedAt: $lastTriedAt, ')
+          ..write('printedAt: $printedAt')
           ..write(')'))
         .toString();
   }
@@ -5647,6 +6253,20 @@ class $LedgerEntriesTable extends LedgerEntries
       'REFERENCES staff (id)',
     ),
   );
+  static const VerificationMeta _customerIdMeta = const VerificationMeta(
+    'customerId',
+  );
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+    'customer_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES customers (id)',
+    ),
+  );
   static const VerificationMeta _subtotalMeta = const VerificationMeta(
     'subtotal',
   );
@@ -5743,6 +6363,7 @@ class $LedgerEntriesTable extends LedgerEntries
     type,
     outletId,
     staffId,
+    customerId,
     subtotal,
     discount,
     tax,
@@ -5796,6 +6417,12 @@ class $LedgerEntriesTable extends LedgerEntries
       context.handle(
         _staffIdMeta,
         staffId.isAcceptableOrUnknown(data['staff_id']!, _staffIdMeta),
+      );
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+        _customerIdMeta,
+        customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
       );
     }
     if (data.containsKey('subtotal')) {
@@ -5875,6 +6502,10 @@ class $LedgerEntriesTable extends LedgerEntries
         DriftSqlType.string,
         data['${effectivePrefix}staff_id'],
       ),
+      customerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_id'],
+      ),
       subtotal: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}subtotal'],
@@ -5922,6 +6553,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
   final String type;
   final String? outletId;
   final String? staffId;
+  final String? customerId;
   final double subtotal;
   final double discount;
   final double tax;
@@ -5936,6 +6568,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     required this.type,
     this.outletId,
     this.staffId,
+    this.customerId,
     required this.subtotal,
     required this.discount,
     required this.tax,
@@ -5956,6 +6589,9 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     }
     if (!nullToAbsent || staffId != null) {
       map['staff_id'] = Variable<String>(staffId);
+    }
+    if (!nullToAbsent || customerId != null) {
+      map['customer_id'] = Variable<String>(customerId);
     }
     map['subtotal'] = Variable<double>(subtotal);
     map['discount'] = Variable<double>(discount);
@@ -5983,6 +6619,9 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       staffId: staffId == null && nullToAbsent
           ? const Value.absent()
           : Value(staffId),
+      customerId: customerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerId),
       subtotal: Value(subtotal),
       discount: Value(discount),
       tax: Value(tax),
@@ -6007,6 +6646,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       type: serializer.fromJson<String>(json['type']),
       outletId: serializer.fromJson<String?>(json['outletId']),
       staffId: serializer.fromJson<String?>(json['staffId']),
+      customerId: serializer.fromJson<String?>(json['customerId']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       discount: serializer.fromJson<double>(json['discount']),
       tax: serializer.fromJson<double>(json['tax']),
@@ -6026,6 +6666,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       'type': serializer.toJson<String>(type),
       'outletId': serializer.toJson<String?>(outletId),
       'staffId': serializer.toJson<String?>(staffId),
+      'customerId': serializer.toJson<String?>(customerId),
       'subtotal': serializer.toJson<double>(subtotal),
       'discount': serializer.toJson<double>(discount),
       'tax': serializer.toJson<double>(tax),
@@ -6043,6 +6684,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     String? type,
     Value<String?> outletId = const Value.absent(),
     Value<String?> staffId = const Value.absent(),
+    Value<String?> customerId = const Value.absent(),
     double? subtotal,
     double? discount,
     double? tax,
@@ -6057,6 +6699,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     type: type ?? this.type,
     outletId: outletId.present ? outletId.value : this.outletId,
     staffId: staffId.present ? staffId.value : this.staffId,
+    customerId: customerId.present ? customerId.value : this.customerId,
     subtotal: subtotal ?? this.subtotal,
     discount: discount ?? this.discount,
     tax: tax ?? this.tax,
@@ -6075,6 +6718,9 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       type: data.type.present ? data.type.value : this.type,
       outletId: data.outletId.present ? data.outletId.value : this.outletId,
       staffId: data.staffId.present ? data.staffId.value : this.staffId,
+      customerId: data.customerId.present
+          ? data.customerId.value
+          : this.customerId,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       discount: data.discount.present ? data.discount.value : this.discount,
       tax: data.tax.present ? data.tax.value : this.tax,
@@ -6094,6 +6740,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
           ..write('type: $type, ')
           ..write('outletId: $outletId, ')
           ..write('staffId: $staffId, ')
+          ..write('customerId: $customerId, ')
           ..write('subtotal: $subtotal, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
@@ -6113,6 +6760,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     type,
     outletId,
     staffId,
+    customerId,
     subtotal,
     discount,
     tax,
@@ -6131,6 +6779,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
           other.type == this.type &&
           other.outletId == this.outletId &&
           other.staffId == this.staffId &&
+          other.customerId == this.customerId &&
           other.subtotal == this.subtotal &&
           other.discount == this.discount &&
           other.tax == this.tax &&
@@ -6147,6 +6796,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
   final Value<String> type;
   final Value<String?> outletId;
   final Value<String?> staffId;
+  final Value<String?> customerId;
   final Value<double> subtotal;
   final Value<double> discount;
   final Value<double> tax;
@@ -6162,6 +6812,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     this.type = const Value.absent(),
     this.outletId = const Value.absent(),
     this.staffId = const Value.absent(),
+    this.customerId = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
@@ -6178,6 +6829,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     required String type,
     this.outletId = const Value.absent(),
     this.staffId = const Value.absent(),
+    this.customerId = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
@@ -6195,6 +6847,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     Expression<String>? type,
     Expression<String>? outletId,
     Expression<String>? staffId,
+    Expression<String>? customerId,
     Expression<double>? subtotal,
     Expression<double>? discount,
     Expression<double>? tax,
@@ -6211,6 +6864,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
       if (type != null) 'type': type,
       if (outletId != null) 'outlet_id': outletId,
       if (staffId != null) 'staff_id': staffId,
+      if (customerId != null) 'customer_id': customerId,
       if (subtotal != null) 'subtotal': subtotal,
       if (discount != null) 'discount': discount,
       if (tax != null) 'tax': tax,
@@ -6229,6 +6883,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     Value<String>? type,
     Value<String?>? outletId,
     Value<String?>? staffId,
+    Value<String?>? customerId,
     Value<double>? subtotal,
     Value<double>? discount,
     Value<double>? tax,
@@ -6245,6 +6900,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
       type: type ?? this.type,
       outletId: outletId ?? this.outletId,
       staffId: staffId ?? this.staffId,
+      customerId: customerId ?? this.customerId,
       subtotal: subtotal ?? this.subtotal,
       discount: discount ?? this.discount,
       tax: tax ?? this.tax,
@@ -6274,6 +6930,9 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     }
     if (staffId.present) {
       map['staff_id'] = Variable<String>(staffId.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
     }
     if (subtotal.present) {
       map['subtotal'] = Variable<double>(subtotal.value);
@@ -6313,6 +6972,7 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
           ..write('type: $type, ')
           ..write('outletId: $outletId, ')
           ..write('staffId: $staffId, ')
+          ..write('customerId: $customerId, ')
           ..write('subtotal: $subtotal, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
@@ -8625,6 +9285,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $ReceiptsTable receipts = $ReceiptsTable(this);
   late final $SyncOpsTable syncOps = $SyncOpsTable(this);
+  late final $PrintJobsTable printJobs = $PrintJobsTable(this);
   late final $SyncCursorsTable syncCursors = $SyncCursorsTable(this);
   late final $CachedOrdersTable cachedOrders = $CachedOrdersTable(this);
   late final $InventoryLogsTable inventoryLogs = $InventoryLogsTable(this);
@@ -8649,6 +9310,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     transactionLines,
     receipts,
     syncOps,
+    printJobs,
     syncCursors,
     cachedOrders,
     inventoryLogs,
@@ -9822,6 +10484,27 @@ final class $$CustomersTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$LedgerEntriesTable, List<LedgerEntry>>
+  _ledgerEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.ledgerEntries,
+    aliasName: $_aliasNameGenerator(
+      db.customers.id,
+      db.ledgerEntries.customerId,
+    ),
+  );
+
+  $$LedgerEntriesTableProcessedTableManager get ledgerEntriesRefs {
+    final manager = $$LedgerEntriesTableTableManager(
+      $_db,
+      $_db.ledgerEntries,
+    ).filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_ledgerEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$CustomersTableFilterComposer
@@ -9879,6 +10562,31 @@ class $$CustomersTableFilterComposer
           }) => $$TransactionsTableFilterComposer(
             $db: $db,
             $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> ledgerEntriesRefs(
+    Expression<bool> Function($$LedgerEntriesTableFilterComposer f) f,
+  ) {
+    final $$LedgerEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ledgerEntries,
+      getReferencedColumn: (t) => t.customerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LedgerEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.ledgerEntries,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9980,6 +10688,31 @@ class $$CustomersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> ledgerEntriesRefs<T extends Object>(
+    Expression<T> Function($$LedgerEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$LedgerEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.ledgerEntries,
+      getReferencedColumn: (t) => t.customerId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LedgerEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.ledgerEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CustomersTableTableManager
@@ -9995,7 +10728,10 @@ class $$CustomersTableTableManager
           $$CustomersTableUpdateCompanionBuilder,
           (Customer, $$CustomersTableReferences),
           Customer,
-          PrefetchHooks Function({bool transactionsRefs})
+          PrefetchHooks Function({
+            bool transactionsRefs,
+            bool ledgerEntriesRefs,
+          })
         > {
   $$CustomersTableTableManager(_$AppDatabase db, $CustomersTable table)
     : super(
@@ -10052,36 +10788,63 @@ class $$CustomersTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({transactionsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (transactionsRefs) db.transactions],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (transactionsRefs)
-                    await $_getPrefetchedData<
-                      Customer,
-                      $CustomersTable,
-                      Transaction
-                    >(
-                      currentTable: table,
-                      referencedTable: $$CustomersTableReferences
-                          ._transactionsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$CustomersTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).transactionsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.customerId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({transactionsRefs = false, ledgerEntriesRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (transactionsRefs) db.transactions,
+                    if (ledgerEntriesRefs) db.ledgerEntries,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (transactionsRefs)
+                        await $_getPrefetchedData<
+                          Customer,
+                          $CustomersTable,
+                          Transaction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CustomersTableReferences
+                              ._transactionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CustomersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).transactionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.customerId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (ledgerEntriesRefs)
+                        await $_getPrefetchedData<
+                          Customer,
+                          $CustomersTable,
+                          LedgerEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CustomersTableReferences
+                              ._ledgerEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CustomersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).ledgerEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.customerId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -10098,7 +10861,7 @@ typedef $$CustomersTableProcessedTableManager =
       $$CustomersTableUpdateCompanionBuilder,
       (Customer, $$CustomersTableReferences),
       Customer,
-      PrefetchHooks Function({bool transactionsRefs})
+      PrefetchHooks Function({bool transactionsRefs, bool ledgerEntriesRefs})
     >;
 typedef $$TransactionsTableCreateCompanionBuilder =
     TransactionsCompanion Function({
@@ -11656,6 +12419,7 @@ typedef $$SyncOpsTableCreateCompanionBuilder =
       required String payload,
       Value<String> status,
       Value<int> retryCount,
+      Value<String?> lastError,
       Value<DateTime> createdAt,
       Value<DateTime?> lastTriedAt,
     });
@@ -11666,6 +12430,7 @@ typedef $$SyncOpsTableUpdateCompanionBuilder =
       Value<String> payload,
       Value<String> status,
       Value<int> retryCount,
+      Value<String?> lastError,
       Value<DateTime> createdAt,
       Value<DateTime?> lastTriedAt,
     });
@@ -11701,6 +12466,11 @@ class $$SyncOpsTableFilterComposer
 
   ColumnFilters<int> get retryCount => $composableBuilder(
     column: $table.retryCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11749,6 +12519,11 @@ class $$SyncOpsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -11785,6 +12560,9 @@ class $$SyncOpsTableAnnotationComposer
     column: $table.retryCount,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -11828,6 +12606,7 @@ class $$SyncOpsTableTableManager
                 Value<String> payload = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> lastTriedAt = const Value.absent(),
               }) => SyncOpsCompanion(
@@ -11836,6 +12615,7 @@ class $$SyncOpsTableTableManager
                 payload: payload,
                 status: status,
                 retryCount: retryCount,
+                lastError: lastError,
                 createdAt: createdAt,
                 lastTriedAt: lastTriedAt,
               ),
@@ -11846,6 +12626,7 @@ class $$SyncOpsTableTableManager
                 required String payload,
                 Value<String> status = const Value.absent(),
                 Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> lastTriedAt = const Value.absent(),
               }) => SyncOpsCompanion.insert(
@@ -11854,6 +12635,7 @@ class $$SyncOpsTableTableManager
                 payload: payload,
                 status: status,
                 retryCount: retryCount,
+                lastError: lastError,
                 createdAt: createdAt,
                 lastTriedAt: lastTriedAt,
               ),
@@ -11877,6 +12659,276 @@ typedef $$SyncOpsTableProcessedTableManager =
       $$SyncOpsTableUpdateCompanionBuilder,
       (SyncOp, BaseReferences<_$AppDatabase, $SyncOpsTable, SyncOp>),
       SyncOp,
+      PrefetchHooks Function()
+    >;
+typedef $$PrintJobsTableCreateCompanionBuilder =
+    PrintJobsCompanion Function({
+      Value<int> id,
+      required String jobType,
+      required String referenceId,
+      Value<String> status,
+      Value<int> retryCount,
+      Value<String?> lastError,
+      Value<DateTime> createdAt,
+      Value<DateTime?> lastTriedAt,
+      Value<DateTime?> printedAt,
+    });
+typedef $$PrintJobsTableUpdateCompanionBuilder =
+    PrintJobsCompanion Function({
+      Value<int> id,
+      Value<String> jobType,
+      Value<String> referenceId,
+      Value<String> status,
+      Value<int> retryCount,
+      Value<String?> lastError,
+      Value<DateTime> createdAt,
+      Value<DateTime?> lastTriedAt,
+      Value<DateTime?> printedAt,
+    });
+
+class $$PrintJobsTableFilterComposer
+    extends Composer<_$AppDatabase, $PrintJobsTable> {
+  $$PrintJobsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get jobType => $composableBuilder(
+    column: $table.jobType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get referenceId => $composableBuilder(
+    column: $table.referenceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastTriedAt => $composableBuilder(
+    column: $table.lastTriedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get printedAt => $composableBuilder(
+    column: $table.printedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PrintJobsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PrintJobsTable> {
+  $$PrintJobsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get jobType => $composableBuilder(
+    column: $table.jobType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get referenceId => $composableBuilder(
+    column: $table.referenceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastTriedAt => $composableBuilder(
+    column: $table.lastTriedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get printedAt => $composableBuilder(
+    column: $table.printedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PrintJobsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PrintJobsTable> {
+  $$PrintJobsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get jobType =>
+      $composableBuilder(column: $table.jobType, builder: (column) => column);
+
+  GeneratedColumn<String> get referenceId => $composableBuilder(
+    column: $table.referenceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastTriedAt => $composableBuilder(
+    column: $table.lastTriedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get printedAt =>
+      $composableBuilder(column: $table.printedAt, builder: (column) => column);
+}
+
+class $$PrintJobsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PrintJobsTable,
+          PrintJob,
+          $$PrintJobsTableFilterComposer,
+          $$PrintJobsTableOrderingComposer,
+          $$PrintJobsTableAnnotationComposer,
+          $$PrintJobsTableCreateCompanionBuilder,
+          $$PrintJobsTableUpdateCompanionBuilder,
+          (PrintJob, BaseReferences<_$AppDatabase, $PrintJobsTable, PrintJob>),
+          PrintJob,
+          PrefetchHooks Function()
+        > {
+  $$PrintJobsTableTableManager(_$AppDatabase db, $PrintJobsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PrintJobsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PrintJobsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PrintJobsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> jobType = const Value.absent(),
+                Value<String> referenceId = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastTriedAt = const Value.absent(),
+                Value<DateTime?> printedAt = const Value.absent(),
+              }) => PrintJobsCompanion(
+                id: id,
+                jobType: jobType,
+                referenceId: referenceId,
+                status: status,
+                retryCount: retryCount,
+                lastError: lastError,
+                createdAt: createdAt,
+                lastTriedAt: lastTriedAt,
+                printedAt: printedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String jobType,
+                required String referenceId,
+                Value<String> status = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastTriedAt = const Value.absent(),
+                Value<DateTime?> printedAt = const Value.absent(),
+              }) => PrintJobsCompanion.insert(
+                id: id,
+                jobType: jobType,
+                referenceId: referenceId,
+                status: status,
+                retryCount: retryCount,
+                lastError: lastError,
+                createdAt: createdAt,
+                lastTriedAt: lastTriedAt,
+                printedAt: printedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PrintJobsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PrintJobsTable,
+      PrintJob,
+      $$PrintJobsTableFilterComposer,
+      $$PrintJobsTableOrderingComposer,
+      $$PrintJobsTableAnnotationComposer,
+      $$PrintJobsTableCreateCompanionBuilder,
+      $$PrintJobsTableUpdateCompanionBuilder,
+      (PrintJob, BaseReferences<_$AppDatabase, $PrintJobsTable, PrintJob>),
+      PrintJob,
       PrefetchHooks Function()
     >;
 typedef $$SyncCursorsTableCreateCompanionBuilder =
@@ -14018,6 +15070,7 @@ typedef $$LedgerEntriesTableCreateCompanionBuilder =
       required String type,
       Value<String?> outletId,
       Value<String?> staffId,
+      Value<String?> customerId,
       Value<double> subtotal,
       Value<double> discount,
       Value<double> tax,
@@ -14035,6 +15088,7 @@ typedef $$LedgerEntriesTableUpdateCompanionBuilder =
       Value<String> type,
       Value<String?> outletId,
       Value<String?> staffId,
+      Value<String?> customerId,
       Value<double> subtotal,
       Value<double> discount,
       Value<double> tax,
@@ -14085,6 +15139,25 @@ final class $$LedgerEntriesTableReferences
       $_db.staff,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_staffIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CustomersTable _customerIdTable(_$AppDatabase db) =>
+      db.customers.createAlias(
+        $_aliasNameGenerator(db.ledgerEntries.customerId, db.customers.id),
+      );
+
+  $$CustomersTableProcessedTableManager? get customerId {
+    final $_column = $_itemColumn<String>('customer_id');
+    if ($_column == null) return null;
+    final manager = $$CustomersTableTableManager(
+      $_db,
+      $_db.customers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_customerIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -14233,6 +15306,29 @@ class $$LedgerEntriesTableFilterComposer
           }) => $$StaffTableFilterComposer(
             $db: $db,
             $table: $db.staff,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CustomersTableFilterComposer get customerId {
+    final $$CustomersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableFilterComposer(
+            $db: $db,
+            $table: $db.customers,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -14402,6 +15498,29 @@ class $$LedgerEntriesTableOrderingComposer
     );
     return composer;
   }
+
+  $$CustomersTableOrderingComposer get customerId {
+    final $$CustomersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableOrderingComposer(
+            $db: $db,
+            $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$LedgerEntriesTableAnnotationComposer
@@ -14494,6 +15613,29 @@ class $$LedgerEntriesTableAnnotationComposer
     return composer;
   }
 
+  $$CustomersTableAnnotationComposer get customerId {
+    final $$CustomersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> ledgerLinesRefs<T extends Object>(
     Expression<T> Function($$LedgerLinesTableAnnotationComposer a) f,
   ) {
@@ -14561,6 +15703,7 @@ class $$LedgerEntriesTableTableManager
           PrefetchHooks Function({
             bool outletId,
             bool staffId,
+            bool customerId,
             bool ledgerLinesRefs,
             bool paymentsRefs,
           })
@@ -14583,6 +15726,7 @@ class $$LedgerEntriesTableTableManager
                 Value<String> type = const Value.absent(),
                 Value<String?> outletId = const Value.absent(),
                 Value<String?> staffId = const Value.absent(),
+                Value<String?> customerId = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
@@ -14598,6 +15742,7 @@ class $$LedgerEntriesTableTableManager
                 type: type,
                 outletId: outletId,
                 staffId: staffId,
+                customerId: customerId,
                 subtotal: subtotal,
                 discount: discount,
                 tax: tax,
@@ -14615,6 +15760,7 @@ class $$LedgerEntriesTableTableManager
                 required String type,
                 Value<String?> outletId = const Value.absent(),
                 Value<String?> staffId = const Value.absent(),
+                Value<String?> customerId = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
@@ -14630,6 +15776,7 @@ class $$LedgerEntriesTableTableManager
                 type: type,
                 outletId: outletId,
                 staffId: staffId,
+                customerId: customerId,
                 subtotal: subtotal,
                 discount: discount,
                 tax: tax,
@@ -14652,6 +15799,7 @@ class $$LedgerEntriesTableTableManager
               ({
                 outletId = false,
                 staffId = false,
+                customerId = false,
                 ledgerLinesRefs = false,
                 paymentsRefs = false,
               }) {
@@ -14703,6 +15851,21 @@ class $$LedgerEntriesTableTableManager
                                     referencedColumn:
                                         $$LedgerEntriesTableReferences
                                             ._staffIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (customerId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.customerId,
+                                    referencedTable:
+                                        $$LedgerEntriesTableReferences
+                                            ._customerIdTable(db),
+                                    referencedColumn:
+                                        $$LedgerEntriesTableReferences
+                                            ._customerIdTable(db)
                                             .id,
                                   )
                                   as T;
@@ -14777,6 +15940,7 @@ typedef $$LedgerEntriesTableProcessedTableManager =
       PrefetchHooks Function({
         bool outletId,
         bool staffId,
+        bool customerId,
         bool ledgerLinesRefs,
         bool paymentsRefs,
       })
@@ -16924,6 +18088,8 @@ class $AppDatabaseManager {
       $$ReceiptsTableTableManager(_db, _db.receipts);
   $$SyncOpsTableTableManager get syncOps =>
       $$SyncOpsTableTableManager(_db, _db.syncOps);
+  $$PrintJobsTableTableManager get printJobs =>
+      $$PrintJobsTableTableManager(_db, _db.printJobs);
   $$SyncCursorsTableTableManager get syncCursors =>
       $$SyncCursorsTableTableManager(_db, _db.syncCursors);
   $$CachedOrdersTableTableManager get cachedOrders =>

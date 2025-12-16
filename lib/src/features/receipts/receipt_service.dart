@@ -23,7 +23,13 @@ class ReceiptService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Soko 24 Receipt', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Soko 24 Receipt',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.SizedBox(height: 4),
               pw.Text('Receipt: ${entry.id}'),
               pw.Text('Type: ${entry.type.toUpperCase()}'),
@@ -42,14 +48,22 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('UGX $sign${entry.total.toStringAsFixed(0)}',
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    'Total',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(
+                    'UGX $sign${entry.total.toStringAsFixed(0)}',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
                 ],
               ),
               if (bundle.payments.isNotEmpty) ...[
                 pw.SizedBox(height: 6),
-                pw.Text('Payment', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  'Payment',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
                 ...bundle.payments.map(
                   (p) => pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -79,41 +93,66 @@ class ReceiptService {
     } catch (_) {}
   }
 
-  Future<void> printBluetooth(String entryId) async {
-    try {
-      final bundle = await _fetchEntry(entryId);
-      if (bundle == null) return;
-      final printer = BlueThermalPrinter.instance;
-      final isConnected = await printer.isConnected ?? false;
-      if (!isConnected) {
+  Future<void> printBluetooth(String entryId, {BluetoothDevice? device}) async {
+    final bundle = await _fetchEntry(entryId);
+    if (bundle == null) {
+      throw StateError('Receipt not found: $entryId');
+    }
+    await printBluetoothBundle(bundle, device: device);
+  }
+
+  Future<void> printBluetoothBundle(
+    LedgerEntryBundle bundle, {
+    BluetoothDevice? device,
+  }) async {
+    final printer = BlueThermalPrinter.instance;
+    final isConnected = await printer.isConnected ?? false;
+
+    if (!isConnected) {
+      if (device == null) {
         final devices = await printer.getBondedDevices();
-        if (devices.isEmpty) return;
-        await printer.connect(devices.first);
-      }
-      final entry = bundle.entry;
-      final isRefund = entry.type == 'refund';
-      final sign = isRefund ? '-' : '';
-      printer.printCustom('Soko 24 Receipt', 2, 1);
-      printer.printNewLine();
-      printer.printCustom('Type: ${entry.type.toUpperCase()}', 1, 1);
-      printer.printCustom('Receipt: ${entry.id}', 1, 1);
-      printer.printNewLine();
-      for (final line in bundle.lines) {
-        printer.printLeftRight('${line.title} x${line.quantity}',
-            'UGX $sign${line.lineTotal.toStringAsFixed(0)}', 1);
-      }
-      printer.printLeftRight('TOTAL', 'UGX $sign${entry.total.toStringAsFixed(0)}', 2);
-      if (bundle.payments.isNotEmpty) {
-        printer.printNewLine();
-        printer.printCustom('Payment', 1, 0);
-        for (final p in bundle.payments) {
-          printer.printLeftRight(p.method, 'UGX ${p.amount.toStringAsFixed(0)}', 1);
+        if (devices.isEmpty) {
+          throw StateError('No paired Bluetooth printers found.');
         }
+        device = devices.first;
       }
+      await printer.connect(device);
+    }
+
+    final entry = bundle.entry;
+    final isRefund = entry.type == 'refund';
+    final sign = isRefund ? '-' : '';
+    printer.printCustom('Soko 24 Receipt', 2, 1);
+    printer.printNewLine();
+    printer.printCustom('Type: ${entry.type.toUpperCase()}', 1, 1);
+    printer.printCustom('Receipt: ${entry.id}', 1, 1);
+    printer.printNewLine();
+    for (final line in bundle.lines) {
+      printer.printLeftRight(
+        '${line.title} x${line.quantity}',
+        'UGX $sign${line.lineTotal.toStringAsFixed(0)}',
+        1,
+      );
+    }
+    printer.printLeftRight(
+      'TOTAL',
+      'UGX $sign${entry.total.toStringAsFixed(0)}',
+      2,
+    );
+    if (bundle.payments.isNotEmpty) {
       printer.printNewLine();
-      printer.printQRcode(entry.id, 200, 200, 1);
-      printer.paperCut();
-    } catch (_) {}
+      printer.printCustom('Payment', 1, 0);
+      for (final p in bundle.payments) {
+        printer.printLeftRight(
+          p.method,
+          'UGX ${p.amount.toStringAsFixed(0)}',
+          1,
+        );
+      }
+    }
+    printer.printNewLine();
+    printer.printQRcode(entry.id, 200, 200, 1);
+    printer.paperCut();
   }
 
   Future<LedgerEntryBundle?> _fetchEntry(String id) async {

@@ -9,9 +9,16 @@ import 'src/core/app_providers.dart';
 import 'src/core/config/app_config.dart';
 import 'src/core/db/app_database.dart';
 import 'src/core/storage/secure_storage.dart';
+import 'src/core/telemetry/telemetry.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Telemetry.init();
+  } catch (_) {
+    // Best effort.
+  }
   try {
     await Firebase.initializeApp();
   } catch (_) {

@@ -20,7 +20,8 @@ class Items extends Table {
   TextColumn get barcode => text().nullable()();
   BoolColumn get stockEnabled => boolean().withDefault(const Constant(true))();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
-  BoolColumn get publishedOnline => boolean().withDefault(const Constant(false))();
+  BoolColumn get publishedOnline =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
@@ -34,7 +35,8 @@ class Services extends Table {
   TextColumn get description => text().nullable()();
   RealColumn get price => real()();
   IntColumn get durationMinutes => integer().nullable()();
-  BoolColumn get publishedOnline => boolean().withDefault(const Constant(false))();
+  BoolColumn get publishedOnline =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
@@ -102,9 +104,25 @@ class SyncOps extends Table {
   TextColumn get payload => text()(); // JSON payload
   TextColumn get status => text().withDefault(const Constant('pending'))();
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   DateTimeColumn get lastTriedAt => dateTime().nullable()();
+}
+
+class PrintJobs extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get jobType => text()(); // receipt
+  TextColumn get referenceId => text()(); // ledger entry id
+  TextColumn get status => text().withDefault(
+    const Constant('pending'),
+  )(); // pending, printed, cancelled
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get lastTriedAt => dateTime().nullable()();
+  DateTimeColumn get printedAt => dateTime().nullable()();
 }
 
 class SyncCursors extends Table {
@@ -171,6 +189,7 @@ class LedgerEntries extends Table {
   TextColumn get type => text()(); // sale, refund, adjustment
   TextColumn get outletId => text().nullable().references(Outlets, #id)();
   TextColumn get staffId => text().nullable().references(Staff, #id)();
+  TextColumn get customerId => text().nullable().references(Customers, #id)();
   RealColumn get subtotal => real().withDefault(const Constant(0))();
   RealColumn get discount => real().withDefault(const Constant(0))();
   RealColumn get tax => real().withDefault(const Constant(0))();
@@ -250,6 +269,7 @@ class AuditLogs extends Table {
     TransactionLines,
     Receipts,
     SyncOps,
+    PrintJobs,
     SyncCursors,
     CachedOrders,
     InventoryLogs,
@@ -274,31 +294,36 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (migrator) => migrator.createAll(),
-        onUpgrade: (migrator, from, to) async {
-          if (from < 2) {
-            await migrator.createTable(roles);
-            await migrator.createTable(staff);
-            await migrator.createTable(outlets);
-            await migrator.createTable(ledgerEntries);
-            await migrator.createTable(ledgerLines);
-            await migrator.createTable(payments);
-            await migrator.createTable(cashMovements);
-            await migrator.createTable(shifts);
-            await migrator.createTable(auditLogs);
-          }
-          if (from < 3) {
-            await migrator.createTable(syncCursors);
-          }
-          if (from < 4) {
-            await migrator.createTable(cachedOrders);
-          }
-        },
-      );
+    onCreate: (migrator) => migrator.createAll(),
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(roles);
+        await migrator.createTable(staff);
+        await migrator.createTable(outlets);
+        await migrator.createTable(ledgerEntries);
+        await migrator.createTable(ledgerLines);
+        await migrator.createTable(payments);
+        await migrator.createTable(cashMovements);
+        await migrator.createTable(shifts);
+        await migrator.createTable(auditLogs);
+      }
+      if (from < 3) {
+        await migrator.createTable(syncCursors);
+      }
+      if (from < 4) {
+        await migrator.createTable(cachedOrders);
+      }
+      if (from < 5) {
+        await migrator.addColumn(syncOps, syncOps.lastError);
+        await migrator.addColumn(ledgerEntries, ledgerEntries.customerId);
+        await migrator.createTable(printJobs);
+      }
+    },
+  );
 
   // Items
   Future<List<Item>> getAllItems() => select(items).get();
@@ -318,8 +343,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Services
-  Stream<List<Service>> watchServices() =>
-      (select(services)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+  Stream<List<Service>> watchServices() => (select(
+    services,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
   Future<void> upsertService(ServicesCompanion companion) async {
     await into(services).insertOnConflictUpdate(companion);
   }
@@ -338,8 +364,9 @@ class AppDatabase extends _$AppDatabase {
     await into(customers).insertOnConflictUpdate(companion);
   }
 
-  Stream<List<Customer>> watchCustomers() =>
-      (select(customers)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+  Stream<List<Customer>> watchCustomers() => (select(
+    customers,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
 
   // Transactions and lines
   Future<void> saveTransaction({
@@ -358,8 +385,9 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  Stream<List<Transaction>> watchTransactions() =>
-      (select(transactions)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+  Stream<List<Transaction>> watchTransactions() => (select(
+    transactions,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
   Future<void> markTransactionSynced(String id) async {
     await (update(transactions)..where((tbl) => tbl.id.equals(id))).write(
@@ -367,12 +395,15 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Future<List<TransactionWithLines>> fetchTransactionWithLines(String id) async {
-    final header =
-        await (select(transactions)..where((tbl) => tbl.id.equals(id))).getSingle();
-    final itemsLines = await (select(transactionLines)
-          ..where((tbl) => tbl.transactionId.equals(id)))
-        .get();
+  Future<List<TransactionWithLines>> fetchTransactionWithLines(
+    String id,
+  ) async {
+    final header = await (select(
+      transactions,
+    )..where((tbl) => tbl.id.equals(id))).getSingle();
+    final itemsLines = await (select(
+      transactionLines,
+    )..where((tbl) => tbl.transactionId.equals(id))).get();
     return [TransactionWithLines(header, itemsLines)];
   }
 
@@ -408,25 +439,25 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> markLedgerSynced(String id, String ack) async {
     await (update(ledgerEntries)..where((tbl) => tbl.id.equals(id))).write(
-      LedgerEntriesCompanion(
-        synced: const Value(true),
-        remoteAck: Value(ack),
-      ),
+      LedgerEntriesCompanion(synced: const Value(true), remoteAck: Value(ack)),
     );
   }
 
-  Stream<List<LedgerEntry>> watchLedgerEntries() => (select(ledgerEntries)
-        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-      .watch();
+  Stream<List<LedgerEntry>> watchLedgerEntries() => (select(
+    ledgerEntries,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
   Future<LedgerEntryBundle?> fetchLedgerEntryBundle(String id) async {
-    final entry =
-        await (select(ledgerEntries)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    final entry = await (select(
+      ledgerEntries,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (entry == null) return null;
-    final lines =
-        await (select(ledgerLines)..where((tbl) => tbl.entryId.equals(id))).get();
-    final payments =
-        await (select(this.payments)..where((tbl) => tbl.entryId.equals(id))).get();
+    final lines = await (select(
+      ledgerLines,
+    )..where((tbl) => tbl.entryId.equals(id))).get();
+    final payments = await (select(
+      this.payments,
+    )..where((tbl) => tbl.entryId.equals(id))).get();
     return LedgerEntryBundle(entry: entry, lines: lines, payments: payments);
   }
 
@@ -435,10 +466,9 @@ class AppDatabase extends _$AppDatabase {
 
   // Sync
   Future<int> enqueueSync(String type, String payloadJson) async {
-    return into(syncOps).insert(SyncOpsCompanion.insert(
-      opType: type,
-      payload: payloadJson,
-    ));
+    return into(
+      syncOps,
+    ).insert(SyncOpsCompanion.insert(opType: type, payload: payloadJson));
   }
 
   Future<List<SyncOp>> pendingSyncOps() =>
@@ -450,32 +480,45 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markSynced(int id) async {
     final now = DateTime.now().toUtc();
     await (update(syncOps)..where((tbl) => tbl.id.equals(id))).write(
-      SyncOpsCompanion(status: const Value('synced'), lastTriedAt: Value(now)),
+      SyncOpsCompanion(
+        status: const Value('synced'),
+        lastTriedAt: Value(now),
+        lastError: const Value(null),
+      ),
     );
   }
 
-  Future<void> markSyncFailed(int id, {required int retryCount}) async {
+  Future<void> markSyncFailed(
+    int id, {
+    required int retryCount,
+    String? lastError,
+  }) async {
     final now = DateTime.now().toUtc();
     await (update(syncOps)..where((tbl) => tbl.id.equals(id))).write(
       SyncOpsCompanion(
         retryCount: Value(retryCount),
         lastTriedAt: Value(now),
+        lastError: Value(lastError),
       ),
     );
   }
 
+  Future<void> retrySyncOpNow(int id) async {
+    await (update(syncOps)..where((t) => t.id.equals(id))).write(
+      const SyncOpsCompanion(lastTriedAt: Value(null)),
+    );
+  }
+
   Future<DateTime?> getLastPulledAt(String key) async {
-    final row =
-        await (select(syncCursors)..where((tbl) => tbl.key.equals(key))).getSingleOrNull();
+    final row = await (select(
+      syncCursors,
+    )..where((tbl) => tbl.key.equals(key))).getSingleOrNull();
     return row?.lastPulledAt;
   }
 
   Future<void> setLastPulledAt(String key, DateTime timestamp) async {
     await into(syncCursors).insertOnConflictUpdate(
-      SyncCursorsCompanion.insert(
-        key: key,
-        lastPulledAt: Value(timestamp),
-      ),
+      SyncCursorsCompanion.insert(key: key, lastPulledAt: Value(timestamp)),
     );
   }
 
@@ -491,10 +534,15 @@ class AppDatabase extends _$AppDatabase {
         note: Value(note),
       ),
     );
-    final item = await (select(items)..where((tbl) => tbl.id.equals(itemId))).getSingle();
+    final item = await (select(
+      items,
+    )..where((tbl) => tbl.id.equals(itemId))).getSingle();
     final updatedQty = item.stockQty + delta;
     await (update(items)..where((tbl) => tbl.id.equals(itemId))).write(
-      ItemsCompanion(stockQty: Value(updatedQty), updatedAt: Value(DateTime.now().toUtc())),
+      ItemsCompanion(
+        stockQty: Value(updatedQty),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
     );
   }
 
@@ -526,13 +574,14 @@ class AppDatabase extends _$AppDatabase {
   // Items (safe delete: detach from immutable history)
   Future<void> deleteItemAndDetach(String itemId) async {
     await transaction(() async {
-      await (update(transactionLines)..where((tbl) => tbl.itemId.equals(itemId))).write(
-        const TransactionLinesCompanion(itemId: Value(null)),
-      );
-      await (update(ledgerLines)..where((tbl) => tbl.itemId.equals(itemId))).write(
-        const LedgerLinesCompanion(itemId: Value(null)),
-      );
-      await (delete(inventoryLogs)..where((tbl) => tbl.itemId.equals(itemId))).go();
+      await (update(transactionLines)
+            ..where((tbl) => tbl.itemId.equals(itemId)))
+          .write(const TransactionLinesCompanion(itemId: Value(null)));
+      await (update(ledgerLines)..where((tbl) => tbl.itemId.equals(itemId)))
+          .write(const LedgerLinesCompanion(itemId: Value(null)));
+      await (delete(
+        inventoryLogs,
+      )..where((tbl) => tbl.itemId.equals(itemId))).go();
       await (delete(items)..where((tbl) => tbl.id.equals(itemId))).go();
     });
   }
@@ -547,7 +596,8 @@ class AppDatabase extends _$AppDatabase {
       }
       try {
         final payload = jsonDecode(op.payload);
-        if (payload is Map<String, dynamic> && payload['local_id']?.toString() == localItemId) {
+        if (payload is Map<String, dynamic> &&
+            payload['local_id']?.toString() == localItemId) {
           await (delete(syncOps)..where((tbl) => tbl.id.equals(op.id))).go();
         }
       } catch (_) {
@@ -557,19 +607,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Shifts + cash movements
-  Stream<Shift?> watchOpenShift() => (select(shifts)
-        ..where((tbl) => tbl.closedAt.isNull())
-        ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
-        ..limit(1))
-      .watch()
-      .map((rows) => rows.isEmpty ? null : rows.first);
+  Stream<Shift?> watchOpenShift() =>
+      (select(shifts)
+            ..where((tbl) => tbl.closedAt.isNull())
+            ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
+            ..limit(1))
+          .watch()
+          .map((rows) => rows.isEmpty ? null : rows.first);
 
   Future<Shift?> getOpenShift() async {
-    final rows = await (select(shifts)
-          ..where((tbl) => tbl.closedAt.isNull())
-          ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
-          ..limit(1))
-        .get();
+    final rows =
+        await (select(shifts)
+              ..where((tbl) => tbl.closedAt.isNull())
+              ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
+              ..limit(1))
+            .get();
     return rows.isEmpty ? null : rows.first;
   }
 
@@ -649,11 +701,15 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<double> computeCashSalesSince(DateTime since) async {
-    final joinQuery = select(payments).join([
-      innerJoin(ledgerEntries, ledgerEntries.id.equalsExp(payments.entryId)),
-    ])
-      ..where(payments.method.equals('cash'))
-      ..where(ledgerEntries.createdAt.isBiggerOrEqualValue(since));
+    final joinQuery =
+        select(payments).join([
+            innerJoin(
+              ledgerEntries,
+              ledgerEntries.id.equalsExp(payments.entryId),
+            ),
+          ])
+          ..where(payments.method.equals('cash'))
+          ..where(ledgerEntries.createdAt.isBiggerOrEqualValue(since));
 
     final rows = await joinQuery.get();
     double total = 0;
@@ -670,8 +726,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<double> computeCashMovementsNetSince(DateTime since) async {
-    final rows = await (select(cashMovements)..where((t) => t.createdAt.isBiggerOrEqualValue(since)))
-        .get();
+    final rows = await (select(
+      cashMovements,
+    )..where((t) => t.createdAt.isBiggerOrEqualValue(since))).get();
     double net = 0;
     for (final m in rows) {
       if (m.type == 'float') net += m.amount;
@@ -691,8 +748,87 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Future<List<CachedOrder>> getCachedOrders() =>
-      (select(cachedOrders)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
+  Future<List<CachedOrder>> getCachedOrders() => (select(
+    cachedOrders,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
+
+  // Print queue
+  Future<int> enqueueReceiptPrintJob(String entryId) async {
+    final existing =
+        await (select(printJobs)
+              ..where(
+                (t) =>
+                    t.jobType.equals('receipt') &
+                    t.referenceId.equals(entryId) &
+                    t.status.equals('pending'),
+              )
+              ..limit(1))
+            .getSingleOrNull();
+    if (existing != null) return existing.id;
+    return into(printJobs).insert(
+      PrintJobsCompanion.insert(jobType: 'receipt', referenceId: entryId),
+    );
+  }
+
+  Stream<List<PrintJob>> watchPrintJobs({int limit = 100}) =>
+      (select(printJobs)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+            ..limit(limit))
+          .watch();
+
+  Future<List<PrintJob>> pendingPrintJobs() =>
+      (select(printJobs)
+            ..where((t) => t.status.equals('pending'))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .get();
+
+  Future<void> markPrintJobPrinted(int id) async {
+    final now = DateTime.now().toUtc();
+    await (update(printJobs)..where((t) => t.id.equals(id))).write(
+      PrintJobsCompanion(
+        status: const Value('printed'),
+        printedAt: Value(now),
+        lastTriedAt: Value(now),
+        lastError: const Value(null),
+      ),
+    );
+  }
+
+  Future<void> markPrintJobFailed(
+    int id, {
+    required int retryCount,
+    required String lastError,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await (update(printJobs)..where((t) => t.id.equals(id))).write(
+      PrintJobsCompanion(
+        retryCount: Value(retryCount),
+        lastTriedAt: Value(now),
+        lastError: Value(lastError),
+      ),
+    );
+  }
+
+  Future<void> retryPrintJob(int id) async {
+    await (update(printJobs)..where((t) => t.id.equals(id))).write(
+      const PrintJobsCompanion(
+        retryCount: Value(0),
+        lastTriedAt: Value(null),
+        lastError: Value(null),
+        status: Value('pending'),
+      ),
+    );
+  }
+
+  Future<void> cancelPrintJob(int id) async {
+    await (update(printJobs)..where((t) => t.id.equals(id))).write(
+      const PrintJobsCompanion(status: Value('cancelled')),
+    );
+  }
+
+  Future<int> clearPrintedJobs() async {
+    return (delete(printJobs)..where((t) => t.status.equals('printed'))).go();
+  }
 }
 
 class TransactionWithLines {
@@ -702,7 +838,11 @@ class TransactionWithLines {
 }
 
 class LedgerEntryBundle {
-  LedgerEntryBundle({required this.entry, required this.lines, required this.payments});
+  LedgerEntryBundle({
+    required this.entry,
+    required this.lines,
+    required this.payments,
+  });
 
   final LedgerEntry entry;
   final List<LedgerLine> lines;

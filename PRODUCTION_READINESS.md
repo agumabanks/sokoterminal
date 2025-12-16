@@ -54,7 +54,7 @@ It prioritizes:
 - [~] Offline-first customer management (including walk-ins)
 - [~] Sync never creates duplicates (server idempotency; ledger entries)
 - [~] Sync handles retries safely (at-least-once delivery; ledger + SyncOps backoff)
-- [~] Sync handles partial failures (per-op resume; still needs richer op acks)
+- [~] Sync handles partial failures (per-op resume + last-error visibility; still needs richer op acks)
 
 ### Security & Permissions
 - [~] Seller auth (token) stable with refresh + device token management
@@ -68,7 +68,7 @@ It prioritizes:
 - [x] Replace dialogs with smooth bottom sheets for core flows
 - [ ] Brutal simplification pass (remove 20% of elements)
 - [ ] Performance: smooth scrolling, fast startup, image caching
-- [ ] Instrumentation: crash reporting + analytics + key funnel events
+- [~] Instrumentation: crash reporting + analytics + key funnel events (local telemetry log + export; remote pending)
 
 ---
 
@@ -154,11 +154,11 @@ Flutter
 - [~] Local ledger tables exist and checkout writes a ledger entry
 - [x] Add “Ledger sync status” UI (pending, failed, synced)
 - [~] Implement refund/void as new ledger entries (not editing)
-- [ ] Payment methods:
+- [x] Payment methods:
   - Cash, mobile money, card
   - Split payments (optional)
   - Credit / pay-later sales (common in hardware/wholesale)
-- [ ] Receipt rendering + thermal print pipeline
+- [x] Receipt rendering + thermal print pipeline
 
 #### 2B. Customers (walk-ins included)
 Backend
@@ -368,7 +368,7 @@ Backend
 
 Flutter
 - [x] Barcode scanning (fast flow, offline search)
-- [ ] Thermal printing pipeline + retry queue
+- [x] Thermal printing pipeline + retry queue
 - [ ] Cash drawer trigger (if supported)
 - [ ] Optional scale integration for weighted items
 
@@ -434,7 +434,7 @@ Flutter
   - Retry after crash mid-sync
   - Manager PIN required for refund/void
 - [ ] Performance budgets (startup time, list FPS)
-- [ ] Crash reporting + analytics event schema
+- [~] Crash reporting + analytics event schema (local telemetry log + export; remote pending)
 
 ---
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,16 +10,12 @@ import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/telemetry/telemetry.dart';
 import '../../widgets/bottom_sheet_modal.dart';
-import '../receipts/receipt_service.dart';
+import '../receipts/receipt_providers.dart';
 
 final ledgerEntriesStreamProvider = StreamProvider<List<LedgerEntry>>((ref) {
   return ref.watch(appDatabaseProvider).watchLedgerEntries();
-});
-
-final receiptServiceProvider = Provider<ReceiptService>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  return ReceiptService(db);
 });
 
 class TransactionsScreen extends ConsumerWidget {
@@ -36,9 +34,9 @@ class TransactionsScreen extends ConsumerWidget {
             icon: const Icon(Icons.sync),
             tooltip: 'Sync now',
             onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sync started…')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Sync started…')));
               await ref.read(syncServiceProvider).syncNow();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
@@ -58,23 +56,32 @@ class TransactionsScreen extends ConsumerWidget {
             vertical: DesignTokens.spaceSm,
           ),
           itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: DesignTokens.spaceSm),
+          separatorBuilder: (_, __) =>
+              const SizedBox(height: DesignTokens.spaceSm),
           itemBuilder: (context, index) {
             final entry = list[index];
             final isRefund = entry.type == 'refund';
             final sign = isRefund ? '-' : '';
             return ListTile(
               tileColor: DesignTokens.surfaceWhite,
-              shape: RoundedRectangleBorder(borderRadius: DesignTokens.borderRadiusMd),
+              shape: RoundedRectangleBorder(
+                borderRadius: DesignTokens.borderRadiusMd,
+              ),
               leading: Container(
                 padding: DesignTokens.paddingSm,
                 decoration: BoxDecoration(
-                  color: (isRefund ? DesignTokens.error : DesignTokens.brandAccent).withOpacity(0.12),
+                  color:
+                      (isRefund ? DesignTokens.error : DesignTokens.brandAccent)
+                          .withOpacity(0.12),
                   borderRadius: DesignTokens.borderRadiusSm,
                 ),
                 child: Icon(
-                  isRefund ? Icons.assignment_return_outlined : Icons.point_of_sale,
-                  color: isRefund ? DesignTokens.error : DesignTokens.brandAccent,
+                  isRefund
+                      ? Icons.assignment_return_outlined
+                      : Icons.point_of_sale,
+                  color: isRefund
+                      ? DesignTokens.error
+                      : DesignTokens.brandAccent,
                 ),
               ),
               title: Text(
@@ -95,12 +102,40 @@ class TransactionsScreen extends ConsumerWidget {
                   IconButton(
                     icon: const Icon(Icons.print),
                     tooltip: 'Print',
-                    onPressed: () => ref.read(receiptServiceProvider).printBluetooth(entry.id),
+                    onPressed: () async {
+                      final printer = ref.read(printQueueServiceProvider);
+                      if (!printer.printerEnabled) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Printing is disabled in Settings'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (!printer.hasPreferredPrinter) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Choose a printer in Settings to print receipts',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      await printer.enqueueReceipt(entry.id);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Receipt queued for printing'),
+                        ),
+                      );
+                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.share),
                     tooltip: 'Share PDF',
-                    onPressed: () => ref.read(receiptServiceProvider).sharePdf(entry.id),
+                    onPressed: () =>
+                        ref.read(receiptServiceProvider).sharePdf(entry.id),
                   ),
                   entry.synced
                       ? const Icon(Icons.cloud_done, color: Colors.green)
@@ -117,7 +152,11 @@ class TransactionsScreen extends ConsumerWidget {
     );
   }
 
-  void _showEntryDetails(BuildContext parentContext, WidgetRef ref, String entryId) {
+  void _showEntryDetails(
+    BuildContext parentContext,
+    WidgetRef ref,
+    String entryId,
+  ) {
     BottomSheetModal.show(
       context: parentContext,
       title: 'Receipt',
@@ -130,7 +169,9 @@ class TransactionsScreen extends ConsumerWidget {
           }
           final bundle = snapshot.data;
           if (bundle == null) {
-            return Center(child: Text('Not found', style: DesignTokens.textBody));
+            return Center(
+              child: Text('Not found', style: DesignTokens.textBody),
+            );
           }
           final entry = bundle.entry;
           final isRefund = entry.type == 'refund';
@@ -147,14 +188,22 @@ class TransactionsScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Type: ${entry.type.toUpperCase()}', style: DesignTokens.textSmallBold),
+                    Text(
+                      'Type: ${entry.type.toUpperCase()}',
+                      style: DesignTokens.textSmallBold,
+                    ),
                     const SizedBox(height: DesignTokens.spaceXs),
-                    Text('Date: ${_fmt(entry.createdAt)}', style: DesignTokens.textSmall),
+                    Text(
+                      'Date: ${_fmt(entry.createdAt)}',
+                      style: DesignTokens.textSmall,
+                    ),
                     const SizedBox(height: DesignTokens.spaceXs),
                     Text(
                       entry.synced ? 'Synced' : 'Pending sync',
                       style: DesignTokens.textSmall.copyWith(
-                        color: entry.synced ? DesignTokens.brandAccent : DesignTokens.warning,
+                        color: entry.synced
+                            ? DesignTokens.brandAccent
+                            : DesignTokens.warning,
                       ),
                     ),
                   ],
@@ -163,7 +212,9 @@ class TransactionsScreen extends ConsumerWidget {
               const SizedBox(height: DesignTokens.spaceMd),
               ...bundle.lines.map(
                 (l) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceXs),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: DesignTokens.spaceXs,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -185,8 +236,13 @@ class TransactionsScreen extends ConsumerWidget {
               const Divider(height: DesignTokens.spaceLg),
               Row(
                 children: [
-                  Expanded(child: Text('Total', style: DesignTokens.textBodyBold)),
-                  Text('UGX $sign${entry.total.toStringAsFixed(0)}', style: DesignTokens.textBodyBold),
+                  Expanded(
+                    child: Text('Total', style: DesignTokens.textBodyBold),
+                  ),
+                  Text(
+                    'UGX $sign${entry.total.toStringAsFixed(0)}',
+                    style: DesignTokens.textBodyBold,
+                  ),
                 ],
               ),
               if (bundle.payments.isNotEmpty) ...[
@@ -195,11 +251,18 @@ class TransactionsScreen extends ConsumerWidget {
                 const SizedBox(height: DesignTokens.spaceSm),
                 ...bundle.payments.map(
                   (p) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceXs),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: DesignTokens.spaceXs,
+                    ),
                     child: Row(
                       children: [
-                        Expanded(child: Text(p.method, style: DesignTokens.textSmall)),
-                        Text('UGX ${p.amount.toStringAsFixed(0)}', style: DesignTokens.textSmallBold),
+                        Expanded(
+                          child: Text(p.method, style: DesignTokens.textSmall),
+                        ),
+                        Text(
+                          'UGX ${p.amount.toStringAsFixed(0)}',
+                          style: DesignTokens.textSmallBold,
+                        ),
                       ],
                     ),
                   ),
@@ -210,7 +273,8 @@ class TransactionsScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => ref.read(receiptServiceProvider).sharePdf(entryId),
+                      onPressed: () =>
+                          ref.read(receiptServiceProvider).sharePdf(entryId),
                       icon: const Icon(Icons.share),
                       label: const Text('Share'),
                     ),
@@ -218,7 +282,36 @@ class TransactionsScreen extends ConsumerWidget {
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => ref.read(receiptServiceProvider).printBluetooth(entryId),
+                      onPressed: () async {
+                        final printer = ref.read(printQueueServiceProvider);
+                        if (!printer.printerEnabled) {
+                          if (!parentContext.mounted) return;
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('Printing is disabled in Settings'),
+                            ),
+                          );
+                          return;
+                        }
+                        if (!printer.hasPreferredPrinter) {
+                          if (!parentContext.mounted) return;
+                          ScaffoldMessenger.of(parentContext).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Choose a printer in Settings to print receipts',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        await printer.enqueueReceipt(entryId);
+                        if (!parentContext.mounted) return;
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
+                          const SnackBar(
+                            content: Text('Receipt queued for printing'),
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.print),
                       label: const Text('Print'),
                     ),
@@ -229,28 +322,40 @@ class TransactionsScreen extends ConsumerWidget {
                 const SizedBox(height: DesignTokens.spaceSm),
                 Row(
                   children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        await _refundFlow(parentContext, ref, bundle, isVoid: false);
-                      },
-                      icon: const Icon(Icons.assignment_return_outlined),
-                      label: const Text('Refund'),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          await _refundFlow(
+                            parentContext,
+                            ref,
+                            bundle,
+                            isVoid: false,
+                          );
+                        },
+                        icon: const Icon(Icons.assignment_return_outlined),
+                        label: const Text('Refund'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.of(sheetContext).pop();
-                        await _refundFlow(parentContext, ref, bundle, isVoid: true);
-                      },
-                      style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
-                      icon: const Icon(Icons.block),
-                      label: const Text('Void'),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(sheetContext).pop();
+                          await _refundFlow(
+                            parentContext,
+                            ref,
+                            bundle,
+                            isVoid: true,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: DesignTokens.error,
+                        ),
+                        icon: const Icon(Icons.block),
+                        label: const Text('Void'),
+                      ),
                     ),
-                  ),
                   ],
                 ),
               ],
@@ -270,7 +375,9 @@ class TransactionsScreen extends ConsumerWidget {
     final ok = await requireManagerPin(
       parentContext,
       ref,
-      reason: isVoid ? 'Void sale ${original.entry.id}' : 'Refund sale ${original.entry.id}',
+      reason: isVoid
+          ? 'Void sale ${original.entry.id}'
+          : 'Refund sale ${original.entry.id}',
     );
     if (!parentContext.mounted) return;
     if (!ok) return;
@@ -299,7 +406,9 @@ class TransactionsScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                isVoid ? 'Select items to void (default: all)' : 'Select items to refund (default: all)',
+                isVoid
+                    ? 'Select items to void (default: all)'
+                    : 'Select items to refund (default: all)',
                 style: DesignTokens.textSmall,
               ),
               const SizedBox(height: DesignTokens.spaceMd),
@@ -341,18 +450,28 @@ class TransactionsScreen extends ConsumerWidget {
                               icon: const Icon(Icons.remove, size: 18),
                               visualDensity: VisualDensity.compact,
                               onPressed: () => setState(() {
-                                quantities[line.id] = (qty - 1).clamp(0, maxQty);
+                                quantities[line.id] = (qty - 1).clamp(
+                                  0,
+                                  maxQty,
+                                );
                               }),
                             ),
                             SizedBox(
                               width: 28,
-                              child: Text('$qty', textAlign: TextAlign.center, style: DesignTokens.textBodyBold),
+                              child: Text(
+                                '$qty',
+                                textAlign: TextAlign.center,
+                                style: DesignTokens.textBodyBold,
+                              ),
                             ),
                             IconButton(
                               icon: const Icon(Icons.add, size: 18),
                               visualDensity: VisualDensity.compact,
                               onPressed: () => setState(() {
-                                quantities[line.id] = (qty + 1).clamp(0, maxQty);
+                                quantities[line.id] = (qty + 1).clamp(
+                                  0,
+                                  maxQty,
+                                );
                               }),
                             ),
                           ],
@@ -378,8 +497,16 @@ class TransactionsScreen extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    Expanded(child: Text('Refund total', style: DesignTokens.textBodyBold)),
-                    Text('UGX ${subtotal.toStringAsFixed(0)}', style: DesignTokens.textBodyBold),
+                    Expanded(
+                      child: Text(
+                        'Refund total',
+                        style: DesignTokens.textBodyBold,
+                      ),
+                    ),
+                    Text(
+                      'UGX ${subtotal.toStringAsFixed(0)}',
+                      style: DesignTokens.textBodyBold,
+                    ),
                   ],
                 ),
               ),
@@ -393,15 +520,21 @@ class TransactionsScreen extends ConsumerWidget {
                           ref,
                           original: original,
                           quantities: quantities,
-                          note: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+                          note: reasonCtrl.text.trim().isEmpty
+                              ? null
+                              : reasonCtrl.text.trim(),
                           isVoid: isVoid,
                         );
                         if (context.mounted) Navigator.of(context).pop();
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isVoid ? DesignTokens.error : DesignTokens.brandAccent,
+                  backgroundColor: isVoid
+                      ? DesignTokens.error
+                      : DesignTokens.brandAccent,
                 ),
-                icon: Icon(isVoid ? Icons.block : Icons.assignment_return_outlined),
+                icon: Icon(
+                  isVoid ? Icons.block : Icons.assignment_return_outlined,
+                ),
                 label: Text(isVoid ? 'Void Sale' : 'Create Refund'),
               ),
             ],
@@ -419,7 +552,9 @@ class TransactionsScreen extends ConsumerWidget {
     required String? note,
     required bool isVoid,
   }) async {
-    final selected = original.lines.where((l) => (quantities[l.id] ?? 0) > 0).toList();
+    final selected = original.lines
+        .where((l) => (quantities[l.id] ?? 0) > 0)
+        .toList();
     if (selected.isEmpty) return;
 
     final refundEntryId = _uuid.v4();
@@ -448,7 +583,9 @@ class TransactionsScreen extends ConsumerWidget {
       );
     }
 
-    final method = original.payments.isNotEmpty ? original.payments.first.method : 'cash';
+    final method = original.payments.isNotEmpty
+        ? original.payments.first.method
+        : 'cash';
     final payments = [
       PaymentsCompanion.insert(
         entryId: refundEntryId,
@@ -468,9 +605,15 @@ class TransactionsScreen extends ConsumerWidget {
         discount: const Value(0),
         tax: const Value(0),
         total: Value(subtotal),
-        note: Value(note ?? (isVoid ? 'Void sale ${original.entry.id}' : 'Refund sale ${original.entry.id}')),
+        note: Value(
+          note ??
+              (isVoid
+                  ? 'Void sale ${original.entry.id}'
+                  : 'Refund sale ${original.entry.id}'),
+        ),
         staffId: const Value(null),
         outletId: const Value(null),
+        customerId: Value(original.entry.customerId),
         createdAt: Value(now),
       ),
       lines: refundLines,
@@ -495,31 +638,58 @@ class TransactionsScreen extends ConsumerWidget {
       'discount': 0,
       'tax': 0,
       'total': subtotal,
-      'note': note ?? (isVoid ? 'Void sale ${original.entry.id}' : 'Refund sale ${original.entry.id}'),
+      'note':
+          note ??
+          (isVoid
+              ? 'Void sale ${original.entry.id}'
+              : 'Refund sale ${original.entry.id}'),
       'occurred_at': now.toIso8601String(),
       'lines': refundLines
-          .map((e) => {
-                'product_id': e.itemId.value,
-                'service_id': e.serviceId.value,
-                'name': e.title.value,
-                'price': e.unitPrice.value,
-                'quantity': e.quantity.value,
-                'subtotal': e.lineTotal.value,
-              })
+          .map(
+            (e) => {
+              'product_id': e.itemId.value,
+              'service_id': e.serviceId.value,
+              'name': e.title.value,
+              'price': e.unitPrice.value,
+              'quantity': e.quantity.value,
+              'subtotal': e.lineTotal.value,
+            },
+          )
           .toList(),
       'payments': payments
-          .map((p) => {
-                'method': p.method.value,
-                'amount': p.amount.value,
-                'external_ref': null,
-              })
+          .map(
+            (p) => {
+              'method': p.method.value,
+              'amount': p.amount.value,
+              'external_ref': null,
+            },
+          )
           .toList(),
     });
+
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          isVoid ? 'void_created' : 'refund_created',
+          props: {
+            'original_entry_id': original.entry.id,
+            'entry_id': refundEntryId,
+            'amount': subtotal,
+            'lines_count': selected.length,
+          },
+        ),
+      );
+    }
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(isVoid ? 'Void recorded (sync pending)' : 'Refund recorded (sync pending)'),
+        content: Text(
+          isVoid
+              ? 'Void recorded (sync pending)'
+              : 'Refund recorded (sync pending)',
+        ),
         backgroundColor: DesignTokens.brandAccent,
       ),
     );
