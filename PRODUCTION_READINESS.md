@@ -118,16 +118,16 @@ Backend
 - [ ] Seller categories/collections (see below)
 
 Flutter
-- [~] Pull seller products to local DB (`SyncService.pullSellerProducts`)
-- [ ] Catalog screens use only local DB as truth (remote is just sync)
+- [x] Pull seller products to local DB (`SyncService.pullSellerProducts`)
+- [x] Catalog screens use only local DB as truth (remote is just sync)
 - [ ] Full product editor:
   - Draft mode (offline), autosave
   - Upload queue for images
   - Variant builder UI
   - Validation that matches backend rules
-- [ ] Stock management:
+- [~] Stock management:
   - Fast stock adjust UI (scan/search item)
-  - Inventory logs + low stock alerts
+  - Inventory logs + low stock alerts (alerts pending)
 - [ ] Product “Preview as customer” page using Amazon patterns (see UX section)
 
 #### 1B. Services (online + offline)
@@ -136,7 +136,7 @@ Backend
 - [ ] Bookings endpoints + provider-side actions (confirm/cancel/complete)
 
 Flutter
-- [~] Pull seller services to local DB (`SyncService.pullSellerServices`)
+- [x] Pull seller services to local DB (`SyncService.pullSellerServices`)
 - [ ] Service editor with availability + pricing options
 - [ ] Bookings inbox (offline cache + sync)
 
