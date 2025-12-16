@@ -34,12 +34,20 @@ class SyncService {
       (_) => _pump(),
     );
     _retryTimer ??= Timer.periodic(const Duration(minutes: 5), (_) => _pump());
+    unawaited(_pump());
   }
 
   Future<void> syncNow() => _pump();
 
   Future<void> primeOfflineData() async {
-    await pullPosDelta();
+    try {
+      await pullPosDelta();
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'primeOfflineData'));
+      }
+    }
   }
 
   Future<void> enqueue(String type, Map<String, dynamic> payload) async {
@@ -95,6 +103,11 @@ class SyncService {
         await pullPosDelta();
       } catch (_) {
         // Best effort: next pump will retry.
+      }
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'sync_pump'));
       }
     } finally {
       _isPumping = false;

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/app_providers.dart';
 import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import 'cart_controller.dart';
@@ -25,6 +26,10 @@ final servicesStreamProvider = StreamProvider<List<Service>>((ref) {
 
 final customersStreamProvider = StreamProvider<List<Customer>>((ref) {
   return ref.watch(appDatabaseProvider).watchCustomers();
+});
+
+final productsLastPulledAtProvider = FutureProvider<DateTime?>((ref) async {
+  return ref.watch(appDatabaseProvider).getLastPulledAt('products');
 });
 
 /// Checkout Screen — The primary POS interface for sellers.
@@ -45,11 +50,55 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   bool _scanLocked = false;
+  bool _syncingCatalog = false;
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncCatalog(BuildContext context) async {
+    if (_syncingCatalog) return;
+    setState(() => _syncingCatalog = true);
+    try {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Syncing catalog…')));
+      await ref.read(syncServiceProvider).syncNow();
+      ref.invalidate(productsLastPulledAtProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Catalog updated'),
+          backgroundColor: DesignTokens.brandAccent,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _syncingCatalog = false);
+      }
+    }
+  }
+
+  int _productGridColumns(double width) {
+    if (width >= 960) return 5;
+    if (width >= 720) return 4;
+    if (width >= 520) return 3;
+    return 2;
+  }
+
+  String _fmtShort(DateTime? dt) {
+    if (dt == null) return '—';
+    final local = dt.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} $hh:$mm';
   }
 
   @override
@@ -75,6 +124,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ),
           IconButton(
+            icon: _syncingCatalog
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            onPressed: _syncingCatalog ? null : () => _syncCatalog(context),
+            tooltip: 'Sync catalog',
+          ),
+          IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () => _showMoreOptions(context, ref),
             tooltip: 'More options',
@@ -84,6 +144,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 720;
+          final productsPulledAt = ref
+              .watch(productsLastPulledAtProvider)
+              .valueOrNull;
 
           // ─────────────────────────────────────────────────────────────────
           // CATALOG PANE
@@ -103,6 +166,36 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       _searchCtrl.clear();
                       setState(() => _query = '');
                     },
+                  ),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DesignTokens.spaceMd,
+                    0,
+                    DesignTokens.spaceMd,
+                    DesignTokens.spaceSm,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          productsPulledAt == null
+                              ? 'Catalog not synced yet'
+                              : 'Last sync: ${_fmtShort(productsPulledAt)}',
+                          style: DesignTokens.textSmall,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _syncingCatalog
+                            ? null
+                            : () => _syncCatalog(context),
+                        icon: const Icon(Icons.sync, size: 18),
+                        label: Text(_syncingCatalog ? 'Syncing…' : 'Sync'),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -131,17 +224,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               .where((item) => _matchesItem(item, _query))
                               .toList();
                     if (filtered.isEmpty) {
+                      final missingInitialSync =
+                          _query.isEmpty && productsPulledAt == null;
                       return SliverToBoxAdapter(
                         child: _EmptySearchState(
-                          message: _query.isEmpty
+                          message: missingInitialSync
+                              ? 'Sync your products to start selling offline.'
+                              : _query.isEmpty
                               ? 'No products yet'
                               : 'No matching products',
+                          actionLabel: missingInitialSync ? 'Sync now' : null,
+                          onAction: missingInitialSync
+                              ? () => _syncCatalog(context)
+                              : null,
                         ),
                       );
                     }
                     return SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isWide ? 4 : 3,
+                        crossAxisCount: _productGridColumns(
+                          constraints.maxWidth,
+                        ),
                         mainAxisSpacing: DesignTokens.spaceSm,
                         crossAxisSpacing: DesignTokens.spaceSm,
                         childAspectRatio: 0.9,
@@ -2075,8 +2178,14 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _EmptySearchState extends StatelessWidget {
-  const _EmptySearchState({required this.message});
+  const _EmptySearchState({
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -2087,6 +2196,17 @@ class _EmptySearchState extends StatelessWidget {
           Icon(Icons.search_off, color: DesignTokens.grayMedium),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(message, style: DesignTokens.textSmall),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: DesignTokens.spaceMd),
+            ElevatedButton.icon(
+              onPressed: onAction,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+              ),
+              icon: const Icon(Icons.sync),
+              label: Text(actionLabel!),
+            ),
+          ],
         ],
       ),
     );

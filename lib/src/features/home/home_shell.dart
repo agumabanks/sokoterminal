@@ -34,7 +34,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     Future<void>.microtask(() async {
       final sync = ref.read(syncServiceProvider);
       sync.start();
-      unawaited(sync.primeOfflineData());
 
       final printQueue = ref.read(printQueueServiceProvider);
       printQueue.start();
