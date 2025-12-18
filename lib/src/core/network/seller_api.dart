@@ -193,6 +193,15 @@ class SellerApi {
     return client.post('/v2/profile/update', data: payload);
   }
 
+  // Seller delivery profile (local delivery)
+  Future<Response<dynamic>> fetchDeliveryProfile() {
+    return client.get('/v2/seller/delivery-profile');
+  }
+
+  Future<Response<dynamic>> upsertDeliveryProfile(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/delivery-profile', data: payload);
+  }
+
   // POS configuration (printer width)
   Future<Response<dynamic>> updatePosConfig(Map<String, dynamic> payload) {
     return client.post('/v2/seller/pos/configuration/update', data: payload);

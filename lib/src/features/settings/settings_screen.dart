@@ -175,6 +175,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.go('/home/more/export'),
           ),
           ListTile(
+            leading: const Icon(Icons.local_shipping_outlined),
+            title: const Text('Delivery settings'),
+            subtitle: const Text('Enable seller delivery, set fees'),
+            onTap: () => context.go('/home/more/delivery-settings'),
+          ),
+          ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: () => ref.read(authControllerProvider.notifier).logout(),

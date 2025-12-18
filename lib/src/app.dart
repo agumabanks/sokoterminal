@@ -32,6 +32,7 @@ import 'features/refunds/refunds_screen.dart';
 import 'features/verification/verification_screen.dart';
 import 'features/wholesale/wholesale_screen.dart';
 import 'features/shifts/shifts_screen.dart';
+import 'features/delivery/delivery_settings_screen.dart';
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -172,6 +173,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'settings',
                     name: 'settings',
                     builder: (context, state) => const SettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'delivery-settings',
+                    name: 'delivery-settings',
+                    builder: (context, state) => const DeliverySettingsScreen(),
                   ),
                   GoRoute(
                     path: 'print-queue',
