@@ -986,7 +986,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
               if (context.mounted) Navigator.of(context).pop();
             },
-            icon: const Icon(Icons.whatsapp),
+            icon: const Icon(Icons.chat),
             label: const Text('Send via WhatsApp'),
           ),
           const SizedBox(height: DesignTokens.spaceSm),
@@ -2309,7 +2309,7 @@ class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet> {
                 HapticFeedback.mediumImpact();
                 Navigator.of(context).pop(code.trim());
               },
-              errorBuilder: (context, error, child) {
+              errorBuilder: (BuildContext context, MobileScannerException error) {
                 return Center(
                   child: Text(
                     'Camera unavailable',

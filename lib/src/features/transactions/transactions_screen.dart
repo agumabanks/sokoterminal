@@ -132,7 +132,7 @@ class TransactionsScreen extends ConsumerWidget {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.whatsapp),
+                    icon: const Icon(Icons.chat),
                     tooltip: 'Send WhatsApp',
                     onPressed: () => ref
                         .read(receiptServiceProvider)
@@ -292,7 +292,7 @@ class TransactionsScreen extends ConsumerWidget {
                       onPressed: () => ref
                           .read(receiptServiceProvider)
                           .shareWhatsapp(entryId),
-                      icon: const Icon(Icons.whatsapp),
+                      icon: const Icon(Icons.chat),
                       label: const Text('WhatsApp'),
                     ),
                   ),

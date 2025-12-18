@@ -41,7 +41,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // Warm up notifications/token registration in background.
     ref.watch(notificationsControllerProvider);
     final staffState = ref.watch(staffPinProvider);
