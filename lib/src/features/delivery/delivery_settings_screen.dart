@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,8 @@ class DeliverySettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen> {
+  static const double _maxRadiusKm = 5;
+
   bool _loading = true;
   bool _saving = false;
   Object? _error;
@@ -23,8 +26,12 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
   bool _sellerVerified = false;
 
   bool _enabled = false;
-  double _radiusKm = 10;
+  double _radiusKm = _maxRadiusKm;
   String _pricingMode = 'base_per_km';
+
+  double _platformFeePercent = 10;
+  double _minPlatformFee = 500;
+  double? _maxPlatformFee;
 
   final _originLabelCtrl = TextEditingController();
   final _originLatCtrl = TextEditingController();
@@ -77,6 +84,13 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
 
       _sellerVerified = body['seller_verified'] == true;
 
+      final feeSplitPolicy = body['fee_split_policy'] is Map<String, dynamic>
+          ? (body['fee_split_policy'] as Map<String, dynamic>)
+          : <String, dynamic>{};
+      _platformFeePercent = _toDouble(feeSplitPolicy['platform_fee_percent']) ?? 10;
+      _minPlatformFee = _toDouble(feeSplitPolicy['min_platform_fee']) ?? 500;
+      _maxPlatformFee = _toDouble(feeSplitPolicy['max_platform_fee']);
+
       final defaults = body['defaults'] is Map<String, dynamic> ? (body['defaults'] as Map<String, dynamic>) : <String, dynamic>{};
       final profile = body['profile'] is Map<String, dynamic> ? (body['profile'] as Map<String, dynamic>) : null;
       final shopOrigin = body['shop_origin'] is Map<String, dynamic> ? (body['shop_origin'] as Map<String, dynamic>) : <String, dynamic>{};
@@ -84,7 +98,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
       final source = profile ?? defaults;
 
       _enabled = (source['enabled'] == true);
-      _radiusKm = _toDouble(source['radius_km']) ?? 10;
+      _radiusKm = (_toDouble(source['radius_km']) ?? _maxRadiusKm).clamp(1, _maxRadiusKm).toDouble();
       _pricingMode = (source['pricing_mode'] ?? 'base_per_km').toString();
 
       final originLabel = (source['origin_label'] ?? shopOrigin['origin_label'] ?? '').toString();
@@ -158,7 +172,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
       final payload = <String, dynamic>{
         'enabled': _enabled,
         'pricing_mode': _pricingMode,
-        'radius_km': _radiusKm,
+        'radius_km': _radiusKm.clamp(1, _maxRadiusKm),
         'base_fee': baseFee,
         'per_km_fee': perKmFee,
         'min_fee': minFee,
@@ -199,6 +213,9 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
     final preview1 = _calcFee(distanceKm: 1, baseFee: baseFee, perKmFee: perKmFee, minFee: minFee, maxFee: maxFee, pricingMode: _pricingMode);
     final preview3 = _calcFee(distanceKm: 3, baseFee: baseFee, perKmFee: perKmFee, minFee: minFee, maxFee: maxFee, pricingMode: _pricingMode);
     final preview5 = _calcFee(distanceKm: 5, baseFee: baseFee, perKmFee: perKmFee, minFee: minFee, maxFee: maxFee, pricingMode: _pricingMode);
+    final preview1PlatformFee = _platformFee(preview1);
+    final preview3PlatformFee = _platformFee(preview3);
+    final preview5PlatformFee = _platformFee(preview5);
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -233,6 +250,14 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                                 : (v) => setState(() => _enabled = v),
                           ),
                           const SizedBox(height: DesignTokens.spaceSm),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Seller delivery is limited to ${_maxRadiusKm.toStringAsFixed(0)} km. Outside this radius, buyers will use Soko24 delivery.',
+                              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayDark),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
                           Row(
                             children: [
                               const Icon(Icons.radio_button_checked, size: 18, color: DesignTokens.grayDark),
@@ -246,10 +271,10 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                             ],
                           ),
                           Slider(
-                            value: _radiusKm.clamp(1, 50).toDouble(),
+                            value: _radiusKm.clamp(1, _maxRadiusKm).toDouble(),
                             min: 1,
-                            max: 50,
-                            divisions: 49,
+                            max: _maxRadiusKm,
+                            divisions: (_maxRadiusKm - 1).toInt(),
                             label: '${_radiusKm.toStringAsFixed(0)} km',
                             onChanged: (v) => setState(() => _radiusKm = v),
                           ),
@@ -395,9 +420,22 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                             ],
                           ),
                           const SizedBox(height: DesignTokens.spaceMd),
-                          _PreviewRow(label: '1 km', value: _ugx(preview1)),
-                          _PreviewRow(label: '3 km', value: _ugx(preview3)),
-                          _PreviewRow(label: '5 km', value: _ugx(preview5)),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Platform system charge: ${_platformFeePercent.toStringAsFixed(0)}% (min ${_ugx(_minPlatformFee)}${_maxPlatformFee != null ? ', max ${_ugx(_maxPlatformFee!)}' : ''}).',
+                              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayDark),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(label: '1 km (customer pays)', value: _ugx(preview1)),
+                          _PreviewRow(label: '1 km (you receive)', value: _ugx(math.max(0, preview1 - preview1PlatformFee))),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(label: '3 km (customer pays)', value: _ugx(preview3)),
+                          _PreviewRow(label: '3 km (you receive)', value: _ugx(math.max(0, preview3 - preview3PlatformFee))),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(label: '5 km (customer pays)', value: _ugx(preview5)),
+                          _PreviewRow(label: '5 km (you receive)', value: _ugx(math.max(0, preview5 - preview5PlatformFee))),
                         ],
                       ),
                     ),
@@ -506,6 +544,18 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
   double _roundUp100(double amount) {
     if (amount <= 0) return 0;
     return (amount / 100).ceilToDouble() * 100;
+  }
+
+  double _platformFee(double totalFee) {
+    if (totalFee <= 0) return 0;
+
+    var platformFee = _roundUp100((totalFee * _platformFeePercent) / 100);
+    platformFee = math.max(_minPlatformFee, platformFee);
+    if (_maxPlatformFee != null) {
+      platformFee = math.min(_maxPlatformFee!, platformFee);
+    }
+    platformFee = math.min(totalFee, platformFee);
+    return platformFee;
   }
 
   String _ugx(double value) => 'UGX ${value.toStringAsFixed(0)}';
