@@ -23,6 +23,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
   bool _saving = false;
   Object? _error;
 
+  bool _platformEnabled = true;
   bool _sellerVerified = false;
 
   bool _enabled = false;
@@ -82,6 +83,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
         throw StateError((body['message'] ?? 'Failed to load').toString());
       }
 
+      _platformEnabled = body['platform_enabled'] != false;
       _sellerVerified = body['seller_verified'] == true;
 
       final feeSplitPolicy = body['fee_split_policy'] is Map<String, dynamic>
@@ -136,6 +138,13 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
 
     final etaMin = int.tryParse(_etaMinCtrl.text.trim());
     final etaMax = int.tryParse(_etaMaxCtrl.text.trim());
+
+    if (_enabled && !_platformEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Seller delivery is temporarily disabled by Soko24')),
+      );
+      return;
+    }
 
     if (_enabled && (!_sellerVerified)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -239,13 +248,15 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Enable seller delivery'),
                             subtitle: Text(
-                              _sellerVerified
-                                  ? 'Deliver locally to nearby buyers'
-                                  : 'Verify your shop to enable seller delivery',
+                              !_platformEnabled
+                                  ? 'Seller delivery is temporarily disabled by Soko24'
+                                  : (_sellerVerified
+                                      ? 'Deliver locally to nearby buyers'
+                                      : 'Verify your shop to enable seller delivery'),
                               style: DesignTokens.textSmall,
                             ),
                             value: _enabled,
-                            onChanged: !_sellerVerified
+                            onChanged: (!_sellerVerified || !_platformEnabled)
                                 ? null
                                 : (v) => setState(() => _enabled = v),
                           ),
