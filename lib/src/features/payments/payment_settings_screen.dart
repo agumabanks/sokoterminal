@@ -18,9 +18,15 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
   final _bankAccNameCtrl = TextEditingController();
   final _bankAccNoCtrl = TextEditingController();
   final _bankRoutingCtrl = TextEditingController();
+  
+  // Mobile money merchant codes
+  final _mtnMerchantCtrl = TextEditingController();
+  final _airtelMerchantCtrl = TextEditingController();
+  final _paybillCtrl = TextEditingController();
 
   bool _cashEnabled = true;
   bool _bankEnabled = false;
+  bool _mobileMoneyEnabled = false;
 
   bool _loading = true;
   bool _saving = false;
@@ -38,6 +44,9 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
     _bankAccNameCtrl.dispose();
     _bankAccNoCtrl.dispose();
     _bankRoutingCtrl.dispose();
+    _mtnMerchantCtrl.dispose();
+    _airtelMerchantCtrl.dispose();
+    _paybillCtrl.dispose();
     super.dispose();
   }
 
@@ -59,6 +68,14 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
       _bankAccNameCtrl.text = (data['bank_acc_name'] ?? '').toString();
       _bankAccNoCtrl.text = (data['bank_acc_no'] ?? '').toString();
       _bankRoutingCtrl.text = (data['bank_routing_no'] ?? '').toString();
+      
+      // Mobile money
+      _mtnMerchantCtrl.text = (data['mtn_merchant_code'] ?? '').toString();
+      _airtelMerchantCtrl.text = (data['airtel_merchant_code'] ?? '').toString();
+      _paybillCtrl.text = (data['paybill_number'] ?? '').toString();
+      _mobileMoneyEnabled = _mtnMerchantCtrl.text.isNotEmpty || 
+                            _airtelMerchantCtrl.text.isNotEmpty ||
+                            _paybillCtrl.text.isNotEmpty;
     } catch (e) {
       _error = e;
     } finally {
@@ -78,6 +95,10 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
         'bank_acc_name': _bankAccNameCtrl.text.trim(),
         'bank_acc_no': _bankAccNoCtrl.text.trim(),
         'bank_routing_no': _bankRoutingCtrl.text.trim(),
+        // Mobile money
+        'mtn_merchant_code': _mtnMerchantCtrl.text.trim(),
+        'airtel_merchant_code': _airtelMerchantCtrl.text.trim(),
+        'paybill_number': _paybillCtrl.text.trim(),
       });
 
       final msg = _extractMessage(res.data) ?? 'Payment settings updated';
@@ -130,9 +151,82 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
                             value: _bankEnabled,
                             onChanged: (v) => setState(() => _bankEnabled = v),
                           ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Accept mobile money'),
+                            value: _mobileMoneyEnabled,
+                            onChanged: (v) => setState(() => _mobileMoneyEnabled = v),
+                          ),
                         ],
                       ),
                     ),
+                    if (_mobileMoneyEnabled) ...[
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      _SectionCard(
+                        title: 'Mobile Money',
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _mtnMerchantCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'MTN Merchant Code',
+                                prefixIcon: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFCC00),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Center(
+                                      child: Text('M', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ),
+                                  ),
+                                ),
+                                hintText: 'e.g. 123456',
+                              ),
+                            ),
+                            const SizedBox(height: DesignTokens.spaceMd),
+                            TextField(
+                              controller: _airtelMerchantCtrl,
+                              decoration: InputDecoration(
+                                labelText: 'Airtel Merchant Code',
+                                prefixIcon: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFED1C24),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Center(
+                                      child: Text('A', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                                    ),
+                                  ),
+                                ),
+                                hintText: 'e.g. 654321',
+                              ),
+                            ),
+                            const SizedBox(height: DesignTokens.spaceMd),
+                            TextField(
+                              controller: _paybillCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Paybill Number',
+                                prefixIcon: Icon(Icons.receipt_long),
+                                hintText: 'e.g. 200200',
+                              ),
+                            ),
+                            const SizedBox(height: DesignTokens.spaceSm),
+                            Text(
+                              'These codes will appear on receipts to help customers pay you via mobile money.',
+                              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: DesignTokens.spaceMd),
                     _SectionCard(
                       title: 'Bank account',
@@ -276,4 +370,3 @@ String? _extractMessage(dynamic body) {
   }
   return null;
 }
-

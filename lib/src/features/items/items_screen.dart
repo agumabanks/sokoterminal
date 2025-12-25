@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
@@ -27,6 +28,7 @@ class ItemsScreen extends ConsumerStatefulWidget {
 
 class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   String _searchQuery = '';
+  static const _uuid = Uuid();
 
   @override
   Widget build(BuildContext context) {
@@ -242,15 +244,27 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                       }
                       
                       final db = ref.read(appDatabaseProvider);
+                      final sync = ref.read(syncServiceProvider);
                       if (existingItem == null) {
+                        final id = _uuid.v4();
                         await db.upsertItem(
                           ItemsCompanion.insert(
+                            id: Value(id),
                             name: name,
                             price: price,
                             stockQty: Value(stock),
                             publishedOnline: Value(publishedOnline),
                             synced: const Value(false),
                           ),
+                        );
+                        await _enqueueItemSync(
+                          sync: sync,
+                          opType: 'item_create',
+                          itemId: id,
+                          name: name,
+                          price: price,
+                          stockQty: stock,
+                          publishedOnline: publishedOnline,
                         );
                       } else {
                         await db.upsertItem(
@@ -263,7 +277,17 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                             synced: const Value(false),
                           ),
                         );
+                        await _enqueueItemSync(
+                          sync: sync,
+                          opType: 'item_update',
+                          itemId: existingItem.id,
+                          name: name,
+                          price: price,
+                          stockQty: stock,
+                          publishedOnline: publishedOnline,
+                        );
                       }
+                      unawaited(sync.syncNow());
                       
                       if (context.mounted) {
                         Navigator.pop(context);
@@ -364,6 +388,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 final newStock = item.stockQty + delta;
                 
                 final db = ref.read(appDatabaseProvider);
+                final sync = ref.read(syncServiceProvider);
                 await db.upsertItem(
                   ItemsCompanion(
                     id: Value(item.id),
@@ -380,6 +405,15 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                   delta: delta,
                   note: reason,
                 );
+                final remoteId = _remoteId(item.id);
+                await sync.enqueue('stock_adjust', {
+                  'product_id': remoteId ?? item.id,
+                  'local_id': item.id,
+                  'delta': delta,
+                  'current_stock': newStock < 0 ? 0 : newStock,
+                  'published': item.publishedOnline ? 1 : 0,
+                });
+                unawaited(sync.syncNow());
                 
                 if (context.mounted) {
                   Navigator.pop(context);
@@ -481,6 +515,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
 
   Future<void> _toggleOnline(Item item, bool value) async {
     final db = ref.read(appDatabaseProvider);
+    final sync = ref.read(syncServiceProvider);
     await db.upsertItem(
       ItemsCompanion(
         id: Value(item.id),
@@ -491,6 +526,46 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         synced: const Value(false),
       ),
     );
+    await _enqueueItemSync(
+      sync: sync,
+      opType: 'item_update',
+      itemId: item.id,
+      name: item.name,
+      price: item.price,
+      stockQty: item.stockQty,
+      publishedOnline: value,
+    );
+    unawaited(sync.syncNow());
+  }
+
+  Future<void> _enqueueItemSync({
+    required SyncService sync,
+    required String opType,
+    required String itemId,
+    required String name,
+    required double price,
+    required int stockQty,
+    required bool publishedOnline,
+  }) async {
+    final payload = <String, dynamic>{
+      'local_id': itemId,
+      'name': name,
+      'price': price,
+      'unit_price': price,
+      'stock_qty': stockQty,
+      'current_stock': stockQty,
+      'published': publishedOnline ? 1 : 0,
+    };
+    final remoteId = _remoteId(itemId);
+    if (remoteId != null) {
+      payload['remote_id'] = remoteId;
+    }
+    await sync.enqueue(opType, payload);
+  }
+
+  String? _remoteId(String id) {
+    final isRemote = RegExp(r'^\d+$').hasMatch(id);
+    return isRemote ? id : null;
   }
 
   void _syncFromSeller(BuildContext context) {

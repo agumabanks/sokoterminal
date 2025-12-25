@@ -11,6 +11,7 @@ import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import 'cart_controller.dart';
 import 'parked_sales_controller.dart';
@@ -62,15 +63,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (_syncingCatalog) return;
     setState(() => _syncingCatalog = true);
     try {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Syncing catalog…')));
-      await ref.read(syncServiceProvider).syncNow();
+      // Check if we have any products - if not, do a full resync from epoch
+      final items = await ref.read(appDatabaseProvider).getAllItems();
+      final syncService = ref.read(syncServiceProvider);
+      
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No products found - doing full sync…')),
+        );
+        await syncService.forceFullResync();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Syncing catalog…')),
+        );
+        await syncService.syncNow();
+      }
+      
       ref.invalidate(productsLastPulledAtProvider);
       if (!context.mounted) return;
+      
+      // Check again if we now have products
+      final newItems = await ref.read(appDatabaseProvider).getAllItems();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Catalog updated'),
+          content: Text('Catalog updated - ${newItems.length} products'),
           backgroundColor: DesignTokens.brandAccent,
         ),
       );
@@ -86,12 +102,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  int _productGridColumns(double width) {
-    if (width >= 960) return 5;
-    if (width >= 720) return 4;
-    if (width >= 520) return 3;
-    return 2;
-  }
 
   String _fmtShort(DateTime? dt) {
     if (dt == null) return '—';
@@ -184,7 +194,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         child: Text(
                           productsPulledAt == null
                               ? 'Catalog not synced yet'
-                              : 'Last sync: ${_fmtShort(productsPulledAt)}',
+                              : 'Last sync: ${productsPulledAt.toRelativeLabel()}',
                           style: DesignTokens.textSmall,
                         ),
                       ),
@@ -241,13 +251,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       );
                     }
                     return SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: _productGridColumns(
-                          constraints.maxWidth,
-                        ),
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 200,
                         mainAxisSpacing: DesignTokens.spaceSm,
                         crossAxisSpacing: DesignTokens.spaceSm,
-                        childAspectRatio: 0.9,
+                        childAspectRatio: 0.8,
                       ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
@@ -255,6 +263,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           name: item.name,
                           price: item.price,
                           stock: item.stockQty,
+                          imageUrl: item.imageUrl,
                           onTap: () {
                             HapticFeedback.selectionClick();
                             ref
@@ -277,65 +286,69 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
               ),
 
-              // Services section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DesignTokens.spaceMd,
-                    DesignTokens.spaceLg,
-                    DesignTokens.spaceMd,
-                    DesignTokens.spaceSm,
-                  ),
-                  child: Text('Services', style: DesignTokens.textBodyBold),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DesignTokens.spaceMd,
-                ),
-                sliver: servicesAsync.when(
-                  data: (services) {
-                    final filtered = _query.isEmpty
-                        ? services
-                        : services
-                              .where((s) => _matchesService(s, _query))
-                              .toList();
-                    if (filtered.isEmpty) {
-                      return SliverToBoxAdapter(
-                        child: _EmptySearchState(
-                          message: _query.isEmpty
-                              ? 'No services yet'
-                              : 'No matching services',
+              // Services section (only show if seller has services)
+              servicesAsync.when(
+                data: (services) {
+                  if (services.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  }
+                  final filtered = _query.isEmpty
+                      ? services
+                      : services.where((s) => _matchesService(s, _query)).toList();
+                  return SliverMainAxisGroup(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            DesignTokens.spaceMd,
+                            DesignTokens.spaceLg,
+                            DesignTokens.spaceMd,
+                            DesignTokens.spaceSm,
+                          ),
+                          child: Text('Services', style: DesignTokens.textBodyBold),
                         ),
-                      );
-                    }
-                    return SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final service = filtered[index];
-                        return _ServiceTile(
-                          title: service.title,
-                          price: service.price,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            ref
-                                .read(cartControllerProvider.notifier)
-                                .addService(service: service);
-                          },
-                        );
-                      }, childCount: filtered.length),
-                    );
-                  },
-                  loading: () => const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: DesignTokens.paddingMd,
-                      child: LinearProgressIndicator(),
-                    ),
-                  ),
-                  error: (e, _) => SliverToBoxAdapter(
-                    child: _ErrorState(message: 'Failed to load services'),
-                  ),
-                ),
+                      ),
+                      if (filtered.isEmpty)
+                        SliverToBoxAdapter(
+                          child: _EmptySearchState(
+                            message: 'No matching services',
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DesignTokens.spaceMd,
+                          ),
+                          sliver: SliverGrid(
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 200,
+                              mainAxisSpacing: DesignTokens.spaceSm,
+                              crossAxisSpacing: DesignTokens.spaceSm,
+                              childAspectRatio: 0.85,
+                            ),
+                            delegate: SliverChildBuilderDelegate((context, index) {
+                              final service = filtered[index];
+                              return _ServiceCard(
+                                title: service.title,
+                                price: service.price,
+                                description: service.description,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  ref
+                                      .read(cartControllerProvider.notifier)
+                                      .addService(service: service);
+                                },
+                              );
+                            }, childCount: filtered.length),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (e, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
               ),
+
 
               // Bottom padding
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -664,7 +677,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!ok) return;
 
     final priceCtrl = TextEditingController(
-      text: line.price.toStringAsFixed(0),
+      text: line.price.formatCommas(),
     );
     final newPrice = await BottomSheetModal.show<double>(
       context: context,
@@ -675,7 +688,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Original: UGX ${line.price.toStringAsFixed(0)}',
+            'Original: ${line.price.toUgx()}',
             style: DesignTokens.textSmall,
           ),
           const SizedBox(height: DesignTokens.spaceSm),
@@ -719,7 +732,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Price updated to UGX ${newPrice.toStringAsFixed(0)}'),
+        content: Text('Price updated to ${newPrice.toUgx()}'),
         backgroundColor: DesignTokens.brandAccent,
       ),
     );
@@ -774,7 +787,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final paymentOption = await BottomSheetModal.show<String>(
       context: context,
       title: 'Payment',
-      subtitle: 'UGX ${total.toStringAsFixed(0)} due',
+      subtitle: '${total.toUgx()} due',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -829,7 +842,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         if ((received - total).abs() > 0.01) {
           final change = (received - total).clamp(0, double.infinity);
           note =
-              'Cash received UGX ${received.toStringAsFixed(0)} • Change UGX ${change.toStringAsFixed(0)}';
+              'Cash received ${received.toUgx()} • Change ${change.toUgx()}';
         }
         break;
       case 'mobile_money':
@@ -1007,12 +1020,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     BuildContext context, {
     required double total,
   }) async {
-    final ctrl = TextEditingController(text: total.toStringAsFixed(0));
+    final ctrl = TextEditingController(text: total.formatCommas());
     try {
       return await BottomSheetModal.show<double>(
         context: context,
         title: 'Cash payment',
-        subtitle: 'Total UGX ${total.toStringAsFixed(0)}',
+        subtitle: 'Total ${total.toUgx()}',
         child: StatefulBuilder(
           builder: (sheetContext, setState) {
             final received = _parseAmount(ctrl.text) ?? 0;
@@ -1048,7 +1061,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         ),
                       ),
                       Text(
-                        'UGX ${(ok ? change : (total - received).clamp(0, double.infinity)).toStringAsFixed(0)}',
+                        '${(ok ? change : (total - received).clamp(0, double.infinity)).toUgx()}',
                         style: DesignTokens.textBodyBold.copyWith(
                           color: ok
                               ? DesignTokens.brandAccent
@@ -1140,7 +1153,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: Text(
-                      'Record UGX ${total.toStringAsFixed(0)} as credit for this customer.',
+                      'Record ${total.toUgx()} as credit for this customer.',
                       style: DesignTokens.textSmall.copyWith(
                         color: DesignTokens.brandPrimary,
                       ),
@@ -1184,7 +1197,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final drafts = <_PaymentDraft>[
       _PaymentDraft(
         method: 'cash',
-        amountCtrl: TextEditingController(text: total.toStringAsFixed(0)),
+        amountCtrl: TextEditingController(text: total.formatCommas()),
         refCtrl: TextEditingController(),
       ),
     ];
@@ -1194,7 +1207,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       result = await BottomSheetModal.show<List<CheckoutPayment>>(
         context: context,
         title: 'Split payment',
-        subtitle: 'Total UGX ${total.toStringAsFixed(0)}',
+        subtitle: 'Total ${total.toUgx()}',
         maxHeight: 620,
         child: StatefulBuilder(
           builder: (sheetContext, setState) {
@@ -1229,7 +1242,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         ),
                       ),
                       Text(
-                        'UGX ${remaining.toStringAsFixed(0)}',
+                        '${remaining.toUgx()}',
                         style: DesignTokens.textBodyBold.copyWith(
                           color: remaining.abs() < 0.01
                               ? DesignTokens.brandAccent
@@ -1332,7 +1345,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       _PaymentDraft(
                         method: 'cash',
                         amountCtrl: TextEditingController(
-                          text: remainingAmount.toStringAsFixed(0),
+                          text: remainingAmount.formatCommas(),
                         ),
                         refCtrl: TextEditingController(),
                       ),
@@ -1431,7 +1444,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   style: DesignTokens.textBody,
                 ),
                 Text(
-                  'UGX ${cart.subtotal.toStringAsFixed(0)}',
+                  cart.subtotal.toUgx(),
                   style: DesignTokens.textBodyBold,
                 ),
               ],
@@ -1492,7 +1505,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
               title: Text(sale.label, style: DesignTokens.textBodyBold),
               subtitle: Text(
-                '${sale.lines.length} items • UGX ${sale.total.toStringAsFixed(0)}',
+                '${sale.lines.length} items • ${sale.total.toUgx()}',
                 style: DesignTokens.textSmall,
               ),
               trailing: Text(
@@ -1666,12 +1679,14 @@ class _ProductTile extends StatelessWidget {
     required this.name,
     required this.price,
     this.stock,
+    this.imageUrl,
     this.onTap,
   });
 
   final String name;
   final double price;
   final int? stock;
+  final String? imageUrl;
   final VoidCallback? onTap;
 
   @override
@@ -1681,7 +1696,6 @@ class _ProductTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: DesignTokens.paddingSm,
         decoration: BoxDecoration(
           color: DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
@@ -1691,57 +1705,91 @@ class _ProductTile extends StatelessWidget {
               : null,
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Product icon placeholder
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withOpacity(0.3),
-                  borderRadius: DesignTokens.borderRadiusSm,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(DesignTokens.radiusMd),
                 ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  color: DesignTokens.grayMedium,
-                  size: 28,
-                ),
+                child: _buildImage(),
               ),
             ),
-            const SizedBox(height: DesignTokens.spaceSm),
-            Text(
-              name,
-              style: DesignTokens.textSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: DesignTokens.grayDark,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: DesignTokens.spaceXxs),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'UGX ${price.toStringAsFixed(0)}',
-                  style: DesignTokens.textSmall.copyWith(
-                    color: DesignTokens.brandAccent,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (stock != null)
+            Padding(
+              padding: const EdgeInsets.all(DesignTokens.spaceSm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    '$stock',
+                    name,
                     style: DesignTokens.textSmall.copyWith(
-                      color: lowStock
-                          ? DesignTokens.warning
-                          : DesignTokens.grayMedium,
+                      fontWeight: FontWeight.w600,
+                      color: DesignTokens.grayDark,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-              ],
+                  const SizedBox(height: DesignTokens.spaceXxs),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        price.toUgx(),
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.brandAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (stock != null)
+                        Text(
+                          '$stock',
+                          style: DesignTokens.textSmall.copyWith(
+                            color: lowStock
+                                ? DesignTokens.warning
+                                : DesignTokens.grayMedium,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildImage() {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return Image.network(
+        imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholder(),
+        loadingBuilder: (context, child, event) {
+          if (event == null) return child;
+          return const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+      );
+    }
+    return _buildPlaceholder();
+  }
+
+  Widget _buildPlaceholder() {
+    final color = Colors.primaries[name.hashCode % Colors.primaries.length];
+    final initials = name.trim().split(' ').take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join();
+    return Container(
+      color: color.withOpacity(0.1),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: DesignTokens.textTitle.copyWith(color: color),
       ),
     );
   }
@@ -1782,10 +1830,87 @@ class _ServiceTile extends StatelessWidget {
             const SizedBox(width: DesignTokens.spaceMd),
             Expanded(child: Text(title, style: DesignTokens.textBodyBold)),
             Text(
-              'UGX ${price.toStringAsFixed(0)}',
+              price.toUgx(),
               style: DesignTokens.textBody.copyWith(
                 color: DesignTokens.brandAccent,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceCard extends StatelessWidget {
+  const _ServiceCard({
+    required this.title,
+    required this.price,
+    this.description,
+    this.onTap,
+  });
+
+  final String title;
+  final double price;
+  final String? description;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Colors.primaries[title.hashCode % Colors.primaries.length];
+    final initials = title.trim().split(' ').take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceWhite,
+          borderRadius: DesignTokens.borderRadiusMd,
+          boxShadow: DesignTokens.shadowSm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(DesignTokens.radiusMd),
+                ),
+                child: Container(
+                  color: color.withOpacity(0.1),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.room_service_outlined,
+                    size: 36,
+                    color: color,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(DesignTokens.spaceSm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: DesignTokens.textSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: DesignTokens.grayDark,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: DesignTokens.spaceXxs),
+                  Text(
+                    price.toUgx(),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.brandAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1950,7 +2075,7 @@ class _CartPane extends StatelessWidget {
                   children: [
                     Text('Subtotal', style: DesignTokens.textBody),
                     Text(
-                      'UGX ${cart.subtotal.toStringAsFixed(0)}',
+                      cart.subtotal.toUgx(),
                       style: DesignTokens.textBodyBold,
                     ),
                   ],
@@ -1965,7 +2090,7 @@ class _CartPane extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    'Charge UGX ${cart.subtotal.toStringAsFixed(0)}',
+                    'Charge ${cart.subtotal.toUgx()}',
                     style: DesignTokens.textBody.copyWith(
                       color: DesignTokens.surfaceWhite,
                       fontWeight: FontWeight.w600,
@@ -2029,7 +2154,7 @@ class _CartItem extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'UGX ${price.toStringAsFixed(0)}',
+                        price.toUgx(),
                         style: DesignTokens.textSmall,
                       ),
                       const SizedBox(width: DesignTokens.spaceXs),
@@ -2121,7 +2246,7 @@ class _FloatingCartSummary extends StatelessWidget {
               ),
             ),
             Text(
-              'UGX ${total.toStringAsFixed(0)}',
+              total.toUgx(),
               style: DesignTokens.textBodyBold.copyWith(
                 color: DesignTokens.surfaceWhite,
               ),

@@ -16,6 +16,10 @@ class ReceiptService {
   Future<Uint8List> buildPdf(LedgerEntryBundle bundle) async {
     final doc = pw.Document();
     final entry = bundle.entry;
+    final outlet = await _resolveOutlet(entry.outletId);
+    final template = await _resolveTemplate();
+    final headerText = _cleanText(template?.headerText);
+    final footerText = _cleanText(template?.footerText);
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80,
@@ -26,16 +30,25 @@ class ReceiptService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'Soko 24 Receipt',
+                outlet?.name ?? 'Soko 24',
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
+              if (outlet != null &&
+                  (outlet.address?.trim().isNotEmpty ?? false))
+                pw.Text(outlet.address!.trim()),
+              if (outlet != null && (outlet.phone?.trim().isNotEmpty ?? false))
+                pw.Text(outlet.phone!.trim()),
               pw.SizedBox(height: 4),
               pw.Text('Receipt: ${entry.id}'),
               pw.Text('Type: ${entry.type.toUpperCase()}'),
               pw.Text('Date: ${entry.createdAt.toLocal()}'),
+              if (headerText != null) ...[
+                pw.SizedBox(height: 8),
+                pw.Text(headerText),
+              ],
               pw.SizedBox(height: 12),
               ...bundle.lines.map(
                 (l) => pw.Row(
@@ -77,7 +90,8 @@ class ReceiptService {
                 ),
               ],
               pw.SizedBox(height: 8),
-              pw.Text('Thank you for your business!'),
+              if (footerText != null) pw.Text(footerText),
+              pw.Text('Powered by Soko 24'),
             ],
           );
         },
@@ -101,7 +115,12 @@ class ReceiptService {
     final customer = bundle.entry.customerId == null
         ? null
         : await db.getCustomerById(bundle.entry.customerId!);
-    final text = _buildReceiptText(bundle, customer: customer);
+    final outlet = await _resolveOutlet(bundle.entry.outletId);
+    final text = _buildReceiptText(
+      bundle,
+      customer: customer,
+      outlet: outlet,
+    );
 
     final sanitizedPhone = _sanitizePhone(phone ?? customer?.phone);
     final uri = Uri.parse(
@@ -132,6 +151,10 @@ class ReceiptService {
   }) async {
     final printer = BlueThermalPrinter.instance;
     final isConnected = await printer.isConnected ?? false;
+    final outlet = await _resolveOutlet(bundle.entry.outletId);
+    final template = await _resolveTemplate();
+    final headerText = _cleanText(template?.headerText);
+    final footerText = _cleanText(template?.footerText);
 
     if (!isConnected) {
       if (device == null) {
@@ -147,10 +170,20 @@ class ReceiptService {
     final entry = bundle.entry;
     final isRefund = entry.type == 'refund';
     final sign = isRefund ? '-' : '';
-    printer.printCustom('Soko 24 Receipt', 2, 1);
+    printer.printCustom(outlet?.name ?? 'Soko 24', 2, 1);
+    if (outlet != null && (outlet.address?.trim().isNotEmpty ?? false)) {
+      printer.printCustom(outlet.address!.trim(), 1, 1);
+    }
+    if (outlet != null && (outlet.phone?.trim().isNotEmpty ?? false)) {
+      printer.printCustom(outlet.phone!.trim(), 1, 1);
+    }
     printer.printNewLine();
     printer.printCustom('Type: ${entry.type.toUpperCase()}', 1, 1);
     printer.printCustom('Receipt: ${entry.id}', 1, 1);
+    if (headerText != null) {
+      printer.printNewLine();
+      printer.printCustom(headerText, 1, 1);
+    }
     printer.printNewLine();
     for (final line in bundle.lines) {
       printer.printLeftRight(
@@ -176,7 +209,14 @@ class ReceiptService {
       }
     }
     printer.printNewLine();
-    printer.printQRcode(entry.id, 200, 200, 1);
+    if (template?.showQr ?? true) {
+      printer.printQRcode(entry.id, 200, 200, 1);
+    }
+    if (footerText != null) {
+      printer.printNewLine();
+      printer.printCustom(footerText, 1, 1);
+    }
+    printer.printCustom('Powered by Soko 24', 1, 1);
     printer.paperCut();
   }
 
@@ -184,12 +224,23 @@ class ReceiptService {
     return db.fetchLedgerEntryBundle(id);
   }
 
-  String _buildReceiptText(LedgerEntryBundle bundle, {Customer? customer}) {
+  String _buildReceiptText(
+    LedgerEntryBundle bundle, {
+    Customer? customer,
+    Outlet? outlet,
+  }) {
     final entry = bundle.entry;
     final isRefund = entry.type == 'refund';
     final sign = isRefund ? '-' : '';
     final sb = StringBuffer();
-    sb.writeln('Soko24 Receipt');
+    sb.writeln(outlet?.name ?? 'Soko 24');
+    if (outlet != null && (outlet.address?.trim().isNotEmpty ?? false)) {
+      sb.writeln(outlet.address!.trim());
+    }
+    if (outlet != null && (outlet.phone?.trim().isNotEmpty ?? false)) {
+      sb.writeln(outlet.phone!.trim());
+    }
+    sb.writeln('Receipt');
     sb.writeln('Type: ${entry.type.toUpperCase()}');
     sb.writeln('Receipt: ${entry.id}');
     if (customer != null) {
@@ -213,7 +264,25 @@ class ReceiptService {
       }
     }
     sb.writeln('Thank you!');
+    sb.writeln('Powered by Soko 24');
     return sb.toString();
+  }
+
+  Future<Outlet?> _resolveOutlet(String? outletId) async {
+    if (outletId != null && outletId.trim().isNotEmpty) {
+      final outlet = await db.getOutletById(outletId);
+      if (outlet != null) return outlet;
+    }
+    return db.getPrimaryOutlet();
+  }
+
+  Future<ReceiptTemplate?> _resolveTemplate() {
+    return db.getLatestReceiptTemplate();
+  }
+
+  String? _cleanText(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   String? _sanitizePhone(String? phone) {

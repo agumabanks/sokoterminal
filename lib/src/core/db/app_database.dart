@@ -13,6 +13,7 @@ const _uuid = Uuid();
 
 class Items extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  IntColumn get remoteId => integer().nullable()();
   TextColumn get name => text()();
   RealColumn get price => real()();
   RealColumn get cost => real().nullable()();
@@ -20,6 +21,7 @@ class Items extends Table {
   TextColumn get barcode => text().nullable()();
   BoolColumn get stockEnabled => boolean().withDefault(const Constant(true))();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
+  TextColumn get imageUrl => text().nullable()();
   BoolColumn get publishedOnline =>
       boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
@@ -31,6 +33,7 @@ class Items extends Table {
 
 class Services extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  IntColumn get remoteId => integer().nullable()();
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
   RealColumn get price => real()();
@@ -40,16 +43,19 @@ class Services extends Table {
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  TextColumn get category => text().nullable()();
   @override
   Set<Column<Object>>? get primaryKey => {id};
 }
 
 class Customers extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get remoteId => text().nullable()();
   TextColumn get name => text()();
   TextColumn get phone => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get note => text().nullable()();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
@@ -186,7 +192,8 @@ class Outlets extends Table {
 class LedgerEntries extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
   TextColumn get idempotencyKey => text()();
-  TextColumn get type => text()(); // sale, refund, adjustment
+  TextColumn get type => text()(); // sale, refund, void, adjustment
+  TextColumn get originalEntryId => text().nullable()(); // For refunds: links to original sale
   TextColumn get outletId => text().nullable().references(Outlets, #id)();
   TextColumn get staffId => text().nullable().references(Staff, #id)();
   TextColumn get customerId => text().nullable().references(Customers, #id)();
@@ -260,6 +267,76 @@ class AuditLogs extends Table {
       dateTime().clientDefault(() => DateTime.now().toUtc())();
 }
 
+class ServiceVariants extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get serviceId => text().references(Services, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  RealColumn get price => real()();
+  TextColumn get unit => text().nullable()();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class Quotations extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get customerId => text().nullable().references(Customers, #id)();
+  TextColumn get number => text()();
+  DateTimeColumn get date => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get validUntil => dateTime().nullable()();
+  RealColumn get totalAmount => real()();
+  TextColumn get status => text().withDefault(const Constant('draft'))();
+  TextColumn get notes => text().nullable()();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class QuotationLines extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get quotationId => text().references(Quotations, #id, onDelete: KeyAction.cascade)();
+  TextColumn get description => text()();
+  IntColumn get quantity => integer()();
+  RealColumn get unitPrice => real()();
+  RealColumn get total => real()();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class ReceiptTemplates extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get name => text().withDefault(const Constant('Default'))();
+  TextColumn get style => text().withDefault(const Constant('minimal'))();
+  TextColumn get headerText => text().nullable()();
+  TextColumn get footerText => text().nullable()();
+  BoolColumn get showLogo => boolean().withDefault(const Constant(true))();
+  BoolColumn get showQr => boolean().withDefault(const Constant(true))();
+  TextColumn get colorHex => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class QuotationTemplates extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get name => text().withDefault(const Constant('Default'))();
+  TextColumn get style => text().withDefault(const Constant('minimal'))();
+  TextColumn get headerText => text().nullable()();
+  TextColumn get footerText => text().nullable()();
+  BoolColumn get showLogo => boolean().withDefault(const Constant(true))();
+  BoolColumn get showQr => boolean().withDefault(const Constant(true))();
+  TextColumn get colorHex => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Items,
@@ -282,6 +359,11 @@ class AuditLogs extends Table {
     CashMovements,
     Shifts,
     AuditLogs,
+    ServiceVariants,
+    Quotations,
+    QuotationLines,
+    ReceiptTemplates,
+    QuotationTemplates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -294,7 +376,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -321,6 +403,35 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(syncOps, syncOps.lastError);
         await migrator.addColumn(ledgerEntries, ledgerEntries.customerId);
         await migrator.createTable(printJobs);
+      }
+      if (from < 6) {
+        await migrator.addColumn(services, services.category);
+      }
+      if (from < 7) {
+        await migrator.createTable(serviceVariants);
+        await migrator.createTable(quotations);
+        await migrator.createTable(quotationLines);
+        await migrator.createTable(receiptTemplates);
+      }
+      if (from < 8) {
+        await migrator.addColumn(items, items.imageUrl);
+      }
+      if (from < 9) {
+        // Add remoteId mapping columns
+        await migrator.addColumn(items, items.remoteId);
+        await migrator.addColumn(services, services.remoteId);
+        await migrator.addColumn(customers, customers.remoteId);
+        await migrator.addColumn(customers, customers.synced);
+        // Add receipt template alignment columns
+        await migrator.addColumn(receiptTemplates, receiptTemplates.name);
+        await migrator.addColumn(receiptTemplates, receiptTemplates.style);
+        await migrator.addColumn(receiptTemplates, receiptTemplates.isActive);
+      }
+      if (from < 10) {
+        await migrator.addColumn(ledgerEntries, ledgerEntries.originalEntryId);
+      }
+      if (from < 11) {
+        await migrator.createTable(quotationTemplates);
       }
     },
   );
@@ -357,6 +468,50 @@ class AppDatabase extends _$AppDatabase {
         updatedAt: Value(DateTime.now().toUtc()),
       ),
     );
+  }
+
+  // Service Variants
+  Stream<List<ServiceVariant>> watchServiceVariants(String serviceId) =>
+      (select(serviceVariants)..where((tbl) => tbl.serviceId.equals(serviceId))
+        ..orderBy([(t) => OrderingTerm.asc(t.price)]))
+      .watch();
+  
+  Future<void> upsertServiceVariant(ServiceVariantsCompanion companion) async {
+    await into(serviceVariants).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> deleteServiceVariant(String id) async {
+    await (delete(serviceVariants)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> unsetDefaultVariants(String serviceId) async {
+    await (update(serviceVariants)..where((t) => t.serviceId.equals(serviceId)))
+        .write(const ServiceVariantsCompanion(isDefault: Value(false)));
+  }
+
+  // Quotations
+  Future<void> saveQuotation({
+    required QuotationsCompanion header,
+    required List<QuotationLinesCompanion> lines,
+  }) async {
+    await transaction(() async {
+      await into(quotations).insert(header);
+      for (final line in lines) {
+        await into(quotationLines).insert(line);
+      }
+    });
+  }
+
+  // Receipt Templates
+  Future<void> upsertReceiptTemplate(ReceiptTemplatesCompanion companion) async {
+    await into(receiptTemplates).insertOnConflictUpdate(companion);
+  }
+
+  Future<ReceiptTemplate?> getLatestReceiptTemplate() async {
+    return (select(receiptTemplates)
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .getSingleOrNull();
   }
 
   // Customers
@@ -420,6 +575,19 @@ class AppDatabase extends _$AppDatabase {
     await into(outlets).insertOnConflictUpdate(companion);
   }
 
+  Future<Outlet?> getOutletById(String id) async {
+    return (select(outlets)..where((tbl) => tbl.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  Future<Outlet?> getPrimaryOutlet() async {
+    return (select(outlets)
+          ..where((tbl) => tbl.active.equals(true))
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   // Ledger
   Future<void> saveLedgerEntry({
     required LedgerEntriesCompanion entry,
@@ -447,6 +615,16 @@ class AppDatabase extends _$AppDatabase {
     ledgerEntries,
   )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
+  /// Watch ledger entries since a given date (or all if null)
+  Stream<List<LedgerEntry>> watchLedgerEntriesSince(DateTime? since) {
+    final query = select(ledgerEntries)
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
+    if (since != null) {
+      query.where((t) => t.createdAt.isBiggerOrEqualValue(since));
+    }
+    return query.watch();
+  }
+
   Future<LedgerEntryBundle?> fetchLedgerEntryBundle(String id) async {
     final entry = await (select(
       ledgerEntries,
@@ -463,6 +641,26 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<LedgerEntry>> pendingLedgerEntries() =>
       (select(ledgerEntries)..where((tbl) => tbl.synced.equals(false))).get();
+
+  Future<void> upsertLedgerEntryFromSync({
+    required LedgerEntriesCompanion entry,
+    required List<LedgerLinesCompanion> lines,
+    required List<PaymentsCompanion> payments,
+  }) async {
+    await transaction(() async {
+      await into(ledgerEntries).insertOnConflictUpdate(entry);
+      // Replace lines and payments
+      await (delete(ledgerLines)..where((t) => t.entryId.equals(entry.id.value))).go();
+      await (delete(this.payments)..where((t) => t.entryId.equals(entry.id.value))).go();
+
+      for (final line in lines) {
+        await into(ledgerLines).insert(line);
+      }
+      for (final pay in payments) {
+        await into(this.payments).insert(pay);
+      }
+    });
+  }
 
   // Sync
   Future<int> enqueueSync(String type, String payloadJson) async {

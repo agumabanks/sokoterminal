@@ -118,6 +118,31 @@ class SellerApi {
     });
   }
 
+  // Notifications
+  Future<Response<dynamic>> fetchNotifications() {
+    return client.get('/v2/seller/notifications');
+  }
+
+  Future<Response<dynamic>> fetchUnreadNotifications() {
+    return client.get('/v2/seller/notifications/unread');
+  }
+
+  Future<Response<dynamic>> markNotificationRead(String notificationId) {
+    return client.post('/v2/seller/notifications/mark-read', data: {
+      'notification_id': notificationId,
+    });
+  }
+
+  Future<Response<dynamic>> markAllNotificationsRead() {
+    return client.post('/v2/seller/notifications/mark-all-read');
+  }
+
+  Future<Response<dynamic>> deleteNotification(String notificationId) {
+    return client.post('/v2/seller/notifications/delete', data: {
+      'notification_id': notificationId,
+    });
+  }
+
   // Coupons
   Future<Response<dynamic>> fetchCoupons() {
     return client.get('/v2/seller/coupon/all');
@@ -277,5 +302,110 @@ class SellerApi {
       data: payload,
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
+  }
+
+  // POS Quotations
+  Future<Response<dynamic>> fetchQuotations({int page = 1}) {
+    return client.get('/v2/seller/pos/quotations', query: {'page': page});
+  }
+
+  Future<Response<dynamic>> pushQuotation(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/quotations',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // POS Receipt Templates
+  Future<Response<dynamic>> fetchReceiptTemplates() {
+    return client.get('/v2/seller/pos/receipt-templates');
+  }
+
+  Future<Response<dynamic>> pushReceiptTemplate(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/receipt-templates',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // POS Customers (seller-scoped CRM contacts)
+  Future<Response<dynamic>> fetchSellerCustomers({int page = 1, DateTime? since}) {
+    return client.get('/v2/seller/pos/customers', query: {
+      'page': page,
+      if (since != null) 'since': since.toUtc().toIso8601String(),
+    });
+  }
+
+  Future<Response<dynamic>> pushCustomer(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/customers',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> deleteCustomer(String customerId) {
+    return client.delete('/v2/seller/pos/customers/$customerId');
+  }
+
+  // CRM Contacts
+  Future<Response<dynamic>> batchUpsertCrmContacts(
+    List<Map<String, dynamic>> contacts,
+  ) {
+    return client.post('/v2/seller/crm/contacts/batch', data: {
+      'contacts': contacts,
+    });
+  }
+
+  // POS Staff
+  Future<Response<dynamic>> fetchStaff() {
+    return client.get('/v2/seller/pos/staff');
+  }
+
+  Future<Response<dynamic>> createStaff(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/pos/staff', data: payload);
+  }
+
+  Future<Response<dynamic>> updateStaff(int id, Map<String, dynamic> payload) {
+    return client.put('/v2/seller/pos/staff/$id', data: payload);
+  }
+
+  Future<Response<dynamic>> deleteStaff(int id) {
+    return client.delete('/v2/seller/pos/staff/$id');
+  }
+
+  Future<Response<dynamic>> bootstrapStaff(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/pos/staff/bootstrap', data: payload);
+  }
+
+  // POS Service Variants
+  Future<Response<dynamic>> pushServiceVariant(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/pos/service-variants', data: payload);
+  }
+
+  Future<Response<dynamic>> deleteServiceVariant(String id) {
+    return client.delete('/v2/seller/pos/service-variants/$id');
+  }
+
+  // POS Templates Sync
+  Future<Response<dynamic>> batchUpsertTemplates({
+    required List<Map<String, dynamic>> receiptTemplates,
+    required List<Map<String, dynamic>> quotationTemplates,
+  }) {
+    return client.post('/v2/seller/pos/templates/batch', data: {
+      'receipt_templates': receiptTemplates,
+      'quotation_templates': quotationTemplates,
+    });
   }
 }

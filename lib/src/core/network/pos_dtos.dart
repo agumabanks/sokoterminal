@@ -34,6 +34,10 @@ class PosSyncPullResponse {
     required this.products,
     required this.services,
     required this.customers,
+    required this.receiptTemplates,
+    required this.quotationTemplates,
+    required this.ledgerEntries,
+    required this.sellerProfile,
     required this.outlet,
   });
 
@@ -43,6 +47,8 @@ class PosSyncPullResponse {
   final List<PosSyncProduct> products;
   final List<PosSyncService> services;
   final List<PosSyncCustomer> customers;
+  final List<PosSyncReceiptTemplate> receiptTemplates;
+  final List<PosSyncQuotationTemplate> quotationTemplates;
   final PosSyncOutlet? outlet;
 
   factory PosSyncPullResponse.fromJson(Map<String, dynamic> json) {
@@ -58,6 +64,10 @@ class PosSyncPullResponse {
     final productsRaw = json['products'];
     final servicesRaw = json['services'];
     final customersRaw = json['customers'];
+    final receiptTemplatesRaw = json['receipt_templates'];
+    final quotationTemplatesRaw = json['quotation_templates'];
+    final ledgerEntriesRaw = json['ledger_entries'];
+    final sellerProfileRaw = json['seller_profile'];
 
     final config = json['config'];
     final outletRaw = config is Map<String, dynamic> ? config['outlet'] : null;
@@ -69,9 +79,18 @@ class PosSyncPullResponse {
       products: _parseList(productsRaw, PosSyncProduct.fromJson),
       services: _parseList(servicesRaw, PosSyncService.fromJson),
       customers: _parseList(customersRaw, PosSyncCustomer.fromJson),
+      receiptTemplates: _parseList(receiptTemplatesRaw, PosSyncReceiptTemplate.fromJson),
+      quotationTemplates: _parseList(quotationTemplatesRaw, PosSyncQuotationTemplate.fromJson),
+      ledgerEntries: _parseList(ledgerEntriesRaw, PosSyncLedgerEntry.fromJson),
+      sellerProfile: sellerProfileRaw is Map<String, dynamic>
+          ? PosSyncSellerProfile.fromJson(sellerProfileRaw)
+          : null,
       outlet: outletRaw is Map<String, dynamic> ? PosSyncOutlet.fromJson(outletRaw) : null,
     );
   }
+
+  final List<PosSyncLedgerEntry> ledgerEntries;
+  final PosSyncSellerProfile? sellerProfile;
 }
 
 class PosSyncProduct {
@@ -82,6 +101,7 @@ class PosSyncProduct {
     required this.currentStock,
     required this.published,
     required this.updatedAt,
+    this.imageUrl,
   });
 
   final String id;
@@ -90,6 +110,7 @@ class PosSyncProduct {
   final int currentStock;
   final bool published;
   final DateTime? updatedAt;
+  final String? imageUrl;
 
   factory PosSyncProduct.fromJson(Map<String, dynamic> json) {
     return PosSyncProduct(
@@ -99,6 +120,7 @@ class PosSyncProduct {
       currentStock: _asInt(json['current_stock']),
       published: _asBool(json['published']),
       updatedAt: _asDateTime(json['updated_at']),
+      imageUrl: json['image_url']?.toString() ?? json['image']?.toString(),
     );
   }
 }
@@ -110,6 +132,7 @@ class PosSyncService {
     required this.price,
     required this.description,
     required this.durationMinutes,
+    required this.category,
     required this.published,
     required this.updatedAt,
   });
@@ -119,6 +142,7 @@ class PosSyncService {
   final double price;
   final String? description;
   final int? durationMinutes;
+  final String? category;
   final bool published;
   final DateTime? updatedAt;
 
@@ -129,6 +153,7 @@ class PosSyncService {
       price: _asDouble(json['price']),
       description: json['description']?.toString(),
       durationMinutes: _asNullableInt(json['duration_minutes']),
+      category: json['category']?.toString(),
       published: _asBool(json['published']),
       updatedAt: _asDateTime(json['updated_at']),
     );
@@ -157,6 +182,131 @@ class PosSyncCustomer {
       phone: json['phone']?.toString(),
       email: json['email']?.toString(),
       updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncLedgerEntry {
+  PosSyncLedgerEntry({
+    required this.id,
+    required this.clientEntryId,
+    required this.customerId,
+    required this.type,
+    required this.subtotal,
+    required this.discount,
+    required this.tax,
+    required this.total,
+    required this.note,
+    required this.occurredAt,
+    required this.updatedAt,
+    required this.lines,
+    required this.payments,
+  });
+
+  final String id;
+  final String clientEntryId;
+  final String? customerId;
+  final String type;
+  final double subtotal;
+  final double discount;
+  final double tax;
+  final double total;
+  final String? note;
+  final DateTime? occurredAt;
+  final DateTime? updatedAt;
+  final List<PosSyncLedgerLine> lines;
+  final List<PosSyncLedgerPayment> payments;
+
+  factory PosSyncLedgerEntry.fromJson(Map<String, dynamic> json) {
+    return PosSyncLedgerEntry(
+      id: (json['id'] ?? '').toString(),
+      clientEntryId: (json['client_entry_id'] ?? '').toString(),
+      customerId: json['customer_id']?.toString(),
+      type: (json['type'] ?? '').toString(),
+      subtotal: _asDouble(json['subtotal']),
+      discount: _asDouble(json['discount']),
+      tax: _asDouble(json['tax']),
+      total: _asDouble(json['total']),
+      note: json['note']?.toString(),
+      occurredAt: _asDateTime(json['occurred_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+      lines: _parseList(json['lines'], PosSyncLedgerLine.fromJson),
+      payments: _parseList(json['payments'], PosSyncLedgerPayment.fromJson),
+    );
+  }
+}
+
+class PosSyncLedgerLine {
+  PosSyncLedgerLine({
+    required this.id,
+    required this.itemId,
+    required this.title,
+    required this.price,
+    required this.quantity,
+    required this.total,
+  });
+
+  final String id;
+  final String? itemId;
+  final String title;
+  final double price;
+  final int quantity;
+  final double total;
+
+  factory PosSyncLedgerLine.fromJson(Map<String, dynamic> json) {
+    return PosSyncLedgerLine(
+      id: (json['id'] ?? '').toString(),
+      itemId: json['item_id']?.toString(),
+      title: (json['title'] ?? '').toString(),
+      price: _asDouble(json['price']),
+      quantity: _asInt(json['quantity']),
+      total: _asDouble(json['total']),
+    );
+  }
+}
+
+class PosSyncLedgerPayment {
+  PosSyncLedgerPayment({
+    required this.id,
+    required this.method,
+    required this.amount,
+  });
+
+  final String id;
+  final String method;
+  final double amount;
+
+  factory PosSyncLedgerPayment.fromJson(Map<String, dynamic> json) {
+    return PosSyncLedgerPayment(
+      id: (json['id'] ?? '').toString(),
+      method: (json['method'] ?? '').toString(),
+      amount: _asDouble(json['amount']),
+    );
+  }
+}
+
+class PosSyncSellerProfile {
+  PosSyncSellerProfile({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.businessName,
+  });
+
+  final String id;
+  final String name;
+  final String? email;
+  final String? phone;
+  final String? businessName;
+
+  factory PosSyncSellerProfile.fromJson(Map<String, dynamic> json) {
+    return PosSyncSellerProfile(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      email: json['email']?.toString(),
+      phone: json['phone']?.toString(),
+      businessName: json['business_name']?.toString(),
     );
   }
 }
@@ -233,3 +383,78 @@ DateTime? _asDateTime(dynamic value) {
   }
 }
 
+class PosSyncReceiptTemplate {
+  PosSyncReceiptTemplate({
+    required this.id,
+    required this.name,
+    required this.style,
+    this.headerColor,
+    this.footerMessage,
+    required this.showLogo,
+    required this.showQr,
+    required this.isActive,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String name;
+  final String style;
+  final String? headerColor;
+  final String? footerMessage;
+  final bool showLogo;
+  final bool showQr;
+  final bool isActive;
+  final DateTime updatedAt;
+
+  factory PosSyncReceiptTemplate.fromJson(Map<String, dynamic> json) {
+    return PosSyncReceiptTemplate(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      style: (json['style'] ?? 'minimal').toString(),
+      headerColor: json['header_color']?.toString(),
+      footerMessage: json['footer_message']?.toString(),
+      showLogo: _asBool(json['show_logo']),
+      showQr: _asBool(json['show_qr']),
+      isActive: _asBool(json['is_active']),
+      updatedAt: _asDateTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+class PosSyncQuotationTemplate {
+  PosSyncQuotationTemplate({
+    required this.id,
+    required this.name,
+    required this.style,
+    this.headerColor,
+    this.footerMessage,
+    required this.showLogo,
+    required this.showQr,
+    required this.isActive,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String name;
+  final String style;
+  final String? headerColor;
+  final String? footerMessage;
+  final bool showLogo;
+  final bool showQr;
+  final bool isActive;
+  final DateTime updatedAt;
+
+  factory PosSyncQuotationTemplate.fromJson(Map<String, dynamic> json) {
+    return PosSyncQuotationTemplate(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      style: (json['style'] ?? 'minimal').toString(),
+      headerColor: json['header_color']?.toString(),
+      footerMessage: json['footer_message']?.toString(),
+      showLogo: _asBool(json['show_logo']),
+      showQr: _asBool(json['show_qr']),
+      isActive: _asBool(json['is_active']),
+      updatedAt: _asDateTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}

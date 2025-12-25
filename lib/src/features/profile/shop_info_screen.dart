@@ -17,14 +17,14 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _metaTitleCtrl = TextEditingController();
+  final _metaDescCtrl = TextEditingController();
 
   bool _loading = true;
   bool _saving = false;
   Object? _error;
 
   String? _email;
-  String? _metaTitle;
-  String? _metaDescription;
   dynamic _logoUploadId;
 
   @override
@@ -38,6 +38,8 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
+    _metaTitleCtrl.dispose();
+    _metaDescCtrl.dispose();
     super.dispose();
   }
 
@@ -57,9 +59,11 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
       _addressCtrl.text = (data['address'] ?? '').toString();
 
       _email = (data['email'] ?? '').toString();
-      _metaTitle = (data['title'] ?? '').toString();
-      _metaDescription = (data['description'] ?? '').toString();
+      final metaTitle = (data['title'] ?? '').toString();
+      final metaDescription = (data['description'] ?? '').toString();
       _logoUploadId = data['upload_id'];
+      _metaTitleCtrl.text = metaTitle;
+      _metaDescCtrl.text = metaDescription;
     } catch (e) {
       _error = e;
     } finally {
@@ -72,6 +76,8 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     final name = _nameCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
     final address = _addressCtrl.text.trim();
+    final metaTitle = _metaTitleCtrl.text.trim();
+    final metaDescription = _metaDescCtrl.text.trim();
 
     if (name.isEmpty || address.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,8 +93,8 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
         'name': name,
         'address': address,
         'phone': phone,
-        'meta_title': _metaTitle ?? '',
-        'meta_description': _metaDescription ?? '',
+        'meta_title': metaTitle,
+        'meta_description': metaDescription,
         if (_logoUploadId != null) 'logo': _logoUploadId,
       };
       final res = await api.updateShopInfo(payload);
@@ -162,6 +168,31 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Address',
                               prefixIcon: Icon(Icons.location_on_outlined),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    _SectionCard(
+                      title: 'Online details',
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _metaTitleCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Shop tagline',
+                              prefixIcon: Icon(Icons.title),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceMd),
+                          TextField(
+                            controller: _metaDescCtrl,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: 'Shop description',
+                              alignLabelWithHint: true,
+                              prefixIcon: Icon(Icons.notes_outlined),
                             ),
                           ),
                         ],

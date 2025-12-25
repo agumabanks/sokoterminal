@@ -12,6 +12,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../widgets/section_header.dart';
 import '../checkout/checkout_screen.dart';
+import 'service_variants_screen.dart';
 
 class ServicesScreen extends ConsumerWidget {
   const ServicesScreen({super.key});
@@ -53,26 +54,41 @@ class ServicesScreen extends ConsumerWidget {
                       'UGX ${service.price.toStringAsFixed(0)}'
                       '${service.durationMinutes != null ? ' • ${service.durationMinutes} mins' : ''}',
                     ),
-                    trailing: Switch(
-                      value: service.publishedOnline,
-                      onChanged: (value) async {
-                        await ref.read(appDatabaseProvider).upsertService(
-                              service.toCompanion(true).copyWith(
-                                    publishedOnline: Value(value),
-                                    updatedAt: Value(DateTime.now().toUtc()),
-                                  ),
-                            );
-                        if (value) {
-                          await ref.read(syncServiceProvider).enqueue('service_update', {
-                            'local_id': service.id,
-                            'title': service.title,
-                            'price': service.price,
-                            'description': service.description,
-                            'duration': service.durationMinutes,
-                            'published': value ? 1 : 0,
-                          });
-                        }
-                      },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.style_outlined),
+                          tooltip: 'Manage Variants',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ServiceVariantsScreen(serviceId: service.id),
+                            ),
+                          ),
+                        ),
+                        Switch(
+                          value: service.publishedOnline,
+                          onChanged: (value) async {
+                            await ref.read(appDatabaseProvider).upsertService(
+                                  service.toCompanion(true).copyWith(
+                                        publishedOnline: Value(value),
+                                        updatedAt: Value(DateTime.now().toUtc()),
+                                      ),
+                                );
+                            if (value) {
+                              await ref.read(syncServiceProvider).enqueue('service_update', {
+                                'local_id': service.id,
+                                'title': service.title,
+                                'price': service.price,
+                                'description': service.description,
+                                'duration': service.durationMinutes,
+                                'published': value ? 1 : 0,
+                              });
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 )),

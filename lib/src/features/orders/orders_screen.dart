@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'order_details_screen.dart';
 import 'orders_controller.dart';
 
 class OrdersScreen extends ConsumerWidget {
@@ -49,7 +50,7 @@ class OrdersScreen extends ConsumerWidget {
                       Text(order['payment_status']?.toString() ?? '-', style: const TextStyle(fontSize: 12)),
                     ],
                   ),
-                  onTap: () => _showUpdate(context, ref, order),
+                  onTap: () => _showDetails(context, order),
                 ),
               );
             },
@@ -59,53 +60,13 @@ class OrdersScreen extends ConsumerWidget {
     );
   }
 
-  void _showUpdate(BuildContext context, WidgetRef ref, Map<String, dynamic> order) {
-    final statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
-    String delivery = order['delivery_status']?.toString() ?? 'pending';
-    String payment = order['payment_status']?.toString() ?? 'unpaid';
+  void _showDetails(BuildContext context, Map<String, dynamic> order) {
     final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Order #$orderId', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            _OrderItemsList(order: order, orderId: orderId),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: delivery,
-              items: statuses.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-              onChanged: (v) => delivery = v ?? delivery,
-              decoration: const InputDecoration(labelText: 'Delivery'),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: payment,
-              items: const [
-                DropdownMenuItem(value: 'paid', child: Text('Paid')),
-                DropdownMenuItem(value: 'unpaid', child: Text('Unpaid')),
-              ],
-              onChanged: (v) => payment = v ?? payment,
-              decoration: const InputDecoration(labelText: 'Payment'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () async {
-                if (orderId == 0) return;
-                await ref.read(ordersControllerProvider.notifier).updateStatus(
-                      orderId: orderId,
-                      delivery: delivery,
-                      payment: payment,
-                    );
-                if (context.mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+    if (orderId == 0) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderDetailsScreen(orderId: orderId, initialData: order),
       ),
     );
   }

@@ -9,11 +9,12 @@ import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/home/home_shell.dart';
+import 'features/contacts/contacts_screen.dart';
+import 'features/splash/splash_screen.dart';
 import 'features/items/items_screen.dart';
 import 'features/services/services_screen.dart';
 import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
-import 'features/customers/customers_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/staff_screen.dart';
@@ -33,6 +34,8 @@ import 'features/verification/verification_screen.dart';
 import 'features/wholesale/wholesale_screen.dart';
 import 'features/shifts/shifts_screen.dart';
 import 'features/delivery/delivery_settings_screen.dart';
+import 'features/quotations/quotations_screen.dart';
+import 'features/settings/receipt_templates_screen.dart';
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -56,16 +59,25 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) {
       final loggedIn = authState.status == AuthStatus.authenticated;
       final onLogin = state.matchedLocation == '/login';
+      final onSplash = state.matchedLocation == '/splash';
+
+      if (onSplash) return null; // Let splash handle logic
+
       if (!loggedIn && !onLogin) return '/login';
       if (loggedIn && onLogin) return '/home/checkout';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/login',
         name: 'login',
@@ -135,6 +147,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ChatScreen(),
                   ),
                   GoRoute(
+                    path: 'chat/:conversationId',
+                    name: 'chat-detail',
+                    builder: (context, state) {
+                      final convoId = int.tryParse(state.pathParameters['conversationId'] ?? '');
+                      return ChatScreen(conversationId: convoId);
+                    },
+                  ),
+                  GoRoute(
                     path: 'coupons',
                     name: 'coupons',
                     builder: (context, state) => const CouponsScreen(),
@@ -153,11 +173,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'ads',
                     name: 'ads',
                     builder: (context, state) => const AdsScreen(),
-                  ),
-                  GoRoute(
-                    path: 'customers',
-                    name: 'customers',
-                    builder: (context, state) => const CustomersScreen(),
                   ),
                   GoRoute(
                     path: 'reports',
@@ -234,6 +249,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'shifts',
                     name: 'shifts',
                     builder: (context, state) => const ShiftsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'contacts',
+                    name: 'contacts',
+                    builder: (context, state) => const ContactsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'quotations',
+                    name: 'quotations',
+                    builder: (context, state) => const QuotationsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'receipt-templates',
+                    name: 'receipt-templates',
+                    builder: (context, state) => const ReceiptTemplatesScreen(),
                   ),
                 ],
               ),

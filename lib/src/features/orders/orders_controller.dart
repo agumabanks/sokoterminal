@@ -82,6 +82,36 @@ class OrdersController extends StateNotifier<OrdersState> {
     }
   }
 
+  Future<Map<String, dynamic>?> loadOrderDetails(int orderId) async {
+    try {
+      // First try to find in current state
+      final existing = state.orders.cast<Map<String, dynamic>?>().firstWhere(
+        (o) => o?['id']?.toString() == orderId.toString(),
+        orElse: () => null,
+      );
+      
+      // Fetch fresh details from API
+      final res = await api.fetchOrderDetails(orderId);
+      final data = (res.data is List ? res.data.first : res.data) as Map<String, dynamic>;
+      
+      // If we have existing items, merge them if new data doesn't have items
+      if (existing != null && existing['items'] != null && data['items'] == null) {
+        data['items'] = existing['items'];
+      } else if (data['items'] == null) {
+        // Fetch items if missing
+        data['items'] = await loadItems(orderId);
+      }
+      
+      return data;
+    } catch (e) {
+      // Fallback to local state if API fails
+      return state.orders.cast<Map<String, dynamic>?>().firstWhere(
+        (o) => o?['id']?.toString() == orderId.toString(),
+        orElse: () => null,
+      );
+    }
+  }
+
   Future<void> pullCached() async {
     final cachedRows = await db.getCachedOrders();
     if (cachedRows.isEmpty) return;

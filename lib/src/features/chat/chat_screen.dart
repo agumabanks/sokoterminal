@@ -114,12 +114,40 @@ class ConversationsController extends StateNotifier<ConversationsState> {
   }
 }
 
-class ChatScreen extends ConsumerWidget {
-  const ChatScreen({super.key});
+class ChatScreen extends ConsumerStatefulWidget {
+  const ChatScreen({super.key, this.conversationId});
+  final int? conversationId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends ConsumerState<ChatScreen> {
+  bool _openedInitial = false;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(conversationsControllerProvider);
+    ref.listen<ConversationsState>(conversationsControllerProvider, (prev, next) {
+      if (_openedInitial) return;
+      final targetId = widget.conversationId;
+      if (targetId == null) return;
+      ConversationDto? match;
+      for (final convo in next.items) {
+        if (convo.id == targetId) {
+          match = convo;
+          break;
+        }
+      }
+      if (match != null) {
+        _openedInitial = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _openThread(context, ref, match!);
+        });
+      }
+    });
+
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
@@ -341,4 +369,3 @@ class _EmptyConversationsState extends StatelessWidget {
     );
   }
 }
-

@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soko Photo Editor</title>
+    <meta name="description" content="Professional photo editor for Soko sellers - Edit product images with ease">
+    
+    <!-- Fabric.js (local, avoids CSP/CDN issues) -->
+    <script src="vendor/fabric.min.js"></script>
+    
+    <!-- Lucide Icons (local, avoids CSP/CDN issues) -->
+    <script src="vendor/lucide.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="loader">
+            <div class="loader-spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+        <!-- Top Toolbar -->
+        <header class="top-toolbar">
+            <div class="toolbar-left">
+                <div class="logo">
+                    <span class="logo-icon"><i data-lucide="image"></i></span>
+                    <span class="logo-text">Soko Studio</span>
+                </div>
+                <div class="divider"></div>
+                <div class="history-controls">
+                    <button class="tool-btn" id="btn-undo" title="Undo (Ctrl+Z)" disabled>
+                        <i data-lucide="undo-2"></i>
+                    </button>
+                    <button class="tool-btn" id="btn-redo" title="Redo (Ctrl+Y)" disabled>
+                        <i data-lucide="redo-2"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar-center">
+                <div class="zoom-controls">
+                    <button class="tool-btn" id="btn-zoom-out" title="Zoom Out">
+                        <i data-lucide="zoom-out"></i>
+                    </button>
+                    <span class="zoom-level" id="zoom-level">100%</span>
+                    <button class="tool-btn" id="btn-zoom-in" title="Zoom In">
+                        <i data-lucide="zoom-in"></i>
+                    </button>
+                    <button class="tool-btn" id="btn-zoom-fit" title="Fit to Screen">
+                        <i data-lucide="maximize"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="tool-btn" id="btn-my-uploads" title="My Uploads (Ctrl+O)">
+                    <i data-lucide="images"></i>
+                </button>
+                <button class="tool-btn" id="btn-auto-enhance" title="Auto Enhance">
+                    <i data-lucide="sparkles"></i>
+                </button>
+                <button class="tool-btn" id="btn-shortcuts" title="Keyboard Shortcuts (?)">
+                    <i data-lucide="keyboard"></i>
+                </button>
+                <button class="btn-secondary" id="btn-reset">
+                    <i data-lucide="refresh-cw"></i>
+                    Reset
+                </button>
+                <button class="btn-primary" id="btn-export">
+                    <i data-lucide="save"></i>
+                    Save
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Left Sidebar - Tools -->
+            <aside class="left-sidebar">
+                <div class="tools-panel">
+                    <div class="tool-group">
+                        <h3 class="tool-group-title">Transform</h3>
+                        <button class="sidebar-tool active" data-tool="select" title="Select & Move">
+                            <i data-lucide="mouse-pointer-2"></i>
+                            <span>Select</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="resize" title="Resize & Crop">
+                            <i data-lucide="scaling"></i>
+                            <span>Resize</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="rotate" title="Rotate & Flip">
+                            <i data-lucide="rotate-cw"></i>
+                            <span>Rotate</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <h3 class="tool-group-title">Enhance</h3>
+                        <button class="sidebar-tool" data-tool="adjust" title="Adjustments">
+                            <i data-lucide="sliders-horizontal"></i>
+                            <span>Adjust</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="filters" title="Filters & Effects">
+                            <i data-lucide="sparkles"></i>
+                            <span>Filters</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="background" title="Background Removal">
+                            <i data-lucide="eraser"></i>
+                            <span>Remove BG</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <h3 class="tool-group-title">Create</h3>
+                        <button class="sidebar-tool" data-tool="text" title="Add Text">
+                            <i data-lucide="type"></i>
+                            <span>Text</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="draw" title="Draw & Paint">
+                            <i data-lucide="pencil"></i>
+                            <span>Draw</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="shapes" title="Add Shapes">
+                            <i data-lucide="shapes"></i>
+                            <span>Shapes</span>
+                        </button>
+                    </div>
+                    
+                    <div class="tool-group">
+                        <h3 class="tool-group-title">Organize</h3>
+                        <button class="sidebar-tool" data-tool="layers" title="Layers Panel">
+                            <i data-lucide="layers"></i>
+                            <span>Layers</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="brand" title="Brand Kit">
+                            <i data-lucide="palette"></i>
+                            <span>Brand</span>
+                        </button>
+                        <button class="sidebar-tool" data-tool="history" title="Edit History">
+                            <i data-lucide="history"></i>
+                            <span>History</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Canvas Area -->
+            <main class="canvas-area">
+                <!-- Drop Zone (when no image loaded) -->
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone-content">
+                        <i data-lucide="image-plus" class="drop-icon"></i>
+                        <h2>Drop your image here</h2>
+                        <p>or click to browse</p>
+                        <input type="file" id="file-input" accept="image/*" hidden>
+                        <button class="btn-primary" id="btn-browse">
+                            <i data-lucide="folder-open"></i>
+                            Browse Files
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Canvas Container -->
+                <div class="canvas-container hidden" id="canvas-container">
+                    <canvas id="editor-canvas"></canvas>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Properties -->
+            <aside class="right-sidebar" id="right-sidebar">
+                <!-- Dynamic content based on selected tool -->
+                <div class="properties-panel" id="properties-panel">
+                    <div class="panel-placeholder">
+                        <i data-lucide="settings-2"></i>
+                        <p>Select a tool to see options</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal hidden" id="export-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Save Image</h2>
+                <button class="modal-close" id="modal-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="export-preview">
+                    <img id="export-preview-img" alt="Export preview">
+                </div>
+                
+                <!-- Original File Info (shown when editing existing file) -->
+                <div class="original-file-info hidden" id="original-file-info">
+                    <div class="file-info-badge">
+                        <i data-lucide="file-image"></i>
+                        <span id="original-filename">original.jpg</span>
+                    </div>
+                </div>
+                
+                <div class="export-options">
+                    <!-- Save Mode Selection -->
+                    <div class="form-group" id="save-mode-group">
+                        <label>Save Option</label>
+                        <div class="save-mode-options">
+                            <button class="save-mode-btn active" data-mode="new">
+                                <i data-lucide="file-plus"></i>
+                                Save as New File
+                            </button>
+                            <button class="save-mode-btn" data-mode="replace" id="btn-replace-mode">
+                                <i data-lucide="replace"></i>
+                                Replace Original
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Format</label>
+                        <div class="format-options">
+                            <button class="format-btn active" data-format="png">PNG</button>
+                            <button class="format-btn" data-format="jpeg">JPEG</button>
+                            <button class="format-btn" data-format="webp">WebP</button>
+                        </div>
+                    </div>
+                    <div class="form-group" id="quality-group">
+                        <label>Quality: <span id="quality-value">90%</span></label>
+                        <input type="range" id="export-quality" min="10" max="100" value="90">
+                    </div>
+                    <div class="form-group" id="filename-group">
+                        <label>Filename</label>
+                        <input type="text" id="export-filename" value="edited-image" class="text-input">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-cancel-export">Cancel</button>
+                <button class="btn-secondary" id="btn-download">
+                    <i data-lucide="download"></i>
+                    Download
+                </button>
+                <button class="btn-success" id="btn-save-to-server">
+                    <i data-lucide="cloud-upload"></i>
+                    Save to Server
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uploads Picker Modal -->
+    <div class="modal hidden" id="uploads-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content uploads-content">
+            <div class="modal-header">
+                <h2>My Uploads</h2>
+                <button class="modal-close" id="uploads-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body uploads-body">
+                <div class="uploads-toolbar">
+                    <input type="text" id="uploads-search" value="" class="text-input" placeholder="Search images...">
+                    <select id="uploads-sort" class="text-input">
+                        <option value="newest" selected>Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="smallest">Smallest</option>
+                        <option value="largest">Largest</option>
+                    </select>
+                </div>
+                <div id="uploads-grid" class="uploads-grid">
+                    <div class="uploads-empty">Loading...</div>
+                </div>
+                <div class="uploads-footer">
+                    <button class="btn-secondary" id="uploads-prev" disabled>
+                        <i data-lucide="chevron-left"></i>
+                        Prev
+                    </button>
+                    <button class="btn-secondary" id="uploads-next" disabled>
+                        Next
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-save Indicator -->
+    <div class="autosave-indicator hidden" id="autosave-indicator">
+        <i data-lucide="save"></i>
+        <span>Auto-saved</span>
+    </div>
+
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal hidden" id="shortcuts-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content shortcuts-content">
+            <div class="modal-header">
+                <h2>Keyboard Shortcuts</h2>
+                <button class="modal-close" id="shortcuts-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body shortcuts-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-group">
+                        <h4>General</h4>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Y</kbd><span>Redo</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>S</kbd><span>Save</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>D</kbd><span>Download</span></div>
+                        <div class="shortcut-item"><kbd>Delete</kbd><span>Delete Selected</span></div>
+                        <div class="shortcut-item"><kbd>Esc</kbd><span>Deselect / Cancel</span></div>
+                        <div class="shortcut-item"><kbd>?</kbd><span>Show Shortcuts</span></div>
+                    </div>
+                    <div class="shortcut-group">
+                        <h4>Tools</h4>
+                        <div class="shortcut-item"><kbd>V</kbd><span>Select Tool</span></div>
+                        <div class="shortcut-item"><kbd>R</kbd><span>Resize Tool</span></div>
+                        <div class="shortcut-item"><kbd>T</kbd><span>Text Tool</span></div>
+                        <div class="shortcut-item"><kbd>B</kbd><span>Brush/Draw</span></div>
+                        <div class="shortcut-item"><kbd>E</kbd><span>Eraser</span></div>
+                        <div class="shortcut-item"><kbd>L</kbd><span>Layers Panel</span></div>
+                    </div>
+                    <div class="shortcut-group">
+                        <h4>Canvas</h4>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>+</kbd><span>Zoom In</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>-</kbd><span>Zoom Out</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>0</kbd><span>Fit to Screen</span></div>
+                        <div class="shortcut-item"><kbd>Space</kbd>+<kbd>Drag</kbd><span>Pan Canvas</span></div>
+                    </div>
+                    <div class="shortcut-group">
+                        <h4>Layers</h4>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>]</kbd><span>Bring Forward</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>[</kbd><span>Send Backward</span></div>
+                        <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>J</kbd><span>Duplicate Layer</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tool-specific Panel Templates -->
+    <template id="template-resize-panel">
+        <div class="panel-section">
+            <h3>Resize & Crop</h3>
+            
+            <!-- Soko Product Presets -->
+            <h4>Soko Product Sizes</h4>
+            <div class="preset-grid">
+                <button class="preset-btn" data-width="800" data-height="800" title="Standard product image">
+                    <span class="preset-size">800×800</span>
+                    <span class="preset-label">Standard</span>
+                </button>
+                <button class="preset-btn" data-width="1200" data-height="1200" title="High-res product">
+                    <span class="preset-size">1200×1200</span>
+                    <span class="preset-label">HD</span>
+                </button>
+                <button class="preset-btn" data-width="600" data-height="600" title="Thumbnail">
+                    <span class="preset-size">600×600</span>
+                    <span class="preset-label">Thumb</span>
+                </button>
+                <button class="preset-btn" data-width="1080" data-height="1080" title="Instagram/Social">
+                    <span class="preset-size">1080×1080</span>
+                    <span class="preset-label">Social</span>
+                </button>
+            </div>
+            
+            <div class="divider-line"></div>
+            
+            <!-- Custom Size -->
+            <h4>Custom Size</h4>
+            <div class="size-inputs">
+                <div class="size-input-group">
+                    <label>Width</label>
+                    <input type="number" id="resize-width" class="text-input" placeholder="px">
+                </div>
+                <button class="link-btn active" id="btn-link-dimensions" title="Lock aspect ratio">
+                    <i data-lucide="lock"></i>
+                </button>
+                <div class="size-input-group">
+                    <label>Height</label>
+                    <input type="number" id="resize-height" class="text-input" placeholder="px">
+                </div>
+            </div>
+            
+            <div class="divider-line"></div>
+            
+            <!-- Aspect Ratio Crop -->
+            <h4>Aspect Ratio</h4>
+            <div class="aspect-ratios">
+                <button class="aspect-btn active" data-ratio="free">Free</button>
+                <button class="aspect-btn" data-ratio="1:1">1:1</button>
+                <button class="aspect-btn" data-ratio="4:3">4:3</button>
+                <button class="aspect-btn" data-ratio="16:9">16:9</button>
+                <button class="aspect-btn" data-ratio="9:16">9:16</button>
+            </div>
+            
+            <div class="resize-actions">
+                <button class="btn-secondary" id="btn-cancel-resize">Cancel</button>
+                <button class="btn-primary" id="btn-apply-resize">Apply</button>
+            </div>
+        </div>
+    </template>
+
+    
+    <template id="template-rotate-panel">
+        <div class="panel-section">
+            <h3>Rotation</h3>
+            <div class="form-group">
+                <label>Angle: <span id="rotation-value">0°</span></label>
+                <input type="range" id="rotation-slider" min="-180" max="180" value="0">
+            </div>
+            <div class="quick-rotate">
+                <button class="tool-btn" data-rotate="-90" title="Rotate Left">
+                    <i data-lucide="rotate-ccw"></i>
+                </button>
+                <button class="tool-btn" data-rotate="90" title="Rotate Right">
+                    <i data-lucide="rotate-cw"></i>
+                </button>
+                <button class="tool-btn" data-flip="horizontal" title="Flip Horizontal">
+                    <i data-lucide="flip-horizontal"></i>
+                </button>
+                <button class="tool-btn" data-flip="vertical" title="Flip Vertical">
+                    <i data-lucide="flip-vertical"></i>
+                </button>
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-adjust-panel">
+        <div class="panel-section">
+            <h3>Adjustments</h3>
+            <div class="adjustment-sliders">
+                <div class="form-group">
+                    <label>Brightness <span class="adj-value" id="brightness-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="brightness" min="-100" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Contrast <span class="adj-value" id="contrast-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="contrast" min="-100" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Saturation <span class="adj-value" id="saturation-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="saturation" min="-100" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Hue <span class="adj-value" id="hue-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="hue" min="-180" max="180" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Blur <span class="adj-value" id="blur-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="blur" min="0" max="100" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Noise <span class="adj-value" id="noise-value">0</span></label>
+                    <input type="range" class="adjustment-slider" data-adjust="noise" min="0" max="100" value="0">
+                </div>
+            </div>
+            <button class="btn-secondary full-width" id="btn-reset-adjustments">Reset All</button>
+        </div>
+    </template>
+    
+    <template id="template-filters-panel">
+        <div class="panel-section">
+            <h3>Filters</h3>
+            <div class="filters-grid" id="filters-grid">
+                <!-- Filters will be dynamically inserted -->
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-background-panel">
+        <div class="panel-section">
+            <h3>Background</h3>
+            <button class="btn-primary full-width" id="btn-remove-bg">
+                <i data-lucide="wand-2"></i>
+                Remove Background
+            </button>
+            <div class="form-group" style="margin-top: 12px;">
+                <label>Tolerance: <span id="bg-tolerance-value">32</span></label>
+                <input type="range" id="bg-tolerance" min="5" max="90" value="32">
+            </div>
+            <div class="form-group">
+                <label>Feather: <span id="bg-feather-value">2</span>px</label>
+                <input type="range" id="bg-feather" min="0" max="12" value="2">
+            </div>
+            <div class="divider-line"></div>
+            <h4>Replace Background</h4>
+            <div class="bg-colors">
+                <button class="bg-color-btn" data-color="transparent" title="Transparent">
+                    <span class="transparent-pattern"></span>
+                </button>
+                <button class="bg-color-btn" data-color="#ffffff" style="background:#ffffff"></button>
+                <button class="bg-color-btn" data-color="#000000" style="background:#000000"></button>
+                <button class="bg-color-btn" data-color="#ff6b6b" style="background:#ff6b6b"></button>
+                <button class="bg-color-btn" data-color="#4ecdc4" style="background:#4ecdc4"></button>
+                <button class="bg-color-btn" data-color="#ffe66d" style="background:#ffe66d"></button>
+            </div>
+            <div class="form-group">
+                <label>Custom Color</label>
+                <input type="color" id="bg-custom-color" value="#ffffff" class="color-input">
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-text-panel">
+        <div class="panel-section">
+            <h3>Add Text</h3>
+            <div class="form-group">
+                <textarea id="text-content" class="text-input" placeholder="Enter your text..." rows="3"></textarea>
+            </div>
+            <button class="btn-primary full-width" id="btn-add-text">
+                <i data-lucide="plus"></i>
+                Add Text
+            </button>
+            <div class="divider-line"></div>
+            <h4>Text Properties</h4>
+            <div class="form-group">
+                <label>Font Family</label>
+                <select id="font-family" class="select-input">
+                    <option value="system-ui" selected>System</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Verdana">Verdana</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Font Size: <span id="font-size-value">32px</span></label>
+                <input type="range" id="font-size" min="8" max="200" value="32">
+            </div>
+            <div class="text-style-buttons">
+                <button class="style-btn" id="btn-bold" title="Bold">
+                    <i data-lucide="bold"></i>
+                </button>
+                <button class="style-btn" id="btn-italic" title="Italic">
+                    <i data-lucide="italic"></i>
+                </button>
+                <button class="style-btn" id="btn-underline" title="Underline">
+                    <i data-lucide="underline"></i>
+                </button>
+            </div>
+            <div class="form-group">
+                <label>Text Color</label>
+                <input type="color" id="text-color" value="#ffffff" class="color-input">
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-draw-panel">
+        <div class="panel-section">
+            <h3>Drawing</h3>
+            <div class="draw-tools">
+                <button class="draw-tool-btn active" data-draw="brush" title="Brush">
+                    <i data-lucide="brush"></i>
+                </button>
+                <button class="draw-tool-btn" data-draw="pencil" title="Pencil">
+                    <i data-lucide="pencil"></i>
+                </button>
+                <button class="draw-tool-btn" data-draw="spray" title="Spray">
+                    <i data-lucide="droplets"></i>
+                </button>
+                <button class="draw-tool-btn" data-draw="eraser" title="Eraser">
+                    <i data-lucide="eraser"></i>
+                </button>
+            </div>
+            <div class="form-group">
+                <label>Brush Size: <span id="brush-size-value">10px</span></label>
+                <input type="range" id="brush-size" min="1" max="100" value="10">
+            </div>
+            <div class="form-group">
+                <label>Opacity: <span id="brush-opacity-value">100%</span></label>
+                <input type="range" id="brush-opacity" min="0" max="100" value="100">
+            </div>
+            <div class="form-group">
+                <label>Brush Color</label>
+                <input type="color" id="brush-color" value="#ffffff" class="color-input">
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-shapes-panel">
+        <div class="panel-section">
+            <h3>Shapes</h3>
+            <div class="shapes-grid">
+                <button class="shape-btn" data-shape="rect" title="Rectangle">
+                    <i data-lucide="square"></i>
+                </button>
+                <button class="shape-btn" data-shape="circle" title="Circle">
+                    <i data-lucide="circle"></i>
+                </button>
+                <button class="shape-btn" data-shape="triangle" title="Triangle">
+                    <i data-lucide="triangle"></i>
+                </button>
+                <button class="shape-btn" data-shape="line" title="Line">
+                    <i data-lucide="minus"></i>
+                </button>
+                <button class="shape-btn" data-shape="arrow" title="Arrow">
+                    <i data-lucide="arrow-right"></i>
+                </button>
+                <button class="shape-btn" data-shape="star" title="Star">
+                    <i data-lucide="star"></i>
+                </button>
+            </div>
+            <div class="form-group">
+                <label>Fill Color</label>
+                <input type="color" id="shape-fill" value="#4ecdc4" class="color-input">
+            </div>
+            <div class="form-group">
+                <label>Stroke Color</label>
+                <input type="color" id="shape-stroke" value="#ffffff" class="color-input">
+            </div>
+            <div class="form-group">
+                <label>Stroke Width: <span id="stroke-width-value">2px</span></label>
+                <input type="range" id="stroke-width" min="0" max="20" value="2">
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-layers-panel">
+        <div class="panel-section">
+            <h3>Layers</h3>
+            <div class="layers-toolbar">
+                <button class="tool-btn" id="btn-layer-up" title="Move Up">
+                    <i data-lucide="chevron-up"></i>
+                </button>
+                <button class="tool-btn" id="btn-layer-down" title="Move Down">
+                    <i data-lucide="chevron-down"></i>
+                </button>
+                <button class="tool-btn" id="btn-layer-delete" title="Delete Layer">
+                    <i data-lucide="trash-2"></i>
+                </button>
+                <button class="tool-btn" id="btn-layer-duplicate" title="Duplicate">
+                    <i data-lucide="copy"></i>
+                </button>
+            </div>
+            <div class="layers-list" id="layers-list">
+                <!-- Layers will be dynamically inserted -->
+            </div>
+        </div>
+    </template>
+
+    <template id="template-brand-panel">
+        <div class="panel-section">
+            <h3>Brand Kit</h3>
+            <div class="panel-note" id="brand-kit-loading">Loading brand kit…</div>
+            <div class="panel-note hidden" id="brand-kit-error">Unable to load brand kit.</div>
+            <div class="hidden" id="brand-kit-content">
+                <div class="brand-logo-row">
+                    <div class="brand-logo-preview">
+                        <img id="brand-logo-img" alt="Brand logo" class="hidden">
+                        <div id="brand-logo-placeholder" class="brand-logo-placeholder">
+                            <i data-lucide="image"></i>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" id="btn-add-brand-logo">
+                        <i data-lucide="plus"></i>
+                        Add Logo
+                    </button>
+                </div>
+                <div class="divider-line"></div>
+                <h4>Colors</h4>
+                <div class="bg-colors" id="brand-colors"></div>
+                <div class="divider-line"></div>
+                <h4>Watermark</h4>
+                <div class="form-group">
+                    <label>Text</label>
+                    <input type="text" id="brand-watermark-text" class="text-input" placeholder="Your brand">
+                </div>
+                <button class="btn-secondary full-width" id="btn-add-watermark">
+                    <i data-lucide="stamp"></i>
+                    Add Watermark
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-history-panel">
+        <div class="panel-section">
+            <h3>History</h3>
+            <div class="panel-note" id="history-note">Open an uploaded image to see versions.</div>
+            <div class="history-list" id="history-list"></div>
+        </div>
+    </template>
+
+    <!-- Main Editor Script -->
+    <script src="editor.js"></script>
+</body>
+</html>

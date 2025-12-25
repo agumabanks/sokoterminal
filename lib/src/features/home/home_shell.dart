@@ -12,6 +12,7 @@ import '../settings/staff_pin_controller.dart';
 import '../notifications/notifications_controller.dart';
 import '../../core/sync/sync_service.dart';
 import '../../widgets/pin_prompt_sheet.dart';
+import '../../widgets/connectivity_banner.dart';
 import '../receipts/receipt_providers.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -46,20 +47,27 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ref.watch(notificationsControllerProvider);
     final staffState = ref.watch(staffPinProvider);
     return Scaffold(
-      body: Stack(
+      body: Column(
         children: [
-          widget.shell,
-          if (staffState.enabled && staffState.locked)
-            Container(
-              color: Colors.black.withOpacity(0.6),
-              child: Center(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.lock_open),
-                  label: const Text('Unlock staff PIN'),
-                  onPressed: () => _promptUnlock(context, ref),
-                ),
-              ),
+          const ConnectivityBanner(),
+          Expanded(
+            child: Stack(
+              children: [
+                widget.shell,
+                if (staffState.enabled && staffState.locked)
+                  Container(
+                    color: Colors.black.withOpacity(0.6),
+                    child: Center(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.lock_open),
+                        label: const Text('Unlock staff PIN'),
+                        onPressed: () => _promptUnlock(context, ref),
+                      ),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
