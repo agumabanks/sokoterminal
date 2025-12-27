@@ -67,8 +67,9 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     } catch (e) {
       _error = e;
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -109,8 +110,9 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
         SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 

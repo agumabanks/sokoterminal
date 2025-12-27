@@ -182,7 +182,7 @@ class CouponsScreen extends ConsumerWidget {
           Container(
             padding: DesignTokens.paddingMd,
             decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withOpacity(0.25),
+              color: DesignTokens.grayLight.withValues(alpha: 0.25),
               borderRadius: DesignTokens.borderRadiusMd,
             ),
             child: Column(
@@ -255,7 +255,7 @@ class CouponsScreen extends ConsumerWidget {
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: discountType,
+                      initialValue: discountType,
                       items: const [
                         DropdownMenuItem(value: 'percent', child: Text('Percent')),
                         DropdownMenuItem(value: 'amount', child: Text('Amount')),
@@ -353,14 +353,14 @@ class _CouponCard extends StatelessWidget {
           color: DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
-          border: Border.all(color: DesignTokens.grayLight.withOpacity(0.8)),
+          border: Border.all(color: DesignTokens.grayLight.withValues(alpha: 0.8)),
         ),
         child: Row(
           children: [
             Container(
               padding: DesignTokens.paddingSm,
               decoration: BoxDecoration(
-                color: DesignTokens.brandAccent.withOpacity(0.12),
+                color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
               child: const Icon(Icons.confirmation_number_outlined, color: DesignTokens.brandAccent),
@@ -416,4 +416,3 @@ String _ymd(DateTime dt) {
   final d = dt.toLocal();
   return '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
-

@@ -110,7 +110,8 @@ class ServiceVariantsScreen extends ConsumerWidget {
     final sync = ref.read(syncServiceProvider);
 
     await db.deleteServiceVariant(v.id);
-    await sync.enqueue('service_variant_delete', {'id': v.id});
+    await sync.enqueue('service_variant_delete', {'variant_id': v.id});
+    unawaited(sync.syncNow());
   }
 
   Future<void> _showEditor(BuildContext context, WidgetRef ref, {ServiceVariant? variant}) async {
@@ -177,22 +178,19 @@ class ServiceVariantsScreen extends ConsumerWidget {
                   unit: Value(unit),
                   isDefault: Value(isDefault),
                   updatedAt: Value(now),
-                  synced: const Value(true), // Optimistic
+                  synced: const Value(false),
                 );
 
                 await db.upsertServiceVariant(companion);
 
-                await sync.enqueue(
-                  variant == null ? 'service_variant_create' : 'service_variant_update',
-                  {
-                    'local_id': id,
-                    'service_id': serviceId,
-                    'name': name,
-                    'price': price,
-                    'unit': unit,
-                    'is_default': isDefault ? 1 : 0,
-                  },
-                );
+                await sync.enqueue('service_variant_push', {
+                  'id': id,
+                  'service_id': serviceId,
+                  'name': name,
+                  'price': price,
+                  'unit': unit,
+                  'is_default': isDefault ? 1 : 0,
+                });
                 
                 // Trigger immediate sync attempt
                 unawaited(sync.syncNow());

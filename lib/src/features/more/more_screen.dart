@@ -86,6 +86,41 @@ class MoreScreen extends ConsumerWidget {
                 onTap: () => context.go('/home/more/items'),
               ),
               ActionTile(
+                title: 'Suppliers',
+                subtitle: 'Manage suppliers',
+                icon: Icons.local_shipping_outlined,
+                iconColor: DesignTokens.grayMedium,
+                onTap: () => context.go('/home/more/suppliers'),
+              ),
+              ActionTile(
+                title: 'Purchase Orders',
+                subtitle: 'Create supplier POs',
+                icon: Icons.playlist_add_check_outlined,
+                iconColor: DesignTokens.brandAccent,
+                onTap: () => context.go('/home/more/purchase-orders'),
+              ),
+              ActionTile(
+                title: 'Receive Stock',
+                subtitle: 'Goods received (GRN)',
+                icon: Icons.call_received_outlined,
+                iconColor: DesignTokens.success,
+                onTap: () => context.go('/home/more/receive-stock'),
+              ),
+              ActionTile(
+                title: 'Stock Count',
+                subtitle: 'Stocktake & variances',
+                icon: Icons.fact_check_outlined,
+                iconColor: Colors.deepPurple,
+                onTap: () => context.go('/home/more/stocktake'),
+              ),
+              ActionTile(
+                title: 'Low Stock',
+                subtitle: 'Reorder suggestions',
+                icon: Icons.warning_amber_outlined,
+                iconColor: DesignTokens.warning,
+                onTap: () => context.go('/home/more/low-stock'),
+              ),
+              ActionTile(
                 title: 'Services',
                 subtitle: 'Bookings & availability',
                 icon: Icons.room_service_outlined,
@@ -253,7 +288,7 @@ class MoreScreen extends ConsumerWidget {
               subtitle: 'Log out of this device',
               icon: Icons.logout,
               iconColor: DesignTokens.error,
-              iconBackgroundColor: DesignTokens.error.withOpacity(0.1),
+              iconBackgroundColor: DesignTokens.error.withValues(alpha: 0.1),
               showChevron: false,
               onTap: () {
                 ref.read(authControllerProvider.notifier).logout();

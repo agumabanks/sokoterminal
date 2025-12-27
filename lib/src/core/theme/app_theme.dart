@@ -24,12 +24,10 @@ class AppTheme {
         primary: DesignTokens.brandPrimary,
         secondary: DesignTokens.brandAccent,
         surface: DesignTokens.surface,
-        background: DesignTokens.surface,
         error: DesignTokens.error,
         onPrimary: DesignTokens.surfaceWhite,
         onSecondary: DesignTokens.surfaceWhite,
         onSurface: DesignTokens.grayDark,
-        onBackground: DesignTokens.grayDark,
       ),
 
       // Scaffold
@@ -181,7 +179,7 @@ class AppTheme {
 
       // Chips
       chipTheme: ChipThemeData(
-        backgroundColor: DesignTokens.grayLight.withOpacity(0.5),
+        backgroundColor: DesignTokens.grayLight.withValues(alpha: 0.5),
         labelStyle: DesignTokens.textSmall.copyWith(
           fontWeight: FontWeight.w500,
         ),
@@ -197,15 +195,15 @@ class AppTheme {
 
       // Switch
       switchTheme: SwitchThemeData(
-        thumbColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
             return DesignTokens.brandAccent;
           }
           return DesignTokens.grayMedium;
         }),
-        trackColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
-            return DesignTokens.brandAccent.withOpacity(0.3);
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return DesignTokens.brandAccent.withValues(alpha: 0.3);
           }
           return DesignTokens.grayLight;
         }),
@@ -213,7 +211,7 @@ class AppTheme {
 
       // Divider
       dividerTheme: DividerThemeData(
-        color: DesignTokens.grayLight.withOpacity(0.5),
+        color: DesignTokens.grayLight.withValues(alpha: 0.5),
         thickness: 1,
         space: 1,
       ),

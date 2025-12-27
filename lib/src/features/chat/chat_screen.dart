@@ -180,7 +180,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: DesignTokens.brandAccent.withOpacity(0.12),
+                        backgroundColor: DesignTokens.brandAccent.withValues(alpha: 0.12),
                         child: const Icon(Icons.chat_bubble_outline, color: DesignTokens.brandAccent),
                       ),
                       title: Text(convo.name.isEmpty ? 'Conversation' : convo.name, style: DesignTokens.textBodyBold),
@@ -278,8 +278,8 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: msg.outgoing
-                            ? DesignTokens.brandAccent.withOpacity(0.12)
-                            : DesignTokens.grayLight.withOpacity(0.35),
+                            ? DesignTokens.brandAccent.withValues(alpha: 0.12)
+                            : DesignTokens.grayLight.withValues(alpha: 0.35),
                         borderRadius: DesignTokens.borderRadiusMd,
                       ),
                       child: Column(
@@ -306,7 +306,7 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
           ),
           decoration: BoxDecoration(
             color: DesignTokens.surfaceWhite,
-            border: Border(top: BorderSide(color: DesignTokens.grayLight.withOpacity(0.7))),
+            border: Border(top: BorderSide(color: DesignTokens.grayLight.withValues(alpha: 0.7))),
           ),
           child: Row(
             children: [

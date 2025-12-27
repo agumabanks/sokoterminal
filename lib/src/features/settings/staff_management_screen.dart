@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/auth/pos_session_controller.dart';
+import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/network/seller_api.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_button.dart';
@@ -70,13 +74,15 @@ class StaffState {
 final staffControllerProvider =
     StateNotifierProvider<StaffController, StaffState>((ref) {
   final api = ref.watch(sellerApiProvider);
-  return StaffController(api)..load();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return StaffController(api, prefs)..load();
 });
 
 class StaffController extends StateNotifier<StaffState> {
-  StaffController(this._api) : super(const StaffState());
+  StaffController(this._api, this._prefs) : super(const StaffState());
 
   final SellerApi _api;
+  final SharedPreferences _prefs;
 
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
@@ -88,10 +94,12 @@ class StaffController extends StateNotifier<StaffState> {
       final staff = list
           .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
           .toList();
+      final initialized = staff.isNotEmpty;
+      await _prefs.setBool(posStaffInitializedPrefKey, initialized);
       state = state.copyWith(
         loading: false,
         staff: staff,
-        initialized: staff.isNotEmpty,
+        initialized: initialized,
       );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
@@ -170,6 +178,7 @@ class StaffManagementScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(staffControllerProvider);
     final controller = ref.read(staffControllerProvider.notifier);
+    final posSession = ref.watch(posSessionProvider);
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -183,7 +192,26 @@ class StaffManagementScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: _buildBody(context, state, controller),
+      body: Column(
+        children: [
+          if (state.initialized)
+            _PosSessionCard(
+              session: posSession,
+              onLogin: () => context.go('/pos-login?redirect=/home/more/staff'),
+              onLogout: () async {
+                await ref.read(posSessionProvider.notifier).end();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Signed out'),
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
+                );
+              },
+            ),
+          Expanded(child: _buildBody(context, state, controller)),
+        ],
+      ),
     );
   }
 
@@ -248,7 +276,7 @@ class StaffManagementScreen extends ConsumerWidget {
       final result = await BottomSheetModal.show<Map<String, dynamic>>(
         context: context,
         title: 'Add Staff Member',
-        builder: (ctx) => _StaffForm(),
+        child: _StaffForm(),
       );
       if (result != null) {
         final ok = await controller.create(
@@ -277,7 +305,7 @@ class StaffManagementScreen extends ConsumerWidget {
       final result = await BottomSheetModal.show<Map<String, dynamic>>(
         context: context,
         title: 'Edit Staff',
-        builder: (ctx) => _StaffForm(initial: member),
+        child: _StaffForm(initial: member),
       );
       if (result != null) {
         if (result['delete'] == true) {
@@ -309,6 +337,76 @@ class StaffManagementScreen extends ConsumerWidget {
         }
       }
     }());
+  }
+}
+
+class _PosSessionCard extends StatelessWidget {
+  const _PosSessionCard({
+    required this.session,
+    required this.onLogin,
+    required this.onLogout,
+  });
+
+  final PosSessionState session;
+  final VoidCallback onLogin;
+  final Future<void> Function() onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = session.isActive
+        ? '${session.staffName ?? 'Staff'} • ${(session.staffRole ?? '').toLowerCase()}'
+        : 'Not signed in';
+    final subtitle = session.isActive
+        ? 'Signed in for sync and privileged actions.'
+        : 'Sign in to sync sales and cash movements.';
+
+    return Container(
+      margin: DesignTokens.paddingScreen,
+      padding: DesignTokens.paddingMd,
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceWhite,
+        borderRadius: DesignTokens.borderRadiusMd,
+        boxShadow: DesignTokens.shadowSm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('POS Session', style: DesignTokens.textBodyBold),
+          const SizedBox(height: DesignTokens.spaceXs),
+          Text(title, style: DesignTokens.textBody),
+          const SizedBox(height: DesignTokens.spaceXs),
+          Text(subtitle, style: DesignTokens.textSmall),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: session.loading ? null : onLogin,
+                  icon: session.loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(session.isActive ? Icons.switch_account : Icons.login),
+                  label: Text(session.isActive ? 'Switch staff' : 'Sign in'),
+                ),
+              ),
+              if (session.isActive) ...[
+                const SizedBox(width: DesignTokens.spaceSm),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: session.loading ? null : () => unawaited(onLogout()),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign out'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -436,8 +534,8 @@ class _StaffCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: member.role == 'manager'
-                    ? DesignTokens.brandPrimary.withOpacity(0.1)
-                    : DesignTokens.brandAccent.withOpacity(0.1),
+                    ? DesignTokens.brandPrimary.withValues(alpha: 0.1)
+                    : DesignTokens.brandAccent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
               ),
               child: Text(
@@ -455,7 +553,7 @@ class _StaffCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: DesignTokens.error.withOpacity(0.1),
+                  color: DesignTokens.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
                 ),
                 child: Text(
@@ -517,7 +615,7 @@ class _StaffFormState extends State<_StaffForm> {
           ),
           const SizedBox(height: DesignTokens.spaceMd),
           DropdownButtonFormField<String>(
-            value: _role,
+            initialValue: _role,
             decoration: const InputDecoration(labelText: 'Role'),
             items: const [
               DropdownMenuItem(value: 'cashier', child: Text('Cashier')),

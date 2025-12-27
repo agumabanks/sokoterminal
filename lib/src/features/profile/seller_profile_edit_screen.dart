@@ -55,8 +55,9 @@ class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScree
     } catch (e) {
       _error = e;
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -93,8 +94,9 @@ class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScree
         SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -254,4 +256,3 @@ String? _extractMessage(dynamic body) {
   }
   return null;
 }
-

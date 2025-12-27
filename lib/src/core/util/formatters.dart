@@ -1,5 +1,12 @@
 import 'package:intl/intl.dart';
 
+/// Formats a POS receipt number as `000-XXX` (e.g., `000-001`).
+String formatPosReceiptNumber(int? number) {
+  if (number == null || number <= 0) return '000-001';
+  final numStr = number.toString().padLeft(3, '0');
+  return '000-$numStr';
+}
+
 extension PriceExtensions on num {
   /// Formats a number to UGX with comma separators.
   /// Example: 1000 -> UGX 1,000

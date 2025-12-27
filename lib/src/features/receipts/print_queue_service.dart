@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/db/app_database.dart';

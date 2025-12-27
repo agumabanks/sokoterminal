@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/settings/shop_payment_settings.dart';
 import '../../core/theme/design_tokens.dart';
 
 class PaymentSettingsScreen extends ConsumerStatefulWidget {
@@ -56,31 +57,33 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
       _error = null;
     });
 
+    final prefs = ref.read(sharedPreferencesProvider);
+    final cached = ShopPaymentSettingsCache.tryRead(prefs);
+    if (cached != null) {
+      _applySettings(cached);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+      }
+    }
+
     try {
       final api = ref.read(sellerApiProvider);
       final res = await api.fetchShopInfo();
       final data = _unwrapData(res.data);
-
-      _cashEnabled = _asBool(data['cash_on_delivery_status'], defaultValue: true);
-      _bankEnabled = _asBool(data['bank_payment_status'], defaultValue: false);
-
-      _bankNameCtrl.text = (data['bank_name'] ?? '').toString();
-      _bankAccNameCtrl.text = (data['bank_acc_name'] ?? '').toString();
-      _bankAccNoCtrl.text = (data['bank_acc_no'] ?? '').toString();
-      _bankRoutingCtrl.text = (data['bank_routing_no'] ?? '').toString();
-      
-      // Mobile money
-      _mtnMerchantCtrl.text = (data['mtn_merchant_code'] ?? '').toString();
-      _airtelMerchantCtrl.text = (data['airtel_merchant_code'] ?? '').toString();
-      _paybillCtrl.text = (data['paybill_number'] ?? '').toString();
-      _mobileMoneyEnabled = _mtnMerchantCtrl.text.isNotEmpty || 
-                            _airtelMerchantCtrl.text.isNotEmpty ||
-                            _paybillCtrl.text.isNotEmpty;
+      final settings = ShopPaymentSettings.fromShopInfo(data);
+      _applySettings(settings);
+      await ShopPaymentSettingsCache.write(prefs, settings);
     } catch (e) {
-      _error = e;
+      if (cached == null) {
+        _error = e;
+      }
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -88,18 +91,9 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
     setState(() => _saving = true);
     try {
       final api = ref.read(sellerApiProvider);
-      final res = await api.updateShopInfo({
-        'cash_on_delivery_status': _cashEnabled ? 1 : 0,
-        'bank_payment_status': _bankEnabled ? 1 : 0,
-        'bank_name': _bankNameCtrl.text.trim(),
-        'bank_acc_name': _bankAccNameCtrl.text.trim(),
-        'bank_acc_no': _bankAccNoCtrl.text.trim(),
-        'bank_routing_no': _bankRoutingCtrl.text.trim(),
-        // Mobile money
-        'mtn_merchant_code': _mtnMerchantCtrl.text.trim(),
-        'airtel_merchant_code': _airtelMerchantCtrl.text.trim(),
-        'paybill_number': _paybillCtrl.text.trim(),
-      });
+      final settings = _collectSettings();
+      final res = await api.updateShopInfo(settings.toUpdatePayload());
+      await ShopPaymentSettingsCache.write(ref.read(sharedPreferencesProvider), settings);
 
       final msg = _extractMessage(res.data) ?? 'Payment settings updated';
       if (!mounted) return;
@@ -112,9 +106,38 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
         SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
+  }
+
+  ShopPaymentSettings _collectSettings() {
+    return ShopPaymentSettings(
+      cashEnabled: _cashEnabled,
+      bankEnabled: _bankEnabled,
+      mobileMoneyEnabled: _mobileMoneyEnabled,
+      bankName: _bankNameCtrl.text.trim(),
+      bankAccountName: _bankAccNameCtrl.text.trim(),
+      bankAccountNumber: _bankAccNoCtrl.text.trim(),
+      bankRoutingNumber: _bankRoutingCtrl.text.trim(),
+      mtnMerchantCode: _mtnMerchantCtrl.text.trim(),
+      airtelMerchantCode: _airtelMerchantCtrl.text.trim(),
+      paybillNumber: _paybillCtrl.text.trim(),
+    );
+  }
+
+  void _applySettings(ShopPaymentSettings settings) {
+    _cashEnabled = settings.cashEnabled;
+    _bankEnabled = settings.bankEnabled;
+    _bankNameCtrl.text = settings.bankName;
+    _bankAccNameCtrl.text = settings.bankAccountName;
+    _bankAccNoCtrl.text = settings.bankAccountNumber;
+    _bankRoutingCtrl.text = settings.bankRoutingNumber;
+    _mtnMerchantCtrl.text = settings.mtnMerchantCode;
+    _airtelMerchantCtrl.text = settings.airtelMerchantCode;
+    _paybillCtrl.text = settings.paybillNumber;
+    _mobileMoneyEnabled = settings.mobileMoneyEnabled;
   }
 
   @override
@@ -351,16 +374,6 @@ Map<String, dynamic> _unwrapData(dynamic body) {
     return body;
   }
   return <String, dynamic>{};
-}
-
-bool _asBool(dynamic value, {required bool defaultValue}) {
-  if (value == null) return defaultValue;
-  if (value is bool) return value;
-  if (value is num) return value != 0;
-  final s = value.toString().toLowerCase().trim();
-  if (s == '1' || s == 'true' || s == 'yes') return true;
-  if (s == '0' || s == 'false' || s == 'no') return false;
-  return defaultValue;
 }
 
 String? _extractMessage(dynamic body) {

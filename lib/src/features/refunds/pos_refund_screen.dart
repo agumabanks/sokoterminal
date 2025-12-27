@@ -1,16 +1,18 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart' hide Column;
+import 'package:drift/drift.dart' as drift hide Column;
 
 import '../../core/app_providers.dart';
+import '../../core/auth/pos_session_controller.dart';
+import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/formatters.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/error_page.dart';
@@ -44,21 +46,38 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   }
 
   Future<void> _searchReceipts(String query) async {
-    if (query.isEmpty) {
-      setState(() => _searchResults = []);
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _error = null;
+      });
       return;
     }
     
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
     try {
       final db = ref.read(appDatabaseProvider);
-      // Search by idempotency key (receipt number) or date
-      final results = await (db.select(db.ledgerEntries)
+      // Search by receipt number (preferred), fallback to idempotency key.
+      final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+      final q = db.select(db.ledgerEntries)
         ..where((t) => t.type.equals('sale'))
-        ..where((t) => t.idempotencyKey.like('%$query%'))
-        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-        ..limit(20))
-        .get();
+        ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)])
+        ..limit(20);
+      if (digits.isNotEmpty) {
+        final receiptNo = int.tryParse(digits);
+        if (receiptNo != null) {
+          q.where((t) => t.receiptNumber.equals(receiptNo));
+        } else {
+          q.where((t) => t.idempotencyKey.like('%$trimmed%'));
+        }
+      } else {
+        q.where((t) => t.idempotencyKey.like('%$trimmed%'));
+      }
+      final results = await q.get();
       
       setState(() {
         _searchResults = results;
@@ -114,67 +133,106 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
     
     setState(() => _loading = true);
     try {
+      final approved = await requireManagerPin(
+        context,
+        ref,
+        reason: 'process a refund',
+      );
+      if (!approved) {
+        setState(() => _loading = false);
+        return;
+      }
+
       final db = ref.read(appDatabaseProvider);
       final sync = ref.read(syncServiceProvider);
-      final uuid = const Uuid();
+      final actorStaffId =
+          ref.read(posSessionProvider).staffId?.toString() ?? _selectedSale!.staffId;
       
-      final refundId = uuid.v4();
-      final idempotencyKey = 'REF-${DateTime.now().millisecondsSinceEpoch}';
+      final refundId = const Uuid().v4();
+      final idempotencyKey = 'refund_$refundId';
+      final occurredAt = DateTime.now().toUtc();
       
-      // Build refund lines
-      final refundLines = <Map<String, dynamic>>[];
+      // Build refund lines (store positive amounts; entry type indicates refund).
+      final lineRows = <LedgerLinesCompanion>[];
+      final apiLines = <Map<String, dynamic>>[];
       for (final line in _saleLines) {
         final qty = _refundQuantities[line.id] ?? 0;
-        if (qty > 0) {
-          refundLines.add({
-            'title': line.title,
-            'item_id': line.itemId,
-            'service_id': line.serviceId,
-            'quantity': -qty, // Negative for refund
-            'unit_price': line.unitPrice,
-            'line_total': -(line.unitPrice * qty),
-          });
-        }
+        if (qty <= 0) continue;
+
+        final lineTotal = line.unitPrice * qty;
+        lineRows.add(
+          LedgerLinesCompanion.insert(
+            entryId: refundId,
+            title: line.title,
+            itemId: drift.Value(line.itemId),
+            serviceId: drift.Value(line.serviceId),
+            variant: drift.Value(line.variant),
+            quantity: qty,
+            unitPrice: line.unitPrice,
+            lineTotal: lineTotal,
+          ),
+        );
+
+        apiLines.add({
+          'product_id': line.itemId,
+          'service_id': line.serviceId,
+          'name': line.title,
+          if (line.variant != null && line.variant!.trim().isNotEmpty)
+            'variation': line.variant,
+          'price': line.unitPrice,
+          'quantity': qty,
+          'subtotal': lineTotal,
+        });
       }
       
-      // Create refund ledger entry (negative amounts)
-      await db.into(db.ledgerEntries).insert(
-        LedgerEntriesCompanion.insert(
+      // Get next receipt number for refund
+      final receiptNumber = await db.getNextReceiptNumber();
+      final outletId =
+          _selectedSale!.outletId ?? (await db.getPrimaryOutlet())?.id;
+
+      final refundNote = _noteCtrl.text.trim().isEmpty
+          ? 'Refund for ${formatPosReceiptNumber(_selectedSale!.receiptNumber)}'
+          : _noteCtrl.text.trim();
+
+      await db.saveLedgerEntry(
+        entry: LedgerEntriesCompanion.insert(
           id: drift.Value(refundId),
+          receiptNumber: drift.Value(receiptNumber),
           idempotencyKey: idempotencyKey,
           type: 'refund',
           originalEntryId: drift.Value(_selectedSale!.id),
-          outletId: drift.Value(_selectedSale!.outletId),
-          staffId: drift.Value(_selectedSale!.staffId),
+          outletId: drift.Value(outletId),
+          staffId: drift.Value(actorStaffId),
           customerId: drift.Value(_selectedSale!.customerId),
-          total: drift.Value(-_refundTotal),
-          note: drift.Value(_noteCtrl.text.isNotEmpty 
-              ? 'Refund: ${_noteCtrl.text}' 
-              : 'Refund for ${_selectedSale!.idempotencyKey}'),
+          subtotal: drift.Value(_refundTotal),
+          discount: const drift.Value(0),
+          tax: const drift.Value(0),
+          total: drift.Value(_refundTotal),
+          note: drift.Value(refundNote),
+          createdAt: drift.Value(occurredAt),
         ),
-      );
-      
-      // Insert refund lines
-      for (final lineData in refundLines) {
-        await db.into(db.ledgerLines).insert(
-          LedgerLinesCompanion.insert(
+        lines: lineRows,
+        payments: [
+          PaymentsCompanion.insert(
             entryId: refundId,
-            title: lineData['title'] as String,
-            itemId: drift.Value(lineData['item_id'] as String?),
-            serviceId: drift.Value(lineData['service_id'] as String?),
-            quantity: lineData['quantity'] as int,
-            unitPrice: lineData['unit_price'] as double,
-            lineTotal: lineData['line_total'] as double,
+            method: 'cash',
+            amount: _refundTotal,
           ),
-        );
-      }
-      
-      // Restore stock for refunded items
+        ],
+      );
+
+      // Restore stock for refunded items (best-effort).
       for (final line in _saleLines) {
         final qty = _refundQuantities[line.id] ?? 0;
-        if (qty > 0 && line.itemId != null) {
-          await db.restoreStock(line.itemId!, qty);
-        }
+        if (qty <= 0) continue;
+        final itemId = line.itemId;
+        if (itemId == null || itemId.isEmpty) continue;
+        await db.recordInventoryMovement(
+          itemId: itemId,
+          delta: qty,
+          note: 'refund',
+          variant: line.variant ?? '',
+        );
       }
       
       // Queue sync
@@ -183,10 +241,30 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         'idempotency_key': idempotencyKey,
         'type': 'refund',
         'original_entry_id': _selectedSale!.id,
-        'total': -_refundTotal,
-        'lines': refundLines,
-        'note': _noteCtrl.text,
+        'subtotal': _refundTotal,
+        'discount': 0,
+        'tax': 0,
+        'total': _refundTotal,
+        'note': refundNote,
+        'occurred_at': occurredAt.toIso8601String(),
+        'customer_id': _selectedSale!.customerId,
+        'payments': [
+          {'method': 'cash', 'amount': _refundTotal},
+        ],
+        'lines': apiLines,
       });
+      await db.recordAuditLog(
+        actorStaffId: actorStaffId,
+        action: 'refund',
+        payload: {
+          'refund_entry_id': refundId,
+          'original_entry_id': _selectedSale!.id,
+          'refund_receipt_number': receiptNumber,
+          'amount': _refundTotal,
+          'lines': apiLines,
+          if (refundNote.trim().isNotEmpty) 'note': refundNote.trim(),
+        },
+      );
       unawaited(sync.syncNow());
       
       if (!mounted) return;
@@ -230,11 +308,21 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           const SizedBox(height: DesignTokens.spaceSm),
           AppInput(
             controller: _searchCtrl,
-            label: 'Receipt number',
+            label: 'Receipt number (e.g. 000-123)',
             prefixIcon: Icons.search,
             onChanged: (v) => _searchReceipts(v),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+              child: ErrorPage(
+                title: 'Refund search failed',
+                message: _error,
+                onRetry: () => _searchReceipts(_searchCtrl.text),
+              ),
+            )
+          else
           if (_searching)
             const Center(child: CircularProgressIndicator())
           else if (_searchResults.isEmpty && _searchCtrl.text.isNotEmpty)
@@ -286,7 +374,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Refunding: ${_selectedSale!.idempotencyKey}',
+                      'Refunding: ${formatPosReceiptNumber(_selectedSale!.receiptNumber)}',
                       style: DesignTokens.textBodyBold,
                     ),
                     Text(
@@ -362,7 +450,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                 AppButton(
                   label: 'Process Refund',
                   onPressed: _refundTotal > 0 ? _processRefund : null,
-                  loading: _loading,
+                  isLoading: _loading,
                 ),
               ],
             ),
@@ -396,7 +484,7 @@ class _SaleCard extends StatelessWidget {
           ),
           child: Icon(Icons.receipt, color: DesignTokens.brandPrimary),
         ),
-        title: Text(sale.idempotencyKey),
+        title: Text('Receipt ${formatPosReceiptNumber(sale.receiptNumber)}'),
         subtitle: Text(dateFormat.format(sale.createdAt.toLocal())),
         trailing: Text(
           currencyFormat.format(sale.total),

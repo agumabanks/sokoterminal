@@ -11,7 +11,7 @@ class ApiClient {
       : _secureStorage = secureStorage {
     _dio = Dio(
       BaseOptions(
-        baseUrl: config.apiBaseUrl,
+        baseUrl: _normalizeBaseUrl(config.apiBaseUrl),
         connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
         receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
         headers: {'Accept': 'application/json'},
@@ -24,6 +24,10 @@ class ApiClient {
           final token = await _secureStorage.readAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
+          }
+          final posToken = await _secureStorage.readPosSessionToken();
+          if (posToken != null && posToken.isNotEmpty) {
+            options.headers['X-POS-Session'] = posToken;
           }
           return handler.next(options);
         },
@@ -46,7 +50,7 @@ class ApiClient {
   Dio get client => _dio;
 
   Future<Response<T>> get<T>(String path, {Map<String, dynamic>? query}) async {
-    return _dio.get<T>(path, queryParameters: query);
+    return _dio.get<T>(_normalizePath(path), queryParameters: query);
   }
 
   Future<Response<T>> post<T>(
@@ -55,7 +59,12 @@ class ApiClient {
     Object? data,
     Options? options,
   }) async {
-    return _dio.post<T>(path, data: data, queryParameters: query, options: options);
+    return _dio.post<T>(
+      _normalizePath(path),
+      data: data,
+      queryParameters: query,
+      options: options,
+    );
   }
 
   Future<Response<T>> patch<T>(
@@ -64,7 +73,12 @@ class ApiClient {
     Object? data,
     Options? options,
   }) async {
-    return _dio.patch<T>(path, data: data, queryParameters: query, options: options);
+    return _dio.patch<T>(
+      _normalizePath(path),
+      data: data,
+      queryParameters: query,
+      options: options,
+    );
   }
 
   Future<Response<T>> put<T>(
@@ -73,7 +87,12 @@ class ApiClient {
     Object? data,
     Options? options,
   }) async {
-    return _dio.put<T>(path, data: data, queryParameters: query, options: options);
+    return _dio.put<T>(
+      _normalizePath(path),
+      data: data,
+      queryParameters: query,
+      options: options,
+    );
   }
 
   Future<Response<T>> delete<T>(
@@ -82,6 +101,28 @@ class ApiClient {
     Object? data,
     Options? options,
   }) async {
-    return _dio.delete<T>(path, data: data, queryParameters: query, options: options);
+    return _dio.delete<T>(
+      _normalizePath(path),
+      data: data,
+      queryParameters: query,
+      options: options,
+    );
+  }
+
+  static String _normalizeBaseUrl(String baseUrl) {
+    final trimmed = baseUrl.trim();
+    if (trimmed.isEmpty) return trimmed;
+    return trimmed.endsWith('/') ? trimmed : '$trimmed/';
+  }
+
+  static String _normalizePath(String path) {
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return trimmed.substring(1);
+    }
+    return trimmed;
   }
 }

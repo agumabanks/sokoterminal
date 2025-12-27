@@ -40,6 +40,59 @@ class SecureStorage {
   Future<String?> readPin() => _storage.read(key: 'staff_pin');
   Future<void> deletePin() => _storage.delete(key: 'staff_pin');
 
+  // POS staff session (server-side RBAC)
+  Future<void> writePosSessionToken(String token) =>
+      _storage.write(key: 'pos_session_token', value: token);
+  Future<String?> readPosSessionToken() => _storage.read(key: 'pos_session_token');
+  Future<void> deletePosSessionToken() => _storage.delete(key: 'pos_session_token');
+
+  Future<void> writePosSessionMeta({
+    required int staffId,
+    required String staffName,
+    required String staffRole,
+    DateTime? expiresAt,
+  }) async {
+    await Future.wait([
+      _storage.write(key: 'pos_session_staff_id', value: staffId.toString()),
+      _storage.write(key: 'pos_session_staff_name', value: staffName),
+      _storage.write(key: 'pos_session_staff_role', value: staffRole),
+      if (expiresAt != null)
+        _storage.write(
+          key: 'pos_session_expires_at',
+          value: expiresAt.toUtc().toIso8601String(),
+        )
+      else
+        _storage.delete(key: 'pos_session_expires_at'),
+    ]);
+  }
+
+  Future<int?> readPosSessionStaffId() async {
+    final raw = await _storage.read(key: 'pos_session_staff_id');
+    if (raw == null || raw.trim().isEmpty) return null;
+    return int.tryParse(raw.trim());
+  }
+
+  Future<String?> readPosSessionStaffName() =>
+      _storage.read(key: 'pos_session_staff_name');
+
+  Future<String?> readPosSessionStaffRole() =>
+      _storage.read(key: 'pos_session_staff_role');
+
+  Future<DateTime?> readPosSessionExpiresAt() async {
+    final raw = await _storage.read(key: 'pos_session_expires_at');
+    if (raw == null || raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw.trim())?.toUtc();
+  }
+
+  Future<void> deletePosSessionMeta() async {
+    await Future.wait([
+      _storage.delete(key: 'pos_session_staff_id'),
+      _storage.delete(key: 'pos_session_staff_name'),
+      _storage.delete(key: 'pos_session_staff_role'),
+      _storage.delete(key: 'pos_session_expires_at'),
+    ]);
+  }
+
   Future<void> write({required String key, required String value}) =>
       _storage.write(key: key, value: value);
   Future<String?> read({required String key}) => _storage.read(key: key);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../invoices/invoice_providers.dart';
 import 'orders_controller.dart';
 
 class OrderDetailsScreen extends ConsumerStatefulWidget {
@@ -50,7 +51,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       );
     }
 
-    final code = _order!['code']?.toString() ?? _order!['id']?.toString() ?? 'N/A';
+    final code = _order!['order_code']?.toString() ?? _order!['code']?.toString() ?? _order!['id']?.toString() ?? 'N/A';
     final dateStr = _order!['created_at']?.toString();
     final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
     final formattedDate = date != null ? DateFormat('MMM d, y HH:mm').format(date) : '-';
@@ -59,6 +60,26 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       appBar: AppBar(
         title: Text('Order #$code'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Share invoice PDF',
+            onPressed: _order == null
+                ? null
+                : () async {
+                    final current = _order;
+                    if (current == null) return;
+                    try {
+                      await ref
+                          .read(invoiceServiceProvider)
+                          .shareOrderInvoicePdf(current);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Invoice export failed: $e')),
+                      );
+                    }
+                  },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchDetails,
@@ -83,7 +104,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               _InfoRow('Payment Status', _order!['payment_status']?.toString().toUpperCase() ?? 'PENDING',
                   isBadge: true,
                   color: _getStatusColor(_order!['payment_status']?.toString() ?? '')),
-              _InfoRow('Delivery Status', _order!['delivery_status']?.toString().toUpperCase() ?? 'PENDING',
+              _InfoRow(
+                'Delivery Status',
+                (_order!['delivery_status']?.toString() ?? 'pending').toUpperCase().replaceAll('_', ' '),
                   isBadge: true,
                   color: _getStatusColor(_order!['delivery_status']?.toString() ?? '')),
               _InfoRow('Payment Method', _order!['payment_type']?.toString() ?? '-'),
@@ -155,7 +178,11 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   }
 
   Widget _buildItemsList() {
-    final items = (_order!['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final itemsRaw = _order!['order_items'] ?? _order!['items'];
+    final items = (itemsRaw is List ? itemsRaw : const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
     if (items.isEmpty) return const Text('No items found');
 
     return Card(
@@ -171,7 +198,12 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
           final item = items[index];
           final name = item['product_name']?.toString() ?? item['name']?.toString() ?? 'Item';
           final qty = int.tryParse(item['quantity']?.toString() ?? '0') ?? 0;
-          final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
+          final unitPrice = item['unit_price'] is num
+              ? (item['unit_price'] as num).toDouble()
+              : double.tryParse(item['unit_price']?.toString() ?? '') ?? 0;
+          final lineTotal = item['total'] is num
+              ? (item['total'] as num).toDouble()
+              : (unitPrice * qty);
           final variant = item['variation']?.toString() ?? '';
 
           return ListTile(
@@ -182,7 +214,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('x$qty', style: TextStyle(color: Colors.grey[600])),
-                Text('UGX ${NumberFormat('#,###').format(price * qty)}',
+                Text('UGX ${NumberFormat('#,###').format(lineTotal)}',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
@@ -217,9 +249,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: row.color.withOpacity(0.1),
+                                  color: row.color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: row.color.withOpacity(0.5)),
+                                  border: Border.all(color: row.color.withValues(alpha: 0.5)),
                                 ),
                                 child: Text(
                                   row.value,
@@ -243,7 +275,11 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     final statuses = ['pending', 'confirmed', 'picked_up', 'on_the_way', 'delivered', 'cancelled'];
     final paymentStatuses = ['paid', 'unpaid'];
     
-    String delivery = _order!['delivery_status']?.toString() ?? 'pending';
+    String delivery = (_order!['delivery_status_raw'] ?? _order!['delivery_status'] ?? 'pending')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll(' ', '_');
     String payment = _order!['payment_status']?.toString() ?? 'unpaid';
 
     showModalBottomSheet(
@@ -263,14 +299,14 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             const Text('Update Order Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
             DropdownButtonFormField<String>(
-              value: statuses.contains(delivery) ? delivery : statuses.first,
+              initialValue: statuses.contains(delivery) ? delivery : statuses.first,
               decoration: const InputDecoration(labelText: 'Delivery Status', border: OutlineInputBorder()),
               items: statuses.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase().replaceAll('_', ' ')))).toList(),
               onChanged: (v) => delivery = v!,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: paymentStatuses.contains(payment) ? payment : paymentStatuses.last,
+              initialValue: paymentStatuses.contains(payment) ? payment : paymentStatuses.last,
               decoration: const InputDecoration(labelText: 'Payment Status', border: OutlineInputBorder()),
               items: paymentStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase()))).toList(),
               onChanged: (v) => payment = v!,

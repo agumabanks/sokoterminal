@@ -1,21 +1,25 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' as drift hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
-import '../../core/security/manager_approval.dart';
+import '../../core/auth/pos_session_controller.dart';
 import '../../core/db/app_database.dart';
+import '../../core/security/manager_approval.dart';
+import '../../core/settings/pos_void_reason_codes.dart';
 import '../../core/sync/sync_service.dart';
-import '../../core/theme/design_tokens.dart';
 import '../../core/telemetry/telemetry.dart';
+import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../invoices/invoice_providers.dart';
 import '../receipts/receipt_providers.dart';
 import '../orders/orders_controller.dart';
+import '../refunds/pos_refund_screen.dart';
 
 /// Date filter options for transactions
 enum DateFilter { today, week, month, all, custom }
@@ -122,7 +126,6 @@ class TransactionsScreenController extends StateNotifier<TransactionsScreenState
 
 class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
-  static const _uuid = Uuid();
 
   @override
   ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -155,6 +158,15 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> with Si
       appBar: AppBar(
         title: Text('Transactions', style: DesignTokens.textTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.assignment_return_outlined),
+            tooltip: 'Process POS refund',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PosRefundScreen()),
+              );
+            },
+          ),
           if (screenState.syncing)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -212,7 +224,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> with Si
                             screenController.setDateFilter(filter);
                           }
                         },
-                        selectedColor: DesignTokens.brandAccent.withOpacity(0.2),
+                        selectedColor: DesignTokens.brandAccent.withValues(alpha: 0.2),
                         checkmarkColor: DesignTokens.brandAccent,
                       ),
                     );
@@ -283,26 +295,31 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> with Si
       context: context,
       title: 'Filter Transactions',
       subtitle: 'Choose time period',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...DateFilter.values.map((filter) => RadioListTile<DateFilter>(
-            title: Text(_dateFilterLabel(filter, state)),
-            value: filter,
-            groupValue: state.dateFilter,
-            onChanged: (v) {
-              if (v == DateFilter.custom) {
-                Navigator.pop(context);
-                _pickCustomRange(context, controller);
-              } else if (v != null) {
-                controller.setDateFilter(v);
-                Navigator.pop(context);
-              }
-            },
-          )),
-          const SizedBox(height: DesignTokens.spaceMd),
-        ],
+      child: RadioGroup<DateFilter>(
+        groupValue: state.dateFilter,
+        onChanged: (v) {
+          if (v == null) return;
+          if (v == DateFilter.custom) {
+            Navigator.pop(context);
+            _pickCustomRange(context, controller);
+            return;
+          }
+          controller.setDateFilter(v);
+          Navigator.pop(context);
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ...DateFilter.values.map(
+              (filter) => RadioListTile<DateFilter>(
+                title: Text(_dateFilterLabel(filter, state)),
+                value: filter,
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+          ],
+        ),
       ),
     );
   }
@@ -395,7 +412,7 @@ class _POSTransactionsList extends ConsumerWidget {
       final date = DateTime.parse(e.key);
       final label = _formatDateLabel(date);
       final total = e.value.fold<double>(0, (sum, entry) => 
-        sum + (entry.type == 'refund' ? -entry.total : entry.total));
+        sum + ((entry.type == 'refund' || entry.type == 'void') ? -entry.total : entry.total));
       return _DateGroup(label: label, entries: e.value, total: total);
     }).toList();
   }
@@ -430,6 +447,15 @@ class _POSTransactionTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isRefund = entry.type == 'refund';
+    final isVoid = entry.type == 'void';
+    final isReversal = isRefund || isVoid;
+    final icon = isRefund
+        ? Icons.assignment_return_outlined
+        : isVoid
+        ? Icons.block_outlined
+        : Icons.point_of_sale;
+    final tone = isReversal ? DesignTokens.error : DesignTokens.brandAccent;
+    final sign = isReversal ? '-' : '';
     
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -442,18 +468,18 @@ class _POSTransactionTile extends ConsumerWidget {
         leading: Container(
           padding: DesignTokens.paddingSm,
           decoration: BoxDecoration(
-            color: (isRefund ? DesignTokens.error : DesignTokens.brandAccent).withOpacity(0.12),
+            color: tone.withValues(alpha: 0.12),
             borderRadius: DesignTokens.borderRadiusSm,
           ),
           child: Icon(
-            isRefund ? Icons.assignment_return_outlined : Icons.point_of_sale,
-            color: isRefund ? DesignTokens.error : DesignTokens.brandAccent,
+            icon,
+            color: tone,
           ),
         ),
         title: Text(
-          '${isRefund ? '-' : ''}${entry.total.toUgx()}',
+          '$sign${entry.total.toUgx()}',
           style: DesignTokens.textBodyBold.copyWith(
-            color: isRefund ? DesignTokens.error : DesignTokens.grayDark,
+            color: isReversal ? DesignTokens.error : DesignTokens.grayDark,
           ),
         ),
         subtitle: Text(
@@ -517,7 +543,8 @@ class _POSTransactionTile extends ConsumerWidget {
             return Center(child: Text('Not found', style: DesignTokens.textBody));
           }
           final entry = bundle.entry;
-          final isRefund = entry.type == 'refund';
+          final isReversal = entry.type == 'refund' || entry.type == 'void';
+          final sign = isReversal ? '-' : '';
           
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -525,7 +552,7 @@ class _POSTransactionTile extends ConsumerWidget {
               Container(
                 padding: DesignTokens.paddingMd,
                 decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withOpacity(0.25),
+                  color: DesignTokens.grayLight.withValues(alpha: 0.25),
                   borderRadius: DesignTokens.borderRadiusMd,
                 ),
                 child: Column(
@@ -534,6 +561,13 @@ class _POSTransactionTile extends ConsumerWidget {
                     Text('Type: ${entry.type.toUpperCase()}', style: DesignTokens.textSmallBold),
                     const SizedBox(height: DesignTokens.spaceXs),
                     Text('Date: ${_formatDateTime(entry.createdAt)}', style: DesignTokens.textSmall),
+                    if (entry.originalEntryId != null) ...[
+                      const SizedBox(height: DesignTokens.spaceXs),
+                      Text(
+                        'Ref: ${entry.originalEntryId}',
+                        style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      ),
+                    ],
                     const SizedBox(height: DesignTokens.spaceXs),
                     Text(
                       entry.synced ? 'Synced' : 'Pending sync',
@@ -558,7 +592,7 @@ class _POSTransactionTile extends ConsumerWidget {
                     ),
                     const SizedBox(width: DesignTokens.spaceSm),
                     Text(
-                      '${isRefund ? '-' : ''}${l.lineTotal.toUgx()}',
+                      '$sign${l.lineTotal.toUgx()}',
                       style: DesignTokens.textBodyBold,
                     ),
                   ],
@@ -569,36 +603,67 @@ class _POSTransactionTile extends ConsumerWidget {
                 children: [
                   Expanded(child: Text('Total', style: DesignTokens.textBodyBold)),
                   Text(
-                    '${isRefund ? '-' : ''}${entry.total.toUgx()}',
+                    '$sign${entry.total.toUgx()}',
                     style: DesignTokens.textBodyBold,
                   ),
                 ],
               ),
+              if (entry.type == 'sale') ...[
+                const SizedBox(height: DesignTokens.spaceMd),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: DesignTokens.error,
+                    side: const BorderSide(color: DesignTokens.error),
+                  ),
+                  onPressed: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _voidSale(context, ref, bundle);
+                  },
+                  icon: const Icon(Icons.block_outlined),
+                  label: const Text('Void sale'),
+                ),
+              ],
               const SizedBox(height: DesignTokens.spaceLg),
-              Row(
+              Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => ref.read(receiptServiceProvider).sharePdf(entryId),
-                      icon: const Icon(Icons.share),
-                      label: const Text('PDF'),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => ref.read(receiptServiceProvider).sharePdf(entryId),
+                          icon: const Icon(Icons.share),
+                          label: const Text('Receipt PDF'),
+                        ),
+                      ),
+                      const SizedBox(width: DesignTokens.spaceSm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => ref.read(invoiceServiceProvider).sharePosInvoicePdf(entryId),
+                          icon: const Icon(Icons.picture_as_pdf),
+                          label: const Text('Invoice PDF'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => ref.read(receiptServiceProvider).shareWhatsapp(entryId),
-                      icon: const Icon(Icons.chat),
-                      label: const Text('WhatsApp'),
-                    ),
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _printReceipt(context, ref, entryId),
-                      icon: const Icon(Icons.print),
-                      label: const Text('Print'),
-                    ),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => ref.read(receiptServiceProvider).shareWhatsapp(entryId),
+                          icon: const Icon(Icons.chat),
+                          label: const Text('WhatsApp'),
+                        ),
+                      ),
+                      const SizedBox(width: DesignTokens.spaceSm),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _printReceipt(context, ref, entryId),
+                          icon: const Icon(Icons.print),
+                          label: const Text('Print'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -612,6 +677,228 @@ class _POSTransactionTile extends ConsumerWidget {
   String _formatDateTime(DateTime dt) {
     final local = dt.toLocal();
     return DateFormat('yyyy-MM-dd HH:mm').format(local);
+  }
+
+  Future<void> _voidSale(
+    BuildContext context,
+    WidgetRef ref,
+    LedgerEntryBundle saleBundle,
+  ) async {
+    final sale = saleBundle.entry;
+    if (sale.type != 'sale') return;
+
+    final ok = await requireManagerPin(context, ref, reason: 'void this sale');
+    if (!ok || !context.mounted) return;
+
+    final prefs = ref.read(sharedPreferencesProvider);
+    final reasons = PosVoidReasonCodesCache.read(prefs);
+    if (reasons.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Set up void reason codes in Settings first.')),
+      );
+      return;
+    }
+
+    final reason = await BottomSheetModal.show<String>(
+      context: context,
+      title: 'Void reason',
+      subtitle: 'Select a reason code',
+      maxHeight: 520,
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        itemCount: reasons.length,
+        itemBuilder: (ctx, i) {
+          final code = reasons[i];
+          return ListTile(
+            leading: const Icon(Icons.block_outlined),
+            title: Text(code),
+            onTap: () => Navigator.of(ctx).pop(code),
+          );
+        },
+      ),
+    );
+    if (reason == null || reason.trim().isEmpty || !context.mounted) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final alreadyVoided = await (db.select(db.ledgerEntries)
+          ..where((t) => t.type.equals('void') & t.originalEntryId.equals(sale.id))
+          ..limit(1))
+        .getSingleOrNull();
+    if (alreadyVoided != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sale is already voided.')),
+      );
+      return;
+    }
+
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'pos_void_started',
+          props: {
+            'sale_entry_id': sale.id,
+            'sale_total': sale.total,
+            'reason_code': reason,
+          },
+        ),
+      );
+    }
+
+    final sync = ref.read(syncServiceProvider);
+    final actorStaffId = ref.read(posSessionProvider).staffId?.toString() ?? sale.staffId;
+    final voidId = const Uuid().v4();
+    final idempotencyKey = 'void_$voidId';
+    final occurredAt = DateTime.now().toUtc();
+    final receiptNumber = await db.getNextReceiptNumber();
+    final outletId = sale.outletId ?? (await db.getPrimaryOutlet())?.id;
+    final note = 'Void ($reason) for ${formatPosReceiptNumber(sale.receiptNumber)}';
+
+    final lineRows = <LedgerLinesCompanion>[];
+    final apiLines = <Map<String, dynamic>>[];
+    for (final line in saleBundle.lines) {
+      lineRows.add(
+        LedgerLinesCompanion.insert(
+          entryId: voidId,
+          title: line.title,
+          itemId: drift.Value(line.itemId),
+          serviceId: drift.Value(line.serviceId),
+          variant: drift.Value(line.variant),
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          lineTotal: line.lineTotal,
+        ),
+      );
+
+      apiLines.add({
+        'product_id': line.itemId,
+        'service_id': line.serviceId,
+        'name': line.title,
+        if (line.variant != null && line.variant!.trim().isNotEmpty)
+          'variation': line.variant,
+        'price': line.unitPrice,
+        'quantity': line.quantity,
+        'subtotal': line.lineTotal,
+      });
+    }
+
+    final paymentsSource = saleBundle.payments.isNotEmpty
+        ? saleBundle.payments
+        : [
+            Payment(
+              id: 0,
+              entryId: sale.id,
+              method: 'cash',
+              amount: sale.total,
+              externalRef: null,
+            ),
+          ];
+
+    final paymentRows = <PaymentsCompanion>[];
+    final apiPayments = <Map<String, dynamic>>[];
+    for (final p in paymentsSource) {
+      paymentRows.add(
+        PaymentsCompanion.insert(
+          entryId: voidId,
+          method: p.method,
+          amount: p.amount,
+          externalRef: drift.Value(p.externalRef),
+        ),
+      );
+      apiPayments.add({
+        'method': p.method,
+        'amount': p.amount,
+        if (p.externalRef != null && p.externalRef!.trim().isNotEmpty)
+          'external_ref': p.externalRef,
+      });
+    }
+
+    await db.saveLedgerEntry(
+      entry: LedgerEntriesCompanion.insert(
+        id: drift.Value(voidId),
+        receiptNumber: drift.Value(receiptNumber),
+        idempotencyKey: idempotencyKey,
+        type: 'void',
+        originalEntryId: drift.Value(sale.id),
+        outletId: drift.Value(outletId),
+        staffId: drift.Value(actorStaffId),
+        customerId: drift.Value(sale.customerId),
+        subtotal: drift.Value(sale.subtotal),
+        discount: drift.Value(sale.discount),
+        tax: drift.Value(sale.tax),
+        total: drift.Value(sale.total),
+        note: drift.Value(note),
+        createdAt: drift.Value(occurredAt),
+      ),
+      lines: lineRows,
+      payments: paymentRows,
+    );
+
+    for (final line in saleBundle.lines) {
+      final itemId = line.itemId;
+      if (itemId == null || itemId.trim().isEmpty) continue;
+      await db.recordInventoryMovement(
+        itemId: itemId,
+        delta: line.quantity,
+        note: 'void',
+        variant: line.variant ?? '',
+      );
+    }
+
+    await sync.enqueue('ledger_push', {
+      'entry_id': voidId,
+      'idempotency_key': idempotencyKey,
+      'type': 'void',
+      'reason_code': reason,
+      'original_entry_id': sale.id,
+      'subtotal': sale.subtotal,
+      'discount': sale.discount,
+      'tax': sale.tax,
+      'total': sale.total,
+      'note': note,
+      'occurred_at': occurredAt.toIso8601String(),
+      'customer_id': sale.customerId,
+      'payments': apiPayments,
+      'lines': apiLines,
+    });
+
+    await db.recordAuditLog(
+      actorStaffId: actorStaffId,
+      action: 'void',
+      payload: {
+        'void_entry_id': voidId,
+        'original_entry_id': sale.id,
+        'reason_code': reason,
+        'amount': sale.total,
+        'lines': apiLines,
+      },
+    );
+
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'pos_void_created',
+          props: {
+            'void_entry_id': voidId,
+            'sale_entry_id': sale.id,
+            'amount': sale.total,
+            'lines_count': apiLines.length,
+            'reason_code': reason,
+          },
+        ),
+      );
+    }
+
+    unawaited(sync.syncNow());
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sale voided (${sale.total.toUgx()})'),
+        backgroundColor: DesignTokens.error,
+      ),
+    );
   }
 }
 
@@ -695,7 +982,7 @@ class _OnlineOrdersList extends ConsumerWidget {
         Container(
           width: double.infinity,
           padding: DesignTokens.paddingMd,
-          color: DesignTokens.brandPrimary.withOpacity(0.05),
+          color: DesignTokens.brandPrimary.withValues(alpha: 0.05),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -767,7 +1054,7 @@ class _OnlineOrderTile extends ConsumerWidget {
         leading: Container(
           padding: DesignTokens.paddingSm,
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.12),
+            color: statusColor.withValues(alpha: 0.12),
             borderRadius: DesignTokens.borderRadiusSm,
           ),
           child: Icon(Icons.shopping_bag_outlined, color: statusColor),
@@ -779,7 +1066,7 @@ class _OnlineOrderTile extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.12),
+                color: statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -804,7 +1091,7 @@ class _OnlineOrderTile extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: paymentColor.withOpacity(0.12),
+                color: paymentColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -849,7 +1136,7 @@ class _OnlineOrderTile extends ConsumerWidget {
           Container(
             padding: DesignTokens.paddingMd,
             decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withOpacity(0.25),
+              color: DesignTokens.grayLight.withValues(alpha: 0.25),
               borderRadius: DesignTokens.borderRadiusMd,
             ),
             child: Column(
@@ -913,13 +1200,18 @@ class _OnlineOrderTile extends ConsumerWidget {
                   children: loadedItems.map((i) {
                     final name = i['name']?.toString() ?? i['product_name']?.toString() ?? 'Item';
                     final qty = int.tryParse(i['quantity']?.toString() ?? '1') ?? 1;
-                    final price = double.tryParse(i['price']?.toString() ?? '0') ?? 0;
+                    final unitPrice = i['unit_price'] is num
+                        ? (i['unit_price'] as num).toDouble()
+                        : double.tryParse(i['unit_price']?.toString() ?? '') ?? 0;
+                    final lineTotal = i['total'] is num
+                        ? (i['total'] as num).toDouble()
+                        : (unitPrice * qty);
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceXs),
                       child: Row(
                         children: [
                           Expanded(child: Text('$name x$qty', style: DesignTokens.textBody)),
-                          Text(price.toUgx(), style: DesignTokens.textBodyBold),
+                          Text(lineTotal.toUgx(), style: DesignTokens.textBodyBold),
                         ],
                       ),
                     );
@@ -941,6 +1233,22 @@ class _OnlineOrderTile extends ConsumerWidget {
           const SizedBox(height: DesignTokens.spaceLg),
           
           // Actions
+          OutlinedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await ref.read(invoiceServiceProvider).shareOrderInvoicePdf(order);
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Invoice export failed: $e')),
+                );
+              }
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Invoice PDF'),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
@@ -955,8 +1263,12 @@ class _OnlineOrderTile extends ConsumerWidget {
   }
   
   void _updateOrderStatus(BuildContext context, WidgetRef ref, Map<String, dynamic> order) {
-    final statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
-    String delivery = order['delivery_status']?.toString() ?? 'pending';
+    final statuses = ['pending', 'confirmed', 'picked_up', 'on_the_way', 'delivered', 'cancelled'];
+    String delivery = (order['delivery_status_raw'] ?? order['delivery_status'] ?? 'pending')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll(' ', '_');
     String payment = order['payment_status']?.toString() ?? 'unpaid';
     final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
     
@@ -970,14 +1282,21 @@ class _OnlineOrderTile extends ConsumerWidget {
             Text('Update Order #$orderId', style: DesignTokens.textBodyBold),
             const SizedBox(height: DesignTokens.spaceMd),
             DropdownButtonFormField<String>(
-              value: delivery,
-              items: statuses.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase()))).toList(),
+              initialValue: statuses.contains(delivery) ? delivery : statuses.first,
+              items: statuses
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.toUpperCase().replaceAll('_', ' ')),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => delivery = v ?? delivery,
               decoration: const InputDecoration(labelText: 'Delivery Status'),
             ),
             const SizedBox(height: DesignTokens.spaceSm),
             DropdownButtonFormField<String>(
-              value: payment,
+              initialValue: payment,
               items: const [
                 DropdownMenuItem(value: 'paid', child: Text('PAID')),
                 DropdownMenuItem(value: 'unpaid', child: Text('UNPAID')),

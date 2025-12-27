@@ -12,6 +12,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../widgets/section_header.dart';
 import '../checkout/checkout_screen.dart';
+import 'service_bookings_screen.dart';
 import 'service_variants_screen.dart';
 
 class ServicesScreen extends ConsumerWidget {
@@ -28,6 +29,14 @@ class ServicesScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => _showAddService(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.event_note_outlined),
+            tooltip: 'Bookings',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ServiceBookingsScreen()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.cloud_sync),
@@ -70,21 +79,35 @@ class ServicesScreen extends ConsumerWidget {
                         Switch(
                           value: service.publishedOnline,
                           onChanged: (value) async {
-                            await ref.read(appDatabaseProvider).upsertService(
-                                  service.toCompanion(true).copyWith(
-                                        publishedOnline: Value(value),
-                                        updatedAt: Value(DateTime.now().toUtc()),
-                                      ),
-                                );
-                            if (value) {
-                              await ref.read(syncServiceProvider).enqueue('service_update', {
-                                'local_id': service.id,
-                                'title': service.title,
-                                'price': service.price,
-                                'description': service.description,
-                                'duration': service.durationMinutes,
-                                'published': value ? 1 : 0,
-                              });
+                            final db = ref.read(appDatabaseProvider);
+                            final sync = ref.read(syncServiceProvider);
+                            await db.upsertService(
+                              service.toCompanion(true).copyWith(
+                                    publishedOnline: Value(value),
+                                    synced: const Value(false),
+                                    updatedAt: Value(DateTime.now().toUtc()),
+                                  ),
+                            );
+
+                            final payload = <String, dynamic>{
+                              'local_id': service.id,
+                              if (service.remoteId != null) 'remote_id': service.remoteId,
+                              'title': service.title,
+                              'description': service.description,
+                              'base_price': service.price,
+                              'duration_minutes': service.durationMinutes,
+                              'is_published': value,
+                            };
+
+                            if (value && service.remoteId == null) {
+                              await sync.enqueue('service_create', payload);
+                              unawaited(sync.syncNow());
+                              return;
+                            }
+
+                            if (service.remoteId != null) {
+                              await sync.enqueue('service_update', payload);
+                              unawaited(sync.syncNow());
                             }
                           },
                         ),
@@ -103,6 +126,8 @@ class ServicesScreen extends ConsumerWidget {
   Future<void> _showAddService(BuildContext context, WidgetRef ref) async {
     final titleCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
+    final descriptionCtrl = TextEditingController();
+    final durationCtrl = TextEditingController();
     bool online = true;
     final parentContext = context;
 
@@ -133,6 +158,25 @@ class ServicesScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: DesignTokens.spaceMd),
+            TextField(
+              controller: durationCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Duration (minutes)',
+                prefixIcon: Icon(Icons.schedule_outlined),
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+            TextField(
+              controller: descriptionCtrl,
+              minLines: 2,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+                prefixIcon: Icon(Icons.notes_outlined),
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: online,
@@ -144,6 +188,9 @@ class ServicesScreen extends ConsumerWidget {
               onPressed: () async {
                 final title = titleCtrl.text.trim();
                 final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+                final durationMinutes =
+                    int.tryParse(durationCtrl.text.trim().replaceAll(',', ''));
+                final description = descriptionCtrl.text.trim();
                 if (title.isEmpty || price <= 0) return;
 
                 final db = ref.read(appDatabaseProvider);
@@ -154,15 +201,22 @@ class ServicesScreen extends ConsumerWidget {
                     id: Value(id),
                     title: title,
                     price: price,
+                    description: description.isEmpty ? const Value.absent() : Value(description),
+                    durationMinutes: durationMinutes == null
+                        ? const Value.absent()
+                        : Value(durationMinutes),
                     publishedOnline: Value(online),
+                    synced: const Value(false),
                   ),
                 );
                 if (online) {
                   await sync.enqueue('service_create', {
                     'local_id': id,
                     'title': title,
-                    'price': price,
-                    'published': 1,
+                    'description': description,
+                    'base_price': price,
+                    'duration_minutes': durationMinutes,
+                    'is_published': true,
                   });
                   unawaited(sync.syncNow());
                 }
@@ -187,5 +241,7 @@ class ServicesScreen extends ConsumerWidget {
 
     titleCtrl.dispose();
     priceCtrl.dispose();
+    descriptionCtrl.dispose();
+    durationCtrl.dispose();
   }
 }

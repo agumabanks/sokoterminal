@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/security/manager_approval.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../auth/auth_controller.dart';
 import '../receipts/receipt_providers.dart';
@@ -91,9 +92,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 unawaited(
                                   ref.read(printQueueServiceProvider).pump(),
                                 );
-                                if (sheetContext.mounted)
+                                if (sheetContext.mounted) {
                                   Navigator.of(sheetContext).pop();
-                                if (!mounted) return;
+                                }
+                                if (!context.mounted) return;
                                 setState(() {});
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -104,7 +106,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   ),
                                 );
                               } catch (e) {
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
@@ -130,23 +132,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             leading: const Icon(Icons.fact_check_outlined),
             title: const Text('Test print'),
             subtitle: const Text('Send a test slip to the selected printer'),
-            onTap: () async {
-              try {
-                await ref.read(printQueueServiceProvider).testPrint();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Test print sent'),
-                    backgroundColor: DesignTokens.brandAccent,
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Test print failed: $e')),
-                );
-              }
-            },
+              onTap: () async {
+                try {
+                  await ref.read(printQueueServiceProvider).testPrint();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Test print sent'),
+                      backgroundColor: DesignTokens.brandAccent,
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Test print failed: $e')),
+                  );
+                }
+              },
           ),
           ListTile(
             leading: const Icon(Icons.sync),
@@ -179,6 +181,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: const Text('Delivery settings'),
             subtitle: const Text('Enable seller delivery, set fees'),
             onTap: () => context.go('/home/more/delivery-settings'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.block_outlined),
+            title: const Text('Void reason codes'),
+            subtitle: const Text('Required reasons for voids'),
+            onTap: () async {
+              final ok = await requireManagerPin(
+                context,
+                ref,
+                reason: 'edit void reason codes',
+              );
+              if (!ok || !context.mounted) return;
+              context.go('/home/more/void-reason-codes');
+            },
           ),
           ListTile(
             leading: const Icon(Icons.logout),

@@ -166,7 +166,7 @@ class AuctionsScreen extends ConsumerWidget {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: DesignTokens.warning.withOpacity(0.12),
+                        backgroundColor: DesignTokens.warning.withValues(alpha: 0.12),
                         child: const Icon(Icons.gavel_outlined, color: DesignTokens.warning),
                       ),
                       title: Text(auction.name.isEmpty ? 'Auction #${auction.id}' : auction.name,
@@ -228,7 +228,7 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
         Container(
           padding: DesignTokens.paddingMd,
           decoration: BoxDecoration(
-            color: DesignTokens.grayLight.withOpacity(0.25),
+            color: DesignTokens.grayLight.withValues(alpha: 0.25),
             borderRadius: DesignTokens.borderRadiusMd,
           ),
           child: Column(
@@ -273,7 +273,7 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
                   final bid = bids[index];
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: DesignTokens.brandPrimary.withOpacity(0.08),
+                      backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.08),
                       child: const Icon(Icons.person_outline, color: DesignTokens.brandPrimary),
                     ),
                     title: Text(bid.customerName, style: DesignTokens.textBodyBold),

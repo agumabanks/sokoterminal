@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/app_providers.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import 'notifications_controller.dart';
@@ -351,12 +350,12 @@ class _NotificationCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isUnread 
               ? DesignTokens.surfaceWhite 
-              : DesignTokens.surfaceWhite.withOpacity(0.7),
+              : DesignTokens.surfaceWhite.withValues(alpha: 0.7),
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: isUnread ? DesignTokens.shadowSm : [],
           border: Border.all(
             color: isUnread 
-                ? categoryColor.withOpacity(0.4) 
+                ? categoryColor.withValues(alpha: 0.4) 
                 : DesignTokens.grayLight,
             width: isUnread ? 1.5 : 1,
           ),
@@ -374,7 +373,7 @@ class _NotificationCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: categoryColor.withOpacity(0.12),
+                    color: categoryColor.withValues(alpha: 0.12),
                     borderRadius: DesignTokens.borderRadiusSm,
                   ),
                   child: Icon(
@@ -438,7 +437,7 @@ class _NotificationCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: categoryColor.withOpacity(0.1),
+                              color: categoryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -519,7 +518,7 @@ class _EmptyState extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withOpacity(0.5),
+              color: DesignTokens.grayLight.withValues(alpha: 0.5),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -544,7 +543,7 @@ class _EmptyState extends StatelessWidget {
             Container(
               padding: DesignTokens.paddingSm,
               decoration: BoxDecoration(
-                color: DesignTokens.error.withOpacity(0.1),
+                color: DesignTokens.error.withValues(alpha: 0.1),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
               child: Text(

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -60,10 +62,14 @@ class SyncService {
   Future<void> _ensureInitialDataLoaded() async {
     final items = await db.getAllItems();
     if (items.isEmpty) {
-      print('[SyncService] No items in DB - triggering full resync from epoch...');
+      if (kDebugMode) {
+        debugPrint('[SyncService] No items in DB - triggering full resync from epoch...');
+      }
       await forceFullResync();
     } else {
-      print('[SyncService] Have ${items.length} items in DB - normal sync');
+      if (kDebugMode) {
+        debugPrint('[SyncService] Have ${items.length} items in DB - normal sync');
+      }
       await _pump();
     }
   }
@@ -73,11 +79,15 @@ class SyncService {
   /// Force a complete resync by clearing all sync cursors and pulling from epoch.
   /// This is useful when the initial sync failed or products are missing.
   Future<void> forceFullResync() async {
-    print('[SyncService] Starting FULL RESYNC from epoch...');
+    if (kDebugMode) {
+      debugPrint('[SyncService] Starting FULL RESYNC from epoch...');
+    }
     
     // Clear all sync cursors
     await db.customStatement('DELETE FROM sync_cursors');
-    print('[SyncService] Cleared all sync cursors');
+    if (kDebugMode) {
+      debugPrint('[SyncService] Cleared all sync cursors');
+    }
     
     // Now pull will use epoch as the since timestamp
     await pullPosDelta();
@@ -108,9 +118,7 @@ class SyncService {
     try {
       final List<ConnectivityResult> list = await Connectivity()
           .checkConnectivity();
-      final online =
-          list.contains(ConnectivityResult.mobile) ||
-          list.contains(ConnectivityResult.wifi);
+      final online = list.any((r) => r != ConnectivityResult.none);
       if (!online) return;
 
       final queue = await db.pendingSyncOps();
@@ -121,19 +129,29 @@ class SyncService {
           await db.markSynced(op.id);
         } catch (e) {
           final errorMsg = _formatSyncError(e);
-          await db.markSyncFailed(
-            op.id,
-            retryCount: op.retryCount + 1,
-            lastError: errorMsg,
-          );
+          final nextRetryCount = op.retryCount + 1;
+          final blocked = _shouldBlock(e);
+          if (blocked) {
+            await db.markSyncBlocked(
+              op.id,
+              retryCount: nextRetryCount,
+              lastError: errorMsg,
+            );
+          } else {
+            await db.markSyncFailed(
+              op.id,
+              retryCount: nextRetryCount,
+              lastError: errorMsg,
+            );
+          }
           final telemetry = Telemetry.instance;
           if (telemetry != null) {
             unawaited(
               telemetry.event(
-                'sync_op_failed',
+                blocked ? 'sync_op_blocked' : 'sync_op_failed',
                 props: {
                   'op_type': op.opType,
-                  'retry_count': op.retryCount + 1,
+                  'retry_count': nextRetryCount,
                   'error': errorMsg,
                 },
               ),
@@ -240,8 +258,24 @@ class SyncService {
     if (error is DioException) {
       final status = error.response?.statusCode;
       final path = error.requestOptions.path;
-      final message =
-          error.message ?? error.error?.toString() ?? 'DioException';
+      String? serverMessage;
+      final data = error.response?.data;
+      if (data is Map) {
+        final msg = data['message'] ?? data['error'] ?? data['detail'];
+        if (msg != null) {
+          serverMessage = msg.toString();
+        }
+        final conflicts = data['conflicts'];
+        if (conflicts is List && conflicts.isNotEmpty) {
+          final suffix = 'conflicts: ${conflicts.length}';
+          final base = serverMessage;
+          serverMessage = base == null || base.trim().isEmpty
+              ? suffix
+              : '$base • $suffix';
+        }
+      }
+
+      final message = serverMessage ?? error.message ?? error.error?.toString() ?? 'DioException';
       final parts = <String>[
         if (status != null) 'HTTP $status',
         if (path.isNotEmpty) path,
@@ -254,24 +288,379 @@ class SyncService {
     return out.length > 600 ? out.substring(0, 600) : out;
   }
 
+  bool _shouldBlock(Object error) {
+    if (error is! DioException) return false;
+    final status = error.response?.statusCode;
+    if (status == null) return false;
+    if (status >= 500) return false;
+    if (status == 408) return false;
+    if (status == 409) {
+      final data = error.response?.data;
+      final msg = (data is Map ? data['message']?.toString() : null) ?? '';
+      final normalized = msg.toLowerCase();
+      if (normalized.contains('still being processed')) return false;
+      return true;
+    }
+    return true;
+  }
+
+  Future<int?> _resolveRemoteProductId(dynamic raw) async {
+    if (raw == null) return null;
+    final asInt = _asNullableInt(raw);
+    if (asInt != null) return asInt;
+    final id = raw.toString().trim();
+    if (id.isEmpty) return null;
+    final item = await db.getItemById(id);
+    return item?.remoteId ?? _asNullableInt(id);
+  }
+
+  Future<int?> _resolveRemoteServiceId(dynamic raw) async {
+    if (raw == null) return null;
+    final asInt = _asNullableInt(raw);
+    if (asInt != null) return asInt;
+    final id = raw.toString().trim();
+    if (id.isEmpty) return null;
+    final service = await db.getServiceById(id);
+    return service?.remoteId ?? _asNullableInt(id);
+  }
+
+  String? _toApiDiscountType(dynamic raw) {
+    if (raw == null) return null;
+    final s = raw.toString().trim().toLowerCase();
+    if (s == 'flat' || s == 'amount') return 'amount';
+    if (s == 'percent' || s == 'percentage') return 'percent';
+    return null;
+  }
+
+  Future<Map<String, dynamic>> _uploadImageFile(String filePath) async {
+    final path = filePath.trim();
+    if (path.isEmpty) {
+      throw DioException(
+        requestOptions: RequestOptions(path: 'file/upload'),
+        error: 'Missing file path for upload',
+      );
+    }
+
+    final file = File(path);
+    if (!file.existsSync()) {
+      throw DioException(
+        requestOptions: RequestOptions(path: 'file/upload'),
+        error: 'File not found: $path',
+      );
+    }
+
+    final res = await sellerApi.uploadSellerFile(file);
+    if (res.data is! Map<String, dynamic>) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Invalid upload response shape',
+      );
+    }
+    final data = res.data as Map<String, dynamic>;
+    final ok = _asBool(data['result']);
+    if (!ok) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: data['message']?.toString() ?? 'Upload failed',
+      );
+    }
+    final id = _asNullableInt(data['id']);
+    final url = data['url']?.toString();
+    if (id == null || url == null || url.trim().isEmpty) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Upload succeeded but missing id/url',
+      );
+    }
+    return {'id': id, 'url': url};
+  }
+
+  List<String> _decodeStringList(String? raw) {
+    if (raw == null) return const [];
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is List) {
+        return decoded.map((e) => e?.toString() ?? '').where((e) => e.trim().isNotEmpty).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  List<int> _decodeIntList(String? raw) {
+    if (raw == null) return const [];
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is List) {
+        return decoded.map((e) => int.tryParse(e?.toString() ?? '')).whereType<int>().toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  Future<void> _pushItemVariantStocks(String localId, int remoteProductId) async {
+    final item = await db.getItemById(localId);
+    if (item == null) return;
+
+    final stocks = await db.getItemStocksForItem(localId);
+    final variants = stocks.where((s) => s.variant.trim().isNotEmpty).toList();
+    if (variants.isEmpty) return;
+
+    for (final s in variants) {
+      final variant = s.variant.trim();
+      if (variant.isEmpty) continue;
+
+      int? uploadId = s.imageUploadId;
+      final imagePathOrUrl = (s.imageUrl ?? '').trim();
+      if (imagePathOrUrl.isNotEmpty &&
+          !(imagePathOrUrl.startsWith('http://') ||
+              imagePathOrUrl.startsWith('https://'))) {
+        final file = File(imagePathOrUrl);
+        if (file.existsSync()) {
+          final uploaded = await _uploadImageFile(imagePathOrUrl);
+          uploadId = uploaded['id'] as int;
+          final url = uploaded['url'] as String;
+          await (db.update(db.itemStocks)
+                ..where(
+                  (t) => t.itemId.equals(localId) & t.variant.equals(variant),
+                ))
+              .write(
+            ItemStocksCompanion(
+              imageUploadId: drift.Value(uploadId),
+              imageUrl: drift.Value(url),
+              updatedAt: drift.Value(DateTime.now().toUtc()),
+            ),
+          );
+        } else {
+          // Drop missing local file to avoid a stuck sync loop.
+          await (db.update(db.itemStocks)
+                ..where(
+                  (t) => t.itemId.equals(localId) & t.variant.equals(variant),
+                ))
+              .write(
+            ItemStocksCompanion(
+              imageUploadId: drift.Value(null),
+              imageUrl: drift.Value(null),
+              updatedAt: drift.Value(DateTime.now().toUtc()),
+            ),
+          );
+        }
+      }
+
+      final sku = (s.sku ?? '').trim();
+      final payload = <String, dynamic>{
+        'product_id': remoteProductId,
+        'name': item.name,
+        'unit_price': s.price,
+        'current_stock': s.stockQty,
+        'variation': variant,
+        if (sku.isNotEmpty) 'sku': sku,
+        if (uploadId != null) 'thumbnail_upload_id': uploadId,
+      };
+
+      final safeVariantKey =
+          variant.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-');
+      await sellerApi.upsertPosCatalogProduct(
+        payload,
+        idempotencyKey: '$localId:$safeVariantKey',
+      );
+    }
+  }
+
   Future<void> _dispatch(SyncOp op) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
     switch (op.opType) {
       case 'item_create':
       case 'item_update':
-        final localId = payload['local_id'] as String?;
-        if (op.opType == 'item_create') {
-          await sellerApi.createProduct(payload);
-        } else {
-          final productId =
-              payload['remote_id']?.toString() ??
-              payload['local_id']?.toString() ??
-              '';
-          await sellerApi.updateProduct(productId, payload);
+        final localId = payload['local_id']?.toString() ?? '';
+        if (localId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing local_id for item sync',
+          );
         }
-        if (localId != null) {
-          await db.markItemSynced(localId);
+
+        final item = await db.getItemById(localId);
+        final remoteId =
+            _asNullableInt(payload['remote_id']) ??
+            item?.remoteId ??
+            _asNullableInt(localId);
+
+        final apiDiscountType =
+            _toApiDiscountType(payload['discount_type'] ?? item?.discountType);
+
+        final upsertPayload = <String, dynamic>{
+          if (remoteId != null) 'product_id': remoteId,
+          'name': (payload['name'] ?? item?.name ?? '').toString(),
+          'unit_price': _asDouble(payload['unit_price'] ?? item?.price ?? 0),
+          'current_stock': _asInt(payload['current_stock'] ?? item?.stockQty ?? 0),
+          'published': _asBool(payload['published'] ?? item?.publishedOnline ?? false),
+          if (_asNullableInt(payload['category_id']) != null)
+            'category_id': _asNullableInt(payload['category_id']),
+          if (_asNullableInt(payload['brand_id']) != null) 'brand_id': _asNullableInt(payload['brand_id']),
+          if ((payload['unit'] ?? item?.unit) != null) 'unit': (payload['unit'] ?? item?.unit).toString(),
+          if (payload['weight'] != null || item?.weight != null)
+            'weight': _asDouble(payload['weight'] ?? item?.weight ?? 0),
+          if (payload['min_qty'] != null || item?.minPurchaseQty != null)
+            'min_qty': _asInt(payload['min_qty'] ?? item?.minPurchaseQty ?? 1),
+          if (payload['low_stock_quantity'] != null || item?.lowStockWarning != null)
+            'low_stock_quantity': _asInt(payload['low_stock_quantity'] ?? item?.lowStockWarning ?? 0),
+          if (payload['discount'] != null || item?.discount != null)
+            'discount': _asDouble(payload['discount'] ?? item?.discount ?? 0),
+          if (apiDiscountType != null) 'discount_type': apiDiscountType,
+          if (payload['shipping_cost'] != null || item?.shippingFee != null)
+            'shipping_cost': _asDouble(payload['shipping_cost'] ?? item?.shippingFee ?? 0),
+          if (payload['est_shipping_days'] != null || item?.shippingDays != null)
+            'est_shipping_days': _asInt(payload['est_shipping_days'] ?? item?.shippingDays ?? 0),
+          if (payload['refundable'] != null || item?.refundable != null)
+            'refundable': _asBool(payload['refundable'] ?? item?.refundable ?? false),
+          if (payload['cash_on_delivery'] != null || item?.cashOnDelivery != null)
+            'cash_on_delivery': _asBool(payload['cash_on_delivery'] ?? item?.cashOnDelivery ?? true),
+          if (payload['tags'] != null) 'tags': payload['tags'],
+          if (payload['description'] != null) 'description': payload['description'],
+          if (payload['sku'] != null || item?.sku != null) 'sku': payload['sku'] ?? item?.sku,
+          if (payload['barcode'] != null || item?.barcode != null)
+            'barcode': payload['barcode'] ?? item?.barcode,
+        };
+
+        // Fill category/brand from local item if missing.
+        final categoryIdRaw = (payload['category_id'] ?? item?.categoryId)?.toString();
+        if (!upsertPayload.containsKey('category_id') && categoryIdRaw != null) {
+          final cat = int.tryParse(categoryIdRaw);
+          if (cat != null) upsertPayload['category_id'] = cat;
         }
+        final brandIdRaw = (payload['brand_id'] ?? item?.brandId)?.toString();
+        if (!upsertPayload.containsKey('brand_id') && brandIdRaw != null) {
+          final brand = int.tryParse(brandIdRaw);
+          if (brand != null) upsertPayload['brand_id'] = brand;
+        }
+
+        // Prefer local DB tags/description if present (keeps parity when editing pulled items).
+        if (!upsertPayload.containsKey('tags') && item?.tags != null) {
+          upsertPayload['tags'] = item!.tags;
+        }
+        if (!upsertPayload.containsKey('description') && item?.description != null) {
+          upsertPayload['description'] = item!.description;
+        }
+
+        // Images: upload any pending local files and attach upload IDs.
+        if (item != null) {
+          // Thumbnail
+          var thumbUploadId = item.thumbnailUploadId;
+          final thumbPathOrUrl = (item.thumbnailUrl ?? item.imageUrl)?.trim();
+          if ((thumbPathOrUrl ?? '').isNotEmpty &&
+              !(thumbPathOrUrl!.startsWith('http://') || thumbPathOrUrl.startsWith('https://'))) {
+            final file = File(thumbPathOrUrl);
+            if (file.existsSync()) {
+              final uploaded = await _uploadImageFile(thumbPathOrUrl);
+              thumbUploadId = uploaded['id'] as int;
+              final url = uploaded['url'] as String;
+              await db.updateItemFields(
+                localId,
+                ItemsCompanion(
+                  thumbnailUploadId: drift.Value(thumbUploadId),
+                  thumbnailUrl: drift.Value(url),
+                  imageUrl: drift.Value(url),
+                ),
+              );
+            } else {
+              // Drop missing local file to avoid a stuck sync loop.
+              await db.updateItemFields(
+                localId,
+                ItemsCompanion(
+                  thumbnailUrl: drift.Value(null),
+                  imageUrl: drift.Value(null),
+                ),
+              );
+            }
+          }
+          if (thumbUploadId != null) {
+            upsertPayload['thumbnail_upload_id'] = thumbUploadId;
+          }
+
+          // Gallery (remote urls first, then pending local paths).
+          final urlsAll = _decodeStringList(item.galleryUrls);
+          final idsAll = _decodeIntList(item.galleryUploadIds);
+          final remoteCount = idsAll.length < urlsAll.length ? idsAll.length : urlsAll.length;
+          final remoteUrls = urlsAll.take(remoteCount).toList();
+          final remoteIds = idsAll.take(remoteCount).toList();
+          final pending = urlsAll.skip(remoteCount).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+          if (pending.isNotEmpty) {
+            final pendingQueue = List<String>.from(pending);
+            var mutated = false;
+            for (final path in List<String>.from(pendingQueue)) {
+              if (path.startsWith('http://') || path.startsWith('https://')) {
+                continue;
+              }
+              final file = File(path);
+              if (!file.existsSync()) {
+                pendingQueue.remove(path);
+                mutated = true;
+                continue;
+              }
+              try {
+                final uploaded = await _uploadImageFile(path);
+                remoteIds.add(uploaded['id'] as int);
+                remoteUrls.add(uploaded['url'] as String);
+                pendingQueue.remove(path);
+                mutated = true;
+                await db.updateItemFields(
+                  localId,
+                  ItemsCompanion(
+                    galleryUrls: drift.Value(jsonEncode([...remoteUrls, ...pendingQueue])),
+                    galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
+                  ),
+                );
+              } catch (_) {
+                // Keep for retry.
+              }
+            }
+            if (mutated) {
+              await db.updateItemFields(
+                localId,
+                ItemsCompanion(
+                  galleryUrls: drift.Value(jsonEncode([...remoteUrls, ...pendingQueue])),
+                  galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
+                ),
+              );
+            }
+          }
+
+          final hasGalleryColumns = item.galleryUrls != null || item.galleryUploadIds != null;
+          final hasUnknownRemoteWithoutIds =
+              idsAll.isEmpty && pending.any((p) => p.startsWith('http://') || p.startsWith('https://'));
+          final canReplaceGallery = hasGalleryColumns && !hasUnknownRemoteWithoutIds;
+          if (canReplaceGallery) {
+            upsertPayload['photo_upload_ids'] = remoteIds;
+            upsertPayload['replace_photo_upload_ids'] = true;
+          }
+        }
+
+        final res = await sellerApi.upsertPosCatalogProduct(
+          upsertPayload,
+          idempotencyKey: localId,
+        );
+
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid product upsert response shape',
+          );
+        }
+        final productIdRaw = (res.data as Map<String, dynamic>)['product_id'];
+        final productId = _asNullableInt(productIdRaw);
+        if (productId == null) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Missing product_id in product upsert response',
+          );
+        }
+        await db.markItemSyncedWithRemoteId(localId, productId);
+        await _pushItemVariantStocks(localId, productId);
         break;
       case 'item_delete':
         final productId =
@@ -279,10 +668,8 @@ class SyncService {
             payload['product_id']?.toString() ??
             '';
         if (productId.isEmpty) {
-          throw DioException(
-            requestOptions: RequestOptions(path: op.opType),
-            error: 'Missing remote_id for item_delete',
-          );
+          // Local-only item deletion: nothing to do remotely.
+          return;
         }
         try {
           await sellerApi.deleteProduct(productId);
@@ -297,17 +684,73 @@ class SyncService {
         break;
       case 'service_create':
       case 'service_update':
-        final localId = payload['local_id'] as String?;
-        if (op.opType == 'service_create') {
-          await sellerApi.createService(payload);
-        } else {
-          final serviceId =
-              payload['remote_id']?.toString() ??
-              payload['local_id']?.toString() ??
-              '';
-          await sellerApi.updateService(serviceId, payload);
+        final localId = payload['local_id']?.toString().trim();
+        if (localId == null || localId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing local_id for service sync op',
+          );
         }
-        if (localId != null) {
+
+        final isCreate = op.opType == 'service_create';
+        final mappedPayload = <String, dynamic>{};
+        final title = (payload['title'] ?? '').toString();
+        if (isCreate || (payload.containsKey('title') && title.trim().isNotEmpty)) {
+          mappedPayload['title'] = title;
+        }
+        if (payload['summary'] != null) mappedPayload['summary'] = payload['summary'];
+        if (payload['description'] != null) mappedPayload['description'] = payload['description'];
+
+        if (isCreate || payload.containsKey('base_price') || payload.containsKey('price')) {
+          mappedPayload['base_price'] = _asDouble(payload['base_price'] ?? payload['price'] ?? 0);
+        }
+        if (payload['currency'] != null) mappedPayload['currency'] = payload['currency'];
+        if (payload['category_id'] != null) mappedPayload['category_id'] = payload['category_id'];
+
+        final durationRaw = payload['duration_minutes'] ?? payload['duration'];
+        if (durationRaw != null) mappedPayload['duration_minutes'] = _asInt(durationRaw);
+
+        if (payload.containsKey('is_published') || payload.containsKey('published')) {
+          mappedPayload['is_published'] = _asBool(payload['is_published'] ?? payload['published']);
+        }
+
+        if (op.opType == 'service_create') {
+          final res = await sellerApi.createService(
+            mappedPayload,
+            idempotencyKey: localId,
+          );
+          if (res.data is! Map) {
+            throw DioException(
+              requestOptions: res.requestOptions,
+              error: 'Invalid service create response shape',
+            );
+          }
+          final body = Map<String, dynamic>.from(res.data as Map);
+          final data = body['data'];
+          int? remoteId;
+          if (data is Map) {
+            remoteId = _asNullableInt(data['id']);
+          } else {
+            remoteId = _asNullableInt(body['id']);
+          }
+          if (remoteId == null) {
+            throw DioException(
+              requestOptions: res.requestOptions,
+              error: 'Missing service id in create response',
+            );
+          }
+          await db.markServiceSyncedWithRemoteId(localId, remoteId);
+        } else {
+          final remoteId =
+              _asNullableInt(payload['remote_id']) ??
+              (await db.getServiceById(localId))?.remoteId;
+          if (remoteId == null) {
+            throw DioException(
+              requestOptions: RequestOptions(path: op.opType),
+              error: 'Service not synced yet for service_update',
+            );
+          }
+          await sellerApi.updateService(remoteId.toString(), mappedPayload);
           await db.markServiceSynced(localId);
         }
         break;
@@ -323,10 +766,55 @@ class SyncService {
             payload['idempotency_key']?.toString() ??
             payload['entry_id']?.toString() ??
             '';
-        final res = await sellerApi.pushLedgerEntry(
-          payload,
-          idempotencyKey: key,
-        );
+        final body = Map<String, dynamic>.from(payload);
+
+        // Backend expects `ref_entry_id` for refunds; older client payloads used
+        // `original_entry_id`.
+        if ((body['type'] ?? '').toString() == 'refund') {
+          body['ref_entry_id'] ??= body['original_entry_id'];
+        }
+
+        final linesRaw = body['lines'];
+        if (linesRaw is List) {
+          final updated = <Map<String, dynamic>>[];
+          for (final raw in linesRaw) {
+            if (raw is! Map) continue;
+            final line = Map<String, dynamic>.from(raw);
+
+            final productRaw = line['product_id'];
+            if (productRaw != null && productRaw.toString().trim().isNotEmpty) {
+              final resolved = await _resolveRemoteProductId(productRaw);
+              if (resolved == null) {
+                throw DioException(
+                  requestOptions: RequestOptions(path: op.opType),
+                  error: 'Product not synced yet for ledger entry',
+                );
+              }
+              line['product_id'] = resolved;
+            } else {
+              line.remove('product_id');
+            }
+
+            final serviceRaw = line['service_id'];
+            if (serviceRaw != null && serviceRaw.toString().trim().isNotEmpty) {
+              final resolved = await _resolveRemoteServiceId(serviceRaw);
+              if (resolved == null) {
+                throw DioException(
+                  requestOptions: RequestOptions(path: op.opType),
+                  error: 'Service not synced yet for ledger entry',
+                );
+              }
+              line['service_id'] = resolved;
+            } else {
+              line.remove('service_id');
+            }
+
+            updated.add(line);
+          }
+          body['lines'] = updated;
+        }
+
+        final res = await sellerApi.pushLedgerEntry(body, idempotencyKey: key);
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
             requestOptions: res.requestOptions,
@@ -354,10 +842,52 @@ class SyncService {
         }
         break;
       case 'stock_adjust':
-        await sellerApi.updateProduct(
-          payload['product_id'].toString(),
-          payload,
+        final localId = payload['local_id']?.toString() ?? '';
+        if (localId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing local_id for stock_adjust',
+          );
+        }
+        final item = await db.getItemById(localId);
+        final remoteId =
+            _asNullableInt(payload['product_id']) ??
+            _asNullableInt(payload['remote_id']) ??
+            item?.remoteId ??
+            _asNullableInt(localId);
+        if (remoteId == null) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing remote product id for stock_adjust',
+          );
+        }
+
+        final upsertPayload = <String, dynamic>{
+          'product_id': remoteId,
+          'name': (item?.name ?? payload['name'] ?? '').toString(),
+          'unit_price': _asDouble(item?.price ?? payload['unit_price'] ?? 0),
+          'current_stock': _asInt(payload['current_stock'] ?? item?.stockQty ?? 0),
+          'published': _asBool(payload['published'] ?? item?.publishedOnline ?? false),
+          if (item?.sku != null) 'sku': item!.sku,
+          if (item?.barcode != null) 'barcode': item!.barcode,
+        };
+        final variation = payload['variation']?.toString();
+        if (variation != null && variation.trim().isNotEmpty) {
+          upsertPayload['variation'] = variation.trim();
+        }
+
+        final res = await sellerApi.upsertPosCatalogProduct(
+          upsertPayload,
+          idempotencyKey: localId,
         );
+        if (res.data is Map<String, dynamic>) {
+          final productId = _asNullableInt((res.data as Map<String, dynamic>)['product_id']);
+          if (productId != null) {
+            await db.markItemSyncedWithRemoteId(localId, productId);
+          }
+        } else {
+          await db.markItemSynced(localId);
+        }
         break;
       case 'cash_movement_push':
         final key =
@@ -412,10 +942,156 @@ class SyncService {
           );
         }
         break;
+      case 'grn_push':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['client_grn_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for goods received note',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final linesRaw = body['lines'];
+        if (linesRaw is List) {
+          final updated = <Map<String, dynamic>>[];
+          for (final raw in linesRaw) {
+            if (raw is! Map) continue;
+            final line = Map<String, dynamic>.from(raw);
+            final productRaw = line['product_id'];
+            if (productRaw != null && productRaw.toString().trim().isNotEmpty) {
+              final resolved = await _resolveRemoteProductId(productRaw);
+              if (resolved == null) {
+                throw DioException(
+                  requestOptions: RequestOptions(path: op.opType),
+                  error: 'Product not synced yet for GRN',
+                );
+              }
+              line['product_id'] = resolved;
+            }
+            updated.add(line);
+          }
+          body['lines'] = updated;
+        }
+        final res = await sellerApi.pushGoodsReceivedNote(body, idempotencyKey: key);
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid GRN ack response shape',
+          );
+        }
+        final ack = PosLedgerAck.fromJson(res.data as Map<String, dynamic>);
+        if (ack.idempotencyKey != key) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'GRN ack idempotency mismatch',
+          );
+        }
+        break;
+      case 'stocktake_push':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['client_stocktake_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for stocktake',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final linesRaw = body['lines'];
+        if (linesRaw is List) {
+          final updated = <Map<String, dynamic>>[];
+          for (final raw in linesRaw) {
+            if (raw is! Map) continue;
+            final line = Map<String, dynamic>.from(raw);
+            final productRaw = line['product_id'];
+            if (productRaw != null && productRaw.toString().trim().isNotEmpty) {
+              final resolved = await _resolveRemoteProductId(productRaw);
+              if (resolved == null) {
+                throw DioException(
+                  requestOptions: RequestOptions(path: op.opType),
+                  error: 'Product not synced yet for stocktake',
+                );
+              }
+              line['product_id'] = resolved;
+            }
+            updated.add(line);
+          }
+          body['lines'] = updated;
+        }
+        final res = await sellerApi.pushStocktake(body, idempotencyKey: key);
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid stocktake ack response shape',
+          );
+        }
+        final ack = PosLedgerAck.fromJson(res.data as Map<String, dynamic>);
+        if (ack.idempotencyKey != key) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Stocktake ack idempotency mismatch',
+          );
+        }
+        break;
+      case 'purchase_order_push':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['client_po_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for purchase order',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final linesRaw = body['lines'];
+        if (linesRaw is List) {
+          final updated = <Map<String, dynamic>>[];
+          for (final raw in linesRaw) {
+            if (raw is! Map) continue;
+            final line = Map<String, dynamic>.from(raw);
+            final productRaw = line['product_id'];
+            if (productRaw != null && productRaw.toString().trim().isNotEmpty) {
+              final resolved = await _resolveRemoteProductId(productRaw);
+              if (resolved == null) {
+                throw DioException(
+                  requestOptions: RequestOptions(path: op.opType),
+                  error: 'Product not synced yet for purchase order',
+                );
+              }
+              line['product_id'] = resolved;
+            }
+            updated.add(line);
+          }
+          body['lines'] = updated;
+        }
+        final res = await sellerApi.createPurchaseOrder(body, idempotencyKey: key);
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid purchase order response',
+          );
+        }
+        final ackKey = (res.data as Map<String, dynamic>)['idempotency_key']?.toString();
+        if (ackKey != key) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Purchase order ack idempotency mismatch',
+          );
+        }
+        break;
       case 'quotation_push':
         final key =
             payload['idempotency_key']?.toString() ??
+            payload['id']?.toString() ??
             payload['quotation_id']?.toString() ??
+            payload['local_id']?.toString() ??
             '';
         if (key.isEmpty) {
           throw DioException(
@@ -423,9 +1099,97 @@ class SyncService {
             error: 'Missing idempotency_key for quotation',
           );
         }
-        final body = Map<String, dynamic>.from(payload)
+        final rawBody = Map<String, dynamic>.from(payload)
           ..remove('idempotency_key');
+
+        final id =
+            (rawBody['id'] ??
+                    rawBody['quotation_id'] ??
+                    rawBody['local_id'] ??
+                    rawBody['quotationId'] ??
+                    rawBody['localId'])
+                ?.toString()
+                .trim();
+        if (id == null || id.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing quotation id',
+          );
+        }
+
+        final quotationNumber =
+            (rawBody['quotation_number'] ?? rawBody['number'] ?? rawBody['quotationNumber'])
+                ?.toString()
+                .trim();
+        if (quotationNumber == null || quotationNumber.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing quotation_number',
+          );
+        }
+
+        var validityDays = _asInt(rawBody['validity_days'] ?? rawBody['validityDays']);
+        if (validityDays <= 0) {
+          final validUntil =
+              DateTime.tryParse((rawBody['valid_until'] ?? rawBody['validUntil'] ?? '').toString());
+          if (validUntil != null) {
+            validityDays = validUntil.difference(DateTime.now()).inDays;
+          }
+        }
+        if (validityDays <= 0) validityDays = 30;
+
+        final customerId = rawBody['customer_id']?.toString();
+        final notes = rawBody['notes']?.toString() ?? rawBody['note']?.toString();
+
+        final lines = <Map<String, dynamic>>[];
+        final rawLines = rawBody['lines'];
+        if (rawLines is List) {
+          for (final raw in rawLines) {
+            if (raw is! Map) continue;
+            final line = Map<String, dynamic>.from(raw);
+            final title =
+                (line['title'] ?? line['name'] ?? line['description'] ?? 'Item')
+                    .toString()
+                    .trim();
+            final quantity = _asInt(line['quantity'] ?? line['qty'] ?? 1);
+            final price = _asDouble(line['price'] ?? line['unit_price'] ?? line['unitPrice'] ?? 0);
+            final total = _asDouble(line['total']) != 0
+                ? _asDouble(line['total'])
+                : price * quantity;
+
+            lines.add({
+              if (line['item_id'] != null) 'item_id': line['item_id'],
+              if (line['service_id'] != null) 'service_id': line['service_id'],
+              'title': title.isEmpty ? 'Item' : title,
+              'price': price,
+              'quantity': quantity <= 0 ? 1 : quantity,
+              'total': total,
+            });
+          }
+        }
+        if (lines.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Quotation must include at least one line',
+          );
+        }
+
+        final body = <String, dynamic>{
+          'id': id,
+          'quotation_number': quotationNumber,
+          'customer_id': customerId,
+          'validity_days': validityDays,
+          'total': _asDouble(rawBody['total']),
+          if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+          'lines': lines,
+        };
+
         await sellerApi.pushQuotation(body, idempotencyKey: key);
+        final localId = id.trim();
+        if (localId.isNotEmpty) {
+          await (db.update(db.quotations)..where((t) => t.id.equals(localId)))
+              .write(const QuotationsCompanion(synced: drift.Value(true)));
+        }
         break;
       case 'receipt_template_push':
       case 'receipt_template_update':
@@ -461,15 +1225,67 @@ class SyncService {
             error: 'Missing idempotency_key for customer',
           );
         }
+        final localCustomerId =
+            payload['customer_id']?.toString() ?? payload['local_id']?.toString() ?? '';
         final body = Map<String, dynamic>.from(payload)
           ..remove('idempotency_key');
-        await sellerApi.pushCustomer(body, idempotencyKey: key);
+        final res = await sellerApi.pushCustomer(body, idempotencyKey: key);
+        String? remoteId;
+        DateTime? updatedAt;
+        if (res.data is Map) {
+          final data = Map<String, dynamic>.from(res.data as Map);
+          remoteId = data['contact_id']?.toString();
+          updatedAt =
+              DateTime.tryParse(data['updated_at']?.toString() ?? '')?.toUtc();
+        }
+        if (localCustomerId.trim().isNotEmpty) {
+          await (db.update(db.customers)
+                ..where((t) => t.id.equals(localCustomerId.trim())))
+              .write(
+            CustomersCompanion(
+              remoteId:
+                  remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
+              synced: const drift.Value(true),
+              updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
         break;
       case 'service_variant_push':
-        await sellerApi.pushServiceVariant(payload);
+      case 'service_variant_create':
+      case 'service_variant_update':
+        final variantIdRaw = payload['id'] ?? payload['variant_id'] ?? payload['local_id'];
+        final serviceIdRaw = payload['service_id'] ?? payload['serviceId'];
+        final variantId = variantIdRaw?.toString().trim() ?? '';
+        final serviceId = serviceIdRaw?.toString().trim() ?? '';
+        if (variantId.isEmpty || serviceId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing id/service_id for service variant push',
+          );
+        }
+
+        final mapped = <String, dynamic>{
+          'id': variantId,
+          'service_id': serviceId,
+          'name': payload['name'],
+          'price': payload['price'],
+          'unit': payload['unit'],
+          'is_default': _asBool(payload['is_default'] ?? false),
+        };
+        await sellerApi.pushServiceVariant(mapped);
+        final localVariantId = mapped['id']?.toString();
+        if (localVariantId != null && localVariantId.trim().isNotEmpty) {
+          await (db.update(db.serviceVariants)
+                ..where((t) => t.id.equals(localVariantId.trim())))
+              .write(const ServiceVariantsCompanion(synced: drift.Value(true)));
+        }
         break;
       case 'service_variant_delete':
-        final variantId = payload['variant_id']?.toString() ?? '';
+        final variantId =
+            payload['variant_id']?.toString() ??
+            payload['id']?.toString() ??
+            '';
         if (variantId.isEmpty) {
           throw DioException(
             requestOptions: RequestOptions(path: op.opType),
@@ -506,7 +1322,9 @@ class SyncService {
         since = cursors.cast<DateTime>().reduce((a, b) => a.isBefore(b) ? a : b);
       }
 
-      print('[SyncService] Pulling delta since $since'); // Debug log
+      if (kDebugMode) {
+        debugPrint('[SyncService] Pulling delta since $since');
+      }
 
       final res = await sellerApi.pullPosSync(since: since);
       if (res.data is! Map<String, dynamic>) {
@@ -518,50 +1336,157 @@ class SyncService {
 
       // Handle wrapped response (e.g. {data: {...}, success: true})
       var responseData = res.data as Map<String, dynamic>;
-      print('[SyncService] Wrapper keys: ${responseData.keys.toList()}');
+      if (kDebugMode) {
+        debugPrint('[SyncService] Wrapper keys: ${responseData.keys.toList()}');
+      }
       
       if (responseData.containsKey('data')) {
-         print('[SyncService] Inner data type: ${responseData['data'].runtimeType}');
+         if (kDebugMode) {
+           debugPrint('[SyncService] Inner data type: ${responseData['data'].runtimeType}');
+         }
          if (responseData['data'] is Map) {
            final inner = responseData['data'] as Map;
-           print('[SyncService] Inner keys: ${inner.keys.toList()}');
+           if (kDebugMode) {
+             debugPrint('[SyncService] Inner keys: ${inner.keys.toList()}');
+           }
            responseData = responseData['data'] as Map<String, dynamic>;
          } else {
-           print('[SyncService] Inner data IS NOT A MAP!');
+           if (kDebugMode) {
+             debugPrint('[SyncService] Inner data IS NOT A MAP!');
+           }
          }
       }
 
       final pull = PosSyncPullResponse.fromJson(responseData);
       
       // Debug: Log what we received
-      print('[SyncService] Pull received: ${pull.products.length} products, ${pull.services.length} services, ${pull.customers.length} customers, ${pull.ledgerEntries.length} txns');
+      if (kDebugMode) {
+        debugPrint(
+          '[SyncService] Pull received: ${pull.products.length} products, ${pull.services.length} services, ${pull.customers.length} customers, ${pull.ledgerEntries.length} txns',
+        );
+      }
       
       _syncStatusController.add('Syncing products...');
       if (pull.products.isEmpty) {
-        print('[SyncService] WARNING: No products in sync response!');
+        if (kDebugMode) {
+          debugPrint('[SyncService] WARNING: No products in sync response!');
+        }
       }
 
       for (final p in pull.products) {
         if (p.id.isEmpty) continue;
+        final remoteId = int.tryParse(p.id);
+        final existing =
+            remoteId != null ? await db.getItemByRemoteId(remoteId) : null;
+        final localId = existing?.id ?? p.id;
+        final displayPrice = p.stocks.isEmpty
+            ? p.unitPrice
+            : p.stocks.map((s) => s.price).reduce((a, b) => a < b ? a : b);
+        final displayStock = p.stocks.isEmpty
+            ? p.currentStock
+            : p.stocks.fold<int>(0, (sum, s) => sum + s.qty);
+        final discountType = p.discountType == null
+            ? null
+            : (p.discountType == 'amount' ? 'flat' : p.discountType);
         await db.upsertItem(
           ItemsCompanion.insert(
-            id: drift.Value(p.id),
+            id: drift.Value(localId),
+            remoteId:
+                remoteId != null ? drift.Value(remoteId) : const drift.Value.absent(),
             name: p.name.isEmpty ? 'Product' : p.name,
-            price: p.unitPrice,
-            stockQty: drift.Value(p.currentStock),
+            price: displayPrice,
+            stockQty: drift.Value(displayStock),
             imageUrl: drift.Value(p.imageUrl),
+            thumbnailUrl: (p.thumbnailUrl ?? p.imageUrl) != null
+                ? drift.Value(p.thumbnailUrl ?? p.imageUrl)
+                : const drift.Value.absent(),
+            thumbnailUploadId: p.thumbnailUploadId != null
+                ? drift.Value(p.thumbnailUploadId)
+                : const drift.Value.absent(),
+            galleryUrls: p.galleryUrls.isNotEmpty
+                ? drift.Value(jsonEncode(p.galleryUrls))
+                : const drift.Value.absent(),
+            galleryUploadIds: p.photoUploadIds.isNotEmpty
+                ? drift.Value(jsonEncode(p.photoUploadIds))
+                : const drift.Value.absent(),
             publishedOnline: drift.Value(p.published),
+            categoryId: p.categoryId != null
+                ? drift.Value(p.categoryId.toString())
+                : const drift.Value.absent(),
+            brandId: p.brandId != null
+                ? drift.Value(p.brandId.toString())
+                : const drift.Value.absent(),
+            unit: p.unit != null ? drift.Value(p.unit) : const drift.Value.absent(),
+            weight: p.weight != null ? drift.Value(p.weight) : const drift.Value.absent(),
+            minPurchaseQty: p.minQty != null
+                ? drift.Value(p.minQty!)
+                : const drift.Value.absent(),
+            tags: p.tags != null ? drift.Value(p.tags) : const drift.Value.absent(),
+            description: p.description != null
+                ? drift.Value(p.description)
+                : const drift.Value.absent(),
+            discount: p.discount != null ? drift.Value(p.discount) : const drift.Value.absent(),
+            discountType: discountType != null ? drift.Value(discountType) : const drift.Value.absent(),
+            shippingDays: p.estShippingDays != null ? drift.Value(p.estShippingDays) : const drift.Value.absent(),
+            shippingFee: p.shippingCost != null ? drift.Value(p.shippingCost) : const drift.Value.absent(),
+            refundable: drift.Value(p.refundable ?? false),
+            cashOnDelivery: drift.Value(p.cashOnDelivery ?? true),
+            lowStockWarning: p.lowStockQuantity != null ? drift.Value(p.lowStockQuantity) : const drift.Value.absent(),
+            barcode: p.barcode != null
+                ? drift.Value(p.barcode)
+                : const drift.Value.absent(),
             updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
             synced: const drift.Value(true),
           ),
         );
+
+        // Upsert variant stocks (product_stocks). If backend didn't send any,
+        // treat the product as a single-stock item.
+        final incomingStocks = p.stocks.isNotEmpty
+            ? p.stocks
+            : [
+                PosSyncProductStock(
+                  id: 0,
+                  variant: '',
+                  price: p.unitPrice,
+                  qty: p.currentStock,
+                ),
+              ];
+
+        final variants = <String>[];
+        for (final s in incomingStocks) {
+          final variant = s.variant;
+          variants.add(variant);
+          await db.upsertItemStock(
+            ItemStocksCompanion.insert(
+              itemId: localId,
+              variant: variant,
+              remoteStockId: s.id > 0 ? drift.Value(s.id) : const drift.Value.absent(),
+              price: s.price,
+              stockQty: drift.Value(s.qty),
+              sku: drift.Value(s.sku),
+              imageUploadId: s.imageUploadId != null
+                  ? drift.Value(s.imageUploadId)
+                  : const drift.Value.absent(),
+              imageUrl: drift.Value(s.imageUrl),
+              updatedAt: drift.Value(s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
+        await db.deleteItemStocksNotIn(localId, variants);
       }
 
       for (final s in pull.services) {
         if (s.id.isEmpty) continue;
+        final remoteId = int.tryParse(s.id);
+        final existing =
+            remoteId != null ? await db.getServiceByRemoteId(remoteId) : null;
+        final localId = existing?.id ?? s.id;
         await db.upsertService(
           ServicesCompanion.insert(
-            id: drift.Value(s.id),
+            id: drift.Value(localId),
+            remoteId:
+                remoteId != null ? drift.Value(remoteId) : const drift.Value.absent(),
             title: s.title.isEmpty ? 'Service' : s.title,
             price: s.price,
             description: drift.Value(s.description),
@@ -577,13 +1502,39 @@ class SyncService {
       _syncStatusController.add('Syncing customers...');
       for (final c in pull.customers) {
         if (c.id.isEmpty) continue;
+        final existingById = await db.getCustomerById(c.id);
+        final existingByRemote = existingById == null
+            ? await db.getCustomerByRemoteId(c.id)
+            : null;
+        final localId = existingById?.id ?? existingByRemote?.id ?? c.id;
+
         await db.upsertCustomer(
           CustomersCompanion.insert(
-            id: drift.Value(c.id),
+            id: drift.Value(localId),
+            remoteId: drift.Value(c.id),
             name: c.name.isEmpty ? 'Customer' : c.name,
             phone: drift.Value(c.phone),
             email: drift.Value(c.email),
+            synced: const drift.Value(true),
             updatedAt: drift.Value(c.updatedAt ?? DateTime.now().toUtc()),
+          ),
+        );
+      }
+
+      _syncStatusController.add('Syncing suppliers...');
+      for (final s in pull.suppliers) {
+        if (s.id <= 0) continue;
+        await db.upsertSupplier(
+          SuppliersCompanion.insert(
+            id: drift.Value(s.id),
+            name: s.name.isEmpty ? 'Supplier' : s.name,
+            contactName: drift.Value(s.contactName),
+            phone: drift.Value(s.phone),
+            email: drift.Value(s.email),
+            address: drift.Value(s.address),
+            notes: drift.Value(s.notes),
+            active: drift.Value(s.active),
+            updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
           ),
         );
       }
@@ -695,11 +1646,19 @@ class SyncService {
       
       // Debug: Log total items in DB after sync
       final allItems = await db.getAllItems();
-      print('[SyncService] After sync: ${allItems.length} total items in local DB');
+      if (kDebugMode) {
+        debugPrint('[SyncService] After sync: ${allItems.length} total items in local DB');
+      }
 
     } catch (e, st) {
-      print('[SyncService] CRITICAL ERROR in _pullPosDeltaInternal: $e');
-      print(st);
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'pullPosDelta'));
+      }
+      if (kDebugMode) {
+        debugPrint('[SyncService] ERROR in _pullPosDeltaInternal: $e');
+        debugPrint(st.toString());
+      }
       rethrow;
     }
   }
@@ -893,4 +1852,38 @@ class SyncService {
     }
     return null;
   }
+}
+
+int _asInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is bool) return value ? 1 : 0;
+  return int.tryParse(value.toString()) ?? 0;
+}
+
+int? _asNullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is bool) return value ? 1 : 0;
+  return int.tryParse(value.toString());
+}
+
+double _asDouble(dynamic value) {
+  if (value == null) return 0;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is bool) return value ? 1 : 0;
+  return double.tryParse(value.toString()) ?? 0;
+}
+
+bool _asBool(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final s = value.toString().trim().toLowerCase();
+  if (s == 'true' || s == '1' || s == 'yes') return true;
+  if (s == 'false' || s == '0' || s == 'no') return false;
+  return false;
 }

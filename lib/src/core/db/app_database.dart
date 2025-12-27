@@ -24,11 +24,49 @@ class Items extends Table {
   TextColumn get imageUrl => text().nullable()();
   BoolColumn get publishedOnline =>
       boolean().withDefault(const Constant(false))();
+  // Marketplace fields
+  TextColumn get categoryId => text().nullable()();
+  TextColumn get categoryName => text().nullable()();
+  TextColumn get brandId => text().nullable()();
+  TextColumn get brandName => text().nullable()();
+  TextColumn get unit => text().nullable()(); // pc, kg, set, etc.
+  RealColumn get weight => real().nullable()(); // in kg
+  IntColumn get minPurchaseQty => integer().withDefault(const Constant(1))();
+  TextColumn get tags => text().nullable()(); // comma-separated
+  TextColumn get description => text().nullable()();
+  TextColumn get thumbnailUrl => text().nullable()();
+  IntColumn get thumbnailUploadId => integer().nullable()();
+  TextColumn get galleryUrls => text().nullable()(); // JSON array
+  TextColumn get galleryUploadIds => text().nullable()(); // JSON array of ints
+  RealColumn get discount => real().nullable()();
+  TextColumn get discountType => text().nullable()(); // flat, percent
+  IntColumn get shippingDays => integer().nullable()();
+  RealColumn get shippingFee => real().nullable()();
+  BoolColumn get refundable => boolean().withDefault(const Constant(false))();
+  BoolColumn get cashOnDelivery => boolean().withDefault(const Constant(true))();
+  IntColumn get lowStockWarning => integer().nullable()();
+  // Meta
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   @override
   Set<Column<Object>>? get primaryKey => {id};
+}
+
+class ItemStocks extends Table {
+  TextColumn get itemId => text().references(Items, #id)();
+  TextColumn get variant => text()(); // '' for simple products, or 'Red-L' etc
+  IntColumn get remoteStockId => integer().nullable()();
+  RealColumn get price => real()();
+  IntColumn get stockQty => integer().withDefault(const Constant(0))();
+  TextColumn get sku => text().nullable()();
+  IntColumn get imageUploadId => integer().nullable()();
+  TextColumn get imageUrl => text().nullable()();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {itemId, variant};
 }
 
 class Services extends Table {
@@ -58,6 +96,22 @@ class Customers extends Table {
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class Suppliers extends Table {
+  IntColumn get id => integer()(); // remote supplier id (server)
+  TextColumn get name => text()();
+  TextColumn get contactName => text().nullable()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get address => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+
   @override
   Set<Column<Object>>? get primaryKey => {id};
 }
@@ -147,6 +201,15 @@ class CachedOrders extends Table {
   Set<Column<Object>>? get primaryKey => {orderId};
 }
 
+class CachedServiceBookings extends Table {
+  IntColumn get bookingId => integer()();
+  TextColumn get payloadJson => text()();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {bookingId};
+}
+
 class InventoryLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get itemId => text().references(Items, #id)();
@@ -191,6 +254,7 @@ class Outlets extends Table {
 
 class LedgerEntries extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  IntColumn get receiptNumber => integer().nullable()(); // Sequential receipt number
   TextColumn get idempotencyKey => text()();
   TextColumn get type => text()(); // sale, refund, void, adjustment
   TextColumn get originalEntryId => text().nullable()(); // For refunds: links to original sale
@@ -217,6 +281,7 @@ class LedgerLines extends Table {
   TextColumn get itemId => text().nullable().references(Items, #id)();
   TextColumn get serviceId => text().nullable().references(Services, #id)();
   TextColumn get title => text()();
+  TextColumn get variant => text().nullable()();
   IntColumn get quantity => integer()();
   RealColumn get unitPrice => real()();
   RealColumn get discount => real().withDefault(const Constant(0))();
@@ -340,8 +405,10 @@ class QuotationTemplates extends Table {
 @DriftDatabase(
   tables: [
     Items,
+    ItemStocks,
     Services,
     Customers,
+    Suppliers,
     Transactions,
     TransactionLines,
     Receipts,
@@ -349,6 +416,7 @@ class QuotationTemplates extends Table {
     PrintJobs,
     SyncCursors,
     CachedOrders,
+    CachedServiceBookings,
     InventoryLogs,
     Roles,
     Staff,
@@ -367,7 +435,7 @@ class QuotationTemplates extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase._internal(QueryExecutor executor) : super(executor);
+  AppDatabase._internal(super.executor);
 
   static Future<AppDatabase> make() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -376,7 +444,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -433,15 +501,63 @@ class AppDatabase extends _$AppDatabase {
       if (from < 11) {
         await migrator.createTable(quotationTemplates);
       }
+      if (from < 12) {
+        await migrator.addColumn(ledgerEntries, ledgerEntries.receiptNumber);
+      }
+      if (from < 13) {
+        // Marketplace fields for Items
+        await migrator.addColumn(items, items.categoryId);
+        await migrator.addColumn(items, items.categoryName);
+        await migrator.addColumn(items, items.brandId);
+        await migrator.addColumn(items, items.brandName);
+        await migrator.addColumn(items, items.unit);
+        await migrator.addColumn(items, items.weight);
+        await migrator.addColumn(items, items.minPurchaseQty);
+        await migrator.addColumn(items, items.tags);
+        await migrator.addColumn(items, items.description);
+        await migrator.addColumn(items, items.thumbnailUrl);
+        await migrator.addColumn(items, items.galleryUrls);
+        await migrator.addColumn(items, items.discount);
+        await migrator.addColumn(items, items.discountType);
+        await migrator.addColumn(items, items.shippingDays);
+        await migrator.addColumn(items, items.shippingFee);
+        await migrator.addColumn(items, items.refundable);
+        await migrator.addColumn(items, items.cashOnDelivery);
+        await migrator.addColumn(items, items.lowStockWarning);
+      }
+      if (from < 14) {
+        await migrator.addColumn(items, items.thumbnailUploadId);
+        await migrator.addColumn(items, items.galleryUploadIds);
+      }
+      if (from < 15) {
+        await migrator.createTable(itemStocks);
+      }
+      if (from < 16) {
+        await migrator.addColumn(ledgerLines, ledgerLines.variant);
+      }
+      if (from < 17) {
+        await migrator.createTable(cachedServiceBookings);
+      }
+      if (from < 18) {
+        await migrator.createTable(suppliers);
+      }
     },
   );
 
   // Items
   Future<List<Item>> getAllItems() => select(items).get();
+  Future<Item?> getItemById(String id) =>
+      (select(items)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<Item?> getItemByRemoteId(int remoteId) =>
+      (select(items)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
   Stream<List<Item>> watchItems() =>
       (select(items)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
   Future<void> upsertItem(ItemsCompanion companion) async {
     await into(items).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> updateItemFields(String id, ItemsCompanion companion) async {
+    await (update(items)..where((tbl) => tbl.id.equals(id))).write(companion);
   }
 
   Future<void> markItemSynced(String id) async {
@@ -453,10 +569,48 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> markItemSyncedWithRemoteId(String id, int remoteId) async {
+    await (update(items)..where((tbl) => tbl.id.equals(id))).write(
+      ItemsCompanion(
+        remoteId: Value(remoteId),
+        synced: const Value(true),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  // Item Stocks (variants)
+  Stream<List<ItemStock>> watchItemStocksForItem(String itemId) => (select(
+        itemStocks,
+      )..where((t) => t.itemId.equals(itemId))).watch();
+
+  Future<List<ItemStock>> getItemStocksForItem(String itemId) => (select(
+        itemStocks,
+      )..where((t) => t.itemId.equals(itemId))).get();
+
+  Future<void> upsertItemStock(ItemStocksCompanion companion) async {
+    await into(itemStocks).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> deleteItemStocksNotIn(String itemId, List<String> variants) async {
+    if (variants.isEmpty) {
+      await (delete(itemStocks)..where((t) => t.itemId.equals(itemId))).go();
+      return;
+    }
+    await (delete(itemStocks)
+          ..where((t) => t.itemId.equals(itemId) & t.variant.isNotIn(variants)))
+        .go();
+  }
+
   // Services
   Stream<List<Service>> watchServices() => (select(
     services,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+  Future<Service?> getServiceById(String id) =>
+      (select(services)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<Service?> getServiceByRemoteId(int remoteId) => (select(services)
+        ..where((t) => t.remoteId.equals(remoteId)))
+      .getSingleOrNull();
   Future<void> upsertService(ServicesCompanion companion) async {
     await into(services).insertOnConflictUpdate(companion);
   }
@@ -464,6 +618,16 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markServiceSynced(String id) async {
     await (update(services)..where((tbl) => tbl.id.equals(id))).write(
       ServicesCompanion(
+        synced: const Value(true),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Future<void> markServiceSyncedWithRemoteId(String id, int remoteId) async {
+    await (update(services)..where((tbl) => tbl.id.equals(id))).write(
+      ServicesCompanion(
+        remoteId: Value(remoteId),
         synced: const Value(true),
         updatedAt: Value(DateTime.now().toUtc()),
       ),
@@ -502,12 +666,60 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Stream<List<QuotationWithCustomer>> watchQuotationsWithCustomer() {
+    final query = select(quotations).join([
+      leftOuterJoin(customers, customers.id.equalsExp(quotations.customerId)),
+    ])
+      ..orderBy([OrderingTerm.desc(quotations.date)]);
+
+    return query.watch().map((rows) {
+      return rows
+          .map(
+            (row) => QuotationWithCustomer(
+              quotation: row.readTable(quotations),
+              customer: row.readTableOrNull(customers),
+            ),
+          )
+          .toList();
+    });
+  }
+
+  Future<List<QuotationLine>> getQuotationLinesByQuotationId(String quotationId) {
+    return (select(quotationLines)
+          ..where((t) => t.quotationId.equals(quotationId)))
+        .get();
+  }
+
+  Future<void> upsertQuotationWithLines({
+    required String quotationId,
+    required QuotationsCompanion header,
+    required List<QuotationLinesCompanion> lines,
+  }) async {
+    await transaction(() async {
+      await into(quotations).insertOnConflictUpdate(header);
+      await (delete(quotationLines)
+            ..where((t) => t.quotationId.equals(quotationId)))
+          .go();
+      for (final line in lines) {
+        await into(quotationLines).insert(line);
+      }
+    });
+  }
+
   // Receipt Templates
   Future<void> upsertReceiptTemplate(ReceiptTemplatesCompanion companion) async {
     await into(receiptTemplates).insertOnConflictUpdate(companion);
   }
 
   Future<ReceiptTemplate?> getLatestReceiptTemplate() async {
+    // First try to get the active template
+    final active = await (select(receiptTemplates)
+          ..where((t) => t.isActive.equals(true))
+          ..limit(1))
+        .getSingleOrNull();
+    if (active != null) return active;
+    
+    // Fallback to most recent if none active
     return (select(receiptTemplates)
           ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])
           ..limit(1))
@@ -515,6 +727,10 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Customers
+  Future<Customer?> getCustomerByRemoteId(String remoteId) => (select(customers)
+        ..where((t) => t.remoteId.equals(remoteId)))
+      .getSingleOrNull();
+
   Future<void> upsertCustomer(CustomersCompanion companion) async {
     await into(customers).insertOnConflictUpdate(companion);
   }
@@ -522,6 +738,19 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Customer>> watchCustomers() => (select(
     customers,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+
+  // Suppliers
+  Stream<List<Supplier>> watchSuppliers({bool activeOnly = true}) {
+    final q = select(suppliers)..orderBy([(t) => OrderingTerm.asc(t.name)]);
+    if (activeOnly) {
+      q.where((t) => t.active.equals(true));
+    }
+    return q.watch();
+  }
+
+  Future<void> upsertSupplier(SuppliersCompanion companion) async {
+    await into(suppliers).insertOnConflictUpdate(companion);
+  }
 
   // Transactions and lines
   Future<void> saveTransaction({
@@ -589,6 +818,14 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Ledger
+  /// Get the next sequential receipt number
+  Future<int> getNextReceiptNumber() async {
+    final maxQuery = selectOnly(ledgerEntries)
+      ..addColumns([ledgerEntries.receiptNumber.max()]);
+    final result = await maxQuery.getSingleOrNull();
+    final maxNum = result?.read(ledgerEntries.receiptNumber.max()) ?? 0;
+    return maxNum + 1;
+  }
   Future<void> saveLedgerEntry({
     required LedgerEntriesCompanion entry,
     required List<LedgerLinesCompanion> lines,
@@ -675,6 +912,12 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
           .get();
 
+  Future<List<SyncOp>> blockedSyncOps() =>
+      (select(syncOps)
+            ..where((tbl) => tbl.status.equals('blocked'))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
   Future<void> markSynced(int id) async {
     final now = DateTime.now().toUtc();
     await (update(syncOps)..where((tbl) => tbl.id.equals(id))).write(
@@ -701,9 +944,35 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> markSyncBlocked(
+    int id, {
+    required int retryCount,
+    String? lastError,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await (update(syncOps)..where((tbl) => tbl.id.equals(id))).write(
+      SyncOpsCompanion(
+        status: const Value('blocked'),
+        retryCount: Value(retryCount),
+        lastTriedAt: Value(now),
+        lastError: Value(lastError),
+      ),
+    );
+  }
+
+  Future<void> deleteSyncOp(int id) async {
+    await (delete(syncOps)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> setSyncOpPending(int id) async {
+    await (update(syncOps)..where((t) => t.id.equals(id))).write(
+      const SyncOpsCompanion(status: Value('pending')),
+    );
+  }
+
   Future<void> retrySyncOpNow(int id) async {
     await (update(syncOps)..where((t) => t.id.equals(id))).write(
-      const SyncOpsCompanion(lastTriedAt: Value(null)),
+      const SyncOpsCompanion(status: Value('pending'), lastTriedAt: Value(null)),
     );
   }
 
@@ -724,24 +993,46 @@ class AppDatabase extends _$AppDatabase {
     required String itemId,
     required int delta,
     String? note,
+    String? variant,
   }) async {
-    await into(inventoryLogs).insert(
-      InventoryLogsCompanion.insert(
-        itemId: itemId,
-        delta: delta,
-        note: Value(note),
-      ),
-    );
-    final item = await (select(
-      items,
-    )..where((tbl) => tbl.id.equals(itemId))).getSingle();
-    final updatedQty = item.stockQty + delta;
-    await (update(items)..where((tbl) => tbl.id.equals(itemId))).write(
-      ItemsCompanion(
-        stockQty: Value(updatedQty),
-        updatedAt: Value(DateTime.now().toUtc()),
-      ),
-    );
+    await transaction(() async {
+      await into(inventoryLogs).insert(
+        InventoryLogsCompanion.insert(
+          itemId: itemId,
+          delta: delta,
+          note: Value(note),
+        ),
+      );
+
+      final now = DateTime.now().toUtc();
+      final item = await (select(
+        items,
+      )..where((tbl) => tbl.id.equals(itemId))).getSingle();
+      final updatedQty = item.stockQty + delta;
+      await (update(items)..where((tbl) => tbl.id.equals(itemId))).write(
+        ItemsCompanion(
+          stockQty: Value(updatedQty),
+          updatedAt: Value(now),
+        ),
+      );
+
+      if (variant != null) {
+        final v = variant.trim();
+        final row = await (select(itemStocks)
+              ..where((t) => t.itemId.equals(itemId) & t.variant.equals(v)))
+            .getSingleOrNull();
+        if (row != null) {
+          await (update(itemStocks)
+                ..where((t) => t.itemId.equals(itemId) & t.variant.equals(v)))
+              .write(
+            ItemStocksCompanion(
+              stockQty: Value(row.stockQty + delta),
+              updatedAt: Value(now),
+            ),
+          );
+        }
+      }
+    });
   }
 
   Future<void> recordAuditLog({
@@ -950,6 +1241,21 @@ class AppDatabase extends _$AppDatabase {
     cachedOrders,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
 
+  // Service bookings cache
+  Future<void> upsertCachedServiceBooking(int bookingId, String payloadJson) async {
+    await into(cachedServiceBookings).insertOnConflictUpdate(
+      CachedServiceBookingsCompanion(
+        bookingId: Value(bookingId),
+        payloadJson: Value(payloadJson),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Future<List<CachedServiceBooking>> getCachedServiceBookings() => (select(
+    cachedServiceBookings,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
+
   // Print queue
   Future<int> enqueueReceiptPrintJob(String entryId) async {
     final existing =
@@ -1037,6 +1343,13 @@ class TransactionWithLines {
   TransactionWithLines(this.transaction, this.lines);
   final Transaction transaction;
   final List<TransactionLine> lines;
+}
+
+class QuotationWithCustomer {
+  QuotationWithCustomer({required this.quotation, required this.customer});
+
+  final Quotation quotation;
+  final Customer? customer;
 }
 
 class LedgerEntryBundle {

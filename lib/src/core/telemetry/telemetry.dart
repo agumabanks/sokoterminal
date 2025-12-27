@@ -22,14 +22,27 @@ class Telemetry {
     _instance = Telemetry._(file);
     await file.create(recursive: true);
 
+    final previousFlutterOnError = FlutterError.onError;
     FlutterError.onError = (details) {
+      try {
+        previousFlutterOnError?.call(details);
+      } catch (_) {
+        // Best effort.
+      }
       FlutterError.presentError(details);
       unawaited(_instance!._recordFlutterError(details));
     };
 
+    final previousPlatformOnError = PlatformDispatcher.instance.onError;
     PlatformDispatcher.instance.onError = (error, stack) {
+      bool handled = false;
+      try {
+        handled = previousPlatformOnError?.call(error, stack) ?? false;
+      } catch (_) {
+        handled = false;
+      }
       unawaited(_instance!._recordError(error, stack, kind: 'platform_error'));
-      return true;
+      return handled;
     };
 
     return _instance!;

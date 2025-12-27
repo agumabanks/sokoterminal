@@ -231,6 +231,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     final state = ref.read(authControllerProvider);
+    if (!mounted) return;
     if (state.status == AuthStatus.authenticated) {
       if (!_shouldTreatAsPin(secret, phone)) {
         await _maybeOfferQuickPin(context, phone: phone, password: secret);
@@ -263,6 +264,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final existing = await authCtrl.getQuickPinPhone();
     if (existing != null && existing == phone) return;
 
+    if (!context.mounted) return;
     final pin = await _promptSetPin(context);
     if (pin == null) return;
     await authCtrl.enableQuickPin(phone: phone, password: password, pin: pin);

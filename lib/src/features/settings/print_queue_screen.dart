@@ -255,7 +255,7 @@ class _JobTile extends ConsumerWidget {
             Container(
               padding: DesignTokens.paddingMd,
               decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.25),
+                color: DesignTokens.grayLight.withValues(alpha: 0.25),
                 borderRadius: DesignTokens.borderRadiusMd,
               ),
               child: Text(job.lastError!, style: DesignTokens.textSmall),

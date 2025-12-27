@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
+import '../../core/security/manager_approval.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
@@ -32,35 +33,35 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
     final db = ref.read(appDatabaseProvider);
 
     final connectivity = await Connectivity().checkConnectivity();
-    final online =
-        connectivity.contains(ConnectivityResult.mobile) ||
-        connectivity.contains(ConnectivityResult.wifi);
+    final online = connectivity.any((r) => r != ConnectivityResult.none);
 
     final pendingOps = await db.pendingSyncOps();
+    final blockedOps = await db.blockedSyncOps();
     final pendingCount = pendingOps.length;
     final retryingCount = pendingOps.where((e) => e.retryCount > 0).length;
+    final blockedCount = blockedOps.length;
 
     final byType = <String, int>{};
     for (final op in pendingOps) {
       byType[op.opType] = (byType[op.opType] ?? 0) + 1;
     }
 
-    final failures =
-        pendingOps
-            .where(
-              (op) =>
-                  op.retryCount > 0 && (op.lastError ?? '').trim().isNotEmpty,
-            )
-            .toList()
-          ..sort((a, b) {
-            final at =
-                a.lastTriedAt ??
-                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-            final bt =
-                b.lastTriedAt ??
-                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-            return bt.compareTo(at);
-          });
+    final pendingFailures = pendingOps
+        .where((op) => op.retryCount > 0 && (op.lastError ?? '').trim().isNotEmpty)
+        .toList();
+    final blockedFailures = blockedOps
+        .where((op) => (op.lastError ?? '').trim().isNotEmpty)
+        .toList();
+    final failures = [...blockedFailures, ...pendingFailures]
+      ..sort((a, b) {
+        final at =
+            a.lastTriedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        final bt =
+            b.lastTriedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        return bt.compareTo(at);
+      });
 
     final lastTriedExp = db.syncOps.lastTriedAt.max();
     final lastTriedRow = await (db.selectOnly(
@@ -90,6 +91,7 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
       online: online,
       pendingOps: pendingCount,
       retryingOps: retryingCount,
+      blockedOps: blockedCount,
       failingOps: failures.take(8).toList(),
       pendingLedgerEntries: pendingLedgerRow.read(pendingLedgerExp) ?? 0,
       lastTriedAt: lastTriedRow.read(lastTriedExp),
@@ -104,6 +106,89 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
 
   void _refresh() {
     setState(() => _future = _load());
+  }
+
+  Future<void> _forceFullResync(BuildContext context) async {
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity.any((r) => r != ConnectivityResult.none);
+    if (!online) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are offline. Connect to internet first.')),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    final confirm = await BottomSheetModal.show<bool>(
+      context: context,
+      title: 'Full resync?',
+      subtitle: 'Redownload products, services, customers, and config',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'This clears sync cursors and pulls from the server again. '
+            'Use this when products are missing or inventory looks wrong.',
+            style: DesignTokens.textSmall,
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  label: const Text('Resync'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Full resync started…')),
+    );
+    await ref.read(syncServiceProvider).forceFullResync();
+    _refresh();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Full resync finished')),
+    );
+  }
+
+  Future<void> _retryBlockedOps(BuildContext context) async {
+    final db = ref.read(appDatabaseProvider);
+    final blocked = await db.blockedSyncOps();
+    if (blocked.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No blocked operations')),
+      );
+      return;
+    }
+
+    for (final op in blocked) {
+      await db.retrySyncOpNow(op.id);
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Retrying ${blocked.length} blocked ops…')),
+    );
+    await ref.read(syncServiceProvider).syncNow();
+    _refresh();
   }
 
   @override
@@ -150,7 +235,7 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
                 _OutboxCard(data: data),
                 if (data.failingOps.isNotEmpty) ...[
                   const SizedBox(height: DesignTokens.spaceMd),
-                  _FailuresCard(data: data),
+                  _FailuresCard(data: data, onChanged: _refresh),
                 ],
                 const SizedBox(height: DesignTokens.spaceLg),
                 Row(
@@ -190,6 +275,28 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
                         },
                         icon: const Icon(Icons.delete_sweep_outlined),
                         label: const Text('Cleanup'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _forceFullResync(context),
+                        icon: const Icon(Icons.cloud_download_outlined),
+                        label: const Text('Full Resync'),
+                      ),
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: data.blockedOps > 0
+                            ? () => _retryBlockedOps(context)
+                            : null,
+                        icon: const Icon(Icons.lock_open_outlined),
+                        label: const Text('Retry Blocked'),
                       ),
                     ),
                   ],
@@ -250,6 +357,11 @@ class _SummaryCard extends StatelessWidget {
             'Retrying ops: ${data.retryingOps}',
             style: DesignTokens.textSmall,
           ),
+          if (data.blockedOps > 0)
+            Text(
+              'Blocked ops: ${data.blockedOps}',
+              style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+            ),
           if (data.failingOps.isNotEmpty)
             Text(
               'Recent failures: ${data.failingOps.length}',
@@ -360,8 +472,9 @@ class _OutboxCard extends StatelessWidget {
 }
 
 class _FailuresCard extends ConsumerWidget {
-  const _FailuresCard({required this.data});
+  const _FailuresCard({required this.data, required this.onChanged});
   final _SyncHealthSnapshot data;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -386,15 +499,17 @@ class _FailuresCard extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.error_outline,
+                    Icon(
+                      op.status == 'blocked' ? Icons.lock_outline : Icons.error_outline,
                       color: DesignTokens.error,
                       size: 18,
                     ),
                     const SizedBox(width: DesignTokens.spaceSm),
                     Expanded(
                       child: Text(
-                        '${op.opType} • retry ${op.retryCount}',
+                        op.status == 'blocked'
+                            ? '${op.opType} • blocked'
+                            : '${op.opType} • retry ${op.retryCount}',
                         style: DesignTokens.textSmallBold,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -417,15 +532,21 @@ class _FailuresCard extends ConsumerWidget {
   }
 
   void _showFailureDetails(BuildContext context, WidgetRef ref, SyncOp op) {
+    final canDiscard =
+        op.status == 'blocked' &&
+        op.opType != 'ledger_push' &&
+        op.opType != 'cash_movement_push';
+
     BottomSheetModal.show(
       context: context,
-      title: 'Sync failure',
+      title: op.status == 'blocked' ? 'Sync blocked' : 'Sync failure',
       subtitle: op.opType,
       maxHeight: 720,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _kv('ID', op.id.toString()),
+          _kv('Status', op.status),
           _kv('Retries', op.retryCount.toString()),
           _kv('Last tried', _fmt(op.lastTriedAt)),
           const SizedBox(height: DesignTokens.spaceSm),
@@ -435,7 +556,7 @@ class _FailuresCard extends ConsumerWidget {
             Container(
               padding: DesignTokens.paddingMd,
               decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.25),
+                color: DesignTokens.grayLight.withValues(alpha: 0.25),
                 borderRadius: DesignTokens.borderRadiusMd,
               ),
               child: Text(op.lastError!, style: DesignTokens.textSmall),
@@ -448,7 +569,7 @@ class _FailuresCard extends ConsumerWidget {
             child: Container(
               padding: DesignTokens.paddingMd,
               decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.25),
+                color: DesignTokens.grayLight.withValues(alpha: 0.25),
                 borderRadius: DesignTokens.borderRadiusMd,
               ),
               child: SingleChildScrollView(
@@ -471,6 +592,7 @@ class _FailuresCard extends ConsumerWidget {
                     await ref.read(syncServiceProvider).syncNow();
                     if (!context.mounted) return;
                     Navigator.of(context).pop();
+                    onChanged();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Retry triggered')),
                     );
@@ -495,6 +617,73 @@ class _FailuresCard extends ConsumerWidget {
               ),
             ],
           ),
+          if (canDiscard) ...[
+            const SizedBox(height: DesignTokens.spaceSm),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final approved = await requireManagerPin(
+                  context,
+                  ref,
+                  reason: 'Discard a blocked sync operation (${op.opType})',
+                );
+                if (!approved || !context.mounted) return;
+
+                final confirmed = await BottomSheetModal.show<bool>(
+                  context: context,
+                  title: 'Discard outbox item?',
+                  subtitle: op.opType,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'This removes the operation from the sync queue and it will never be sent to the server.',
+                        style: DesignTokens.textSmall,
+                      ),
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: DesignTokens.spaceSm),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Discard'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: DesignTokens.error,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed != true || !context.mounted) return;
+
+                await ref.read(appDatabaseProvider).deleteSyncOp(op.id);
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                onChanged();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Discarded outbox item')),
+                );
+              },
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Discard (manager)'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: DesignTokens.error,
+                side: const BorderSide(color: DesignTokens.error),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -530,6 +719,7 @@ class _SyncHealthSnapshot {
     required this.online,
     required this.pendingOps,
     required this.retryingOps,
+    required this.blockedOps,
     required this.failingOps,
     required this.pendingLedgerEntries,
     required this.lastTriedAt,
@@ -544,6 +734,7 @@ class _SyncHealthSnapshot {
   final bool online;
   final int pendingOps;
   final int retryingOps;
+  final int blockedOps;
   final List<SyncOp> failingOps;
   final int pendingLedgerEntries;
   final DateTime? lastTriedAt;

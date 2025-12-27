@@ -28,7 +28,6 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   final List<QuotationLineItem> _lines = [];
   final _notesCtrl = TextEditingController();
   int _validityDays = 7;
-  DateTime _createdAt = DateTime.now();
 
   double get _total => _lines.fold(0, (sum, line) => sum + (line.unitPrice * line.quantity));
 
@@ -48,7 +47,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: DesignTokens.brandPrimary.withOpacity(0.1),
+                    backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.1),
                     child: Icon(Icons.person, color: DesignTokens.brandPrimary),
                   ),
                   title: Text(_selectedCustomer?.name ?? 'Select Customer'),
@@ -236,7 +235,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
         totalAmount: _total,
         status: const Value('draft'), // draft, sent, accepted
         notes: Value(_notesCtrl.text),
-        synced: const Value(true),
+        synced: const Value(false),
       ),
       lines: _lines.map((l) => QuotationLinesCompanion.insert(
         id: Value(const Uuid().v4()), // Wrapped in Value
@@ -249,18 +248,26 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
     );
 
     // Enqueue sync - assuming sync keys exist
-    await sync.enqueue('quotation_create', {
-      'local_id': quotationId,
-      'customer_id': _selectedCustomer!.id,
-      'number': number,
+    final customerId = _selectedCustomer!.remoteId ?? _selectedCustomer!.id;
+    final notes = _notesCtrl.text.trim();
+    await sync.enqueue('quotation_push', {
+      'idempotency_key': quotationId,
+      'id': quotationId,
+      'quotation_number': number,
+      'customer_id': customerId,
+      'validity_days': _validityDays,
       'total': _total,
-      'valid_until': expiry.toIso8601String(),
-      'lines': _lines.map((l) => {
-        'description': l.description,
-        'qty': l.quantity,
-        'price': l.unitPrice
-      }).toList(),
+      if (notes.isNotEmpty) 'notes': notes,
+      'lines': _lines
+          .map((l) => {
+                'title': l.description,
+                'price': l.unitPrice,
+                'quantity': l.quantity,
+                'total': l.quantity * l.unitPrice,
+              })
+          .toList(),
     });
+    unawaited(sync.syncNow());
 
     if (!mounted) return;
     Navigator.pop(context);

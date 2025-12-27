@@ -1,12 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/app_providers.dart';
-import '../../core/db/app_database.dart';
-import '../../core/sync/sync_service.dart';
-import '../../core/theme/design_tokens.dart';
+import '../core/app_providers.dart';
+import '../core/db/app_database.dart';
+import '../core/sync/sync_service.dart';
+import '../core/theme/design_tokens.dart';
 
 /// Sync status enum
 enum SyncStatus {
@@ -23,7 +21,7 @@ final syncStatusProvider = StreamProvider<SyncStatusData>((ref) {
   // Watch the SyncOps table for changes
   return db.select(db.syncOps).watch().map((ops) {
     final pending = ops.where((o) => o.status == 'pending').length;
-    final failed = ops.where((o) => o.status == 'failed' || (o.retryCount ?? 0) > 3).length;
+    final failed = ops.where((o) => o.status == 'failed' || o.retryCount > 3).length;
     final total = ops.length;
     
     SyncStatus status;
@@ -274,8 +272,10 @@ class SyncDetailsSheet extends ConsumerWidget {
     }
     
     // Group ops by status
-    final failed = data.ops.where((o) => o.status == 'failed' || (o.retryCount ?? 0) > 3).toList();
-    final pending = data.ops.where((o) => o.status == 'pending' && (o.retryCount ?? 0) <= 3).toList();
+    final failed =
+        data.ops.where((o) => o.status == 'failed' || o.retryCount > 3).toList();
+    final pending =
+        data.ops.where((o) => o.status == 'pending' && o.retryCount <= 3).toList();
     
     return ListView(
       controller: scrollController,
@@ -394,7 +394,7 @@ class _SyncOpCard extends StatelessWidget {
                     )
                   else
                     Text(
-                      'Retry #${op.retryCount ?? 0}',
+                      'Retry #${op.retryCount}',
                       style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
                     ),
                 ],

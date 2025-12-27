@@ -12,25 +12,39 @@ import 'src/core/db/app_database.dart';
 import 'src/core/storage/secure_storage.dart';
 import 'src/core/telemetry/telemetry.dart';
 import 'src/core/telemetry/bug_logger.dart';
+import 'src/core/firebase/crashlytics_service.dart';
+import 'src/core/firebase/remote_config_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Telemetry.init();
-    await BugLogger.init();
-    debugPrint('[Main] Bug monitoring enabled - logs: production_bugs.jsonl');
-  } catch (_) {
-    // Best effort.
-  }
+  // Initialize Firebase Core first
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('[Main] Firebase initialized successfully');
-  } catch (e) {
+    debugPrint('[Main] Firebase Core initialized');
+    
+    // Initialize Crashlytics (error reporting)
+    await CrashlyticsService.instance.init();
+    debugPrint('[Main] Crashlytics initialized');
+    
+    // Initialize Remote Config
+    await RemoteConfigService.instance.init();
+    debugPrint('[Main] Remote Config initialized');
+  } catch (e, stack) {
     debugPrint('[Main] Firebase initialization failed: $e');
+    // Log to crashlytics if possible
+    try {
+      await CrashlyticsService.instance.recordError(e, stack, reason: 'Firebase init failed');
+    } catch (_) {}
   }
+
+  // Initialize legacy telemetry
+  try {
+    await Telemetry.init();
+    await BugLogger.init();
+  } catch (_) {}
 
   // Load environment configuration with sensible fallbacks.
   try {

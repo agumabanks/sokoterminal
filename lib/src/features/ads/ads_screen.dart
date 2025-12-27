@@ -10,7 +10,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
@@ -327,13 +326,14 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
       final file = await _exportAdFile(item, format);
       await Share.shareXFiles([XFile(file.path)], text: caption);
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Share failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -346,13 +346,14 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
         text: caption,
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('WhatsApp share failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -360,7 +361,7 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
     setState(() => _busy = true);
     try {
       final file = await _exportAdFile(item, format);
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Saved to ${file.path}'),
@@ -371,13 +372,14 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -623,7 +625,7 @@ class _AdPreview extends StatelessWidget {
                           vertical: DesignTokens.spaceXs,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: DesignTokens.borderRadiusSm,
                         ),
                         child: Text('Soko 24', style: DesignTokens.textSmallLight),

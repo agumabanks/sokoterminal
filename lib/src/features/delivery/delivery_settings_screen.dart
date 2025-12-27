@@ -17,7 +17,8 @@ class DeliverySettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen> {
-  static const double _maxRadiusKm = 5;
+  static const double _minRadiusKm = 0.5;
+  double _maxRadiusKm = 5;
 
   bool _loading = true;
   bool _saving = false;
@@ -27,7 +28,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
   bool _sellerVerified = false;
 
   bool _enabled = false;
-  double _radiusKm = _maxRadiusKm;
+  double _radiusKm = 5;
   String _pricingMode = 'base_per_km';
 
   double _platformFeePercent = 10;
@@ -97,10 +98,15 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
       final profile = body['profile'] is Map<String, dynamic> ? (body['profile'] as Map<String, dynamic>) : null;
       final shopOrigin = body['shop_origin'] is Map<String, dynamic> ? (body['shop_origin'] as Map<String, dynamic>) : <String, dynamic>{};
 
+      _maxRadiusKm =
+          (_toDouble(defaults['radius_km_max']) ?? _maxRadiusKm).clamp(_minRadiusKm, 1000).toDouble();
+
       final source = profile ?? defaults;
 
       _enabled = (source['enabled'] == true);
-      _radiusKm = (_toDouble(source['radius_km']) ?? _maxRadiusKm).clamp(1, _maxRadiusKm).toDouble();
+      _radiusKm = (_toDouble(source['radius_km']) ?? _maxRadiusKm)
+          .clamp(_minRadiusKm, _maxRadiusKm)
+          .toDouble();
       _pricingMode = (source['pricing_mode'] ?? 'base_per_km').toString();
 
       final originLabel = (source['origin_label'] ?? shopOrigin['origin_label'] ?? '').toString();
@@ -121,8 +127,9 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
     } catch (e) {
       _error = e;
     } finally {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -181,7 +188,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
       final payload = <String, dynamic>{
         'enabled': _enabled,
         'pricing_mode': _pricingMode,
-        'radius_km': _radiusKm.clamp(1, _maxRadiusKm),
+        'radius_km': _radiusKm.clamp(_minRadiusKm, _maxRadiusKm),
         'base_fee': baseFee,
         'per_km_fee': perKmFee,
         'min_fee': minFee,
@@ -207,8 +214,9 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
         SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -225,6 +233,9 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
     final preview1PlatformFee = _platformFee(preview1);
     final preview3PlatformFee = _platformFee(preview3);
     final preview5PlatformFee = _platformFee(preview5);
+    final radiusDivisions = _maxRadiusKm <= _minRadiusKm
+        ? null
+        : (((_maxRadiusKm - _minRadiusKm) / 0.5).round());
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -264,7 +275,7 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              'Seller delivery is limited to ${_maxRadiusKm.toStringAsFixed(0)} km. Outside this radius, buyers will use Soko24 delivery.',
+                              'Seller delivery is limited to ${_fmtKm(_maxRadiusKm)} km. Outside this radius, buyers will use Soko24 delivery.',
                               style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayDark),
                             ),
                           ),
@@ -275,23 +286,23 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Radius: ${_radiusKm.toStringAsFixed(0)} km',
+                                  'Radius: ${_fmtKm(_radiusKm)} km',
                                   style: DesignTokens.textBody,
                                 ),
                               ),
                             ],
                           ),
                           Slider(
-                            value: _radiusKm.clamp(1, _maxRadiusKm).toDouble(),
-                            min: 1,
+                            value: _radiusKm.clamp(_minRadiusKm, _maxRadiusKm).toDouble(),
+                            min: _minRadiusKm,
                             max: _maxRadiusKm,
-                            divisions: (_maxRadiusKm - 1).toInt(),
-                            label: '${_radiusKm.toStringAsFixed(0)} km',
-                            onChanged: (v) => setState(() => _radiusKm = v),
+                            divisions: radiusDivisions,
+                            label: '${_fmtKm(_radiusKm)} km',
+                            onChanged: (v) => setState(() => _radiusKm = _snapKm(v)),
                           ),
                           const SizedBox(height: DesignTokens.spaceSm),
                           DropdownButtonFormField<String>(
-                            value: _pricingMode,
+                            initialValue: _pricingMode,
                             decoration: const InputDecoration(
                               labelText: 'Pricing model',
                               prefixIcon: Icon(Icons.price_change_outlined),
@@ -570,6 +581,17 @@ class _DeliverySettingsScreenState extends ConsumerState<DeliverySettingsScreen>
   }
 
   String _ugx(double value) => 'UGX ${value.toStringAsFixed(0)}';
+
+  double _snapKm(double value) {
+    final snapped = (value / 0.5).round() * 0.5;
+    return snapped.clamp(_minRadiusKm, _maxRadiusKm).toDouble();
+  }
+
+  String _fmtKm(double value) {
+    final snapped = _snapKm(value);
+    final isInt = (snapped - snapped.roundToDouble()).abs() < 0.0001;
+    return isInt ? snapped.toStringAsFixed(0) : snapped.toStringAsFixed(1);
+  }
 
   double? _tryParseDouble(String input) {
     if (input.isEmpty) return null;

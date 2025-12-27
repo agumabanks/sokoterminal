@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/theme/design_tokens.dart';
-import '../../core/util/formatters.dart';
 import 'contacts_controller.dart';
 import 'keypad_screen.dart';
 
@@ -96,7 +95,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: _whatsappGreen.withOpacity(0.3),
+                    color: _whatsappGreen.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -300,7 +299,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: () => controller.refresh(),
+                  onPressed: () {
+                    if (state.isPermanentlyDenied) {
+                       openAppSettings();
+                    } else {
+                       controller.refresh();
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _whatsappGreen,
                     padding: const EdgeInsets.symmetric(
@@ -309,8 +314,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text('Grant Access',
-                      style: TextStyle(
+                  child: Text(state.isPermanentlyDenied ? 'Open Settings' : 'Grant Access',
+                      style: const TextStyle(
                           color: Colors.white, fontWeight: FontWeight.w600)),
                 ),
               ],
@@ -612,7 +617,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     Switch(
                       value: shareWithTeam,
                       onChanged: (v) => setModalState(() => shareWithTeam = v),
-                      activeColor: _whatsappGreen,
+                      activeThumbColor: _whatsappGreen,
                     ),
                   ],
                 ),
@@ -709,7 +714,7 @@ class _QuickActionButton extends StatelessWidget {
               color: const Color(0xFF1F2C34),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF00A884).withOpacity(0.3),
+                color: const Color(0xFF00A884).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -757,7 +762,7 @@ class _RecentContactAvatar extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: _getAvatarColor(contact.name).withOpacity(0.3),
+                    color: _getAvatarColor(contact.name).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -939,7 +944,7 @@ class _LargeAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: _getAvatarColor(name).withOpacity(0.4),
+            color: _getAvatarColor(name).withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -1020,7 +1025,7 @@ class _Badge extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1056,7 +1061,7 @@ class _ActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Row(

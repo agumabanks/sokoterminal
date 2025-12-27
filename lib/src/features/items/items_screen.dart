@@ -4,13 +4,14 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import 'add_product_screen.dart';
 
 /// Items Screen — Product catalog management.
 /// 
@@ -28,7 +29,6 @@ class ItemsScreen extends ConsumerStatefulWidget {
 
 class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   String _searchQuery = '';
-  static const _uuid = Uuid();
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showItemEditor(context, null),
+        onPressed: () => unawaited(_showItemEditor(context, null)),
         icon: const Icon(Icons.add),
         label: const Text('Add Product'),
         backgroundColor: DesignTokens.brandAccent,
@@ -97,7 +97,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 
                 if (items.isEmpty) {
                   return _EmptyState(
-                    onAddProduct: () => _showItemEditor(context, null),
+                    onAddProduct: () => unawaited(_showItemEditor(context, null)),
                   );
                 }
                 
@@ -108,8 +108,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     final item = items[index];
                     return _ItemCard(
                       item: item,
-                      onTap: () => _showItemEditor(context, item),
-                      onStockTap: () => _showStockAdjust(context, item),
+                      onTap: () => unawaited(_showItemEditor(context, item)),
+                      onStockTap: () => unawaited(_showStockAdjust(context, item)),
+                      onDelete: () => _confirmDelete(context, item),
                       onToggleOnline: (v) => _toggleOnline(item, v),
                     );
                   },
@@ -122,317 +123,209 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     );
   }
 
-  void _showItemEditor(BuildContext context, Item? existingItem) {
-    final nameCtrl = TextEditingController(text: existingItem?.name ?? '');
-    final priceCtrl = TextEditingController(
-      text: existingItem?.price.toStringAsFixed(0) ?? '',
-    );
-    final stockCtrl = TextEditingController(
-      text: existingItem?.stockQty.toString() ?? '0',
-    );
-    bool publishedOnline = existingItem?.publishedOnline ?? true;
-    
-    BottomSheetModal.show(
-      context: context,
-      title: existingItem == null ? 'New Product' : 'Edit Product',
-      subtitle: existingItem == null ? 'Add to your catalog' : 'Update product details',
-      child: StatefulBuilder(
-        builder: (context, setLocalState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Product Name',
-                hintText: 'E.g., Coffee, Sandwich...',
-                prefixIcon: Icon(Icons.inventory_2_outlined),
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: priceCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Price (UGX)',
-                      hintText: '0',
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                ),
-                const SizedBox(width: DesignTokens.spaceMd),
-                Expanded(
-                  child: TextField(
-                    controller: stockCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Stock Qty',
-                      hintText: '0',
-                      prefixIcon: Icon(Icons.numbers),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            Container(
-              padding: DesignTokens.paddingMd,
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.3),
-                borderRadius: DesignTokens.borderRadiusMd,
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.public, color: DesignTokens.grayMedium),
-                  const SizedBox(width: DesignTokens.spaceMd),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Publish Online', style: DesignTokens.textBodyBold),
-                        Text(
-                          'Show on marketplace',
-                          style: DesignTokens.textSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: publishedOnline,
-                    onChanged: (v) => setLocalState(() => publishedOnline = v),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            Row(
-              children: [
-                if (existingItem != null)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _confirmDelete(context, existingItem);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: DesignTokens.error,
-                        side: const BorderSide(color: DesignTokens.error),
-                      ),
-                      child: const Text('Delete'),
-                    ),
-                  ),
-                if (existingItem != null) const SizedBox(width: DesignTokens.spaceMd),
-                Expanded(
-                  flex: existingItem != null ? 2 : 1,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim();
-                      final price = double.tryParse(priceCtrl.text) ?? 0;
-                      final stock = int.tryParse(stockCtrl.text) ?? 0;
-                      
-                      if (name.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter a product name')),
-                        );
-                        return;
-                      }
-                      
-                      final db = ref.read(appDatabaseProvider);
-                      final sync = ref.read(syncServiceProvider);
-                      if (existingItem == null) {
-                        final id = _uuid.v4();
-                        await db.upsertItem(
-                          ItemsCompanion.insert(
-                            id: Value(id),
-                            name: name,
-                            price: price,
-                            stockQty: Value(stock),
-                            publishedOnline: Value(publishedOnline),
-                            synced: const Value(false),
-                          ),
-                        );
-                        await _enqueueItemSync(
-                          sync: sync,
-                          opType: 'item_create',
-                          itemId: id,
-                          name: name,
-                          price: price,
-                          stockQty: stock,
-                          publishedOnline: publishedOnline,
-                        );
-                      } else {
-                        await db.upsertItem(
-                          ItemsCompanion(
-                            id: Value(existingItem.id),
-                            name: Value(name),
-                            price: Value(price),
-                            stockQty: Value(stock),
-                            publishedOnline: Value(publishedOnline),
-                            synced: const Value(false),
-                          ),
-                        );
-                        await _enqueueItemSync(
-                          sync: sync,
-                          opType: 'item_update',
-                          itemId: existingItem.id,
-                          name: name,
-                          price: price,
-                          stockQty: stock,
-                          publishedOnline: publishedOnline,
-                        );
-                      }
-                      unawaited(sync.syncNow());
-                      
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(existingItem == null
-                                ? 'Product added!'
-                                : 'Product updated!'),
-                            backgroundColor: DesignTokens.brandAccent,
-                          ),
-                        );
-                      }
-                    },
-                    child: Text(existingItem == null ? 'Add Product' : 'Save Changes'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+  Future<void> _showItemEditor(
+    BuildContext context,
+    Item? existingItem, {
+    bool startPublishOnline = false,
+  }) async {
+    final action = existingItem == null ? 'create products' : 'edit products';
+    final ok = await requireManagerPin(context, ref, reason: action);
+    if (!ok || !mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddProductScreen(
+          existingItem: existingItem,
+          startPublishOnline: startPublishOnline,
         ),
       ),
     );
   }
 
-  void _showStockAdjust(BuildContext context, Item item) {
+  Future<void> _showStockAdjust(BuildContext context, Item item) async {
+    final ok = await requireManagerPin(context, ref, reason: 'adjust stock');
+    if (!ok || !context.mounted) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final sync = ref.read(syncServiceProvider);
+    final stocks = await db.getItemStocksForItem(item.id);
+    if (!context.mounted) return;
+
+    final hasVariants =
+        stocks.length > 1 ||
+        (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
+
     final adjustCtrl = TextEditingController();
     String reason = 'stock_in';
-    
-    BottomSheetModal.show(
-      context: context,
-      title: 'Adjust Stock',
-      subtitle: item.name,
-      child: StatefulBuilder(
-        builder: (context, setLocalState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: DesignTokens.paddingMd,
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.3),
-                borderRadius: DesignTokens.borderRadiusMd,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Current: ',
-                    style: DesignTokens.textBody,
-                  ),
-                  Text(
-                    '${item.stockQty} units',
-                    style: DesignTokens.textBodyBold,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            Row(
+    String selectedVariant = '';
+    if (hasVariants) {
+      final defaultRow = stocks.where((s) => s.variant.trim().isEmpty).toList();
+      selectedVariant = defaultRow.isNotEmpty ? '' : stocks.first.variant;
+    }
+
+    try {
+      await BottomSheetModal.show(
+        context: context,
+        title: 'Adjust Stock',
+        subtitle: item.name,
+        child: StatefulBuilder(
+          builder: (context, setLocalState) {
+            final selectedStock = hasVariants
+                ? stocks.firstWhere((s) => s.variant == selectedVariant)
+                : null;
+            final current = selectedStock?.stockQty ?? item.stockQty;
+            final unitPrice = selectedStock?.price ?? item.price;
+            final variantLabel = selectedStock == null
+                ? null
+                : (selectedStock.variant.trim().isEmpty
+                      ? 'Default'
+                      : selectedStock.variant.replaceAll('-', ' • '));
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: _ReasonChip(
-                    label: 'Stock In (+)',
-                    selected: reason == 'stock_in',
-                    onTap: () => setLocalState(() => reason = 'stock_in'),
-                    color: DesignTokens.brandAccent,
+                Container(
+                  padding: DesignTokens.paddingMd,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.grayLight.withValues(alpha: 0.3),
+                    borderRadius: DesignTokens.borderRadiusMd,
+                  ),
+                  child: Column(
+                    children: [
+                      if (variantLabel != null)
+                        Text(variantLabel, style: DesignTokens.textBodyBold),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Current: ', style: DesignTokens.textBody),
+                          Text(
+                            '$current units',
+                            style: DesignTokens.textBodyBold,
+                          ),
+                        ],
+                      ),
+                      if (hasVariants)
+                        Text(
+                          'Price: ${unitPrice.toStringAsFixed(0)}',
+                          style: DesignTokens.textSmall,
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: DesignTokens.spaceSm),
-                Expanded(
-                  child: _ReasonChip(
-                    label: 'Stock Out (-)',
-                    selected: reason == 'stock_out',
-                    onTap: () => setLocalState(() => reason = 'stock_out'),
-                    color: DesignTokens.error,
+                const SizedBox(height: DesignTokens.spaceMd),
+                if (hasVariants) ...[
+                  Text('Variant', style: DesignTokens.textSmallBold),
+                  const SizedBox(height: DesignTokens.spaceXs),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedVariant,
+                    items: stocks
+                        .map((s) {
+                          final label = s.variant.trim().isEmpty
+                              ? 'Default'
+                              : s.variant.replaceAll('-', ' • ');
+                          return DropdownMenuItem(
+                            value: s.variant,
+                            child: Text(label),
+                          );
+                        })
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setLocalState(() => selectedVariant = v);
+                    },
                   ),
+                  const SizedBox(height: DesignTokens.spaceMd),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ReasonChip(
+                        label: 'Stock In (+)',
+                        selected: reason == 'stock_in',
+                        onTap: () => setLocalState(() => reason = 'stock_in'),
+                        color: DesignTokens.brandAccent,
+                      ),
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: _ReasonChip(
+                        label: 'Stock Out (-)',
+                        selected: reason == 'stock_out',
+                        onTap: () => setLocalState(() => reason = 'stock_out'),
+                        color: DesignTokens.error,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DesignTokens.spaceMd),
+                TextField(
+                  controller: adjustCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    hintText: 'Enter amount...',
+                    prefixIcon: Icon(Icons.numbers),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton(
+                  onPressed: () async {
+                    final qty = int.tryParse(adjustCtrl.text) ?? 0;
+                    if (qty <= 0) return;
+
+                    final requestedDelta = reason == 'stock_in' ? qty : -qty;
+                    final appliedDelta = requestedDelta < 0 && current + requestedDelta < 0
+                        ? -current
+                        : requestedDelta;
+                    if (appliedDelta == 0) return;
+                    final newStock = current + appliedDelta;
+
+                    await db.recordInventoryMovement(
+                      itemId: item.id,
+                      delta: appliedDelta,
+                      note: reason,
+                      variant: hasVariants ? selectedVariant : null,
+                    );
+                    await db.updateItemFields(
+                      item.id,
+                      const ItemsCompanion(synced: Value(false)),
+                    );
+
+                    await sync.enqueue('stock_adjust', {
+                      'local_id': item.id,
+                      if (item.remoteId != null) 'remote_id': item.remoteId,
+                      'delta': appliedDelta,
+                      'current_stock': newStock,
+                      'unit_price': unitPrice,
+                      'published': item.publishedOnline ? 1 : 0,
+                      if (hasVariants && selectedVariant.trim().isNotEmpty)
+                        'variation': selectedVariant.trim(),
+                    });
+                    unawaited(sync.syncNow());
+
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Stock adjusted: ${appliedDelta > 0 ? '+' : ''}$appliedDelta units',
+                        ),
+                        backgroundColor: DesignTokens.brandAccent,
+                      ),
+                    );
+                  },
+                  child: const Text('Apply Adjustment'),
                 ),
               ],
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            TextField(
-              controller: adjustCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Quantity',
-                hintText: 'Enter amount...',
-                prefixIcon: Icon(Icons.numbers),
-              ),
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            ElevatedButton(
-              onPressed: () async {
-                final qty = int.tryParse(adjustCtrl.text) ?? 0;
-                if (qty <= 0) return;
-                
-                final delta = reason == 'stock_in' ? qty : -qty;
-                final newStock = item.stockQty + delta;
-                
-                final db = ref.read(appDatabaseProvider);
-                final sync = ref.read(syncServiceProvider);
-                await db.upsertItem(
-                  ItemsCompanion(
-                    id: Value(item.id),
-                    name: Value(item.name),
-                    price: Value(item.price),
-                    stockQty: Value(newStock < 0 ? 0 : newStock),
-                    publishedOnline: Value(item.publishedOnline),
-                    synced: const Value(false),
-                  ),
-                );
-                
-                await db.recordInventoryMovement(
-                  itemId: item.id,
-                  delta: delta,
-                  note: reason,
-                );
-                final remoteId = _remoteId(item.id);
-                await sync.enqueue('stock_adjust', {
-                  'product_id': remoteId ?? item.id,
-                  'local_id': item.id,
-                  'delta': delta,
-                  'current_stock': newStock < 0 ? 0 : newStock,
-                  'published': item.publishedOnline ? 1 : 0,
-                });
-                unawaited(sync.syncNow());
-                
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Stock adjusted: ${delta > 0 ? '+' : ''}$delta units',
-                      ),
-                      backgroundColor: DesignTokens.brandAccent,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Apply Adjustment'),
-            ),
-          ],
+            );
+          },
         ),
-      ),
-    );
+      );
+    } finally {
+      adjustCtrl.dispose();
+    }
   }
 
   void _confirmDelete(BuildContext context, Item item) {
@@ -447,7 +340,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           Container(
             padding: DesignTokens.paddingMd,
             decoration: BoxDecoration(
-              color: DesignTokens.error.withOpacity(0.1),
+              color: DesignTokens.error.withValues(alpha: 0.1),
               borderRadius: DesignTokens.borderRadiusMd,
             ),
             child: Row(
@@ -477,16 +370,16 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     child: ElevatedButton(
                       onPressed: () async {
                     final db = ref.read(appDatabaseProvider);
-                    final isRemoteId = RegExp(r'^\d+$').hasMatch(item.id);
+                    final remoteId = item.remoteId ?? int.tryParse(item.id);
 
                     // Remove locally immediately (offline-first), and enqueue remote delete if possible.
                     await db.deletePendingItemOps(item.id);
                     await db.deleteItemAndDetach(item.id);
 
-                    if (isRemoteId) {
+                    if (remoteId != null) {
                       await db.enqueueSync(
                         'item_delete',
-                        '{"remote_id":"${item.id}"}',
+                        '{"remote_id":"$remoteId"}',
                       );
                       unawaited(ref.read(syncServiceProvider).syncNow());
                     }
@@ -514,6 +407,37 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   }
 
   Future<void> _toggleOnline(Item item, bool value) async {
+    final ok =
+        await requireManagerPin(context, ref, reason: 'publish products online');
+    if (!ok || !mounted) return;
+
+    if (value) {
+      final missing = _missingMarketplaceFields(item);
+      if (missing.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Complete ${missing.join(', ')} before publishing online.',
+            ),
+            backgroundColor: DesignTokens.warning,
+          ),
+        );
+        unawaited(
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddProductScreen(
+                existingItem: item,
+                startPublishOnline: true,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     final db = ref.read(appDatabaseProvider);
     final sync = ref.read(syncServiceProvider);
     await db.upsertItem(
@@ -530,6 +454,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
       sync: sync,
       opType: 'item_update',
       itemId: item.id,
+      remoteId: item.remoteId,
       name: item.name,
       price: item.price,
       stockQty: item.stockQty,
@@ -538,10 +463,23 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     unawaited(sync.syncNow());
   }
 
+  List<String> _missingMarketplaceFields(Item item) {
+    final missing = <String>[];
+    final hasPhoto = ((item.thumbnailUrl ?? item.imageUrl) ?? '').trim().isNotEmpty;
+    if (!hasPhoto) missing.add('photo');
+    if ((item.categoryId ?? '').trim().isEmpty) missing.add('category');
+    final desc = (item.description ?? '').trim();
+    if (desc.isEmpty || desc.length < 10) missing.add('description');
+    if (item.shippingDays == null) missing.add('shipping days');
+    if (item.shippingFee == null) missing.add('shipping fee');
+    return missing;
+  }
+
   Future<void> _enqueueItemSync({
     required SyncService sync,
     required String opType,
     required String itemId,
+    required int? remoteId,
     required String name,
     required double price,
     required int stockQty,
@@ -556,16 +494,10 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
       'current_stock': stockQty,
       'published': publishedOnline ? 1 : 0,
     };
-    final remoteId = _remoteId(itemId);
     if (remoteId != null) {
       payload['remote_id'] = remoteId;
     }
     await sync.enqueue(opType, payload);
-  }
-
-  String? _remoteId(String id) {
-    final isRemote = RegExp(r'^\d+$').hasMatch(id);
-    return isRemote ? id : null;
   }
 
   void _syncFromSeller(BuildContext context) {
@@ -601,12 +533,14 @@ class _ItemCard extends StatelessWidget {
     required this.item,
     required this.onTap,
     required this.onStockTap,
+    required this.onDelete,
     required this.onToggleOnline,
   });
 
   final Item item;
   final VoidCallback onTap;
   final VoidCallback onStockTap;
+  final VoidCallback onDelete;
   final ValueChanged<bool> onToggleOnline;
 
   @override
@@ -620,7 +554,7 @@ class _ItemCard extends StatelessWidget {
         borderRadius: DesignTokens.borderRadiusMd,
         boxShadow: DesignTokens.shadowSm,
         border: lowStock
-            ? Border.all(color: DesignTokens.warning.withOpacity(0.5))
+            ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
             : null,
       ),
       child: InkWell(
@@ -635,7 +569,7 @@ class _ItemCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withOpacity(0.3),
+                  color: DesignTokens.grayLight.withValues(alpha: 0.3),
                   borderRadius: DesignTokens.borderRadiusSm,
                 ),
                 child: Icon(
@@ -686,8 +620,8 @@ class _ItemCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: lowStock
-                                  ? DesignTokens.warning.withOpacity(0.1)
-                                  : DesignTokens.grayLight.withOpacity(0.5),
+                                  ? DesignTokens.warning.withValues(alpha: 0.1)
+                                  : DesignTokens.grayLight.withValues(alpha: 0.5),
                               borderRadius: DesignTokens.borderRadiusSm,
                             ),
                             child: Row(
@@ -720,10 +654,47 @@ class _ItemCard extends StatelessWidget {
                 ),
               ),
               
-              // Online toggle
-              Switch(
-                value: item.publishedOnline,
-                onChanged: onToggleOnline,
+              // Actions
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Switch(
+                    value: item.publishedOnline,
+                    onChanged: onToggleOnline,
+                  ),
+                  PopupMenuButton<_ItemMenuAction>(
+                    tooltip: 'Actions',
+                    icon: const Icon(Icons.more_horiz),
+                    onSelected: (action) {
+                      switch (action) {
+                        case _ItemMenuAction.edit:
+                          onTap();
+                          break;
+                        case _ItemMenuAction.adjustStock:
+                          onStockTap();
+                          break;
+                        case _ItemMenuAction.delete:
+                          onDelete();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _ItemMenuAction.edit,
+                        child: Text('Edit'),
+                      ),
+                      PopupMenuItem(
+                        value: _ItemMenuAction.adjustStock,
+                        child: Text('Adjust stock'),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: _ItemMenuAction.delete,
+                        child: Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -732,6 +703,8 @@ class _ItemCard extends StatelessWidget {
     );
   }
 }
+
+enum _ItemMenuAction { edit, adjustStock, delete }
 
 class _ReasonChip extends StatelessWidget {
   const _ReasonChip({
@@ -753,7 +726,7 @@ class _ReasonChip extends StatelessWidget {
       child: Container(
         padding: DesignTokens.paddingMd,
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.1) : DesignTokens.grayLight.withOpacity(0.3),
+          color: selected ? color.withValues(alpha: 0.1) : DesignTokens.grayLight.withValues(alpha: 0.3),
           borderRadius: DesignTokens.borderRadiusMd,
           border: Border.all(
             color: selected ? color : Colors.transparent,
@@ -788,7 +761,7 @@ class _EmptyState extends StatelessWidget {
             Container(
               padding: DesignTokens.paddingLg,
               decoration: BoxDecoration(
-                color: DesignTokens.brandPrimary.withOpacity(0.1),
+                color: DesignTokens.brandPrimary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(

@@ -80,7 +80,7 @@ class BottomSheetModal extends StatelessWidget {
     return Container(
       constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
       decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite.withOpacity(0.92),
+        color: DesignTokens.surfaceWhite.withValues(alpha: 0.92),
         borderRadius: DesignTokens.borderRadiusBottomSheet,
       ),
       child: ClipRRect(
@@ -136,7 +136,7 @@ class BottomSheetModal extends StatelessWidget {
                           icon: const Icon(Icons.close),
                           color: DesignTokens.grayMedium,
                           style: IconButton.styleFrom(
-                            backgroundColor: DesignTokens.grayLight.withOpacity(0.5),
+                            backgroundColor: DesignTokens.grayLight.withValues(alpha: 0.5),
                           ),
                         ),
                     ],

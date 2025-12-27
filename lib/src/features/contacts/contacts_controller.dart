@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -60,6 +61,7 @@ class ContactsState {
   final List<ContactItem> filteredContacts;
   final String? error;
   final bool permissionGranted;
+  final bool isPermanentlyDenied;
   final String searchQuery;
 
   ContactsState({
@@ -68,6 +70,7 @@ class ContactsState {
     this.filteredContacts = const [],
     this.error,
     this.permissionGranted = false,
+    this.isPermanentlyDenied = false,
     this.searchQuery = '',
   });
 
@@ -77,6 +80,7 @@ class ContactsState {
     List<ContactItem>? filteredContacts,
     String? error,
     bool? permissionGranted,
+    bool? isPermanentlyDenied,
     String? searchQuery,
   }) {
     return ContactsState(
@@ -85,6 +89,7 @@ class ContactsState {
       filteredContacts: filteredContacts ?? this.filteredContacts,
       error: error,
       permissionGranted: permissionGranted ?? this.permissionGranted,
+      isPermanentlyDenied: isPermanentlyDenied ?? this.isPermanentlyDenied,
       searchQuery: searchQuery ?? this.searchQuery,
     );
   }
@@ -113,8 +118,13 @@ class ContactsController extends StateNotifier<ContactsState> {
   Future<void> refresh() async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final status = await Permission.contacts.request();
+      var status = await Permission.contacts.status;
+      if (!status.isGranted && !status.isPermanentlyDenied) {
+        status = await Permission.contacts.request();
+      }
+      
       final hasPermission = status.isGranted;
+      final isPermanentlyDenied = status.isPermanentlyDenied;
       
       List<ContactItem> items = [];
 
@@ -164,7 +174,8 @@ class ContactsController extends StateNotifier<ContactsState> {
         loading: false, 
         contacts: uniqueItems, 
         filteredContacts: _applySearch(uniqueItems, state.searchQuery),
-        permissionGranted: hasPermission
+        permissionGranted: hasPermission,
+        isPermanentlyDenied: isPermanentlyDenied,
       );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
@@ -230,7 +241,6 @@ class ContactsController extends StateNotifier<ContactsState> {
       );
 
       // 2. Try IMMEDIATE sync to backend (prioritize cloud backup)
-      bool syncedToCloud = false;
       try {
         final response = await _api.pushCustomer({
           'display_name': name,
@@ -243,22 +253,32 @@ class ContactsController extends StateNotifier<ContactsState> {
         
         // If API call succeeded, mark as synced
         if (response.statusCode == 200 || response.statusCode == 201) {
+          final data =
+              response.data is Map ? Map<String, dynamic>.from(response.data as Map) : null;
+          final remoteId = data?['contact_id']?.toString();
+          final remoteUpdatedAt =
+              DateTime.tryParse(data?['updated_at']?.toString() ?? '')?.toUtc();
+
           await _db.upsertCustomer(
             CustomersCompanion.insert(
               id: drift.Value(contactId),
+              remoteId: remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
               name: name,
               phone: drift.Value(phone),
               email: drift.Value(email),
               synced: const drift.Value(true),
-              updatedAt: drift.Value(now),
+              updatedAt: drift.Value(remoteUpdatedAt ?? now),
             ),
           );
-          syncedToCloud = true;
-          print('[Contacts] ✅ Contact "$name" synced to cloud immediately');
+          if (kDebugMode) {
+            debugPrint('[Contacts] Contact "$name" synced to cloud immediately');
+          }
         }
       } catch (e) {
         // API call failed - enqueue for later sync (offline mode)
-        print('[Contacts] ⚠️ Immediate sync failed, enqueueing for later: $e');
+        if (kDebugMode) {
+          debugPrint('[Contacts] Immediate sync failed, enqueueing for later: $e');
+        }
         await _syncService.enqueue('customer_push', {
           'idempotency_key': contactId,
           'customer_id': contactId,

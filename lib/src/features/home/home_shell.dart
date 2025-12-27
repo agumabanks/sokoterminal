@@ -56,7 +56,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 widget.shell,
                 if (staffState.enabled && staffState.locked)
                   Container(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     child: Center(
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.lock_open),

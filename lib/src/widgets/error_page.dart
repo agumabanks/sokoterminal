@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../core/theme/design_tokens.dart';
@@ -168,7 +166,7 @@ class ErrorPage extends StatelessWidget {
                   vertical: DesignTokens.spaceSm,
                 ),
                 decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withOpacity(0.3),
+                  color: DesignTokens.grayLight.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(DesignTokens.radiusSm),
                 ),
                 child: Text(
@@ -208,7 +206,7 @@ class ErrorPage extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(DesignTokens.spaceMd),
-                    color: DesignTokens.grayLight.withOpacity(0.2),
+                    color: DesignTokens.grayLight.withValues(alpha: 0.2),
                     child: SelectableText(
                       diagnosticsInfo!.entries
                           .map((e) => '${e.key}: ${e.value}')

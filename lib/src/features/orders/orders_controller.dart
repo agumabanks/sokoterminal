@@ -28,18 +28,17 @@ class OrdersController extends StateNotifier<OrdersState> {
     state = OrdersState(loading: true, orders: state.orders);
     try {
       final res = await api.fetchOrders();
-      final data = (res.data['data'] ?? res.data ?? []) as dynamic;
-      final list = List<Map<String, dynamic>>.from(data as Iterable);
-      final enriched = <Map<String, dynamic>>[];
+      final data = res.data;
+      final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+      final list = List<Map<String, dynamic>>.from((listRaw as Iterable).map((e) => Map<String, dynamic>.from(e as Map)));
+
       for (final order in list) {
         final id = int.tryParse(order['id']?.toString() ?? '');
         if (id == null) continue;
-        final items = await loadItems(id);
-        final merged = {...order, 'items': items};
-        enriched.add(merged);
-        await db.upsertCachedOrder(id, jsonEncode(merged));
+        await db.upsertCachedOrder(id, jsonEncode(order));
       }
-      state = OrdersState(orders: enriched);
+
+      state = OrdersState(orders: list);
     } catch (e) {
       final cachedRows = await db.getCachedOrders();
       if (cachedRows.isNotEmpty) {
@@ -60,11 +59,8 @@ class OrdersController extends StateNotifier<OrdersState> {
   }) async {
     state = OrdersState(orders: state.orders, loading: true);
     try {
-      await api.updateOrderStatus(
-        orderId: orderId,
-        deliveryStatus: delivery,
-        paymentStatus: payment,
-      );
+      await api.updateOrderDeliveryStatus(orderId: orderId, status: delivery);
+      await api.updateOrderPaymentStatus(orderId: orderId, status: payment);
       await load();
     } catch (e) {
       state = OrdersState(error: e.toString(), orders: state.orders);
@@ -84,25 +80,34 @@ class OrdersController extends StateNotifier<OrdersState> {
 
   Future<Map<String, dynamic>?> loadOrderDetails(int orderId) async {
     try {
-      // First try to find in current state
       final existing = state.orders.cast<Map<String, dynamic>?>().firstWhere(
         (o) => o?['id']?.toString() == orderId.toString(),
         orElse: () => null,
       );
-      
-      // Fetch fresh details from API
+
       final res = await api.fetchOrderDetails(orderId);
-      final data = (res.data is List ? res.data.first : res.data) as Map<String, dynamic>;
-      
-      // If we have existing items, merge them if new data doesn't have items
-      if (existing != null && existing['items'] != null && data['items'] == null) {
-        data['items'] = existing['items'];
-      } else if (data['items'] == null) {
-        // Fetch items if missing
-        data['items'] = await loadItems(orderId);
+      final raw = res.data;
+      final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
+      final first = (listRaw is List && listRaw.isNotEmpty) ? listRaw.first : null;
+      if (first is! Map) {
+        throw const FormatException('Invalid order details response shape');
       }
-      
-      return data;
+
+      final details = Map<String, dynamic>.from(first);
+
+      // Normalize items key for UI/invoice consumers.
+      if (details['items'] == null && details['order_items'] is List) {
+        details['items'] = details['order_items'];
+      }
+      if (details['order_items'] == null && details['items'] is List) {
+        details['order_items'] = details['items'];
+      }
+
+      // Merge list payload fields (customer name/phone) when detail is sparse.
+      final merged = existing == null ? details : {...existing, ...details};
+
+      await db.upsertCachedOrder(orderId, jsonEncode(merged));
+      return merged;
     } catch (e) {
       // Fallback to local state if API fails
       return state.orders.cast<Map<String, dynamic>?>().firstWhere(

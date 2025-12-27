@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/auth/rbac_provider.dart';
-import '../../core/theme/design_tokens.dart';
+import '../core/auth/rbac_provider.dart';
+import '../core/theme/design_tokens.dart';
 
 // Re-export Permission for convenience
-export '../../core/auth/rbac_provider.dart' show Permission;
+export '../core/auth/rbac_provider.dart' show Permission;
 
 /// A reusable widget that prompts for manager PIN before allowing an action
 class ManagerPinGate extends ConsumerStatefulWidget {

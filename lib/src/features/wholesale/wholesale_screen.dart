@@ -213,14 +213,14 @@ class _RowCard extends StatelessWidget {
       ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: badgeColor.withOpacity(0.12),
+          backgroundColor: badgeColor.withValues(alpha: 0.12),
           child: Icon(icon, color: badgeColor),
         ),
         title: Text(title, style: DesignTokens.textBodyBold),
         subtitle: Text(subtitle, style: DesignTokens.textSmall),
         trailing: Chip(
           label: Text(badge),
-          backgroundColor: badgeColor.withOpacity(0.12),
+          backgroundColor: badgeColor.withValues(alpha: 0.12),
           labelStyle: TextStyle(color: badgeColor),
         ),
       ),

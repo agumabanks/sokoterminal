@@ -6,6 +6,7 @@ import '../../core/app_providers.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/phone_normalizer.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated, loading, error }
@@ -167,6 +168,9 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> logout() async {
     _refreshTimer?.cancel();
     await _storage.deleteAccessToken();
+    await _storage.deletePosSessionToken();
+    await _storage.deletePosSessionMeta();
+    await ref.read(sharedPreferencesProvider).remove(posStaffInitializedPrefKey);
     state = AuthState.unauthenticated;
   }
 

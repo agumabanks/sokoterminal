@@ -1,16 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' hide Column;
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/app_input.dart';
 import '../../widgets/error_page.dart';
 import '../receipts/receipt_template_editor.dart';
-import 'package:drift/drift.dart' hide Column;
 
 /// State for receipt templates list
 class TemplatesState {

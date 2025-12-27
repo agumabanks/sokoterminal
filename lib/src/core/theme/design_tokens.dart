@@ -84,7 +84,7 @@ class DesignTokens {
   /// Variants
   static TextStyle get textTitleLight => textTitle.copyWith(color: surfaceWhite);
   static TextStyle get textBodyLight => textBody.copyWith(color: surfaceWhite);
-  static TextStyle get textSmallLight => textSmall.copyWith(color: surfaceWhite.withOpacity(0.8));
+  static TextStyle get textSmallLight => textSmall.copyWith(color: surfaceWhite.withValues(alpha: 0.8));
 
   static TextStyle get textTitleMedium => textTitle.copyWith(fontWeight: FontWeight.w600);
   static TextStyle get textBodyBold => textBody.copyWith(fontWeight: FontWeight.w600);
@@ -140,7 +140,7 @@ class DesignTokens {
 
   static List<BoxShadow> get shadowSm => [
         BoxShadow(
-          color: grayDark.withOpacity(0.04),
+          color: grayDark.withValues(alpha: 0.04),
           blurRadius: 4,
           offset: const Offset(0, 2),
         ),
@@ -148,7 +148,7 @@ class DesignTokens {
 
   static List<BoxShadow> get shadowMd => [
         BoxShadow(
-          color: grayDark.withOpacity(0.08),
+          color: grayDark.withValues(alpha: 0.08),
           blurRadius: 12,
           offset: const Offset(0, 4),
         ),
@@ -156,7 +156,7 @@ class DesignTokens {
 
   static List<BoxShadow> get shadowLg => [
         BoxShadow(
-          color: grayDark.withOpacity(0.12),
+          color: grayDark.withValues(alpha: 0.12),
           blurRadius: 24,
           offset: const Offset(0, 8),
         ),

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/app_providers.dart';
+import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
 
@@ -13,7 +14,8 @@ final cartControllerProvider = StateNotifierProvider<CartController, CartState>(
   (ref) {
     final db = ref.watch(appDatabaseProvider);
     final sync = ref.watch(syncServiceProvider);
-    return CartController(db: db, syncService: sync);
+    final storage = ref.watch(secureStorageProvider);
+    return CartController(db: db, syncService: sync, secureStorage: storage);
   },
 );
 
@@ -45,6 +47,7 @@ class CartLine {
     required this.price,
     this.itemId,
     this.serviceId,
+    this.variant,
     this.quantity = 1,
   });
 
@@ -53,6 +56,7 @@ class CartLine {
   final double price;
   final String? itemId;
   final String? serviceId;
+  final String? variant;
   final int quantity;
 
   double get total => price * quantity;
@@ -64,24 +68,30 @@ class CartLine {
       price: price ?? this.price,
       itemId: itemId,
       serviceId: serviceId,
+      variant: variant,
       quantity: quantity ?? this.quantity,
     );
   }
 }
 
 class CartController extends StateNotifier<CartState> {
-  CartController({required AppDatabase db, required SyncService syncService})
-    : _db = db,
-      _syncService = syncService,
-      super(const CartState());
+  CartController({
+    required AppDatabase db,
+    required SyncService syncService,
+    required SecureStorage secureStorage,
+  })  : _db = db,
+        _syncService = syncService,
+        _storage = secureStorage,
+        super(const CartState());
 
   final AppDatabase _db;
   final SyncService _syncService;
+  final SecureStorage _storage;
   final _uuid = const Uuid();
 
   void addItem({required Item item, int quantity = 1}) {
     final existingIndex = state.lines.indexWhere(
-      (line) => line.itemId == item.id,
+      (line) => line.itemId == item.id && (line.variant ?? '') == '',
     );
     if (existingIndex != -1) {
       final updated = List<CartLine>.from(state.lines);
@@ -99,11 +109,44 @@ class CartController extends StateNotifier<CartState> {
             title: item.name,
             price: item.price,
             itemId: item.id,
+            variant: '',
             quantity: quantity,
           ),
         ],
       );
     }
+  }
+
+  void addItemVariant({
+    required Item item,
+    required String variant,
+    required double price,
+    int quantity = 1,
+  }) {
+    final normalized = variant.trim();
+    final existingIndex = state.lines.indexWhere(
+      (line) => line.itemId == item.id && (line.variant ?? '') == normalized,
+    );
+    if (existingIndex != -1) {
+      final updated = List<CartLine>.from(state.lines);
+      final current = updated[existingIndex];
+      updated[existingIndex] = current.copyWith(quantity: current.quantity + quantity);
+      state = state.copyWith(lines: updated);
+      return;
+    }
+    state = state.copyWith(
+      lines: [
+        ...state.lines,
+        CartLine(
+          id: _uuid.v4(),
+          title: normalized.isEmpty ? item.name : '${item.name} • $normalized',
+          price: price,
+          itemId: item.id,
+          variant: normalized,
+          quantity: quantity,
+        ),
+      ],
+    );
   }
 
   void addService({required Service service, int quantity = 1}) {
@@ -133,6 +176,20 @@ class CartController extends StateNotifier<CartState> {
           )
           .toList(),
     );
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'checkout_cart_qty_changed',
+          props: {
+            'line_id': id,
+            'quantity': quantity,
+            'lines_count': state.lines.length,
+            'subtotal': state.subtotal,
+          },
+        ),
+      );
+    }
   }
 
   void updatePrice(String id, double price) {
@@ -191,6 +248,22 @@ class CartController extends StateNotifier<CartState> {
     final idempotencyKey = _uuid.v4();
     final occurredAt = DateTime.now().toUtc();
 
+    final outletId = (await _db.getPrimaryOutlet())?.id;
+    final staffIdInt = await _storage.readPosSessionStaffId();
+    final staffId = staffIdInt?.toString();
+    final staffName = await _storage.readPosSessionStaffName();
+    if (staffId != null && staffName != null && staffName.trim().isNotEmpty) {
+      await _db.upsertStaff(
+        StaffCompanion.insert(
+          id: Value(staffId),
+          name: staffName.trim(),
+          roleId: const Value.absent(),
+          active: const Value(true),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
+    }
+
     final lines = state.lines
         .map(
           (line) => LedgerLinesCompanion.insert(
@@ -198,6 +271,7 @@ class CartController extends StateNotifier<CartState> {
             itemId: Value(line.itemId),
             serviceId: Value(line.serviceId),
             title: line.title,
+            variant: Value(line.variant),
             quantity: line.quantity,
             unitPrice: line.price,
             lineTotal: line.total,
@@ -216,9 +290,13 @@ class CartController extends StateNotifier<CartState> {
         )
         .toList();
 
+    // Get next sequential receipt number
+    final receiptNumber = await _db.getNextReceiptNumber();
+
     await _db.saveLedgerEntry(
       entry: LedgerEntriesCompanion.insert(
         id: Value(transactionId),
+        receiptNumber: Value(receiptNumber),
         idempotencyKey: idempotencyKey,
         type: 'sale',
         subtotal: Value(total),
@@ -226,14 +304,27 @@ class CartController extends StateNotifier<CartState> {
         tax: const Value(0),
         total: Value(total),
         note: Value(notes),
-        staffId: const Value(null),
-        outletId: const Value(null),
+        staffId: Value(staffId),
+        outletId: Value(outletId),
         customerId: Value(resolvedCustomer?.id),
         createdAt: Value(occurredAt),
       ),
       lines: lines,
       payments: paymentRows,
     );
+
+    // Update local stock immediately (offline-first). Server reconciliation will
+    // happen via delta pull; this keeps POS inventory accurate while offline.
+    for (final line in state.lines) {
+      final itemId = line.itemId;
+      if (itemId == null || itemId.isEmpty) continue;
+      await _db.recordInventoryMovement(
+        itemId: itemId,
+        delta: -line.quantity,
+        note: 'sale',
+        variant: line.variant ?? '',
+      );
+    }
 
     await _syncService.enqueue('ledger_push', {
       'entry_id': transactionId,
@@ -261,6 +352,8 @@ class CartController extends StateNotifier<CartState> {
               'product_id': e.itemId,
               'service_id': e.serviceId,
               'name': e.title,
+              if (e.variant != null && e.variant!.trim().isNotEmpty)
+                'variation': e.variant,
               'price': e.price,
               'quantity': e.quantity,
               'subtotal': e.total,

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/auth/pos_session_controller.dart';
 import '../../core/db/app_database.dart';
+import '../../core/security/manager_approval.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
@@ -97,7 +99,7 @@ class _ShiftStatusCard extends ConsumerWidget {
             Container(
               padding: DesignTokens.paddingSm,
               decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withOpacity(0.4),
+                color: DesignTokens.grayLight.withValues(alpha: 0.4),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
               child: const Icon(Icons.lock_clock, color: DesignTokens.grayMedium),
@@ -148,7 +150,7 @@ class _ShiftStatusCard extends ConsumerWidget {
                   vertical: DesignTokens.spaceXxs,
                 ),
                 decoration: BoxDecoration(
-                  color: DesignTokens.surfaceWhite.withOpacity(0.18),
+                  color: DesignTokens.surfaceWhite.withValues(alpha: 0.18),
                   borderRadius: DesignTokens.borderRadiusSm,
                 ),
                 child: Text(openedText, style: DesignTokens.textSmallLight),
@@ -235,7 +237,7 @@ class _MetricPill extends StatelessWidget {
           vertical: DesignTokens.spaceSm,
         ),
         decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite.withOpacity(0.16),
+          color: DesignTokens.surfaceWhite.withValues(alpha: 0.16),
           borderRadius: DesignTokens.borderRadiusMd,
         ),
         child: Column(
@@ -287,7 +289,15 @@ class _ActionsCard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _cashMovementSheet(context, ref, type: 'float'),
+                    onPressed: () => unawaited(() async {
+                      final approved = await requireManagerPin(
+                        context,
+                        ref,
+                        reason: 'record a cash in (float)',
+                      );
+                      if (!approved || !context.mounted) return;
+                      _cashMovementSheet(context, ref, type: 'float');
+                    }()),
                     icon: const Icon(Icons.add),
                     label: const Text('Cash in'),
                   ),
@@ -295,7 +305,15 @@ class _ActionsCard extends ConsumerWidget {
                 const SizedBox(width: DesignTokens.spaceSm),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _cashMovementSheet(context, ref, type: 'withdrawal'),
+                    onPressed: () => unawaited(() async {
+                      final approved = await requireManagerPin(
+                        context,
+                        ref,
+                        reason: 'record a cash out',
+                      );
+                      if (!approved || !context.mounted) return;
+                      _cashMovementSheet(context, ref, type: 'withdrawal');
+                    }()),
                     icon: const Icon(Icons.remove),
                     label: const Text('Cash out'),
                   ),
@@ -338,8 +356,20 @@ class _ActionsCard extends ConsumerWidget {
             onPressed: () async {
               final opening = double.tryParse(floatCtrl.text.trim()) ?? 0;
               final db = ref.read(appDatabaseProvider);
-              final shiftId = await db.openShift(openingFloat: opening);
-              await db.recordCashMovement(type: 'open', amount: opening, note: 'Open shift ($shiftId)');
+              final outletId = (await db.getPrimaryOutlet())?.id;
+              final staffId = ref.read(posSessionProvider).staffId?.toString();
+              final shiftId = await db.openShift(
+                openingFloat: opening,
+                outletId: outletId,
+                staffId: staffId,
+              );
+              await db.recordCashMovement(
+                type: 'open',
+                amount: opening,
+                note: 'Open shift ($shiftId)',
+                outletId: outletId,
+                staffId: staffId,
+              );
               unawaited(ref.read(syncServiceProvider).syncNow());
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -365,53 +395,107 @@ class _ActionsCard extends ConsumerWidget {
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     final title = type == 'withdrawal' ? 'Cash out' : 'Cash in';
+    String category = type == 'withdrawal' ? 'expense' : 'topup';
     BottomSheetModal.show(
       context: context,
       title: title,
       subtitle: 'Record a ${type == 'withdrawal' ? 'withdrawal' : 'float'}',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: amountCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Amount (UGX)',
-              prefixIcon: Icon(Icons.money),
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceMd),
-          TextField(
-            controller: noteCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Note (optional)',
-              prefixIcon: Icon(Icons.notes_outlined),
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceLg),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
-              if (amount <= 0) return;
-              await ref.read(appDatabaseProvider).recordCashMovement(
-                    type: type,
-                    amount: amount,
-                    note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
-                  );
-              unawaited(ref.read(syncServiceProvider).syncNow());
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('$title recorded'),
-                  backgroundColor: DesignTokens.brandAccent,
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          final categories = type == 'withdrawal'
+              ? const [
+                  ('expense', 'Expense'),
+                  ('supplier', 'Supplier payment'),
+                  ('owner', 'Owner withdrawal'),
+                  ('other', 'Other'),
+                ]
+              : const [
+                  ('topup', 'Top-up'),
+                  ('change', 'Change / float'),
+                  ('other', 'Other'),
+                ];
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Reason', style: DesignTokens.textBodyBold),
+              const SizedBox(height: DesignTokens.spaceSm),
+              Wrap(
+                spacing: DesignTokens.spaceSm,
+                runSpacing: DesignTokens.spaceSm,
+                children: [
+                  for (final item in categories)
+                    ChoiceChip(
+                      label: Text(item.$2),
+                      selected: category == item.$1,
+                      onSelected: (_) => setState(() => category = item.$1),
+                    ),
+                ],
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Amount (UGX)',
+                  prefixIcon: Icon(Icons.money),
                 ),
-              );
-            },
-            child: const Text('Save'),
-          ),
-        ],
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Note (optional)',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              ElevatedButton(
+                onPressed: () async {
+                  final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                  if (amount <= 0) return;
+
+                  final note = noteCtrl.text.trim();
+                  final storedNote = note.isEmpty ? '[$category]' : '[$category] $note';
+
+                  final db = ref.read(appDatabaseProvider);
+                  final outletId = (await db.getPrimaryOutlet())?.id;
+                  final staffId = ref.read(posSessionProvider).staffId?.toString();
+
+                  final movementId = await db.recordCashMovement(
+                        type: type,
+                        amount: amount,
+                        note: storedNote,
+                        outletId: outletId,
+                        staffId: staffId,
+                      );
+                  if (type == 'withdrawal' || type == 'float') {
+                    await db.recordAuditLog(
+                      actorStaffId: staffId,
+                      action: 'cash_movement_$type',
+                      payload: {
+                        'movement_id': movementId,
+                        'amount': amount,
+                        'tag': category,
+                        'note': note,
+                      },
+                    );
+                  }
+                  unawaited(ref.read(syncServiceProvider).syncNow());
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${type == 'withdrawal' ? 'Cash out' : 'Cash in'} recorded'),
+                      backgroundColor: DesignTokens.brandAccent,
+                    ),
+                  );
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -440,7 +524,13 @@ class _ActionsCard extends ConsumerWidget {
               final counted = double.tryParse(countedCtrl.text.trim()) ?? 0;
               final db = ref.read(appDatabaseProvider);
               await db.closeShift(shiftId: shift.id, closingFloat: counted);
-              await db.recordCashMovement(type: 'close', amount: counted, note: 'Close shift (${shift.id})');
+              await db.recordCashMovement(
+                type: 'close',
+                amount: counted,
+                note: 'Close shift (${shift.id})',
+                outletId: shift.outletId,
+                staffId: shift.staffId,
+              );
               unawaited(ref.read(syncServiceProvider).syncNow());
               if (!context.mounted) return;
               Navigator.pop(context);
@@ -473,10 +563,16 @@ class _MovementTile extends StatelessWidget {
     Color color = DesignTokens.brandAccent;
     IconData icon = Icons.add;
     String label = 'Cash in';
+    final tag = _extractTag(movement.note);
     if (isOut) {
       color = DesignTokens.error;
       icon = Icons.remove;
-      label = 'Cash out';
+      label = switch (tag) {
+        'expense' => 'Expense',
+        'supplier' => 'Supplier payment',
+        'owner' => 'Owner withdrawal',
+        _ => 'Cash out',
+      };
     } else if (isOpen) {
       color = DesignTokens.brandPrimary;
       icon = Icons.play_circle_outline;
@@ -502,14 +598,14 @@ class _MovementTile extends StatelessWidget {
         leading: Container(
           padding: DesignTokens.paddingSm,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: DesignTokens.borderRadiusSm,
           ),
           child: Icon(icon, color: color),
         ),
         title: Text(label, style: DesignTokens.textBodyBold),
         subtitle: Text(
-          movement.note ?? '',
+          _stripTag(movement.note) ?? '',
           style: DesignTokens.textSmall,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -529,6 +625,25 @@ class _MovementTile extends StatelessWidget {
       ),
     );
   }
+
+  String? _extractTag(String? note) {
+    if (note == null) return null;
+    final trimmed = note.trimLeft();
+    if (!trimmed.startsWith('[')) return null;
+    final end = trimmed.indexOf(']');
+    if (end <= 1) return null;
+    return trimmed.substring(1, end).trim().toLowerCase();
+  }
+
+  String? _stripTag(String? note) {
+    if (note == null) return null;
+    final trimmed = note.trimLeft();
+    if (!trimmed.startsWith('[')) return note;
+    final end = trimmed.indexOf(']');
+    if (end == -1) return note;
+    final rest = trimmed.substring(end + 1).trimLeft();
+    return rest.isEmpty ? null : rest;
+  }
 }
 
 class _EmptyMovements extends StatelessWidget {
@@ -546,7 +661,7 @@ class _EmptyMovements extends StatelessWidget {
           Container(
             padding: DesignTokens.paddingSm,
             decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withOpacity(0.4),
+              color: DesignTokens.grayLight.withValues(alpha: 0.4),
               borderRadius: DesignTokens.borderRadiusSm,
             ),
             child: const Icon(Icons.money_off, color: DesignTokens.grayMedium),
@@ -607,4 +722,3 @@ class _CardError extends StatelessWidget {
     );
   }
 }
-

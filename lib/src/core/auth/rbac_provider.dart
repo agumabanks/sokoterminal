@@ -107,7 +107,7 @@ class RbacController extends StateNotifier<RbacState> {
       if (role?.canPriceOverride == true) permissions.add(Permission.priceOverride);
       
       // Determine user role (simple: name-based or roleId-based)
-      final userRole = (role?.name?.toLowerCase() == 'manager' || 
+      final userRole = (role?.name.toLowerCase() == 'manager' || 
                         role?.canRefund == true && role?.canVoid == true && role?.canPriceOverride == true)
           ? UserRole.manager
           : UserRole.cashier;

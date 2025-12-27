@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 
 import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
@@ -29,15 +32,23 @@ class SellerApi {
     return client.get('/v2/seller/orders/details/$orderId');
   }
 
-  Future<Response<dynamic>> updateOrderStatus({
+  Future<Response<dynamic>> updateOrderDeliveryStatus({
     required int orderId,
-    required String deliveryStatus,
-    required String paymentStatus,
+    required String status,
   }) {
     return client.post('/v2/seller/orders/update-delivery-status', data: {
       'order_id': orderId,
-      'delivery_status': deliveryStatus,
-      'payment_status': paymentStatus,
+      'status': status,
+    });
+  }
+
+  Future<Response<dynamic>> updateOrderPaymentStatus({
+    required int orderId,
+    required String status,
+  }) {
+    return client.post('/v2/seller/orders/update-payment-status', data: {
+      'order_id': orderId,
+      'status': status,
     });
   }
 
@@ -66,17 +77,67 @@ class SellerApi {
     return client.post('/v2/seller/products/update/$productId', data: payload);
   }
 
+  Future<Response<dynamic>> fetchCategories() {
+    return client.get('/v2/seller/products/categories');
+  }
+
+  Future<Response<dynamic>> fetchBrands() {
+    return client.get('/v2/seller/products/brands');
+  }
+
+  Future<Response<dynamic>> deleteProduct(String productId) {
+    return client.get('/v2/seller/product/delete/$productId');
+  }
+
   Future<Response<dynamic>> fetchProducts({int page = 1}) {
     return client.get('/v2/seller/products/all', query: {'page': page});
   }
 
-  // Services (service-provider addon)
-  Future<Response<dynamic>> createService(Map<String, dynamic> payload) {
-    return client.post('/v2/service-provider/offerings', data: payload);
+  Future<Response<dynamic>> fetchProductDetails(int productId) {
+    return client.get('/v2/seller/products/edit/$productId');
   }
 
-  Future<Response<dynamic>> updateService(String id, Map<String, dynamic> payload) {
-    return client.patch('/v2/service-provider/offerings/$id', data: payload);
+  // Uploads
+  Future<Response<dynamic>> uploadSellerFile(File file) async {
+    final form = FormData.fromMap({
+      'aiz_file': await MultipartFile.fromFile(
+        file.path,
+        filename: p.basename(file.path),
+      ),
+    });
+    return client.post(
+      '/v2/seller/file/upload',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+  }
+
+  // Services (service-provider addon)
+  Future<Response<dynamic>> createService(
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/service-provider/offerings',
+      data: payload,
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> updateService(
+    String id,
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) {
+    return client.patch(
+      '/v2/service-provider/offerings/$id',
+      data: payload,
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
   }
 
   Future<Response<dynamic>> fetchMyServices() {
@@ -85,6 +146,23 @@ class SellerApi {
 
   Future<Response<dynamic>> fetchServiceBookings() {
     return client.get('/v2/service-provider/provider/bookings');
+  }
+
+  Future<Response<dynamic>> confirmServiceBooking(int bookingId) {
+    return client.post('/v2/service-provider/provider/bookings/$bookingId/confirm');
+  }
+
+  Future<Response<dynamic>> completeServiceBooking(int bookingId) {
+    return client.post('/v2/service-provider/provider/bookings/$bookingId/complete');
+  }
+
+  Future<Response<dynamic>> cancelServiceBooking(int bookingId, {String? reason}) {
+    return client.post(
+      '/v2/service-provider/provider/bookings/$bookingId/cancel',
+      data: {
+        if (reason != null) 'reason': reason,
+      },
+    );
   }
 
   // POS / Ledger
@@ -103,12 +181,131 @@ class SellerApi {
     return client.get('/v2/seller/pos/sync/pull', query: {'since': since.toUtc().toIso8601String()});
   }
 
+  // POS Catalog Products (offline-first upsert)
+  Future<Response<dynamic>> upsertPosCatalogProduct(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/catalog/products',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
   Future<Response<dynamic>> fetchPosCustomers() {
     return client.get('/v2/seller/pos/get-customers');
   }
 
   Future<Response<dynamic>> fetchPosConfig() {
     return client.get('/v2/seller/pos/configuration');
+  }
+
+  // Procurement & inventory control (Phase 7)
+  Future<Response<dynamic>> fetchSuppliers() {
+    return client.get('/v2/seller/pos/suppliers');
+  }
+
+  Future<Response<dynamic>> createSupplier(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/suppliers',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> updateSupplier(
+    int supplierId,
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.put(
+      '/v2/seller/pos/suppliers/$supplierId',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> deleteSupplier(
+    int supplierId, {
+    required String idempotencyKey,
+  }) {
+    return client.delete(
+      '/v2/seller/pos/suppliers/$supplierId',
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> fetchPurchaseOrders() {
+    return client.get('/v2/seller/pos/purchase-orders');
+  }
+
+  Future<Response<dynamic>> fetchPurchaseOrderDetails(int purchaseOrderId) {
+    return client.get('/v2/seller/pos/purchase-orders/$purchaseOrderId');
+  }
+
+  Future<Response<dynamic>> createPurchaseOrder(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/purchase-orders',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> cancelPurchaseOrder(
+    int purchaseOrderId, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/purchase-orders/$purchaseOrderId/cancel',
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> markPurchaseOrderSent(
+    int purchaseOrderId, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/purchase-orders/$purchaseOrderId/mark-sent',
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> fetchGoodsReceivedNotes() {
+    return client.get('/v2/seller/pos/goods-received-notes');
+  }
+
+  Future<Response<dynamic>> pushGoodsReceivedNote(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/goods-received-notes',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> fetchStocktakes() {
+    return client.get('/v2/seller/pos/stocktakes');
+  }
+
+  Future<Response<dynamic>> pushStocktake(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/stocktakes',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
   }
 
   Future<Response<dynamic>> updateDeviceToken(String token) {
@@ -232,11 +429,6 @@ class SellerApi {
     return client.post('/v2/seller/pos/configuration/update', data: payload);
   }
 
-  // Product delete
-  Future<Response<dynamic>> deleteProduct(String productId) {
-    return client.get('/v2/seller/product/delete/$productId');
-  }
-
   // Verification form
   Future<Response<dynamic>> fetchVerificationForm() {
     return client.get('/v2/seller/shop-verify-form');
@@ -357,6 +549,19 @@ class SellerApi {
 
   Future<Response<dynamic>> deleteCustomer(String customerId) {
     return client.delete('/v2/seller/pos/customers/$customerId');
+  }
+
+  // POS Sessions (staff PIN login)
+  Future<Response<dynamic>> startPosSession({required String pin}) {
+    return client.post('/v2/seller/pos/sessions/start', data: {'pin': pin});
+  }
+
+  Future<Response<dynamic>> endPosSession() {
+    return client.post('/v2/seller/pos/sessions/end');
+  }
+
+  Future<Response<dynamic>> posSessionMe() {
+    return client.get('/v2/seller/pos/sessions/me');
   }
 
   // CRM Contacts

@@ -6,7 +6,8 @@ import 'receipt_service.dart';
 
 final receiptServiceProvider = Provider<ReceiptService>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  return ReceiptService(db);
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ReceiptService(db, prefs: prefs);
 });
 
 final printQueueServiceProvider = Provider<PrintQueueService>((ref) {

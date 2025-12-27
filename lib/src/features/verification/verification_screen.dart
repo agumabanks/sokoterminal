@@ -488,7 +488,7 @@ class _StatusCard extends StatelessWidget {
           Container(
             padding: DesignTokens.paddingSm,
             decoration: BoxDecoration(
-              color: DesignTokens.surfaceWhite.withOpacity(0.18),
+              color: DesignTokens.surfaceWhite.withValues(alpha: 0.18),
               borderRadius: DesignTokens.borderRadiusSm,
             ),
             child: const Icon(Icons.verified_user, color: DesignTokens.surfaceWhite),
@@ -517,7 +517,7 @@ class _StatusCard extends StatelessWidget {
               vertical: DesignTokens.spaceXxs,
             ),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.18),
+              color: statusColor.withValues(alpha: 0.18),
               borderRadius: DesignTokens.borderRadiusSm,
             ),
             child: Text(
@@ -640,7 +640,7 @@ class _FieldWidget extends StatelessWidget {
       case 'select':
       case 'radio':
         return DropdownButtonFormField<String>(
-          value: singleValue,
+          initialValue: singleValue,
           decoration: InputDecoration(
             labelText: label,
             prefixIcon: const Icon(Icons.list_alt_outlined),
@@ -695,7 +695,7 @@ class _PackageCard extends StatelessWidget {
                     vertical: DesignTokens.spaceXxs,
                   ),
                   decoration: BoxDecoration(
-                    color: DesignTokens.brandAccent.withOpacity(0.12),
+                    color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                     borderRadius: DesignTokens.borderRadiusSm,
                   ),
                   child: Text('Current', style: DesignTokens.textSmall.copyWith(color: DesignTokens.brandAccent)),

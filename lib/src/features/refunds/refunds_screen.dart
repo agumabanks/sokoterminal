@@ -150,7 +150,7 @@ class RefundsScreen extends ConsumerWidget {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: color.withOpacity(0.12),
+                        backgroundColor: color.withValues(alpha: 0.12),
                         child: Icon(Icons.assignment_return_outlined, color: color),
                       ),
                       title: Text(
@@ -163,7 +163,7 @@ class RefundsScreen extends ConsumerWidget {
                       ),
                       trailing: Chip(
                         label: Text(refund.refundLabel.toUpperCase()),
-                        backgroundColor: color.withOpacity(0.12),
+                        backgroundColor: color.withValues(alpha: 0.12),
                         labelStyle: TextStyle(color: color),
                       ),
                       onTap: () => _showDecision(context, ref, refund),
@@ -187,7 +187,7 @@ class RefundsScreen extends ConsumerWidget {
           Container(
             padding: DesignTokens.paddingMd,
             decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withOpacity(0.25),
+              color: DesignTokens.grayLight.withValues(alpha: 0.25),
               borderRadius: DesignTokens.borderRadiusMd,
             ),
             child: Column(

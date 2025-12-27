@@ -116,7 +116,7 @@ class _TrendBadge extends StatelessWidget {
         vertical: DesignTokens.spaceXs,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: DesignTokens.borderRadiusSm,
       ),
       child: Row(
@@ -171,7 +171,7 @@ enum StatCardVariant {
   Color get labelColor {
     switch (this) {
       case StatCardVariant.gradient:
-        return DesignTokens.surfaceWhite.withOpacity(0.8);
+        return DesignTokens.surfaceWhite.withValues(alpha: 0.8);
       default:
         return DesignTokens.grayMedium;
     }
@@ -202,11 +202,11 @@ enum StatCardVariant {
   Color get iconBackgroundColor {
     switch (this) {
       case StatCardVariant.gradient:
-        return DesignTokens.surfaceWhite.withOpacity(0.2);
+        return DesignTokens.surfaceWhite.withValues(alpha: 0.2);
       case StatCardVariant.accent:
-        return DesignTokens.brandAccent.withOpacity(0.15);
+        return DesignTokens.brandAccent.withValues(alpha: 0.15);
       default:
-        return DesignTokens.grayLight.withOpacity(0.5);
+        return DesignTokens.grayLight.withValues(alpha: 0.5);
     }
   }
 }

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/pos_login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/home/home_shell.dart';
 import 'features/contacts/contacts_screen.dart';
@@ -17,7 +18,7 @@ import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/settings/settings_screen.dart';
-import 'features/settings/staff_screen.dart';
+import 'features/settings/staff_management_screen.dart';
 import 'features/settings/sync_health_screen.dart';
 import 'features/settings/export_screen.dart';
 import 'features/settings/print_queue_screen.dart';
@@ -36,6 +37,12 @@ import 'features/shifts/shifts_screen.dart';
 import 'features/delivery/delivery_settings_screen.dart';
 import 'features/quotations/quotations_screen.dart';
 import 'features/settings/receipt_templates_screen.dart';
+import 'features/settings/void_reason_codes_screen.dart';
+import 'features/procurement/suppliers_screen.dart';
+import 'features/procurement/purchase_orders_screen.dart';
+import 'features/procurement/receive_stock_screen.dart';
+import 'features/procurement/stocktake_screen.dart';
+import 'features/procurement/low_stock_screen.dart';
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -77,6 +84,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/pos-login',
+        name: 'pos-login',
+        builder: (context, state) {
+          final redirectTo = state.uri.queryParameters['redirect'];
+          return PosLoginScreen(redirectTo: redirectTo);
+        },
       ),
       GoRoute(
         path: '/login',
@@ -130,6 +145,31 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'items',
                     name: 'items',
                     builder: (context, state) => const ItemsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'suppliers',
+                    name: 'suppliers',
+                    builder: (context, state) => const SuppliersScreen(),
+                  ),
+                  GoRoute(
+                    path: 'purchase-orders',
+                    name: 'purchase-orders',
+                    builder: (context, state) => const PurchaseOrdersScreen(),
+                  ),
+                  GoRoute(
+                    path: 'receive-stock',
+                    name: 'receive-stock',
+                    builder: (context, state) => const ReceiveStockScreen(),
+                  ),
+                  GoRoute(
+                    path: 'stocktake',
+                    name: 'stocktake',
+                    builder: (context, state) => const StocktakeScreen(),
+                  ),
+                  GoRoute(
+                    path: 'low-stock',
+                    name: 'low-stock',
+                    builder: (context, state) => const LowStockScreen(),
                   ),
                   GoRoute(
                     path: 'services',
@@ -243,7 +283,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'staff',
                     name: 'staff',
-                    builder: (context, state) => const StaffScreen(),
+                    builder: (context, state) => const StaffManagementScreen(),
                   ),
                   GoRoute(
                     path: 'shifts',
@@ -264,6 +304,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'receipt-templates',
                     name: 'receipt-templates',
                     builder: (context, state) => const ReceiptTemplatesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'void-reason-codes',
+                    name: 'void-reason-codes',
+                    builder: (context, state) => const VoidReasonCodesScreen(),
                   ),
                 ],
               ),

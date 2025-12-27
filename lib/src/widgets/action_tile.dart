@@ -127,7 +127,7 @@ class _IconContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveColor = color ?? DesignTokens.brandPrimary;
-    final effectiveBackground = backgroundColor ?? effectiveColor.withOpacity(0.1);
+    final effectiveBackground = backgroundColor ?? effectiveColor.withValues(alpha: 0.1);
 
     return Container(
       width: 44,
@@ -188,7 +188,7 @@ class ActionTileCompact extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: effectiveColor.withOpacity(0.1),
+                      color: effectiveColor.withValues(alpha: 0.1),
                       borderRadius: DesignTokens.borderRadiusSm,
                     ),
                     child: Icon(
@@ -307,7 +307,7 @@ class ActionTileSection extends StatelessWidget {
                     child: Divider(
                       height: 1,
                       thickness: 1,
-                      color: DesignTokens.grayLight.withOpacity(0.5),
+                      color: DesignTokens.grayLight.withValues(alpha: 0.5),
                     ),
                   ),
               ],

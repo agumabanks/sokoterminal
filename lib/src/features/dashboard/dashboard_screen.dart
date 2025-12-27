@@ -211,7 +211,7 @@ class DashboardScreen extends ConsumerWidget {
                           vertical: DesignTokens.spaceXs,
                         ),
                         decoration: BoxDecoration(
-                          color: DesignTokens.brandAccent.withOpacity(0.1),
+                          color: DesignTokens.brandAccent.withValues(alpha: 0.1),
                           borderRadius: DesignTokens.borderRadiusSm,
                         ),
                         child: Text(
@@ -295,7 +295,7 @@ class _QuickActionCard extends StatelessWidget {
             Container(
               padding: DesignTokens.paddingSm,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
               child: Icon(icon, color: color, size: 24),
@@ -349,7 +349,7 @@ class _InsightCard extends StatelessWidget {
             Container(
               padding: DesignTokens.paddingSm,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
               child: Icon(icon, color: iconColor, size: 20),
