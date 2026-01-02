@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,6 +7,42 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Google services for Firebase
     id("com.google.gms.google-services")
+    // Crashlytics Gradle plugin (mapping upload for release builds)
+    id("com.google.firebase.crashlytics")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+
+fun readSecret(propKey: String, envKey: String): String? {
+    val fromProp = keystoreProperties.getProperty(propKey)?.trim()?.takeIf { it.isNotEmpty() }
+    val fromEnv = System.getenv(envKey)?.trim()?.takeIf { it.isNotEmpty() }
+    return fromProp ?: fromEnv
+}
+
+val releaseStoreFile = readSecret("storeFile", "STORE_FILE")
+val releaseStorePassword = readSecret("storePassword", "STORE_PASSWORD")
+val releaseKeyAlias = readSecret("keyAlias", "KEY_ALIAS")
+val releaseKeyPassword = readSecret("keyPassword", "KEY_PASSWORD")
+
+val hasReleaseSigning =
+    releaseStoreFile != null &&
+        releaseStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null &&
+        rootProject.file(releaseStoreFile).exists()
+
+if (isReleaseBuild && !hasReleaseSigning) {
+    throw GradleException(
+        "Release signing is not configured. Create android/key.properties (see key.properties.example) " +
+            "or set STORE_FILE/STORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD env vars.",
+    )
 }
 
 android {
@@ -32,11 +70,29 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (hasReleaseSigning) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
+
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

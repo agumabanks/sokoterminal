@@ -162,58 +162,78 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
       );
       if (result == null) return;
 
-      final db = ref.read(appDatabaseProvider);
-      final sync = ref.read(syncServiceProvider);
-      final occurredAt = DateTime.now().toUtc();
-      final clientPoId = const Uuid().v4();
-      final actorStaffId = ref.read(posSessionProvider).staffId?.toString();
-
-      await sync.enqueue('purchase_order_push', {
-        'idempotency_key': 'po_$clientPoId',
-        'client_po_id': clientPoId,
-        'supplier_id': result.supplier?.id,
-        'status': 'draft',
-        'occurred_at': occurredAt.toIso8601String(),
-        'note': result.note?.trim().isNotEmpty == true ? result.note!.trim() : null,
-        'lines': result.lines
-            .map(
-              (l) => {
-                'product_id': l.itemId, // resolved to remote id during sync dispatch
-                if (l.variant.trim().isNotEmpty) 'variation': l.variant.trim(),
-                'quantity': l.quantity,
-                if (l.unitCost != null) 'unit_cost': l.unitCost,
-              },
-            )
-            .toList(),
-      });
-
-      await db.recordAuditLog(
-        actorStaffId: actorStaffId,
-        action: 'purchase_order_create',
-        payload: {
-          'client_po_id': clientPoId,
-          'occurred_at': occurredAt.toIso8601String(),
-          'supplier_id': result.supplier?.id,
-          'lines': result.lines
-              .map((l) => {
-                    'item_id': l.itemId,
-                    'variant': l.variant,
-                    'quantity': l.quantity,
-                    if (l.unitCost != null) 'unit_cost': l.unitCost,
-                  })
-              .toList(),
-        },
-      );
-
-      unawaited(sync.syncNow());
+      // Show loading dialog
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Purchase order queued for sync'),
-          backgroundColor: DesignTokens.brandAccent,
-        ),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
-      await _load();
+
+      try {
+        final db = ref.read(appDatabaseProvider);
+        final sync = ref.read(syncServiceProvider);
+        final occurredAt = DateTime.now().toUtc();
+        final clientPoId = const Uuid().v4();
+        final actorStaffId = ref.read(posSessionProvider).staffId?.toString();
+
+        await sync.enqueue('purchase_order_push', {
+          'idempotency_key': 'po_$clientPoId',
+          'client_po_id': clientPoId,
+          'supplier_id': result.supplier?.id,
+          'status': 'draft',
+          'occurred_at': occurredAt.toIso8601String(),
+          'note': result.note?.trim().isNotEmpty == true ? result.note!.trim() : null,
+          'lines': result.lines
+              .map(
+                (l) => {
+                  'product_id': l.itemId, // resolved to remote id during sync dispatch
+                  if (l.variant.trim().isNotEmpty) 'variation': l.variant.trim(),
+                  'quantity': l.quantity,
+                  if (l.unitCost != null) 'unit_cost': l.unitCost,
+                },
+              )
+              .toList(),
+        });
+
+        await db.recordAuditLog(
+          actorStaffId: actorStaffId,
+          action: 'purchase_order_create',
+          payload: {
+            'client_po_id': clientPoId,
+            'occurred_at': occurredAt.toIso8601String(),
+            'supplier_id': result.supplier?.id,
+            'lines': result.lines
+                .map((l) => {
+                      'item_id': l.itemId,
+                      'variant': l.variant,
+                      'quantity': l.quantity,
+                      if (l.unitCost != null) 'unit_cost': l.unitCost,
+                    })
+                .toList(),
+          },
+        );
+
+        unawaited(sync.syncNow());
+        if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Purchase order queued for sync'),
+            backgroundColor: DesignTokens.brandAccent,
+          ),
+        );
+        await _load();
+      } catch (e) {
+        if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create purchase order: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
+        );
+      }
     }());
   }
 }

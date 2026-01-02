@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/app_providers.dart';
 import '../../core/theme/design_tokens.dart';
+import '../checkout/cart_controller.dart';
 import 'service_bookings_controller.dart';
 
-enum _BookingAction { confirm, complete, cancel }
+enum _BookingAction { confirm, complete, cancel, createSale }
 
 class ServiceBookingsScreen extends ConsumerWidget {
-  const ServiceBookingsScreen({super.key});
+  const ServiceBookingsScreen({super.key, this.serviceId});
+
+  /// Optional: filter bookings for a specific service
+  final String? serviceId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -100,6 +106,41 @@ class ServiceBookingsScreen extends ConsumerWidget {
                                 if (!context.mounted) return;
                                 await controller.cancel(id, reason: reason);
                                 break;
+                              case _BookingAction.createSale:
+                                // Pre-fill checkout with booking data
+                                final offeringId = booking['offering_id']?.toString() ?? booking['offering']?['id']?.toString();
+                                if (offeringId == null || offeringId.isEmpty) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Cannot find service for this booking')),
+                                    );
+                                  }
+                                  return;
+                                }
+                                final db = ref.read(appDatabaseProvider);
+                                // Try to find local service by remote ID
+                                final serviceRemoteId = int.tryParse(offeringId);
+                                final service = serviceRemoteId != null 
+                                    ? await db.getServiceByRemoteId(serviceRemoteId)
+                                    : await db.getServiceById(offeringId);
+                                if (service == null) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Service not found locally. Sync first.')),
+                                    );
+                                  }
+                                  return;
+                                }
+                                // Add to cart
+                                ref.read(cartControllerProvider.notifier).addService(
+                                  service: service,
+                                  variantPrice: price > 0 ? price : null,
+                                );
+                                // Navigate to checkout
+                                if (context.mounted) {
+                                  context.go('/checkout');
+                                }
+                                break;
                             }
                           },
                         ),
@@ -117,8 +158,8 @@ class ServiceBookingsScreen extends ConsumerWidget {
 
   static List<_BookingAction> _actionsForStatus(String statusRaw) {
     final status = statusRaw.toLowerCase().trim();
-    if (status == 'pending') return [_BookingAction.confirm, _BookingAction.cancel];
-    if (status == 'confirmed') return [_BookingAction.complete, _BookingAction.cancel];
+    if (status == 'pending') return [_BookingAction.confirm, _BookingAction.createSale, _BookingAction.cancel];
+    if (status == 'confirmed') return [_BookingAction.complete, _BookingAction.createSale, _BookingAction.cancel];
     return const [];
   }
 
@@ -130,6 +171,8 @@ class ServiceBookingsScreen extends ConsumerWidget {
         return 'Complete';
       case _BookingAction.cancel:
         return 'Cancel';
+      case _BookingAction.createSale:
+        return 'Create Sale';
     }
   }
 

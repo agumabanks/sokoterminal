@@ -462,25 +462,48 @@ class _ActionsCard extends ConsumerWidget {
                   final outletId = (await db.getPrimaryOutlet())?.id;
                   final staffId = ref.read(posSessionProvider).staffId?.toString();
 
-                  final movementId = await db.recordCashMovement(
-                        type: type,
+                  final occurredAt = DateTime.now().toUtc();
+                  String? linkedExpenseId;
+                  int movementId = 0;
+
+                  await db.transaction(() async {
+                    if (type == 'withdrawal' && category != 'owner') {
+                      linkedExpenseId = await db.recordExpense(
                         amount: amount,
-                        note: storedNote,
+                        method: 'cash',
+                        category: category,
+                        note: note.isEmpty ? null : note,
                         outletId: outletId,
                         staffId: staffId,
+                        occurredAt: occurredAt,
                       );
-                  if (type == 'withdrawal' || type == 'float') {
-                    await db.recordAuditLog(
-                      actorStaffId: staffId,
-                      action: 'cash_movement_$type',
-                      payload: {
-                        'movement_id': movementId,
-                        'amount': amount,
-                        'tag': category,
-                        'note': note,
-                      },
+                    }
+
+                    movementId = await db.recordCashMovement(
+                      type: type,
+                      amount: amount,
+                      note: storedNote,
+                      linkedExpenseId: linkedExpenseId,
+                      outletId: outletId,
+                      staffId: staffId,
+                      occurredAt: occurredAt,
                     );
-                  }
+
+                    if (type == 'withdrawal' || type == 'float') {
+                      await db.recordAuditLog(
+                        actorStaffId: staffId,
+                        action: 'cash_movement_$type',
+                        payload: {
+                          'movement_id': movementId,
+                          if (linkedExpenseId != null) 'linked_expense_id': linkedExpenseId,
+                          'amount': amount,
+                          'tag': category,
+                          'note': note,
+                        },
+                      );
+                    }
+                  });
+
                   unawaited(ref.read(syncServiceProvider).syncNow());
                   if (!context.mounted) return;
                   Navigator.pop(context);

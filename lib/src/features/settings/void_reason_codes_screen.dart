@@ -49,11 +49,12 @@ class _VoidReasonCodesScreenState extends ConsumerState<VoidReasonCodesScreen> {
         actions: [
           TextButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               final prefs = ref.read(sharedPreferencesProvider);
               await PosVoidReasonCodesCache.reset(prefs);
               if (!mounted) return;
               setState(() => _codes = PosVoidReasonCodesCache.read(prefs));
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 const SnackBar(content: Text('Reset to defaults')),
               );
             },
@@ -130,4 +131,3 @@ class _VoidReasonCodesScreenState extends ConsumerState<VoidReasonCodesScreen> {
     );
   }
 }
-

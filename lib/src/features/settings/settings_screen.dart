@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import '../../core/app_providers.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/security/manager_approval.dart';
+import '../../core/firebase/remote_config_service.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../auth/auth_controller.dart';
 import '../receipts/receipt_providers.dart';
@@ -23,8 +26,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final printer = ref.watch(printQueueServiceProvider);
+    final remoteConfig = ref.watch(remoteConfigProvider);
+    final config = ref.watch(appConfigProvider);
     final enabled = printer.printerEnabled;
     final printerLabel = printer.preferredPrinterLabel();
+    final privacyPolicyUrl = _privacyPolicyUrl(config.apiBaseUrl);
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -128,6 +134,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: const Text('Pending receipts, retries, errors'),
             onTap: () => context.go('/home/more/print-queue'),
           ),
+          if (remoteConfig.ffPrintDiagnostics)
+            ListTile(
+              leading: const Icon(Icons.fact_check_outlined),
+              title: const Text('Print diagnostics'),
+              subtitle: const Text('Permissions, connection, and test prints'),
+              onTap: () => context.go('/home/more/print-diagnostics'),
+            ),
           ListTile(
             leading: const Icon(Icons.fact_check_outlined),
             title: const Text('Test print'),
@@ -201,6 +214,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: const Text('Logout'),
             onTap: () => ref.read(authControllerProvider.notifier).logout(),
           ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy policy'),
+            subtitle: Text(
+              privacyPolicyUrl,
+              style: DesignTokens.textSmall,
+            ),
+            onTap: () async {
+              final uri = Uri.tryParse(privacyPolicyUrl);
+              if (uri == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid privacy policy URL')),
+                );
+                return;
+              }
+              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not open privacy policy')),
+                );
+              }
+            },
+          ),
           const ListTile(
             leading: Icon(Icons.support_agent),
             title: Text('Support'),
@@ -209,5 +245,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  String _privacyPolicyUrl(String apiBaseUrl) {
+    var base = apiBaseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    if (base.endsWith('/api')) {
+      base = base.substring(0, base.length - 4);
+    }
+    return '$base/privacy-policy';
   }
 }

@@ -37,7 +37,11 @@ class ReceiptService {
     
     // Format data
     final isRefund = entry.type == 'refund';
-    final sign = isRefund ? '-' : '';
+    final isVoid = entry.type == 'void';
+    final isReversal = isRefund || isVoid;
+    final sign = isReversal ? '-' : '';
+    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final isVoided = isVoid || voidForSale != null;
     final receiptNo = _formatReceiptNumber(entry.receiptNumber);
     final dateStr = _dateFormat.format(entry.createdAt.toLocal());
     final timeStr = _timeFormat.format(entry.createdAt.toLocal());
@@ -45,7 +49,8 @@ class ReceiptService {
     final paymentSettings = ShopPaymentSettingsCache.read(prefs);
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
-        !isRefund &&
+        !isReversal &&
+        voidForSale == null &&
         paymentInstructions != null &&
         bundle.payments.any((p) {
           final method = p.method.toLowerCase();
@@ -101,6 +106,57 @@ class ReceiptService {
               ),
               
               pw.SizedBox(height: 12),
+
+              if (isVoided) ...[
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.red, width: 2),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                    children: [
+                      pw.Text(
+                        'VOIDED',
+                        style: pw.TextStyle(
+                          fontSize: 18,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.red,
+                          letterSpacing: 2,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                      if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) ...[
+                        pw.SizedBox(height: 6),
+                        pw.Text(
+                          'Original: ${entry.originalEntryId}',
+                          style: const pw.TextStyle(fontSize: 9, color: _grayMedium),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ],
+                      if (voidForSale != null) ...[
+                        pw.SizedBox(height: 6),
+                        pw.Text(
+                          'Void entry: ${voidForSale.id}',
+                          style: const pw.TextStyle(fontSize: 9, color: _grayMedium),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                        if (voidForSale.note?.trim().isNotEmpty == true)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(top: 4),
+                            child: pw.Text(
+                              voidForSale.note!.trim(),
+                              style: const pw.TextStyle(fontSize: 8, color: _grayMedium),
+                              textAlign: pw.TextAlign.center,
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 12),
+              ],
               
               // ============ RECEIPT INFO BOX ============
               pw.Container(
@@ -123,7 +179,7 @@ class ReceiptService {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
                         pw.Text('Date', style: const pw.TextStyle(fontSize: 10, color: _grayMedium)),
-                        pw.Text('$dateStr • $timeStr', style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text('$dateStr | $timeStr', style: const pw.TextStyle(fontSize: 10)),
                       ],
                     ),
                     if (isRefund) ...[
@@ -284,7 +340,7 @@ class ReceiptService {
               ),
               pw.SizedBox(height: 6),
               pw.Text(
-                'Powered by Soko 24 • soko24.com',
+                'Powered by Soko 24 | soko.sanaa.ug',
                 style: const pw.TextStyle(fontSize: 8, color: _grayMedium),
                 textAlign: pw.TextAlign.center,
               ),
@@ -334,11 +390,14 @@ class ReceiptService {
         : await db.getCustomerById(bundle.entry.customerId!);
     final outlet = await _resolveOutlet(bundle.entry.outletId);
     final template = await _resolveTemplate();
+    final voidForSale =
+        bundle.entry.type == 'sale' ? await db.findVoidForSale(bundle.entry.id) : null;
     final text = _buildReceiptText(
       bundle,
       customer: customer,
       outlet: outlet,
       template: template,
+      voidForSale: voidForSale,
     );
 
     final sanitizedPhone = _sanitizePhone(phone ?? customer?.phone);
@@ -356,17 +415,26 @@ class ReceiptService {
     }
   }
 
-  Future<void> printBluetooth(String entryId, {BluetoothDevice? device}) async {
+  Future<void> printBluetooth(
+    String entryId, {
+    BluetoothDevice? device,
+    bool compatibilityMode = false,
+  }) async {
     final bundle = await _fetchEntry(entryId);
     if (bundle == null) {
       throw StateError('Receipt not found: $entryId');
     }
-    await printBluetoothBundle(bundle, device: device);
+    await printBluetoothBundle(
+      bundle,
+      device: device,
+      compatibilityMode: compatibilityMode,
+    );
   }
 
   Future<void> printBluetoothBundle(
     LedgerEntryBundle bundle, {
     BluetoothDevice? device,
+    bool compatibilityMode = false,
   }) async {
     final printer = BlueThermalPrinter.instance;
     final isConnected = await printer.isConnected ?? false;
@@ -388,11 +456,16 @@ class ReceiptService {
 
     final entry = bundle.entry;
     final isRefund = entry.type == 'refund';
-    final sign = isRefund ? '-' : '';
+    final isVoid = entry.type == 'void';
+    final isReversal = isRefund || isVoid;
+    final sign = isReversal ? '-' : '';
+    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final isVoided = isVoid || voidForSale != null;
     final paymentSettings = ShopPaymentSettingsCache.read(prefs);
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
-        !isRefund &&
+        !isReversal &&
+        voidForSale == null &&
         paymentInstructions != null &&
         bundle.payments.any((p) {
           final method = p.method.toLowerCase();
@@ -410,6 +483,15 @@ class ReceiptService {
     printer.printNewLine();
     printer.printCustom('Type: ${entry.type.toUpperCase()}', 1, 1);
     printer.printCustom('Receipt: ${entry.id}', 1, 1);
+    if (isVoided) {
+      printer.printCustom('*** VOIDED ***', 2, 1);
+      if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) {
+        printer.printCustom('Original: ${entry.originalEntryId}', 1, 1);
+      }
+      if (voidForSale != null) {
+        printer.printCustom('Void entry: ${voidForSale.id}', 1, 1);
+      }
+    }
     if (headerText != null) {
       printer.printNewLine();
       printer.printCustom(headerText, 1, 1);
@@ -443,7 +525,7 @@ class ReceiptService {
       printer.printCustom(paymentInstructions, 1, 1);
     }
     printer.printNewLine();
-    if (template?.showQr ?? true) {
+    if (!compatibilityMode && (template?.showQr ?? true)) {
       printer.printQRcode(entry.id, 200, 200, 1);
     }
     if (footerText != null) {
@@ -451,7 +533,9 @@ class ReceiptService {
       printer.printCustom(footerText, 1, 1);
     }
     printer.printCustom('Powered by Soko 24', 1, 1);
-    printer.paperCut();
+    if (!compatibilityMode) {
+      printer.paperCut();
+    }
   }
 
   Future<LedgerEntryBundle?> _fetchEntry(String id) async {
@@ -463,10 +547,13 @@ class ReceiptService {
     Customer? customer,
     Outlet? outlet,
     ReceiptTemplate? template,
+    LedgerEntry? voidForSale,
   }) {
     final entry = bundle.entry;
     final isRefund = entry.type == 'refund';
-    final sign = isRefund ? '-' : '';
+    final isVoid = entry.type == 'void';
+    final isReversal = isRefund || isVoid;
+    final sign = isReversal ? '-' : '';
     final headerText = _cleanText(template?.headerText);
     final footerText = _cleanText(template?.footerText);
     
@@ -488,6 +575,18 @@ class ReceiptService {
     sb.writeln('');
     sb.writeln('Receipt');
     sb.writeln('Type: ${entry.type.toUpperCase()}');
+    if (isVoid || voidForSale != null) {
+      sb.writeln('STATUS: VOIDED');
+    }
+    if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) {
+      sb.writeln('Original: ${entry.originalEntryId}');
+    }
+    if (voidForSale != null) {
+      sb.writeln('Void entry: ${voidForSale.id}');
+      if (voidForSale.note?.trim().isNotEmpty == true) {
+        sb.writeln('Void note: ${voidForSale.note}');
+      }
+    }
     sb.writeln('Receipt: ${entry.id}');
     if (customer != null) {
       sb.writeln(
@@ -513,7 +612,8 @@ class ReceiptService {
     final paymentSettings = ShopPaymentSettingsCache.read(prefs);
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
-        !isRefund &&
+        !isReversal &&
+        voidForSale == null &&
         paymentInstructions != null &&
         bundle.payments.any((p) {
           final method = p.method.toLowerCase();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/network/seller_api.dart';
@@ -73,6 +74,19 @@ class RefundsController extends StateNotifier<RefundsState> {
   RefundsController(this.api) : super(const RefundsState());
   final SellerApi api;
 
+  String _fmtError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      if (data is Map && data['message'] != null) {
+        return '${data['message']}${status == null ? '' : ' ($status)'}';
+      }
+      if (status != null) return 'Request failed ($status)';
+      return e.message ?? e.toString();
+    }
+    return e.toString();
+  }
+
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
     try {
@@ -86,7 +100,7 @@ class RefundsController extends StateNotifier<RefundsState> {
           .toList();
       state = state.copyWith(loading: false, items: items);
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(loading: false, error: _fmtError(e));
     }
   }
 
@@ -96,7 +110,7 @@ class RefundsController extends StateNotifier<RefundsState> {
       await api.approveRefundRequest(refundId: refundId);
       await load();
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(loading: false, error: _fmtError(e));
     }
   }
 
@@ -106,7 +120,7 @@ class RefundsController extends StateNotifier<RefundsState> {
       await api.rejectRefundRequest(refundId: refundId, reason: reason);
       await load();
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(loading: false, error: _fmtError(e));
     }
   }
 }
@@ -306,4 +320,3 @@ Color _statusColor(int status) {
   if (status == 2) return DesignTokens.error;
   return DesignTokens.warning;
 }
-

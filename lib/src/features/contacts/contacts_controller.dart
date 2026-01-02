@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,7 @@ import '../../core/network/seller_api.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/util/phone_normalizer.dart';
+import '../../core/telemetry/telemetry.dart';
 
 class ContactItem {
   final String id;
@@ -19,6 +22,7 @@ class ContactItem {
   final String? notes;
   final bool isFromDevice;
   final bool isFromSoko;
+  final String? linkedCustomerId;
   final DateTime? lastInteraction;
 
   ContactItem({
@@ -29,6 +33,7 @@ class ContactItem {
     this.notes,
     this.isFromDevice = false,
     this.isFromSoko = false,
+    this.linkedCustomerId,
     this.lastInteraction,
   });
 
@@ -40,6 +45,7 @@ class ContactItem {
     String? notes,
     bool? isFromDevice,
     bool? isFromSoko,
+    String? linkedCustomerId,
     DateTime? lastInteraction,
   }) {
     return ContactItem(
@@ -50,6 +56,7 @@ class ContactItem {
       notes: notes ?? this.notes,
       isFromDevice: isFromDevice ?? this.isFromDevice,
       isFromSoko: isFromSoko ?? this.isFromSoko,
+      linkedCustomerId: linkedCustomerId ?? this.linkedCustomerId,
       lastInteraction: lastInteraction ?? this.lastInteraction,
     );
   }
@@ -130,13 +137,20 @@ class ContactsController extends StateNotifier<ContactsState> {
 
       // 1. Fetch from Device if permitted
       if (hasPermission) {
+        // Import device contacts into local DB (offline-first) then render from DB.
         final deviceContacts = await FlutterContacts.getContacts(withProperties: true);
-        items.addAll(deviceContacts.map((c) => ContactItem(
-          id: c.id,
+        try {
+          await _syncService.importDeviceContacts(deviceContacts);
+        } catch (_) {}
+
+        final cached = await _db.getDeviceContacts();
+        items.addAll(cached.map((c) => ContactItem(
+          id: c.deviceId,
           name: c.displayName,
-          phone: c.phones.isNotEmpty ? c.phones.first.number : null,
-          email: c.emails.isNotEmpty ? c.emails.first.address : null,
+          phone: c.primaryPhoneE164,
+          email: c.primaryEmail,
           isFromDevice: true,
+          linkedCustomerId: c.linkedCustomerId,
         )));
         try {
           // Sync device contacts to backend in background
@@ -300,6 +314,101 @@ class ContactsController extends StateNotifier<ContactsState> {
     }
   }
 
+  Future<String?> createCustomerFromDeviceContact(
+    ContactItem contact, {
+    bool shareWithTeam = true,
+  }) async {
+    if (!contact.isFromDevice) return null;
+    final name = contact.name.trim();
+    if (name.isEmpty) return null;
+
+    final customerId = const Uuid().v4();
+    final now = DateTime.now().toUtc();
+    final phone = contact.phone?.trim().isEmpty ?? true ? null : contact.phone!.trim();
+    final email = contact.email?.trim().isEmpty ?? true ? null : contact.email!.trim();
+
+    await _db.upsertCustomer(
+      CustomersCompanion.insert(
+        id: drift.Value(customerId),
+        name: name,
+        phone: phone == null ? const drift.Value.absent() : drift.Value(phone),
+        email: email == null ? const drift.Value.absent() : drift.Value(email),
+        synced: const drift.Value(false),
+        updatedAt: drift.Value(now),
+      ),
+    );
+
+    // Try immediate sync; fall back to outbox for offline.
+    try {
+      final response = await _api.pushCustomer({
+        'display_name': name,
+        'phones': phone != null ? [phone] : [],
+        'emails': email != null ? [email] : [],
+        'shared_with_business': shareWithTeam,
+        'source': 'pos_terminal',
+      }, idempotencyKey: customerId);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data =
+            response.data is Map ? Map<String, dynamic>.from(response.data as Map) : null;
+        final remoteId = data?['contact_id']?.toString();
+        final remoteUpdatedAt =
+            DateTime.tryParse(data?['updated_at']?.toString() ?? '')?.toUtc();
+        await _db.upsertCustomer(
+          CustomersCompanion.insert(
+            id: drift.Value(customerId),
+            remoteId: remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
+            name: name,
+            phone: phone == null ? const drift.Value.absent() : drift.Value(phone),
+            email: email == null ? const drift.Value.absent() : drift.Value(email),
+            synced: const drift.Value(true),
+            updatedAt: drift.Value(remoteUpdatedAt ?? now),
+          ),
+        );
+      }
+    } catch (_) {
+      await _syncService.enqueue('customer_push', {
+        'idempotency_key': customerId,
+        'customer_id': customerId,
+        'display_name': name,
+        'phones': phone != null ? [phone] : [],
+        'emails': email != null ? [email] : [],
+        'shared_with_business': shareWithTeam,
+        'source': 'pos_terminal',
+      });
+    }
+
+    await _db.linkDeviceContactToCustomer(deviceId: contact.id, customerId: customerId);
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'contact_linked_to_customer',
+          props: {'method': 'create', 'customer_id': customerId},
+        ),
+      );
+    }
+    await refresh();
+    return customerId;
+  }
+
+  Future<void> linkDeviceContact({
+    required String deviceId,
+    required String customerId,
+  }) async {
+    await _db.linkDeviceContactToCustomer(deviceId: deviceId, customerId: customerId);
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'contact_linked_to_customer',
+          props: {'method': 'manual', 'customer_id': customerId},
+        ),
+      );
+    }
+    await refresh();
+  }
+
   /// Delete a contact - removes locally and syncs deletion to backend
   Future<bool> deleteContact(String id) async {
     try {
@@ -366,6 +475,7 @@ class ContactsController extends StateNotifier<ContactsState> {
       email: email,
       isFromDevice: a.isFromDevice || b.isFromDevice,
       isFromSoko: a.isFromSoko || b.isFromSoko,
+      linkedCustomerId: a.linkedCustomerId ?? b.linkedCustomerId,
     );
   }
 

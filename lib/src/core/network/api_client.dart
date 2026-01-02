@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../config/app_config.dart';
@@ -29,7 +30,16 @@ class ApiClient {
           if (posToken != null && posToken.isNotEmpty) {
             options.headers['X-POS-Session'] = posToken;
           }
+          _logRequest(options);
           return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          _logResponse(response);
+          return handler.next(response);
+        },
+        onError: (error, handler) {
+          _logError(error);
+          return handler.next(error);
         },
       ),
     );
@@ -124,5 +134,53 @@ class ApiClient {
       return trimmed.substring(1);
     }
     return trimmed;
+  }
+
+  void _logRequest(RequestOptions options) {
+    debugPrint('[HTTP] -> ${options.method} ${options.uri}');
+    if (options.queryParameters.isNotEmpty) {
+      debugPrint('[HTTP]    query: ${_redact(options.queryParameters)}');
+    }
+    if (options.data != null) {
+      debugPrint('[HTTP]    data: ${_redact(options.data)}');
+    }
+  }
+
+  void _logResponse(Response<dynamic> response) {
+    debugPrint('[HTTP] <- ${response.statusCode} ${response.requestOptions.uri}');
+    if (response.data != null) {
+      debugPrint('[HTTP]    data: ${_redact(response.data)}');
+    }
+  }
+
+  void _logError(DioException error) {
+    debugPrint('[HTTP] !! ${error.requestOptions.uri} ${error.message}');
+    final response = error.response;
+    if (response?.data != null) {
+      debugPrint('[HTTP]    data: ${_redact(response?.data)}');
+    }
+  }
+
+  dynamic _redact(dynamic data) {
+    if (data is Map) {
+      final result = <String, dynamic>{};
+      data.forEach((key, value) {
+        final normalized = key.toString().toLowerCase();
+        if (normalized.contains('password') ||
+            normalized.contains('pin') ||
+            normalized.contains('token') ||
+            normalized.contains('authorization') ||
+            normalized.contains('otp')) {
+          result[key.toString()] = '***';
+        } else {
+          result[key.toString()] = value;
+        }
+      });
+      return result;
+    }
+    if (data is List) {
+      return data.map(_redact).toList();
+    }
+    return data;
   }
 }

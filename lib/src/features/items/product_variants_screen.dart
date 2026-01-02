@@ -55,28 +55,26 @@ class ProductVariantsScreen extends ConsumerWidget {
                       onAdd: () => _addVariant(context, ref, item, stocks),
                     )
                   else
-                    ...stocks
-                        .map(
-                          (s) => _VariantTile(
-                            stock: s,
-                            onEdit: () => _editVariant(
-                              context,
-                              ref,
-                              item,
-                              stocks,
-                              s,
-                            ),
-                            onArchive: s.variant.trim().isEmpty
-                                ? null
-                                : () => _archiveVariant(
-                                      context,
-                                      ref,
-                                      item,
-                                      s,
-                                    ),
-                          ),
-                        )
-                        .toList(),
+                    ...stocks.map(
+                      (s) => _VariantTile(
+                        stock: s,
+                        onEdit: () => _editVariant(
+                          context,
+                          ref,
+                          item,
+                          stocks,
+                          s,
+                        ),
+                        onArchive: s.variant.trim().isEmpty
+                            ? null
+                            : () => _archiveVariant(
+                                  context,
+                                  ref,
+                                  item,
+                                  s,
+                                ),
+                      ),
+                    ),
                   const SizedBox(height: DesignTokens.spaceXl),
                 ],
               );
@@ -281,6 +279,7 @@ class ProductVariantsScreen extends ConsumerWidget {
         ),
       );
       if (saved != true) return;
+      if (!context.mounted) return;
 
       final variant = variantCtrl.text.trim();
       if (variant.isEmpty) {
@@ -321,6 +320,7 @@ class ProductVariantsScreen extends ConsumerWidget {
         final stockMatches = await (db.select(db.itemStocks)
               ..where((t) => t.sku.equals(sku)))
             .get();
+        if (!context.mounted) return;
         final conflictStock = stockMatches.any(
           (s) => !(s.itemId == itemId && s.variant == variant),
         );
@@ -331,6 +331,7 @@ class ProductVariantsScreen extends ConsumerWidget {
 
         final itemMatches =
             await (db.select(db.items)..where((t) => t.sku.equals(sku))).get();
+        if (!context.mounted) return;
         final conflictItem = itemMatches.any((i) => i.id != itemId);
         if (conflictItem) {
           _toast(context, 'SKU is already used by another product.');

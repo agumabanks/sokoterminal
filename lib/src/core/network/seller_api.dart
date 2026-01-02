@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../config/app_config.dart';
@@ -404,7 +405,19 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> updateShopInfo(Map<String, dynamic> payload) {
-    return client.post('/v2/seller/shop-update', data: payload);
+    return _updateShopInfoWithFallback(payload);
+  }
+
+  Future<Response<dynamic>> _updateShopInfoWithFallback(Map<String, dynamic> payload) async {
+    try {
+      return await client.post('/v2/seller/shop-update', data: payload);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 404 || status == 405) {
+        return client.post('/v2/seller/shop/update', data: payload);
+      }
+      rethrow;
+    }
   }
 
   Future<Response<dynamic>> fetchSellerProfile() {
@@ -427,6 +440,26 @@ class SellerApi {
   // POS configuration (printer width)
   Future<Response<dynamic>> updatePosConfig(Map<String, dynamic> payload) {
     return client.post('/v2/seller/pos/configuration/update', data: payload);
+  }
+
+  // POS business profile (outlet + payment settings)
+  Future<Response<dynamic>> fetchPosBusinessProfile() {
+    return client.get('/v2/seller/pos/business/profile');
+  }
+
+  Future<Response<dynamic>> updatePosBusinessProfile(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.patch(
+      '/v2/seller/pos/business/profile',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> fetchPosOutlets() {
+    return client.get('/v2/seller/pos/outlets');
   }
 
   // Verification form
@@ -491,6 +524,24 @@ class SellerApi {
   }) {
     return client.post(
       '/v2/seller/pos/audit-logs',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // POS Expenses
+  Future<Response<dynamic>> fetchExpenses({DateTime? since}) {
+    return client.get('/v2/seller/pos/expenses', query: {
+      if (since != null) 'since': since.toUtc().toIso8601String(),
+    });
+  }
+
+  Future<Response<dynamic>> pushExpense(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/expenses',
       data: payload,
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
@@ -612,5 +663,231 @@ class SellerApi {
       'receipt_templates': receiptTemplates,
       'quotation_templates': quotationTemplates,
     });
+  }
+
+  // Server Exports (PR14)
+  Future<Response<dynamic>> requestExport({
+    required String type,
+    int? outletId,
+  }) {
+    return client.post('/v2/seller/pos/exports', data: {
+      'type': type,
+      if (outletId != null) 'outlet_id': outletId,
+    });
+  }
+
+  // Support Bundles (PR15)
+  Future<Response<dynamic>> uploadSupportBundle({
+    required Map<String, dynamic> metadata,
+    String? fileUrl,
+  }) {
+    return client.post('/v2/seller/pos/support/bundles', data: {
+      'metadata': metadata,
+      if (fileUrl != null) 'file_url': fileUrl,
+    });
+  }
+
+  // POS Shifts
+  Future<Response<dynamic>> fetchShifts({DateTime? since}) {
+    return client.get('/v2/seller/pos/shifts', query: {
+      if (since != null) 'since': since.toUtc().toIso8601String(),
+    });
+  }
+
+  Future<Response<dynamic>> pushShift(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/shifts',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> closeShift(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/shifts/close',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // POS Settings
+  Future<Response<dynamic>> fetchSettings() {
+    return client.get('/v2/seller/pos/settings');
+  }
+
+  Future<Response<dynamic>> pushSetting(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/settings',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> batchPushSettings(
+    List<Map<String, dynamic>> settings, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/settings/batch',
+      data: {'settings': settings},
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // Staff Phone Login (for multi-device access)
+  Future<Response<dynamic>> staffLogin({
+    required String phone,
+    required String pin,
+  }) {
+    return client.post('/v2/seller/pos/staff/login', data: {
+      'phone': phone,
+      'pin': pin,
+    });
+  }
+
+  Future<Response<dynamic>> staffMe() {
+    return client.get('/v2/seller/pos/staff/me');
+  }
+
+  // Customer Packages & Redemptions
+  Future<Response<dynamic>> pushPackagePurchase(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/customer-packages',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> pushPackageRedemption(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/package-redemptions',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  /// Register a new seller with shop
+  Future<Response<dynamic>> registerSeller({
+    required String name,
+    String? email,
+    required String phone,
+    required String pin,
+    required String shopName,
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? category,
+    double? deliveryRadiusKm,
+  }) {
+    // Use the public Dio instance (no auth token required)
+    final publicDio = Dio(BaseOptions(
+      baseUrl: config.apiBaseUrl,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    ));
+    publicDio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          debugPrint('[HTTP:public] -> ${options.method} ${options.uri}');
+          if (options.data != null) {
+            debugPrint('[HTTP:public]    data: ${_redactSensitive(options.data)}');
+          }
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          debugPrint('[HTTP:public] <- ${response.statusCode} ${response.requestOptions.uri}');
+          if (response.data != null) {
+            debugPrint('[HTTP:public]    data: ${_redactSensitive(response.data)}');
+          }
+          return handler.next(response);
+        },
+        onError: (error, handler) {
+          debugPrint('[HTTP:public] !! ${error.requestOptions.uri} ${error.message}');
+          if (error.response?.data != null) {
+            debugPrint('[HTTP:public]    data: ${_redactSensitive(error.response?.data)}');
+          }
+          return handler.next(error);
+        },
+      ),
+    );
+
+    final payload = <String, dynamic>{
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'pin': pin,
+      'shop_name': shopName,
+      if (address != null && address.isNotEmpty) 'address': address,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (category != null) 'category': category,
+      if (deliveryRadiusKm != null) 'delivery_radius_km': deliveryRadiusKm,
+    };
+
+    Future<Response<dynamic>> send(Map<String, dynamic> body) {
+      return publicDio.post('/v2/seller/register', data: body);
+    }
+
+    return send(payload).catchError((error) async {
+      if (error is DioException) {
+        final msg = _extractErrorMessage(error.response?.data);
+        if (msg.contains("Unknown column 'latitude'") || msg.contains("Unknown column 'longitude'")) {
+          final retry = Map<String, dynamic>.from(payload)
+            ..remove('latitude')
+            ..remove('longitude');
+          debugPrint('[HTTP:public] retry register without coordinates');
+          return send(retry);
+        }
+      }
+      throw error;
+    });
+  }
+
+  static dynamic _redactSensitive(dynamic data) {
+    if (data is Map) {
+      final result = <String, dynamic>{};
+      data.forEach((key, value) {
+        final normalized = key.toString().toLowerCase();
+        if (normalized.contains('password') ||
+            normalized.contains('pin') ||
+            normalized.contains('token') ||
+            normalized.contains('authorization') ||
+            normalized.contains('otp')) {
+          result[key.toString()] = '***';
+        } else {
+          result[key.toString()] = value;
+        }
+      });
+      return result;
+    }
+    if (data is List) {
+      return data.map(_redactSensitive).toList();
+    }
+    return data;
+  }
+
+  static String _extractErrorMessage(dynamic data) {
+    if (data is Map) {
+      final message = data['error'] ?? data['message'] ?? data['msg'];
+      if (message != null) return message.toString();
+    }
+    return '';
   }
 }

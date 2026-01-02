@@ -1,11 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/sync/sync_service.dart';
+import '../../core/telemetry/telemetry.dart';
+import '../../core/app_providers.dart';
+import '../../core/db/app_database.dart';
 import 'contacts_controller.dart';
 import 'keypad_screen.dart';
+
+final deviceContactsOptInProvider = FutureProvider<bool>((ref) async {
+  return ref.watch(syncServiceProvider).isDeviceContactsOptedIn();
+});
 
 /// WhatsApp-inspired Contacts Screen — Premium, dark, minimal.
 /// Following Steve Jobs standard: Maximum impact, minimum complexity.
@@ -48,6 +58,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(contactsControllerProvider);
     final controller = ref.read(contactsControllerProvider.notifier);
+    final optInAsync = ref.watch(deviceContactsOptInProvider);
 
     return Scaffold(
       backgroundColor: _bgBlack,
@@ -56,6 +67,25 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         children: [
           // Quick action buttons row
           _buildQuickActions(),
+
+          // Contacts sync toggle (privacy-safe)
+          optInAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (enabled) => _SyncBanner(
+              enabled: enabled,
+              onChanged: (next) async {
+                await ref.read(syncServiceProvider).setDeviceContactsOptIn(next);
+                ref.invalidate(deviceContactsOptInProvider);
+                final telemetry = Telemetry.instance;
+                if (telemetry != null) {
+                  unawaited(telemetry.event('contacts_opt_in_changed', props: {'enabled': next}));
+                }
+                // Refresh immediately to import + (if enabled) sync.
+                await controller.refresh();
+              },
+            ),
+          ),
 
           // Recent contacts section with header
           if (state.filteredContacts.isNotEmpty) _buildRecentSection(state),
@@ -360,6 +390,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           itemCount: state.filteredContacts.length,
           itemBuilder: (context, index) {
             final contact = state.filteredContacts[index];
+            final canDelete =
+                contact.isFromSoko && contact.id.startsWith('soko_') && !contact.isFromDevice;
+            final tile = _ContactListTile(
+              contact: contact,
+              onTap: () => _showContactDetails(context, contact),
+            );
+            if (!canDelete) return tile;
             return Dismissible(
               key: Key(contact.id),
               direction: DismissDirection.endToStart,
@@ -372,10 +409,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               ),
               confirmDismiss: (direction) => _confirmDelete(context, contact),
               onDismissed: (direction) => controller.deleteContact(contact.id),
-              child: _ContactListTile(
-                contact: contact,
-                onTap: () => _showContactDetails(context, contact),
-              ),
+              child: tile,
             );
           },
         ),
@@ -411,6 +445,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
 
   void _showContactDetails(BuildContext context, ContactItem contact) {
     HapticFeedback.selectionClick();
+    final controller = ref.read(contactsControllerProvider.notifier);
     showModalBottomSheet(
       context: context,
       backgroundColor: _cardBg,
@@ -503,8 +538,119 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 ],
               ),
               const SizedBox(height: 12),
+
+              if (contact.isFromDevice && !contact.isFromSoko) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F2C34),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Soko CRM',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Save this contact as a customer so you can attach sales, send receipts, and track history.',
+                        style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final id = await controller.createCustomerFromDeviceContact(contact);
+                          if (!context.mounted) return;
+                          if (id != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Saved to Soko CRM')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.person_add_alt_1_outlined),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _whatsappGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        label: const Text('Save as customer'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final picked = await _pickExistingCustomer(context);
+                          if (picked == null) return;
+                          await controller.linkDeviceContact(
+                            deviceId: contact.id,
+                            customerId: picked.id,
+                          );
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Linked to customer')),
+                          );
+                        },
+                        icon: const Icon(Icons.link),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.grey.shade700),
+                        ),
+                        label: const Text('Link to existing customer'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<Customer?> _pickExistingCustomer(BuildContext context) async {
+    final db = ref.read(appDatabaseProvider);
+    final customers = await db.select(db.customers).get();
+    customers.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    if (!context.mounted) return null;
+    if (customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No customers found to link')),
+      );
+      return null;
+    }
+
+    return showModalBottomSheet<Customer?>(
+      context: context,
+      backgroundColor: _cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: customers.length,
+          separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white12),
+          itemBuilder: (context, index) {
+            final c = customers[index];
+            return ListTile(
+              title: Text(c.name, style: const TextStyle(color: Colors.white)),
+              subtitle: Text(
+                c.phone ?? c.email ?? '',
+                style: TextStyle(color: Colors.grey.shade400),
+              ),
+              onTap: () => Navigator.of(context).pop(c),
+            );
+          },
         ),
       ),
     );
@@ -687,6 +833,62 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
 // ============================================================================
 // WIDGETS
 // ============================================================================
+
+class _SyncBanner extends StatelessWidget {
+  const _SyncBanner({required this.enabled, required this.onChanged});
+
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF0B141A),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111B21),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sync, color: Color(0xFF00A884)),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sync device contacts',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Imports contacts locally for matching + WhatsApp, then syncs to Soko CRM during normal sync.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: enabled,
+              onChanged: onChanged,
+              activeThumbColor: Color(0xFF00A884),
+              activeTrackColor: Color(0xFF00A884),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Quick action button (Call, Schedule, Keypad)
 class _QuickActionButton extends StatelessWidget {

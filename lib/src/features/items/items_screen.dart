@@ -12,6 +12,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import 'add_product_screen.dart';
+import 'product_preview_screen.dart';
 
 /// Items Screen — Product catalog management.
 /// 
@@ -109,6 +110,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     return _ItemCard(
                       item: item,
                       onTap: () => unawaited(_showItemEditor(context, item)),
+                      onPreview: () => unawaited(_showItemPreview(context, item)),
                       onStockTap: () => unawaited(_showStockAdjust(context, item)),
                       onDelete: () => _confirmDelete(context, item),
                       onToggleOnline: (v) => _toggleOnline(item, v),
@@ -130,7 +132,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   }) async {
     final action = existingItem == null ? 'create products' : 'edit products';
     final ok = await requireManagerPin(context, ref, reason: action);
-    if (!ok || !mounted) return;
+    if (!ok || !context.mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -138,6 +140,15 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           existingItem: existingItem,
           startPublishOnline: startPublishOnline,
         ),
+      ),
+    );
+  }
+
+  Future<void> _showItemPreview(BuildContext context, Item item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductPreviewScreen(itemId: item.id),
       ),
     );
   }
@@ -532,6 +543,7 @@ class _ItemCard extends StatelessWidget {
   const _ItemCard({
     required this.item,
     required this.onTap,
+    required this.onPreview,
     required this.onStockTap,
     required this.onDelete,
     required this.onToggleOnline,
@@ -539,13 +551,15 @@ class _ItemCard extends StatelessWidget {
 
   final Item item;
   final VoidCallback onTap;
+  final VoidCallback onPreview;
   final VoidCallback onStockTap;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleOnline;
 
   @override
   Widget build(BuildContext context) {
-    final lowStock = item.stockQty < 5;
+    final threshold = item.lowStockWarning ?? 5;
+    final lowStock = item.stockEnabled && item.stockQty <= threshold;
     
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -667,6 +681,9 @@ class _ItemCard extends StatelessWidget {
                     icon: const Icon(Icons.more_horiz),
                     onSelected: (action) {
                       switch (action) {
+                        case _ItemMenuAction.preview:
+                          onPreview();
+                          break;
                         case _ItemMenuAction.edit:
                           onTap();
                           break;
@@ -679,6 +696,11 @@ class _ItemCard extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _ItemMenuAction.preview,
+                        child: Text('Preview'),
+                      ),
+                      PopupMenuDivider(),
                       PopupMenuItem(
                         value: _ItemMenuAction.edit,
                         child: Text('Edit'),
@@ -704,7 +726,7 @@ class _ItemCard extends StatelessWidget {
   }
 }
 
-enum _ItemMenuAction { edit, adjustStock, delete }
+enum _ItemMenuAction { preview, edit, adjustStock, delete }
 
 class _ReasonChip extends StatelessWidget {
   const _ReasonChip({

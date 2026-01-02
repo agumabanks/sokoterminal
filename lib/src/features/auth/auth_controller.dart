@@ -109,41 +109,115 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<Map<String, dynamic>> checkUserExistence(String phone) async {
+    final normalized = normalizeUgPhone(phone);
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/v2/seller/pos/auth/check',
+        data: {'phone': normalized},
+      );
+      return response.data ?? {'exists': false};
+    } catch (e) {
+      return {'exists': false, 'error': e.toString()};
+    }
+  }
+
+  Future<void> register({
+    required String name,
+    required String phone,
+    required String pin,
+  }) async {
+    state = state.copyWith(status: AuthStatus.loading, message: null);
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/v2/auth/signup',
+        data: {
+          'name': name.trim(),
+          'email_or_phone': phone,
+          'register_by': 'phone',
+          'password': pin,
+          'password_confirmation': pin,
+          'user_type': 'seller',
+          'registered_via': 'terminal',
+        },
+      );
+      final data = response.data ?? {};
+      final token = data['access_token'] ?? data['token'] ?? '';
+      if (token.isEmpty) {
+        // Check if registration succeeded but needs verification
+        final result = data['result'];
+        final message = data['message'];
+        if (result == true || result == 'true') {
+          // Account created, may need OTP verification
+          state = AuthState(
+            status: AuthStatus.unauthenticated,
+            message: message?.toString() ?? 'Account created! Please verify your phone.',
+          );
+          return;
+        }
+        throw Exception(message ?? 'Registration failed');
+      }
+      await _storage.writeAccessToken(token);
+      await _storage.writeLastLoginPhone(phone);
+      state = AuthState(status: AuthStatus.authenticated, token: token);
+      _scheduleTokenRefresh();
+      unawaited(ref.read(syncServiceProvider).syncNow());
+    } on DioException catch (e) {
+      final errorData = e.response?.data;
+      String errorMsg = 'Registration failed';
+      if (errorData is Map) {
+        final message = errorData['message'];
+        if (message is List) {
+          errorMsg = message.join('\n');
+        } else if (message != null) {
+          errorMsg = message.toString();
+        }
+      }
+      state = AuthState(status: AuthStatus.error, message: errorMsg);
+    } catch (e) {
+      state = AuthState(status: AuthStatus.error, message: e.toString());
+    }
+  }
+
   Future<void> loginWithQuickPin({
     required String phone,
     required String pin,
   }) async {
+    state = state.copyWith(status: AuthStatus.loading, message: null);
     final normalized = normalizeUgPhone(phone);
-    final savedPhone = await _storage.readSellerQuickPhone();
-    final savedPin = await _storage.readSellerQuickPin();
-    final savedPassword = await _storage.readSellerQuickPassword();
-
-    if (savedPhone == null ||
-        savedPin == null ||
-        savedPassword == null ||
-        savedPhone.isEmpty ||
-        savedPassword.isEmpty) {
-      state = const AuthState(
-        status: AuthStatus.error,
-        message: 'PIN login not set up on this device.',
+    
+    try {
+      // Try backend verification first
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/v2/seller/pos/pin/verify',
+        data: {'phone': normalized, 'pin': pin},
       );
+      
+      final data = response.data ?? {};
+      if (data['result'] == true && data['access_token'] != null) {
+        final token = data['access_token'];
+        await _storage.writeAccessToken(token);
+        await _storage.writeLastLoginPhone(normalized);
+        state = AuthState(status: AuthStatus.authenticated, token: token);
+        _scheduleTokenRefresh();
+        unawaited(ref.read(syncServiceProvider).syncNow());
+        return;
+      }
+    } catch (e) {
+      // Fallback to local check if backend fails (e.g. offline) or returns specific error?
+      // For now, let's stick to strict backend verification as requested "saved to backend too"
+      
+      // However, if we want to support offline PIN login later, we'd check _storage here.
+      // Given the requirement "pin saved to backend... user to do more with less clicks",
+      // backend verification is key for security and cross-device.
+      
+      String msg = 'PIN login failed';
+      if (e is DioException) {
+        msg = e.response?.data?['message']?.toString() ?? msg;
+      }
+      state = AuthState(status: AuthStatus.error, message: msg);
       return;
     }
-
-    if (normalizeUgPhone(savedPhone) != normalized) {
-      state = const AuthState(
-        status: AuthStatus.error,
-        message: 'PIN is set for a different phone number.',
-      );
-      return;
-    }
-
-    if (savedPin != pin.trim()) {
-      state = const AuthState(status: AuthStatus.error, message: 'Incorrect PIN');
-      return;
-    }
-
-    await login(emailOrPhone: normalized, password: savedPassword);
   }
 
   Future<void> enableQuickPin({
@@ -153,13 +227,30 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     final normalized = normalizeUgPhone(phone);
     final p = pin.trim();
-    if (normalized.isEmpty || password.trim().isEmpty || p.isEmpty) return;
-    await Future.wait([
-      _storage.writeSellerQuickPhone(normalized),
-      _storage.writeSellerQuickPassword(password.trim()),
-      _storage.writeSellerQuickPin(p),
-      _storage.writeLastLoginPhone(normalized),
-    ]);
+    // Enforce 6-digit PIN
+    if (normalized.isEmpty || password.trim().isEmpty || p.length != 6) {
+      return;
+    }
+
+    try {
+      // Store PIN on backend
+      await _apiClient.post(
+        '/v2/seller/pos/pin',
+        data: {'pin': p, 'password': password},
+      );
+
+      // Also cache locally for offline/fallback scenarios (optional, but good for UX)
+      await Future.wait([
+        _storage.writeSellerQuickPhone(normalized),
+        _storage.writeSellerQuickPassword(password.trim()),
+        _storage.writeSellerQuickPin(p),
+        _storage.writeLastLoginPhone(normalized),
+      ]);
+    } catch (e) {
+      // If backend fails, we might still want to fail or handle gracefullly
+      // For now, let's propagate error or handle it in UI
+      rethrow;
+    }
   }
 
   Future<String?> getLastLoginPhone() => _storage.readLastLoginPhone();
@@ -167,10 +258,19 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     _refreshTimer?.cancel();
-    await _storage.deleteAccessToken();
-    await _storage.deletePosSessionToken();
-    await _storage.deletePosSessionMeta();
-    await ref.read(sharedPreferencesProvider).remove(posStaffInitializedPrefKey);
+    
+    // Clear all business data from the local database
+    // This ensures complete data isolation between different sellers on the same device
+    final db = ref.read(appDatabaseProvider);
+    await db.clearAllData();
+    
+    // Clear all secure storage (tokens, credentials, POS sessions, quick login data)
+    await _storage.clearAll();
+    
+    // Clear SharedPreferences (POS staff initialization flag and other prefs)
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs.clear();
+    
     state = AuthState.unauthenticated;
   }
 

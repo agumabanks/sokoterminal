@@ -28,6 +28,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   final List<QuotationLineItem> _lines = [];
   final _notesCtrl = TextEditingController();
   int _validityDays = 7;
+  bool _saving = false;
 
   double get _total => _lines.fold(0, (sum, line) => sum + (line.unitPrice * line.quantity));
 
@@ -120,8 +121,9 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                   ),
                   const SizedBox(height: DesignTokens.spaceMd),
                   AppButton(
-                    label: 'Save Quotation',
-                    onPressed: _selectedCustomer == null || _lines.isEmpty ? null : _saveQuotation,
+                    label: _saving ? 'Saving…' : 'Save Quotation',
+                    isLoading: _saving,
+                    onPressed: _saving || _selectedCustomer == null || _lines.isEmpty ? null : _saveQuotation,
                   ),
                 ],
               ),
@@ -218,60 +220,68 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   Future<void> _saveQuotation() async {
     if (_selectedCustomer == null) return;
 
-    final db = ref.read(appDatabaseProvider);
-    final sync = ref.read(syncServiceProvider);
-    
-    final quotationId = const Uuid().v4();
-    final number = 'QT-${DateFormat('yyyy').format(DateTime.now())}-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
-    final expiry = DateTime.now().add(Duration(days: _validityDays));
+    setState(() => _saving = true);
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final sync = ref.read(syncServiceProvider);
+      
+      final quotationId = const Uuid().v4();
+      final number = 'QT-${DateFormat('yyyy').format(DateTime.now())}-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+      final expiry = DateTime.now().add(Duration(days: _validityDays));
 
-    await db.saveQuotation(
-      header: QuotationsCompanion.insert(
-        id: Value(quotationId), // Wrapped in Value
-        customerId: Value(_selectedCustomer!.id),
-        number: number,
-        date: Value(DateTime.now().toUtc()), // Wrapped in Value
-        validUntil: Value(expiry.toUtc()),
-        totalAmount: _total,
-        status: const Value('draft'), // draft, sent, accepted
-        notes: Value(_notesCtrl.text),
-        synced: const Value(false),
-      ),
-      lines: _lines.map((l) => QuotationLinesCompanion.insert(
-        id: Value(const Uuid().v4()), // Wrapped in Value
-        quotationId: quotationId, // Not wrapped (non-nullable Ref often allows raw value in insert, but let's be safe?) - Actually refs usually take Value if checking logic is strict, but References usually allow raw. The ERROR was on id, customerId, date? Let's verify.
-        description: l.description,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        total: l.quantity * l.unitPrice,
-      )).toList(),
-    );
+      await db.saveQuotation(
+        header: QuotationsCompanion.insert(
+          id: Value(quotationId),
+          customerId: Value(_selectedCustomer!.id),
+          number: number,
+          date: Value(DateTime.now().toUtc()),
+          validUntil: Value(expiry.toUtc()),
+          totalAmount: _total,
+          status: const Value('draft'),
+          notes: Value(_notesCtrl.text),
+          synced: const Value(false),
+        ),
+        lines: _lines.map((l) => QuotationLinesCompanion.insert(
+          id: Value(const Uuid().v4()),
+          quotationId: quotationId,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          total: l.quantity * l.unitPrice,
+        )).toList(),
+      );
 
-    // Enqueue sync - assuming sync keys exist
-    final customerId = _selectedCustomer!.remoteId ?? _selectedCustomer!.id;
-    final notes = _notesCtrl.text.trim();
-    await sync.enqueue('quotation_push', {
-      'idempotency_key': quotationId,
-      'id': quotationId,
-      'quotation_number': number,
-      'customer_id': customerId,
-      'validity_days': _validityDays,
-      'total': _total,
-      if (notes.isNotEmpty) 'notes': notes,
-      'lines': _lines
-          .map((l) => {
-                'title': l.description,
-                'price': l.unitPrice,
-                'quantity': l.quantity,
-                'total': l.quantity * l.unitPrice,
-              })
-          .toList(),
-    });
-    unawaited(sync.syncNow());
+      final customerId = _selectedCustomer!.remoteId ?? _selectedCustomer!.id;
+      final notes = _notesCtrl.text.trim();
+      await sync.enqueue('quotation_push', {
+        'idempotency_key': quotationId,
+        'id': quotationId,
+        'quotation_number': number,
+        'customer_id': customerId,
+        'validity_days': _validityDays,
+        'total': _total,
+        if (notes.isNotEmpty) 'notes': notes,
+        'lines': _lines
+            .map((l) => {
+                  'title': l.description,
+                  'price': l.unitPrice,
+                  'quantity': l.quantity,
+                  'total': l.quantity * l.unitPrice,
+                })
+            .toList(),
+      });
+      unawaited(sync.syncNow());
 
-    if (!mounted) return;
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quotation saved')));
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quotation saved')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save quotation: $e'), backgroundColor: DesignTokens.error),
+      );
+    }
   }
 }
 

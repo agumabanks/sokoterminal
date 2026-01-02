@@ -48,8 +48,16 @@ class InvoiceService {
     final footerText = _cleanText(template?.footerText);
 
     final isRefund = entry.type == 'refund';
-    final title = isRefund ? 'CREDIT NOTE' : 'INVOICE';
-    final sign = isRefund ? '-' : '';
+    final isVoid = entry.type == 'void';
+    final isReversal = isRefund || isVoid;
+    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final isVoided = isVoid || voidForSale != null;
+    final title = isRefund
+        ? 'CREDIT NOTE'
+        : isVoid
+        ? 'VOID NOTE'
+        : 'INVOICE';
+    final sign = isReversal ? '-' : '';
 
     final receiptNo = _formatReceiptNumber(entry.receiptNumber);
     final dateStr = _dateFormat.format(entry.createdAt.toLocal());
@@ -58,7 +66,8 @@ class InvoiceService {
     final paymentSettings = ShopPaymentSettingsCache.read(prefs);
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
-        !isRefund &&
+        !isReversal &&
+        voidForSale == null &&
         paymentInstructions != null &&
         bundle.payments.any((p) {
           final method = p.method.toLowerCase();
@@ -74,6 +83,47 @@ class InvoiceService {
         build: (context) {
           return [
             _buildHeader(outlet, title: title),
+            if (isVoided) ...[
+              pw.SizedBox(height: 10),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.red, width: 2),
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Text(
+                      'VOIDED',
+                      style: pw.TextStyle(
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.red,
+                        letterSpacing: 2,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                    if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) ...[
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        'Original: ${entry.originalEntryId}',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ],
+                    if (voidForSale != null) ...[
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        'Void entry: ${voidForSale.id}',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             if (headerText != null) ...[
               pw.SizedBox(height: 10),
               pw.Text(
@@ -96,9 +146,11 @@ class InvoiceService {
                       _infoRow('Number', receiptNo),
                       _infoRow('Date', '$dateStr • $timeStr'),
                       _infoRow('Type', entry.type.toUpperCase()),
+                      if (isVoided) _infoRow('Status', 'VOIDED'),
                       if (entry.originalEntryId != null &&
                           entry.originalEntryId!.trim().isNotEmpty)
                         _infoRow('Original', entry.originalEntryId!.trim()),
+                      if (voidForSale != null) _infoRow('Void entry', voidForSale.id),
                     ],
                   ),
                 ),

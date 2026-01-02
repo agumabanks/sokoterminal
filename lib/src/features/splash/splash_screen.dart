@@ -42,6 +42,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   Future<void> _checkAuthAndSync() async {
+    if (!mounted) return;
     final secureStorage = ref.read(secureStorageProvider);
     final token = await secureStorage.readAccessToken();
 
@@ -51,37 +52,61 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     }
 
     // Start background sync pump for already-authenticated sessions.
+    if (!mounted) return;
     final syncService = ref.read(syncServiceProvider);
     syncService.start();
 
-    // POS staff session check (only required when staff is initialized on backend).
-    setState(() => _status = 'Checking staff session…');
-    await ref.read(posSessionProvider.notifier).load();
-    final posSession = ref.read(posSessionProvider);
-
-    final prefs = ref.read(sharedPreferencesProvider);
-    bool staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
-    final connectivity = await Connectivity().checkConnectivity();
-    final online = connectivity.any((r) => r != ConnectivityResult.none);
-    if (online) {
-      setState(() => _status = 'Checking staff setup…');
-      try {
-        final res = await ref.read(sellerApiProvider).fetchStaff();
-        final data = res.data;
-        final listRaw = data is Map
-            ? (data['data'] is List ? data['data'] as List : const [])
-            : (data is List ? data : const []);
-        staffInitialized = listRaw.isNotEmpty;
-        await prefs.setBool(posStaffInitializedPrefKey, staffInitialized);
-      } catch (_) {
-        // Keep last-known value when offline/intermittent.
+    final loginType = await secureStorage.read(key: 'login_type');
+    
+    // If logged in as staff, verify shop_id and skip POS PIN check
+    if (loginType == 'staff') {
+      final shopId = await secureStorage.read(key: 'staff_shop_id');
+      if (shopId == null) {
+        // invalid state
+        if (mounted) context.go('/staff-login');
+        return;
       }
-    }
-
-    if (staffInitialized && !posSession.isActive) {
+      
+      // Staff are already "POS authenticated" via phone+PIN
+      if (mounted) {
+        // Start sync (already started above)
+         // ...
+      }
+    } else {
+      // Owner Logic: Check POS PIN session
+      
+      // POS staff session check (only required when staff is initialized on backend).
       if (!mounted) return;
-      context.go('/pos-login?redirect=/home/checkout');
-      return;
+      setState(() => _status = 'Checking staff session…');
+      await ref.read(posSessionProvider.notifier).load();
+      if (!mounted) return;
+      final posSession = ref.read(posSessionProvider);
+
+      final prefs = ref.read(sharedPreferencesProvider);
+      bool staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
+      final connectivity = await Connectivity().checkConnectivity();
+      final online = connectivity.any((r) => r != ConnectivityResult.none);
+      if (online) {
+        if (!mounted) return;
+        setState(() => _status = 'Checking staff setup…');
+        try {
+          final res = await ref.read(sellerApiProvider).fetchStaff();
+          final data = res.data;
+          final listRaw = data is Map
+              ? (data['data'] is List ? data['data'] as List : const [])
+              : (data is List ? data : const []);
+          staffInitialized = listRaw.isNotEmpty;
+          await prefs.setBool(posStaffInitializedPrefKey, staffInitialized);
+        } catch (_) {
+          // Keep last-known value when offline/intermittent.
+        }
+      }
+
+      if (staffInitialized && !posSession.isActive) {
+        if (!mounted) return;
+        context.go('/pos-login?redirect=/home/checkout');
+        return;
+      }
     }
 
     // Subscribe to status updates
@@ -120,14 +145,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Logo placeholder - using text for now or asset if available
-                  const Text(
-                    'Soko 24',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
+                  // App logo
+                  Image.asset(
+                    'assets/images/app_logo.png',
+                    width: 180,
+                    height: 180,
+                    errorBuilder: (context, error, stackTrace) => const Text(
+                      'Soko 24',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                 ],

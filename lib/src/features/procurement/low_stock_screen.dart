@@ -31,13 +31,18 @@ class LowStockScreen extends ConsumerWidget {
       ),
       body: itemsAsync.when(
         data: (items) {
-          final low = items.where((i) {
+          final alerts = items.where((i) {
+            if (!i.stockEnabled) return false;
             final threshold = i.lowStockWarning ?? 5;
-            return i.stockEnabled && i.stockQty <= threshold;
+            return i.stockQty <= threshold;
           }).toList()
             ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
 
-          if (low.isEmpty) {
+          final outOfStock = alerts.where((i) => i.stockQty <= 0).toList();
+          final lowStock =
+              alerts.where((i) => i.stockQty > 0).toList();
+
+          if (outOfStock.isEmpty && lowStock.isEmpty) {
             return Center(
               child: Padding(
                 padding: DesignTokens.paddingScreen,
@@ -61,25 +66,58 @@ class LowStockScreen extends ConsumerWidget {
 
           return RefreshIndicator(
             onRefresh: () => ref.read(syncServiceProvider).syncNow(),
-            child: ListView.separated(
+            child: ListView(
               padding: DesignTokens.paddingScreen,
-              itemCount: low.length,
-              separatorBuilder: (_, __) => const SizedBox(height: DesignTokens.spaceSm),
-              itemBuilder: (context, index) {
-                final item = low[index];
-                final threshold = item.lowStockWarning ?? 5;
-                final subtitle = 'Stock ${item.stockQty} • Reorder at $threshold';
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: DesignTokens.warning,
-                      child: const Icon(Icons.warning_amber, color: Colors.white),
-                    ),
-                    title: Text(item.name),
-                    subtitle: Text(subtitle),
-                  ),
-                );
-              },
+              children: [
+                if (outOfStock.isNotEmpty) ...[
+                  Text('Out of stock', style: DesignTokens.textBodyBold),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  ...outOfStock.map((item) {
+                    final threshold = item.lowStockWarning ?? 5;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+                      child: Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: DesignTokens.error,
+                            child: const Icon(
+                              Icons.inventory_2_outlined,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(item.name),
+                          subtitle: Text('Out of stock • Reorder at $threshold'),
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: DesignTokens.spaceMd),
+                ],
+                if (lowStock.isNotEmpty) ...[
+                  Text('Low stock', style: DesignTokens.textBodyBold),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  ...lowStock.map((item) {
+                    final threshold = item.lowStockWarning ?? 5;
+                    final subtitle = 'Stock ${item.stockQty} • Reorder at $threshold';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+                      child: Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: DesignTokens.warning,
+                            child: const Icon(
+                              Icons.warning_amber,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(item.name),
+                          subtitle: Text(subtitle),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
             ),
           );
         },
@@ -89,4 +127,3 @@ class LowStockScreen extends ConsumerWidget {
     );
   }
 }
-

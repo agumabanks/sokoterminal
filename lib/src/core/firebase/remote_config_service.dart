@@ -25,6 +25,17 @@ class RemoteConfigService {
       'maintenance_mode': false,
       'max_offline_days': 7,
       'sync_interval_seconds': 30,
+      // Feature flags (GA rollout)
+      'ff_pos_voids': true,
+      'ff_product_variants_editor': true,
+      'ff_print_diagnostics': true,
+      'ff_delivery_radius_settings_v2': true,
+      'ff_unified_inbox': true,
+      'ff_customer_profile': false,
+      'ff_contacts_enrichment': true,
+      'ff_soko_studio': false,
+      'ff_business_setup_wizard': false,
+      'ff_expenses_v1': false,
     });
     
     // Fetch and activate
@@ -51,6 +62,17 @@ class RemoteConfigService {
   
   /// Sync interval in seconds
   int get syncIntervalSeconds => _config.getInt('sync_interval_seconds');
+
+  bool get ffPosVoids => _config.getBool('ff_pos_voids');
+  bool get ffProductVariantsEditor => _config.getBool('ff_product_variants_editor');
+  bool get ffPrintDiagnostics => _config.getBool('ff_print_diagnostics');
+  bool get ffDeliveryRadiusSettingsV2 => _config.getBool('ff_delivery_radius_settings_v2');
+  bool get ffUnifiedInbox => _config.getBool('ff_unified_inbox');
+  bool get ffCustomerProfile => _config.getBool('ff_customer_profile');
+  bool get ffContactsEnrichment => _config.getBool('ff_contacts_enrichment');
+  bool get ffSokoStudio => _config.getBool('ff_soko_studio');
+  bool get ffBusinessSetupWizard => _config.getBool('ff_business_setup_wizard');
+  bool get ffExpensesV1 => _config.getBool('ff_expenses_v1');
   
   /// Force refresh config
   Future<void> refresh() async {

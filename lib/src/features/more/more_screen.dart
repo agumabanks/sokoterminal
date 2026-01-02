@@ -6,6 +6,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../core/sync/sync_service.dart';
 import '../../widgets/action_tile.dart';
 import '../auth/auth_controller.dart';
+import '../../core/firebase/remote_config_service.dart';
 
 /// More Screen — Navigation hub for all seller terminal features.
 /// 
@@ -16,6 +17,7 @@ class MoreScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final remoteConfig = ref.watch(remoteConfigProvider);
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
@@ -61,6 +63,14 @@ class MoreScreen extends ConsumerWidget {
                 iconColor: DesignTokens.info,
                 onTap: () => context.go('/home/more/reports'),
               ),
+              if (remoteConfig.ffExpensesV1)
+                ActionTile(
+                  title: 'Expenses',
+                  subtitle: 'Cashouts & operating costs',
+                  icon: Icons.payments_outlined,
+                  iconColor: DesignTokens.error,
+                  onTap: () => context.go('/home/more/expenses'),
+                ),
               ActionTile(
                 title: 'Customers',
                 subtitle: 'CRM, Phone & WhatsApp',
@@ -110,7 +120,7 @@ class MoreScreen extends ConsumerWidget {
                 title: 'Stock Count',
                 subtitle: 'Stocktake & variances',
                 icon: Icons.fact_check_outlined,
-                iconColor: Colors.deepPurple,
+                iconColor: DesignTokens.info,
                 onTap: () => context.go('/home/more/stocktake'),
               ),
               ActionTile(
@@ -131,7 +141,7 @@ class MoreScreen extends ConsumerWidget {
                 title: 'Quotations',
                 subtitle: 'Manage price quotes',
                 icon: Icons.request_quote_outlined,
-                iconColor: Colors.indigo,
+                iconColor: DesignTokens.brandPrimary,
                 onTap: () => context.go('/home/more/quotations'),
               ),
               ActionTile(
@@ -193,7 +203,7 @@ class MoreScreen extends ConsumerWidget {
                 title: 'Ads & Creatives',
                 subtitle: 'Generate social media posts',
                 icon: Icons.campaign_outlined,
-                iconColor: Colors.purple,
+                iconColor: DesignTokens.brandPrimary,
                 onTap: () => context.go('/home/more/ads'),
               ),
               ActionTile(
@@ -220,6 +230,14 @@ class MoreScreen extends ConsumerWidget {
             title: 'Settings',
             icon: Icons.settings_outlined,
             children: [
+              if (remoteConfig.ffBusinessSetupWizard)
+                ActionTile(
+                  title: 'Business Setup',
+                  subtitle: 'Finish setup checklist',
+                  icon: Icons.checklist_outlined,
+                  iconColor: DesignTokens.brandAccent,
+                  onTap: () => context.go('/home/more/business-setup'),
+                ),
               ActionTile(
                 title: 'Profile',
                 subtitle: 'Account & security',
@@ -266,7 +284,7 @@ class MoreScreen extends ConsumerWidget {
                 title: 'Receipt Templates',
                 subtitle: 'Customize print layout',
                 icon: Icons.receipt_outlined,
-                iconColor: Colors.teal,
+                iconColor: DesignTokens.brandAccent,
                 onTap: () => context.go('/home/more/receipt-templates'),
               ),
             ],

@@ -41,3 +41,34 @@ extension DateExtensions on DateTime {
     return DateFormat('MMM dd').format(this);
   }
 }
+
+/// Strips HTML tags from a string and decodes common HTML entities.
+/// Returns clean plain text.
+String stripHtml(String? html) {
+  if (html == null || html.isEmpty) return '';
+  
+  // Remove HTML tags
+  var result = html.replaceAll(RegExp(r'<[^>]*>'), '');
+  
+  // Decode common HTML entities
+  result = result
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&mdash;', '—')
+      .replaceAll('&ndash;', '–')
+      .replaceAll('&bull;', '•');
+  
+  // Normalize whitespace
+  result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
+  
+  return result;
+}
+
+extension StringHtmlExtensions on String {
+  /// Strips HTML tags and returns plain text
+  String get plainText => stripHtml(this);
+}

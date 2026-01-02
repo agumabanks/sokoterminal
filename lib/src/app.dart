@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
+import 'features/auth/staff_login_screen.dart';
+import 'features/auth/register_screen.dart';
+import 'features/auth/seller_registration_screen.dart';
 import 'features/auth/pos_login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/home/home_shell.dart';
@@ -22,6 +25,7 @@ import 'features/settings/staff_management_screen.dart';
 import 'features/settings/sync_health_screen.dart';
 import 'features/settings/export_screen.dart';
 import 'features/settings/print_queue_screen.dart';
+import 'features/settings/print_diagnostics_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/profile/seller_profile_edit_screen.dart';
 import 'features/profile/shop_info_screen.dart';
@@ -38,11 +42,19 @@ import 'features/delivery/delivery_settings_screen.dart';
 import 'features/quotations/quotations_screen.dart';
 import 'features/settings/receipt_templates_screen.dart';
 import 'features/settings/void_reason_codes_screen.dart';
+import 'features/expenses/expenses_screen.dart';
 import 'features/procurement/suppliers_screen.dart';
 import 'features/procurement/purchase_orders_screen.dart';
 import 'features/procurement/receive_stock_screen.dart';
 import 'features/procurement/stocktake_screen.dart';
 import 'features/procurement/low_stock_screen.dart';
+import 'features/setup/business_setup_wizard_screen.dart';
+import 'features/onboarding/quick_onboarding_screen.dart';
+import 'features/onboarding/shop_basics_screen.dart';
+import 'features/onboarding/business_details_screen.dart';
+import 'features/onboarding/payment_config_screen.dart';
+import 'features/onboarding/onboarding_welcome_screen.dart';
+import 'core/onboarding/onboarding_controller.dart';
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -71,12 +83,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loggedIn = authState.status == AuthStatus.authenticated;
       final onLogin = state.matchedLocation == '/login';
+      final onRegister = state.matchedLocation == '/register';
       final onSplash = state.matchedLocation == '/splash';
+      final onOnboarding = state.matchedLocation.startsWith('/onboarding');
 
       if (onSplash) return null; // Let splash handle logic
+      
+      // Allow onboarding routes when authenticated
+      if (loggedIn && onOnboarding) return null;
 
-      if (!loggedIn && !onLogin) return '/login';
-      if (loggedIn && onLogin) return '/home/checkout';
+      if (!loggedIn && !onLogin && !onRegister) return '/login';
+      if (loggedIn && (onLogin || onRegister)) return '/home/checkout';
       return null;
     },
     routes: [
@@ -97,6 +114,44 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/staff-login',
+        name: 'staff-login',
+        builder: (context, state) => const StaffLoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return SellerRegistrationScreen(initialPhone: extra?['phone']);
+        },
+      ),
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const QuickOnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/shop-basics',
+        name: 'onboarding-shop-basics',
+        builder: (context, state) => const ShopBasicsScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/business-details',
+        name: 'onboarding-business-details',
+        builder: (context, state) => const BusinessDetailsEnhancedScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/payment-config',
+        name: 'onboarding-payment-config',
+        builder: (context, state) => const PaymentConfigScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/welcome',
+        name: 'onboarding-welcome',
+        builder: (context, state) => const OnboardingWelcomeScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -220,6 +275,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ReportsScreen(),
                   ),
                   GoRoute(
+                    path: 'expenses',
+                    name: 'expenses',
+                    builder: (context, state) => const ExpensesScreen(),
+                  ),
+                  GoRoute(
                     path: 'refunds',
                     name: 'refunds',
                     builder: (context, state) => const RefundsScreen(),
@@ -238,6 +298,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'print-queue',
                     name: 'print-queue',
                     builder: (context, state) => const PrintQueueScreen(),
+                  ),
+                  GoRoute(
+                    path: 'print-diagnostics',
+                    name: 'print-diagnostics',
+                    builder: (context, state) => const PrintDiagnosticsScreen(),
                   ),
                   GoRoute(
                     path: 'sync-health',
@@ -309,6 +374,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'void-reason-codes',
                     name: 'void-reason-codes',
                     builder: (context, state) => const VoidReasonCodesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'business-setup',
+                    name: 'business-setup',
+                    builder: (context, state) => const BusinessSetupWizardScreen(),
                   ),
                 ],
               ),

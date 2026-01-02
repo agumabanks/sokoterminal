@@ -158,6 +158,70 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     }
   }
 
+  Future<void> _requestServerExport(String type) async {
+    setState(() => _busy = true);
+    try {
+      final api = ref.read(sellerApiProvider);
+      await api.requestExport(type: type);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export requested ($type). Check email/notifications.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to request export: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendSupportBundle() async {
+    setState(() => _busy = true);
+    try {
+      final api = ref.read(sellerApiProvider);
+      final db = ref.read(appDatabaseProvider);
+      final pending = await db.pendingSyncOps();
+      
+      String? fileUrl;
+      // Upload log if exists
+      final file = await Telemetry.getLogFile();
+      if (await file.exists() && await file.length() > 0) {
+        try {
+           final res = await api.uploadSellerFile(file);
+           if (res.data is Map) {
+             fileUrl = (res.data as Map)['url']?.toString();
+           }
+        } catch (_) {
+          // Ignore upload fail, send metadata anyway
+        }
+      }
+
+      await api.uploadSupportBundle(
+        metadata: {
+          'pending_ops': pending.length,
+          'platform': Platform.operatingSystem,
+          'version': '1.0.0', // TODO: Get real version
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+        fileUrl: fileUrl,
+      );
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Support bundle sent successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send bundle: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -208,6 +272,38 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                   onPressed: _busy ? null : _exportTelemetry,
                   icon: const Icon(Icons.bug_report_outlined),
                   label: const Text('Export diagnostics log'),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                const Divider(),
+                const SizedBox(height: DesignTokens.spaceMd),
+                Text('Server Exports (Online)', style: DesignTokens.textBodyBold),
+                const SizedBox(height: DesignTokens.spaceSm),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
+                      label: const Text('Products'),
+                      onPressed: _busy ? null : () => _requestServerExport('products'),
+                    ),
+                    ActionChip(
+                       avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
+                      label: const Text('Ledger'),
+                       onPressed: _busy ? null : () => _requestServerExport('ledger'),
+                    ),
+                    ActionChip(
+                       avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
+                      label: const Text('Inventory'),
+                       onPressed: _busy ? null : () => _requestServerExport('inventory'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DesignTokens.spaceMd),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _sendSupportBundle,
+                  icon: const Icon(Icons.medical_services_outlined),
+                  label: const Text('Send support bundle'),
                 ),
                 if (_busy) ...[
                   const SizedBox(height: DesignTokens.spaceMd),

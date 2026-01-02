@@ -93,11 +93,27 @@ class Customers extends Table {
   TextColumn get phone => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get note => text().nullable()();
+  BoolColumn get isWalkIn => boolean().withDefault(const Constant(false))();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
   Set<Column<Object>>? get primaryKey => {id};
+}
+
+class DeviceContacts extends Table {
+  TextColumn get deviceId => text()(); // stable OS contact id
+  TextColumn get displayName => text()();
+  TextColumn get primaryPhoneE164 => text().nullable()();
+  TextColumn get primaryEmail => text().nullable()();
+  TextColumn get phonesJson => text().nullable()(); // JSON array of E.164 phones
+  TextColumn get emailsJson => text().nullable()(); // JSON array of emails
+  TextColumn get linkedCustomerId => text().nullable().references(Customers, #id)();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {deviceId};
 }
 
 class Suppliers extends Table {
@@ -219,6 +235,24 @@ class InventoryLogs extends Table {
       dateTime().clientDefault(() => DateTime.now().toUtc())();
 }
 
+class StockAlerts extends Table {
+  TextColumn get itemId => text().references(Items, #id)();
+  TextColumn get variant => text()(); // '' for simple products, or variant label
+  IntColumn get threshold => integer()();
+  IntColumn get stockQty => integer()();
+  BoolColumn get acknowledged => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get firstTriggeredAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get lastTriggeredAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get resolvedAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+
+  @override
+  Set<Column<Object>>? get primaryKey => {itemId, variant};
+}
+
 class Roles extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
@@ -305,8 +339,28 @@ class CashMovements extends Table {
   TextColumn get type => text()(); // open, close, float, withdrawal
   RealColumn get amount => real()();
   TextColumn get note => text().nullable()();
+  TextColumn get linkedExpenseId => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
+}
+
+class Expenses extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  IntColumn get remoteId => integer().nullable()(); // server expense id
+  TextColumn get outletId => text().nullable().references(Outlets, #id)();
+  TextColumn get staffId => text().nullable().references(Staff, #id)();
+  TextColumn get method => text()(); // cash, bank_transfer, mobile_money, card, other
+  TextColumn get category => text()(); // utilities, rent, supplier, etc
+  IntColumn get supplierId => integer().nullable()(); // remote supplier id
+  RealColumn get amount => real()();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get occurredAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
 }
 
 class Shifts extends Table {
@@ -402,12 +456,87 @@ class QuotationTemplates extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
+/// Local bookings table for walk-in service sales (unified booking history).
+class LocalBookings extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get serviceId => text().references(Services, #id)();
+  TextColumn get variantId => text().nullable()();
+  TextColumn get variantName => text().nullable()();
+  TextColumn get customerId => text().nullable().references(Customers, #id)();
+  TextColumn get ledgerEntryId => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('completed'))();
+  DateTimeColumn get scheduledAt => dateTime().nullable()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+  RealColumn get price => real().withDefault(const Constant(0))();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Service packages (bundle definitions)
+class ServicePackages extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get serviceId => text().nullable().references(Services, #id)();
+  TextColumn get name => text()();
+  IntColumn get totalSessions => integer()();
+  RealColumn get price => real()();
+  IntColumn get validityDays => integer().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Customer package purchases
+class CustomerPackages extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get packageId => text().references(ServicePackages, #id, onDelete: KeyAction.cascade)();
+  TextColumn get customerId => text().references(Customers, #id)();
+  IntColumn get remainingSessions => integer()();
+  DateTimeColumn get expiresAt => dateTime().nullable()();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Package redemption log
+class PackageRedemptions extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get customerPackageId => text().references(CustomerPackages, #id, onDelete: KeyAction.cascade)();
+  TextColumn get ledgerEntryId => text().nullable()();
+  IntColumn get sessionsUsed => integer().withDefault(const Constant(1))();
+  TextColumn get note => text().nullable()();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Customer memberships (discount tier)
+class CustomerMemberships extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get customerId => text().references(Customers, #id)();
+  TextColumn get tierName => text()();
+  RealColumn get discountPercent => real().withDefault(const Constant(0))();
+  DateTimeColumn get validFrom => dateTime().nullable()();
+  DateTimeColumn get validUntil => dateTime().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Items,
     ItemStocks,
     Services,
     Customers,
+    DeviceContacts,
     Suppliers,
     Transactions,
     TransactionLines,
@@ -418,6 +547,7 @@ class QuotationTemplates extends Table {
     CachedOrders,
     CachedServiceBookings,
     InventoryLogs,
+    StockAlerts,
     Roles,
     Staff,
     Outlets,
@@ -425,6 +555,7 @@ class QuotationTemplates extends Table {
     LedgerLines,
     Payments,
     CashMovements,
+    Expenses,
     Shifts,
     AuditLogs,
     ServiceVariants,
@@ -432,6 +563,11 @@ class QuotationTemplates extends Table {
     QuotationLines,
     ReceiptTemplates,
     QuotationTemplates,
+    LocalBookings,
+    ServicePackages,
+    CustomerPackages,
+    PackageRedemptions,
+    CustomerMemberships,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -444,7 +580,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -541,6 +677,30 @@ class AppDatabase extends _$AppDatabase {
       if (from < 18) {
         await migrator.createTable(suppliers);
       }
+      if (from < 19) {
+        await migrator.createTable(expenses);
+        await migrator.addColumn(cashMovements, cashMovements.linkedExpenseId);
+      }
+      if (from < 20) {
+        await migrator.createTable(deviceContacts);
+      }
+      if (from < 21) {
+        await migrator.createTable(stockAlerts);
+      }
+      if (from < 22) {
+        await migrator.addColumn(customers, customers.isWalkIn);
+      }
+      if (from < 23) {
+        await migrator.createTable(localBookings);
+      }
+      if (from < 24) {
+        await migrator.createTable(servicePackages);
+        await migrator.createTable(customerPackages);
+        await migrator.createTable(packageRedemptions);
+      }
+      if (from < 25) {
+        await migrator.createTable(customerMemberships);
+      }
     },
   );
 
@@ -548,6 +708,8 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Item>> getAllItems() => select(items).get();
   Future<Item?> getItemById(String id) =>
       (select(items)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Stream<Item?> watchItemById(String id) =>
+      (select(items)..where((t) => t.id.equals(id))).watchSingleOrNull();
   Future<Item?> getItemByRemoteId(int remoteId) =>
       (select(items)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
   Stream<List<Item>> watchItems() =>
@@ -634,6 +796,10 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> deleteService(String id) async {
+    await (delete(services)..where((t) => t.id.equals(id))).go();
+  }
+
   // Service Variants
   Stream<List<ServiceVariant>> watchServiceVariants(String serviceId) =>
       (select(serviceVariants)..where((tbl) => tbl.serviceId.equals(serviceId))
@@ -652,6 +818,20 @@ class AppDatabase extends _$AppDatabase {
     await (update(serviceVariants)..where((t) => t.serviceId.equals(serviceId)))
         .write(const ServiceVariantsCompanion(isDefault: Value(false)));
   }
+
+  /// Get all variants for a service (for checkout picker).
+  Future<List<ServiceVariant>> getServiceVariantsForService(String serviceId) =>
+      (select(serviceVariants)
+            ..where((t) => t.serviceId.equals(serviceId))
+            ..orderBy([(t) => OrderingTerm.asc(t.price)]))
+          .get();
+
+  /// Get the default variant for a service (if any).
+  Future<ServiceVariant?> getDefaultVariantForService(String serviceId) =>
+      (select(serviceVariants)
+            ..where((t) => t.serviceId.equals(serviceId) & t.isDefault.equals(true))
+            ..limit(1))
+          .getSingleOrNull();
 
   // Quotations
   Future<void> saveQuotation({
@@ -731,6 +911,14 @@ class AppDatabase extends _$AppDatabase {
         ..where((t) => t.remoteId.equals(remoteId)))
       .getSingleOrNull();
 
+  Future<Customer?> getCustomerByPhoneE164(String phoneE164) => (select(customers)
+        ..where((t) => t.phone.equals(phoneE164)))
+      .getSingleOrNull();
+
+  Future<Customer?> getCustomerByEmail(String email) => (select(customers)
+        ..where((t) => t.email.equals(email.toLowerCase().trim())))
+      .getSingleOrNull();
+
   Future<void> upsertCustomer(CustomersCompanion companion) async {
     await into(customers).insertOnConflictUpdate(companion);
   }
@@ -738,6 +926,189 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Customer>> watchCustomers() => (select(
     customers,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+
+  /// Get or create a daily "Walk-in YYYY-MM-DD" placeholder customer.
+  Future<Customer> getOrCreateWalkInCustomerForDate(DateTime date) async {
+    final datePart = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final name = 'Walk-in $datePart';
+    
+    // Try to find existing walk-in customer for this date
+    final existing = await (select(customers)
+          ..where((t) => t.name.equals(name) & t.isWalkIn.equals(true)))
+        .getSingleOrNull();
+    
+    if (existing != null) return existing;
+    
+    // Create new walk-in customer
+    final id = _uuid.v4();
+    final companion = CustomersCompanion.insert(
+      id: Value(id),
+      name: name,
+      isWalkIn: const Value(true),
+      synced: const Value(false),
+    );
+    await into(customers).insert(companion);
+    return (await (select(customers)..where((t) => t.id.equals(id))).getSingle());
+  }
+
+  /// Create a local booking record for a service sale (walk-in or linked).
+  Future<void> createLocalBooking({
+    required String serviceId,
+    String? variantId,
+    String? variantName,
+    String? customerId,
+    String? ledgerEntryId,
+    required double price,
+    DateTime? completedAt,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await into(localBookings).insert(
+      LocalBookingsCompanion.insert(
+        serviceId: serviceId,
+        variantId: Value(variantId),
+        variantName: Value(variantName),
+        customerId: Value(customerId),
+        ledgerEntryId: Value(ledgerEntryId),
+        status: const Value('completed'),
+        completedAt: Value(completedAt ?? now),
+        price: Value(price),
+        synced: const Value(false),
+      ),
+    );
+  }
+
+  /// Watch local bookings (for unified booking history).
+  Stream<List<LocalBooking>> watchLocalBookings() => (select(localBookings)
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Service Packages (session bundles)
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  /// Watch all active service packages.
+  Stream<List<ServicePackage>> watchServicePackages() => (select(servicePackages)
+        ..where((t) => t.active.equals(true))
+        ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+      .watch();
+
+  /// Get active customer packages (with remaining sessions > 0 and not expired).
+  Future<List<CustomerPackage>> getActivePackagesForCustomer(String customerId) async {
+    final now = DateTime.now().toUtc();
+    final query = select(customerPackages)
+      ..where((t) => t.customerId.equals(customerId) & t.remainingSessions.isBiggerThanValue(0))
+      ..orderBy([(t) => OrderingTerm.asc(t.expiresAt)]);
+    final all = await query.get();
+    // Filter expired packages
+    return all.where((p) => p.expiresAt == null || p.expiresAt!.isAfter(now)).toList();
+  }
+
+  /// Purchase a package for a customer (creates CustomerPackage).
+  Future<String> purchasePackage({
+    required String packageId,
+    required String customerId,
+    required int totalSessions,
+    int? validityDays,
+  }) async {
+    final id = _uuid.v4();
+    final expiresAt = validityDays != null
+        ? DateTime.now().toUtc().add(Duration(days: validityDays))
+        : null;
+    await into(customerPackages).insert(
+      CustomerPackagesCompanion.insert(
+        id: Value(id),
+        packageId: packageId,
+        customerId: customerId,
+        remainingSessions: totalSessions,
+        expiresAt: Value(expiresAt),
+        synced: const Value(false),
+      ),
+    );
+    return id;
+  }
+
+  /// Redeem a session from a customer package (decrements remainingSessions, logs redemption).
+  Future<bool> redeemPackage({
+    required String customerPackageId,
+    String? ledgerEntryId,
+    int sessionsUsed = 1,
+    String? note,
+  }) async {
+    final pkg = await (select(customerPackages)
+          ..where((t) => t.id.equals(customerPackageId)))
+        .getSingleOrNull();
+    if (pkg == null) return false;
+    if (pkg.remainingSessions < sessionsUsed) return false;
+    
+    // Check expiry
+    if (pkg.expiresAt != null && pkg.expiresAt!.isBefore(DateTime.now().toUtc())) {
+      return false;
+    }
+
+    // Decrement sessions
+    await (update(customerPackages)..where((t) => t.id.equals(customerPackageId)))
+        .write(CustomerPackagesCompanion(
+          remainingSessions: Value(pkg.remainingSessions - sessionsUsed),
+          synced: const Value(false),
+        ));
+
+    // Log redemption
+    await into(packageRedemptions).insert(
+      PackageRedemptionsCompanion.insert(
+        customerPackageId: customerPackageId,
+        ledgerEntryId: Value(ledgerEntryId),
+        sessionsUsed: Value(sessionsUsed),
+        note: Value(note),
+        synced: const Value(false),
+      ),
+    );
+    return true;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Customer Memberships (discount tier)
+  // ─────────────────────────────────────────────────────────────────────────
+  
+  /// Get active membership discount for a customer.
+  /// Returns null if no active membership found.
+  Future<CustomerMembership?> getActiveMembershipForCustomer(String customerId) async {
+    final now = DateTime.now().toUtc();
+    final query = select(customerMemberships)
+      ..where((t) => t.customerId.equals(customerId) & t.active.equals(true))
+      ..orderBy([(t) => OrderingTerm.desc(t.discountPercent)]);
+    final all = await query.get();
+    
+    // Filter by validity dates
+    for (final m in all) {
+      final validFrom = m.validFrom;
+      final validUntil = m.validUntil;
+      if (validFrom != null && validFrom.isAfter(now)) continue;
+      if (validUntil != null && validUntil.isBefore(now)) continue;
+      return m; // Return first valid membership (highest discount)
+    }
+    return null;
+  }
+
+  // Device Contacts (local-only cache)
+  Future<void> upsertDeviceContact(DeviceContactsCompanion companion) async {
+    await into(deviceContacts).insertOnConflictUpdate(companion);
+  }
+
+  Stream<List<DeviceContact>> watchDeviceContacts() => (select(
+    deviceContacts,
+  )..orderBy([(t) => OrderingTerm.asc(t.displayName)])).watch();
+
+  Future<List<DeviceContact>> getDeviceContacts() => (select(
+    deviceContacts,
+  )..orderBy([(t) => OrderingTerm.asc(t.displayName)])).get();
+
+  Future<void> linkDeviceContactToCustomer({
+    required String deviceId,
+    required String customerId,
+  }) async {
+    await (update(deviceContacts)..where((t) => t.deviceId.equals(deviceId)))
+        .write(DeviceContactsCompanion(linkedCustomerId: Value(customerId)));
+  }
 
   // Suppliers
   Stream<List<Supplier>> watchSuppliers({bool activeOnly = true}) {
@@ -862,6 +1233,28 @@ class AppDatabase extends _$AppDatabase {
     return query.watch();
   }
 
+  /// Net units moved for an item in a time window (sales - refunds - voids).
+  ///
+  /// This is used for lightweight “fast moving” indicators in the catalog.
+  Stream<int> watchNetUnitsMovedForItemSince(String itemId, DateTime since) {
+    final q = customSelect(
+      'SELECT COALESCE(SUM(CASE e.type '
+      "WHEN 'sale' THEN l.quantity "
+      "WHEN 'refund' THEN -l.quantity "
+      "WHEN 'void' THEN -l.quantity "
+      'ELSE 0 END), 0) AS qty '
+      'FROM ledger_lines l '
+      'JOIN ledger_entries e ON e.id = l.entry_id '
+      'WHERE l.item_id = ? AND e.created_at >= ?',
+      variables: [
+        Variable.withString(itemId),
+        Variable.withDateTime(since),
+      ],
+      readsFrom: {ledgerLines, ledgerEntries},
+    );
+    return q.watchSingle().map((row) => row.read<int>('qty'));
+  }
+
   Future<LedgerEntryBundle?> fetchLedgerEntryBundle(String id) async {
     final entry = await (select(
       ledgerEntries,
@@ -874,6 +1267,22 @@ class AppDatabase extends _$AppDatabase {
       this.payments,
     )..where((tbl) => tbl.entryId.equals(id))).get();
     return LedgerEntryBundle(entry: entry, lines: lines, payments: payments);
+  }
+
+  Future<LedgerEntry?> findVoidForSale(String saleEntryId) {
+    return (select(ledgerEntries)
+          ..where((t) => t.type.equals('void') & t.originalEntryId.equals(saleEntryId))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<bool> isSaleVoided(String saleEntryId) async {
+    final row = await (select(ledgerEntries)
+          ..where((t) => t.type.equals('void') & t.originalEntryId.equals(saleEntryId))
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
   }
 
   Future<List<LedgerEntry>> pendingLedgerEntries() =>
@@ -1022,17 +1431,158 @@ class AppDatabase extends _$AppDatabase {
               ..where((t) => t.itemId.equals(itemId) & t.variant.equals(v)))
             .getSingleOrNull();
         if (row != null) {
+          final nextVariantQty = row.stockQty + delta;
           await (update(itemStocks)
                 ..where((t) => t.itemId.equals(itemId) & t.variant.equals(v)))
               .write(
             ItemStocksCompanion(
-              stockQty: Value(row.stockQty + delta),
+              stockQty: Value(nextVariantQty),
               updatedAt: Value(now),
             ),
           );
         }
       }
+
+      // Low stock alerting (local-first). Variants use their own stock if we
+      // can read it; otherwise fall back to overall item stock.
+      if (item.stockEnabled) {
+        final threshold = item.lowStockWarning ?? 5;
+        final v = (variant ?? '').trim();
+        final row = await (select(itemStocks)
+              ..where((t) => t.itemId.equals(itemId) & t.variant.equals(v)))
+            .getSingleOrNull();
+        final effectiveQty = row?.stockQty ?? (v.isEmpty ? updatedQty : 0);
+        await _upsertOrResolveStockAlert(
+          itemId: itemId,
+          variant: v,
+          stockQty: effectiveQty,
+          threshold: threshold,
+          now: now,
+        );
+      }
     });
+  }
+
+  Future<void> _upsertOrResolveStockAlert({
+    required String itemId,
+    required String variant,
+    required int stockQty,
+    required int threshold,
+    required DateTime now,
+  }) async {
+    final existing = await (select(stockAlerts)
+          ..where(
+            (t) => t.itemId.equals(itemId) & t.variant.equals(variant),
+          ))
+        .getSingleOrNull();
+
+    final isLow = stockQty <= threshold;
+    if (isLow) {
+      if (existing == null) {
+        await into(stockAlerts).insert(
+          StockAlertsCompanion.insert(
+            itemId: itemId,
+            variant: variant,
+            threshold: threshold,
+            stockQty: stockQty,
+            acknowledged: const Value(false),
+            firstTriggeredAt: Value(now),
+            lastTriggeredAt: Value(now),
+            resolvedAt: const Value.absent(),
+            updatedAt: Value(now),
+          ),
+        );
+        return;
+      }
+      await (update(stockAlerts)
+            ..where(
+              (t) => t.itemId.equals(itemId) & t.variant.equals(variant),
+            ))
+          .write(
+        StockAlertsCompanion(
+          threshold: Value(threshold),
+          stockQty: Value(stockQty),
+          lastTriggeredAt: Value(now),
+          resolvedAt: const Value(null),
+          // If stock dips again after resolution, require attention again.
+          acknowledged: existing.resolvedAt == null
+              ? const Value.absent()
+              : const Value(false),
+          updatedAt: Value(now),
+        ),
+      );
+      return;
+    }
+
+    if (existing == null || existing.resolvedAt != null) return;
+    await (update(stockAlerts)
+          ..where((t) => t.itemId.equals(itemId) & t.variant.equals(variant)))
+        .write(
+      StockAlertsCompanion(
+        resolvedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  // Stock Alerts
+  Stream<List<StockAlertWithItem>> watchOpenStockAlertsWithItem() {
+    final query = select(stockAlerts).join([
+      innerJoin(items, items.id.equalsExp(stockAlerts.itemId)),
+    ])
+      ..where(stockAlerts.resolvedAt.isNull())
+      ..orderBy([
+        OrderingTerm.desc(stockAlerts.lastTriggeredAt),
+      ]);
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (r) => StockAlertWithItem(
+                  alert: r.readTable(stockAlerts),
+                  item: r.readTable(items),
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<int> watchOpenStockAlertsCount() {
+    final countExp = stockAlerts.itemId.count();
+    final query = selectOnly(stockAlerts)
+      ..addColumns([countExp])
+      ..where(stockAlerts.resolvedAt.isNull());
+    return query.watchSingle().map((row) => row.read(countExp) ?? 0);
+  }
+
+  Future<void> acknowledgeStockAlert({
+    required String itemId,
+    required String variant,
+  }) async {
+    await (update(stockAlerts)
+          ..where((t) => t.itemId.equals(itemId) & t.variant.equals(variant)))
+        .write(
+      StockAlertsCompanion(
+        acknowledged: const Value(true),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Future<void> upsertOrResolveStockAlert({
+    required String itemId,
+    required String variant,
+    required int stockQty,
+    required int threshold,
+    DateTime? now,
+  }) async {
+    final ts = now ?? DateTime.now().toUtc();
+    await _upsertOrResolveStockAlert(
+      itemId: itemId,
+      variant: variant.trim(),
+      stockQty: stockQty,
+      threshold: threshold,
+      now: ts,
+    );
   }
 
   Future<void> recordAuditLog({
@@ -1160,6 +1710,7 @@ class AppDatabase extends _$AppDatabase {
     required String type,
     required double amount,
     String? note,
+    String? linkedExpenseId,
     DateTime? occurredAt,
   }) async {
     final occurred = occurredAt ?? DateTime.now().toUtc();
@@ -1170,6 +1721,7 @@ class AppDatabase extends _$AppDatabase {
         type: type,
         amount: amount,
         note: Value(note),
+        linkedExpenseId: Value(linkedExpenseId),
         createdAt: Value(occurred),
       ),
     );
@@ -1187,6 +1739,95 @@ class AppDatabase extends _$AppDatabase {
       }),
     );
     return id;
+  }
+
+  // Expenses
+  Stream<List<Expense>> watchExpenses({int limit = 200}) =>
+      (select(expenses)
+            ..orderBy([(t) => OrderingTerm.desc(t.occurredAt)])
+            ..limit(limit))
+          .watch();
+
+  Future<Expense?> getExpenseById(String id) =>
+      (select(expenses)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<Expense?> getExpenseByRemoteId(int remoteId) =>
+      (select(expenses)..where((t) => t.remoteId.equals(remoteId)))
+          .getSingleOrNull();
+
+  Future<void> upsertExpense(ExpensesCompanion companion) async {
+    await into(expenses).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> markExpenseSynced(String expenseId, int remoteId) async {
+    await (update(expenses)..where((t) => t.id.equals(expenseId))).write(
+      ExpensesCompanion(
+        synced: const Value(true),
+        remoteId: Value(remoteId),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Future<String> recordExpense({
+    required double amount,
+    required String method,
+    required String category,
+    int? supplierId,
+    String? note,
+    String? outletId,
+    String? staffId,
+    DateTime? occurredAt,
+  }) async {
+    final expenseId = _uuid.v4();
+    final occurred = occurredAt ?? DateTime.now().toUtc();
+
+    await into(expenses).insert(
+      ExpensesCompanion.insert(
+        id: Value(expenseId),
+        remoteId: const Value.absent(),
+        outletId: Value(outletId),
+        staffId: Value(staffId),
+        amount: amount,
+        method: method.trim(),
+        category: category.trim(),
+        supplierId: Value(supplierId),
+        note: Value(note),
+        occurredAt: Value(occurred),
+        synced: const Value(false),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+
+    await enqueueSync(
+      'expense_push',
+      jsonEncode({
+        'expense_id': expenseId,
+        'amount': amount,
+        'method': method.trim(),
+        'category': category.trim(),
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        'occurred_at': occurred.toIso8601String(),
+        'idempotency_key': 'expense_$expenseId',
+      }),
+    );
+
+    await recordAuditLog(
+      actorStaffId: staffId,
+      action: 'expense_create',
+      payload: {
+        'expense_id': expenseId,
+        'amount': amount,
+        'method': method.trim(),
+        'category': category.trim(),
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (note != null) 'note': note,
+        'occurred_at': occurred.toIso8601String(),
+      },
+    );
+
+    return expenseId;
   }
 
   Future<double> computeCashSalesSince(DateTime since) async {
@@ -1241,6 +1882,10 @@ class AppDatabase extends _$AppDatabase {
     cachedOrders,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
 
+  Stream<List<CachedOrder>> watchCachedOrders() => (select(
+    cachedOrders,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+
   // Service bookings cache
   Future<void> upsertCachedServiceBooking(int bookingId, String payloadJson) async {
     await into(cachedServiceBookings).insertOnConflictUpdate(
@@ -1255,6 +1900,10 @@ class AppDatabase extends _$AppDatabase {
   Future<List<CachedServiceBooking>> getCachedServiceBookings() => (select(
     cachedServiceBookings,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
+
+  Stream<List<CachedServiceBooking>> watchCachedServiceBookings() => (select(
+    cachedServiceBookings,
+  )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
 
   // Print queue
   Future<int> enqueueReceiptPrintJob(String entryId) async {
@@ -1273,6 +1922,12 @@ class AppDatabase extends _$AppDatabase {
       PrintJobsCompanion.insert(jobType: 'receipt', referenceId: entryId),
     );
   }
+
+  // SyncOps (outbox)
+  Stream<List<SyncOp>> watchPendingSyncOps() => (select(syncOps)
+        ..where((t) => t.status.equals('pending'))
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .watch();
 
   Stream<List<PrintJob>> watchPrintJobs({int limit = 100}) =>
       (select(printJobs)
@@ -1337,6 +1992,51 @@ class AppDatabase extends _$AppDatabase {
   Future<Customer?> getCustomerById(String id) async {
     return (select(customers)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
+
+  /// Clears ALL data from the database.
+  /// This is called on logout to ensure complete data isolation between
+  /// different sellers using the same device.
+  Future<void> clearAllData() async {
+    await transaction(() async {
+      // Clear all tables in reverse dependency order to avoid foreign key violations
+      await delete(packageRedemptions).go();
+      await delete(customerPackages).go();
+      await delete(servicePackages).go();
+      await delete(customerMemberships).go();
+      await delete(localBookings).go();
+      await delete(quotationLines).go();
+      await delete(quotations).go();
+      await delete(serviceVariants).go();
+      await delete(auditLogs).go();
+      await delete(shifts).go();
+      await delete(expenses).go();
+      await delete(cashMovements).go();
+      await delete(payments).go();
+      await delete(ledgerLines).go();
+      await delete(ledgerEntries).go();
+      await delete(printJobs).go();
+      await delete(stockAlerts).go();
+      await delete(inventoryLogs).go();
+      await delete(cachedServiceBookings).go();
+      await delete(cachedOrders).go();
+      await delete(syncCursors).go();
+      await delete(syncOps).go();
+      await delete(receipts).go();
+      await delete(transactionLines).go();
+      await delete(transactions).go();
+      await delete(itemStocks).go();
+      await delete(items).go();
+      await delete(services).go();
+      await delete(deviceContacts).go();
+      await delete(customers).go();
+      await delete(staff).go();
+      await delete(roles).go();
+      await delete(outlets).go();
+      await delete(suppliers).go();
+      await delete(receiptTemplates).go();
+      await delete(quotationTemplates).go();
+    });
+  }
 }
 
 class TransactionWithLines {
@@ -1362,4 +2062,11 @@ class LedgerEntryBundle {
   final LedgerEntry entry;
   final List<LedgerLine> lines;
   final List<Payment> payments;
+}
+
+class StockAlertWithItem {
+  const StockAlertWithItem({required this.alert, required this.item});
+
+  final StockAlert alert;
+  final Item item;
 }

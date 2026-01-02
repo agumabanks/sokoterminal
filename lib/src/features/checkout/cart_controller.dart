@@ -48,6 +48,7 @@ class CartLine {
     this.itemId,
     this.serviceId,
     this.variant,
+    this.availableStock,
     this.quantity = 1,
   });
 
@@ -57,11 +58,12 @@ class CartLine {
   final String? itemId;
   final String? serviceId;
   final String? variant;
+  final int? availableStock;
   final int quantity;
 
   double get total => price * quantity;
 
-  CartLine copyWith({int? quantity, double? price}) {
+  CartLine copyWith({int? quantity, double? price, int? availableStock}) {
     return CartLine(
       id: id,
       title: title,
@@ -69,6 +71,7 @@ class CartLine {
       itemId: itemId,
       serviceId: serviceId,
       variant: variant,
+      availableStock: availableStock ?? this.availableStock,
       quantity: quantity ?? this.quantity,
     );
   }
@@ -89,18 +92,39 @@ class CartController extends StateNotifier<CartState> {
   final SecureStorage _storage;
   final _uuid = const Uuid();
 
-  void addItem({required Item item, int quantity = 1}) {
+  String? addItem({required Item item, int quantity = 1, int? availableStock}) {
+    final enforceStock = item.stockEnabled;
+    final maxQty = enforceStock ? (availableStock ?? item.stockQty) : null;
+    if (maxQty != null && maxQty <= 0) {
+      return 'Out of stock: ${item.name}';
+    }
     final existingIndex = state.lines.indexWhere(
       (line) => line.itemId == item.id && (line.variant ?? '') == '',
     );
     if (existingIndex != -1) {
       final updated = List<CartLine>.from(state.lines);
       final current = updated[existingIndex];
+      final requested = current.quantity + quantity;
+      final nextQty = maxQty != null ? requested.clamp(0, maxQty) : requested;
+      if (nextQty <= 0) {
+        updated.removeAt(existingIndex);
+        state = state.copyWith(lines: updated);
+        return 'Out of stock: ${item.name}';
+      }
       updated[existingIndex] = current.copyWith(
-        quantity: current.quantity + quantity,
+        quantity: nextQty,
+        availableStock: maxQty ?? current.availableStock,
       );
       state = state.copyWith(lines: updated);
+      if (maxQty != null && requested > maxQty) {
+        return 'Only $maxQty in stock for ${item.name}';
+      }
+      return null;
     } else {
+      final nextQty = maxQty != null ? quantity.clamp(0, maxQty) : quantity;
+      if (nextQty <= 0) {
+        return 'Out of stock: ${item.name}';
+      }
       state = state.copyWith(
         lines: [
           ...state.lines,
@@ -110,29 +134,58 @@ class CartController extends StateNotifier<CartState> {
             price: item.price,
             itemId: item.id,
             variant: '',
-            quantity: quantity,
+            availableStock: maxQty,
+            quantity: nextQty,
           ),
         ],
       );
+      if (maxQty != null && quantity > maxQty) {
+        // This shouldn't happen given clamp above, but keep message defensive.
+        return 'Only $maxQty in stock for ${item.name}';
+      }
+      return null;
     }
   }
 
-  void addItemVariant({
+  String? addItemVariant({
     required Item item,
     required String variant,
     required double price,
     int quantity = 1,
+    int? availableStock,
   }) {
     final normalized = variant.trim();
+    final enforceStock = item.stockEnabled;
+    final maxQty = enforceStock ? (availableStock ?? 0) : null;
+    if (maxQty != null && maxQty <= 0) {
+      return 'Out of stock: ${item.name}${normalized.isEmpty ? '' : ' • $normalized'}';
+    }
     final existingIndex = state.lines.indexWhere(
       (line) => line.itemId == item.id && (line.variant ?? '') == normalized,
     );
     if (existingIndex != -1) {
       final updated = List<CartLine>.from(state.lines);
       final current = updated[existingIndex];
-      updated[existingIndex] = current.copyWith(quantity: current.quantity + quantity);
+      final requested = current.quantity + quantity;
+      final nextQty = maxQty != null ? requested.clamp(0, maxQty) : requested;
+      if (nextQty <= 0) {
+        updated.removeAt(existingIndex);
+        state = state.copyWith(lines: updated);
+        return 'Out of stock: ${item.name}${normalized.isEmpty ? '' : ' • $normalized'}';
+      }
+      updated[existingIndex] = current.copyWith(
+        quantity: nextQty,
+        availableStock: maxQty ?? current.availableStock,
+      );
       state = state.copyWith(lines: updated);
-      return;
+      if (maxQty != null && requested > maxQty) {
+        return 'Only $maxQty in stock for ${item.name}${normalized.isEmpty ? '' : ' • $normalized'}';
+      }
+      return null;
+    }
+    final nextQty = maxQty != null ? quantity.clamp(0, maxQty) : quantity;
+    if (nextQty <= 0) {
+      return 'Out of stock: ${item.name}${normalized.isEmpty ? '' : ' • $normalized'}';
     }
     state = state.copyWith(
       lines: [
@@ -143,36 +196,88 @@ class CartController extends StateNotifier<CartState> {
           price: price,
           itemId: item.id,
           variant: normalized,
-          quantity: quantity,
+          availableStock: maxQty,
+          quantity: nextQty,
         ),
       ],
     );
+    if (maxQty != null && quantity > maxQty) {
+      return 'Only $maxQty in stock for ${item.name}${normalized.isEmpty ? '' : ' • $normalized'}';
+    }
+    return null;
   }
 
-  void addService({required Service service, int quantity = 1}) {
+  /// Add a service to the cart. If variant is provided, uses variant price.
+  /// Deduplicates: same serviceId + same variant increments quantity.
+  void addService({
+    required Service service,
+    String? variant,
+    double? variantPrice,
+    int quantity = 1,
+  }) {
+    final normalized = (variant ?? '').trim();
+    final effectivePrice = variantPrice ?? service.price;
+    final displayTitle = normalized.isEmpty
+        ? service.title
+        : '${service.title} • $normalized';
+
+    // Check for existing line with same service + variant
+    final existingIndex = state.lines.indexWhere(
+      (line) =>
+          line.serviceId == service.id &&
+          (line.variant ?? '') == normalized,
+    );
+
+    if (existingIndex != -1) {
+      // Increment quantity on existing line
+      final updated = List<CartLine>.from(state.lines);
+      final current = updated[existingIndex];
+      updated[existingIndex] = current.copyWith(
+        quantity: current.quantity + quantity,
+      );
+      state = state.copyWith(lines: updated);
+      return;
+    }
+
+    // Add new line
     state = state.copyWith(
       lines: [
         ...state.lines,
         CartLine(
           id: _uuid.v4(),
-          title: service.title,
-          price: service.price,
+          title: displayTitle,
+          price: effectivePrice,
           serviceId: service.id,
+          variant: normalized.isEmpty ? null : normalized,
           quantity: quantity,
         ),
       ],
     );
   }
 
-  void updateQuantity(String id, int quantity) {
+  String? updateQuantity(String id, int quantity) {
     if (quantity <= 0) {
       removeLine(id);
-      return;
+      return null;
+    }
+    CartLine? line;
+    for (final l in state.lines) {
+      if (l.id == id) {
+        line = l;
+        break;
+      }
+    }
+    final maxQty = line?.availableStock;
+    final nextQty = maxQty != null ? quantity.clamp(0, maxQty) : quantity;
+    if (nextQty <= 0) {
+      removeLine(id);
+      return 'Out of stock';
     }
     state = state.copyWith(
       lines: state.lines
           .map(
-            (line) => line.id == id ? line.copyWith(quantity: quantity) : line,
+            (line) =>
+                line.id == id ? line.copyWith(quantity: nextQty) : line,
           )
           .toList(),
     );
@@ -183,13 +288,91 @@ class CartController extends StateNotifier<CartState> {
           'checkout_cart_qty_changed',
           props: {
             'line_id': id,
-            'quantity': quantity,
+            'quantity': nextQty,
             'lines_count': state.lines.length,
             'subtotal': state.subtotal,
           },
         ),
       );
     }
+    if (maxQty != null && quantity > maxQty) {
+      return 'Only $maxQty in stock';
+    }
+    return null;
+  }
+
+  Future<String?> updateQuantityWithFreshStock(String id, int quantity) async {
+    if (quantity <= 0) {
+      removeLine(id);
+      return null;
+    }
+
+    CartLine? current;
+    for (final l in state.lines) {
+      if (l.id == id) {
+        current = l;
+        break;
+      }
+    }
+    if (current == null) return null;
+
+    int? maxQty = current.availableStock;
+    final itemId = current.itemId;
+    if (itemId != null && itemId.isNotEmpty) {
+      final item = await _db.getItemById(itemId);
+      if (item != null && item.stockEnabled) {
+        final variant = (current.variant ?? '').trim();
+        final stockRow = await (_db.select(_db.itemStocks)
+              ..where(
+                (t) =>
+                    t.itemId.equals(itemId) & t.variant.equals(variant),
+              ))
+            .getSingleOrNull();
+        if (stockRow != null) {
+          maxQty = stockRow.stockQty;
+        } else {
+          maxQty = variant.isEmpty ? item.stockQty : 0;
+        }
+      } else {
+        maxQty = null;
+      }
+    }
+
+    final nextQty = maxQty != null ? quantity.clamp(0, maxQty) : quantity;
+    if (nextQty <= 0) {
+      removeLine(id);
+      return maxQty == null ? null : 'Out of stock';
+    }
+
+    state = state.copyWith(
+      lines: state.lines
+          .map(
+            (line) => line.id == id
+                ? line.copyWith(quantity: nextQty, availableStock: maxQty)
+                : line,
+          )
+          .toList(),
+    );
+
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(
+        telemetry.event(
+          'checkout_cart_qty_changed',
+          props: {
+            'line_id': id,
+            'quantity': nextQty,
+            'lines_count': state.lines.length,
+            'subtotal': state.subtotal,
+          },
+        ),
+      );
+    }
+
+    if (maxQty != null && quantity > maxQty) {
+      return 'Only $maxQty in stock';
+    }
+    return null;
   }
 
   void updatePrice(String id, double price) {
@@ -225,7 +408,14 @@ class CartController extends StateNotifier<CartState> {
     String? notes,
     Customer? customer,
   }) async {
-    final resolvedCustomer = customer ?? state.customer;
+    var resolvedCustomer = customer ?? state.customer;
+    
+    // Auto-assign walk-in customer if cart has services but no customer
+    final hasServiceLine = state.lines.any((l) => l.serviceId != null && l.serviceId!.isNotEmpty);
+    if (hasServiceLine && resolvedCustomer == null) {
+      resolvedCustomer = await _db.getOrCreateWalkInCustomerForDate(DateTime.now());
+    }
+    
     if (payments.isEmpty) {
       throw ArgumentError.value(
         payments,
@@ -242,6 +432,35 @@ class CartController extends StateNotifier<CartState> {
     }
     if (payments.any((p) => p.amount <= 0)) {
       throw ArgumentError('Payment amounts must be greater than 0.');
+    }
+
+    final stockShortages = <String>[];
+    for (final line in state.lines) {
+      final itemId = line.itemId;
+      if (itemId == null || itemId.isEmpty) continue;
+      final item = await _db.getItemById(itemId);
+      if (item == null) continue;
+      if (!item.stockEnabled) continue;
+
+      final variant = (line.variant ?? '').trim();
+      var available = variant.isEmpty ? item.stockQty : 0;
+      final stockRow = await (_db.select(_db.itemStocks)
+            ..where((t) => t.itemId.equals(itemId) & t.variant.equals(variant)))
+          .getSingleOrNull();
+      if (stockRow != null) {
+        available = stockRow.stockQty;
+      }
+      if (available < line.quantity) {
+        final label = variant.isEmpty ? item.name : '${item.name} • $variant';
+        stockShortages.add(
+          '$label (stock $available, requested ${line.quantity})',
+        );
+      }
+    }
+    if (stockShortages.isNotEmpty) {
+      throw StateError(
+        'Insufficient stock: ${stockShortages.join(', ')}',
+      );
     }
 
     final transactionId = _uuid.v4();
@@ -326,6 +545,20 @@ class CartController extends StateNotifier<CartState> {
       );
     }
 
+    // Create local booking records for service lines (unified booking history)
+    for (final line in state.lines) {
+      final serviceId = line.serviceId;
+      if (serviceId == null || serviceId.isEmpty) continue;
+      await _db.createLocalBooking(
+        serviceId: serviceId,
+        variantName: line.variant,
+        customerId: resolvedCustomer?.id,
+        ledgerEntryId: transactionId,
+        price: line.total,
+        completedAt: occurredAt,
+      );
+    }
+
     await _syncService.enqueue('ledger_push', {
       'entry_id': transactionId,
       'idempotency_key': idempotencyKey,
@@ -361,6 +594,7 @@ class CartController extends StateNotifier<CartState> {
           )
           .toList(),
     });
+    unawaited(_syncService.syncNow());
 
     final telemetry = Telemetry.instance;
     if (telemetry != null) {

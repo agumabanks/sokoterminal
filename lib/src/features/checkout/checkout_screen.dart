@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +16,7 @@ import '../../core/db/app_database.dart';
 import '../../core/settings/shop_payment_settings.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import 'cart_controller.dart';
@@ -78,6 +80,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (_syncingCatalog) return;
     setState(() => _syncingCatalog = true);
     try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
+      final connectivity = await Connectivity().checkConnectivity();
+      final online = connectivity.any((r) => r != ConnectivityResult.none);
+      if (online && staffInitialized) {
+        final token = await ref.read(secureStorageProvider).readPosSessionToken();
+        if (token == null || token.trim().isEmpty) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Staff login required to sync (enter cashier/manager PIN).'),
+            ),
+          );
+          context.go('/pos-login?redirect=/home');
+          return;
+        }
+      }
+
       // Check if we have any products - if not, do a full resync from epoch
       final items = await ref.read(appDatabaseProvider).getAllItems();
       final syncService = ref.read(syncServiceProvider);
@@ -127,7 +147,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     if (stocks.isEmpty) {
       HapticFeedback.selectionClick();
-      cartController.addItem(item: item);
+      final msg = cartController.addItem(item: item);
+      if (msg != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        if (msg.startsWith('Out of stock')) return null;
+      }
       return item.name;
     }
 
@@ -135,7 +160,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         stocks.length > 1 || (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
     if (!hasChoices) {
       HapticFeedback.selectionClick();
-      cartController.addItem(item: item);
+      final s = stocks.first;
+      final msg = cartController.addItem(
+        item: item,
+        availableStock: s.stockQty,
+      );
+      if (msg != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        if (msg.startsWith('Out of stock')) return null;
+      }
       return item.name;
     }
 
@@ -152,7 +186,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           final label = s.variant.trim().isEmpty
               ? 'Default'
               : s.variant.replaceAll('-', ' • ');
-          final outOfStock = s.stockQty <= 0;
+          final outOfStock = item.stockEnabled && s.stockQty <= 0;
           return ListTile(
             title: Text(label, style: DesignTokens.textBodyBold),
             subtitle: Text('Stock: ${s.stockQty}', style: DesignTokens.textSmall),
@@ -169,18 +203,33 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ),
     );
 
+    if (!context.mounted) return null;
     if (pickedVariant == null) return null;
     final normalized = pickedVariant.trim();
     final pickedStock = stocks.firstWhere((e) => e.variant.trim() == normalized);
     if (normalized.isEmpty) {
-      cartController.addItem(item: item);
+      final msg = cartController.addItem(
+        item: item,
+        availableStock: pickedStock.stockQty,
+      );
+      if (msg != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+        if (msg.startsWith('Out of stock')) return null;
+      }
       return item.name;
     }
-    cartController.addItemVariant(
+    final msg = cartController.addItemVariant(
       item: item,
       variant: normalized,
       price: pickedStock.price,
+      availableStock: pickedStock.stockQty,
     );
+    if (msg != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg)));
+      if (msg.startsWith('Out of stock')) return null;
+    }
     return '${item.name} • $normalized';
   }
 
@@ -333,14 +382,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
+                        final threshold = item.lowStockWarning ?? 5;
+                        final canSell =
+                            !item.stockEnabled || item.stockQty > 0;
                         return _ProductTile(
                           name: item.name,
                           price: item.price,
                           stock: item.stockQty,
+                          stockEnabled: item.stockEnabled,
+                          lowStockThreshold: threshold,
                           imageUrl: item.imageUrl,
-                          onTap: () {
-                            unawaited(_addProduct(context, item));
-                          },
+                          onTap: canSell
+                              ? () {
+                                  unawaited(_addProduct(context, item));
+                                }
+                              : null,
                         );
                       }, childCount: filtered.length),
                     );
@@ -403,12 +459,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                 title: service.title,
                                 price: service.price,
                                 description: service.description,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  ref
-                                      .read(cartControllerProvider.notifier)
-                                      .addService(service: service);
-                                },
+                                onTap: () => _addServiceWithVariantPicker(context, service),
                               );
                             }, childCount: filtered.length),
                           ),
@@ -434,8 +485,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             customer: cart.customer,
             parkedCount: parked.length,
             onSelectCustomer: () => _selectCustomer(context),
-            onUpdateQuantity: (id, quantity) =>
-                cartController.updateQuantity(id, quantity),
+            onUpdateQuantity: (id, quantity) async {
+              final msg =
+                  await cartController.updateQuantityWithFreshStock(id, quantity);
+              if (msg == null) return;
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(msg)));
+            },
             onEditPrice: (line) => _showPriceOverride(context, line),
             onPark: () => _showParkSale(context, ref),
             onCheckout: () => _handleCheckout(context, ref),
@@ -465,7 +522,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   right: DesignTokens.spaceMd,
                   bottom: DesignTokens.spaceMd,
                   child: _FloatingCartSummary(
-                    itemCount: cart.lines.length,
+                    itemCount: cart.lines.fold<int>(
+                      0,
+                      (sum, line) => sum + line.quantity,
+                    ),
                     total: cart.subtotal,
                     onTap: () => _showCartSheet(context, ref),
                   ),
@@ -497,6 +557,83 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final desc = service.description?.toLowerCase();
     if (desc != null && desc.contains(q)) return true;
     return false;
+  }
+
+  /// Add a service to cart with variant picker support.
+  /// - 0 variants: use base service price
+  /// - 1 variant: auto-use that variant
+  /// - 2+ variants: show 1-tap picker
+  Future<void> _addServiceWithVariantPicker(BuildContext context, Service service) async {
+    final db = ref.read(appDatabaseProvider);
+    final cartController = ref.read(cartControllerProvider.notifier);
+    
+    final variants = await db.getServiceVariantsForService(service.id);
+    
+    // No variants: use base price
+    if (variants.isEmpty) {
+      HapticFeedback.selectionClick();
+      cartController.addService(service: service);
+      return;
+    }
+    
+    // Single variant: auto-use it
+    if (variants.length == 1) {
+      final v = variants.first;
+      HapticFeedback.selectionClick();
+      cartController.addService(
+        service: service,
+        variant: v.name,
+        variantPrice: v.price,
+      );
+      return;
+    }
+    
+    // Multiple variants: show picker
+    if (!context.mounted) return;
+    final picked = await BottomSheetModal.show<ServiceVariant>(
+      context: context,
+      title: service.title,
+      subtitle: 'Select pricing option',
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: variants.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (ctx, i) {
+          final v = variants[i];
+          return ListTile(
+            title: Text(v.name, style: DesignTokens.textBodyBold),
+            subtitle: v.unit != null ? Text('per ${v.unit}') : null,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'UGX ${v.price.toStringAsFixed(0)}',
+                  style: DesignTokens.textBodyBold,
+                ),
+                if (v.isDefault) ...[
+                  const SizedBox(width: 8),
+                  const Chip(
+                    label: Text('Default'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ],
+            ),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              Navigator.of(ctx).pop(v);
+            },
+          );
+        },
+      ),
+    );
+    
+    if (picked == null || !context.mounted) return;
+    cartController.addService(
+      service: service,
+      variant: picked.name,
+      variantPrice: picked.price,
+    );
   }
 
   Future<void> _openScanner(BuildContext context) async {
@@ -535,14 +672,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         final item = await db.getItemById(stock.itemId);
         if (item != null) {
           if (stock.variant.trim().isEmpty) {
-            cartController.addItem(item: item);
+            final msg = cartController.addItem(
+              item: item,
+              availableStock: stock.stockQty,
+            );
+            if (msg != null) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(msg)));
+              if (msg.startsWith('Out of stock')) return;
+            }
             addedLabel = item.name;
           } else {
-            cartController.addItemVariant(
+            final msg = cartController.addItemVariant(
               item: item,
               variant: stock.variant,
               price: stock.price,
+              availableStock: stock.stockQty,
             );
+            if (msg != null) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text(msg)));
+              if (msg.startsWith('Out of stock')) return;
+            }
             addedLabel = '${item.name} • ${stock.variant.trim()}';
           }
         }
@@ -564,11 +717,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 builder: (context, snap) {
                   final name = snap.data?.name ?? s.itemId;
                   final label = s.variant.trim().isEmpty ? 'Default' : s.variant.replaceAll('-', ' • ');
+                  final enabled = !(snap.data?.stockEnabled ?? true) || s.stockQty > 0;
                   return ListTile(
                     title: Text(name, style: DesignTokens.textBodyBold),
-                    subtitle: Text(label, style: DesignTokens.textSmall),
+                    subtitle: Text('$label • Stock ${s.stockQty}', style: DesignTokens.textSmall),
                     trailing: Text(s.price.toUgx(), style: DesignTokens.textSmallBold),
-                    onTap: () => Navigator.of(context).pop(s),
+                    enabled: enabled,
+                    onTap: enabled ? () => Navigator.of(context).pop(s) : null,
                   );
                 },
               );
@@ -579,14 +734,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           final item = await db.getItemById(picked.itemId);
           if (item != null) {
             if (picked.variant.trim().isEmpty) {
-              cartController.addItem(item: item);
+              final msg = cartController.addItem(
+                item: item,
+                availableStock: picked.stockQty,
+              );
+              if (msg != null) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(msg)));
+                if (msg.startsWith('Out of stock')) return;
+              }
               addedLabel = item.name;
             } else {
-              cartController.addItemVariant(
+              final msg = cartController.addItemVariant(
                 item: item,
                 variant: picked.variant,
                 price: picked.price,
+                availableStock: picked.stockQty,
               );
+              if (msg != null) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(msg)));
+                if (msg.startsWith('Out of stock')) return;
+              }
               addedLabel = '${item.name} • ${picked.variant.trim()}';
             }
           }
@@ -975,41 +1146,49 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   void _showCartSheet(BuildContext context, WidgetRef ref) {
-    final cartController = ref.read(cartControllerProvider.notifier);
+    final rootContext = context;
+    final rootRef = ref;
+    final cartController = rootRef.read(cartControllerProvider.notifier);
 
     BottomSheetModal.show(
-      context: context,
+      context: rootContext,
       title: 'Cart',
       subtitle: 'Review items and charge',
       child: Consumer(
-        builder: (context, ref, _) {
-          final cart = ref.watch(cartControllerProvider);
-          final parked = ref.watch(parkedSalesProvider);
+        builder: (sheetContext, sheetRef, _) {
+          final cart = sheetRef.watch(cartControllerProvider);
+          final parked = sheetRef.watch(parkedSalesProvider);
           return _CartPane(
             cart: cart,
             customer: cart.customer,
             parkedCount: parked.length,
             onSelectCustomer: () {
-              Navigator.pop(context);
-              _selectCustomer(context);
+              Navigator.of(sheetContext).pop();
+              _selectCustomer(rootContext);
             },
-            onUpdateQuantity: (id, quantity) =>
-                cartController.updateQuantity(id, quantity),
+            onUpdateQuantity: (id, quantity) async {
+              final msg =
+                  await cartController.updateQuantityWithFreshStock(id, quantity);
+              if (msg == null) return;
+              if (!rootContext.mounted) return;
+              ScaffoldMessenger.of(rootContext)
+                  .showSnackBar(SnackBar(content: Text(msg)));
+            },
             onEditPrice: (line) {
-              Navigator.pop(context);
-              _showPriceOverride(context, line);
+              Navigator.of(sheetContext).pop();
+              _showPriceOverride(rootContext, line);
             },
             onPark: () {
-              Navigator.pop(context);
-              _showParkSale(context, ref);
+              Navigator.of(sheetContext).pop();
+              _showParkSale(rootContext, rootRef);
             },
             onCheckout: () {
-              Navigator.pop(context);
-              _handleCheckout(context, ref);
+              Navigator.of(sheetContext).pop();
+              _handleCheckout(rootContext, rootRef);
             },
             onClear: () {
               cartController.clear();
-              Navigator.pop(context);
+              Navigator.of(sheetContext).pop();
             },
           );
         },
@@ -1022,72 +1201,93 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (cart.lines.isEmpty) return;
 
     final total = cart.subtotal;
+    final prefs = ref.read(sharedPreferencesProvider);
+    final staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity.any((r) => r != ConnectivityResult.none);
+    if (online && staffInitialized) {
+      final token = await ref.read(secureStorageProvider).readPosSessionToken();
+      if (token == null || token.trim().isEmpty) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Staff login required to sync sales. Enter cashier PIN to continue.'),
+          ),
+        );
+        context.go('/pos-login?redirect=/home');
+        return;
+      }
+    }
     final paymentSettings = ShopPaymentSettingsCache.read(
       ref.read(sharedPreferencesProvider),
     );
 
     // Show payment selection (single, split, or credit).
+    if (!context.mounted) return;
     final paymentOption = await BottomSheetModal.show<String>(
       context: context,
       title: 'Payment',
       subtitle: '${total.toUgx()} due',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (paymentSettings.cashEnabled) ...[
+      child: Builder(
+        builder: (sheetContext) => ListView(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          children: [
+            if (paymentSettings.cashEnabled) ...[
+              _PaymentMethodTile(
+                icon: Icons.money,
+                title: 'Cash',
+                subtitle: 'Pay with cash',
+                onTap: () => Navigator.of(sheetContext).pop('cash'),
+              ),
+              const SizedBox(height: DesignTokens.spaceSm),
+            ],
+            if (paymentSettings.mobileMoneyEnabled) ...[
+              _PaymentMethodTile(
+                icon: Icons.phone_android,
+                title: 'Mobile Money',
+                subtitle: 'MTN, Airtel, etc.',
+                onTap: () => Navigator.of(sheetContext).pop('mobile_money'),
+              ),
+              const SizedBox(height: DesignTokens.spaceSm),
+            ],
+            if (paymentSettings.bankEnabled) ...[
+              _PaymentMethodTile(
+                icon: Icons.account_balance_outlined,
+                title: 'Bank transfer',
+                subtitle: 'Record as bank transfer',
+                onTap: () => Navigator.of(sheetContext).pop('bank_transfer'),
+              ),
+              const SizedBox(height: DesignTokens.spaceSm),
+            ],
             _PaymentMethodTile(
-              icon: Icons.money,
-              title: 'Cash',
-              subtitle: 'Pay with cash',
-              onTap: () => Navigator.pop(context, 'cash'),
+              icon: Icons.credit_card,
+              title: 'Card',
+              subtitle: 'Visa, Mastercard',
+              onTap: () => Navigator.of(sheetContext).pop('card'),
             ),
             const SizedBox(height: DesignTokens.spaceSm),
-          ],
-          if (paymentSettings.mobileMoneyEnabled) ...[
+            if (_paymentMethods(
+                  hasCustomer: cart.customer != null,
+                  paymentSettings: paymentSettings,
+                ).where((m) => m.$1 != 'credit').length >=
+                2) ...[
+              _PaymentMethodTile(
+                icon: Icons.splitscreen_outlined,
+                title: 'Split payment',
+                subtitle: 'Mix methods (optional credit)',
+                onTap: () => Navigator.of(sheetContext).pop('split'),
+              ),
+              const SizedBox(height: DesignTokens.spaceSm),
+            ],
             _PaymentMethodTile(
-              icon: Icons.phone_android,
-              title: 'Mobile Money',
-              subtitle: 'MTN, Airtel, etc.',
-              onTap: () => Navigator.pop(context, 'mobile_money'),
+              icon: Icons.handshake_outlined,
+              title: 'Credit / Pay later',
+              subtitle: 'Record as credit sale (customer required)',
+              onTap: () => Navigator.of(sheetContext).pop('credit'),
             ),
-            const SizedBox(height: DesignTokens.spaceSm),
           ],
-          if (paymentSettings.bankEnabled) ...[
-            _PaymentMethodTile(
-              icon: Icons.account_balance_outlined,
-              title: 'Bank transfer',
-              subtitle: 'Record as bank transfer',
-              onTap: () => Navigator.pop(context, 'bank_transfer'),
-            ),
-            const SizedBox(height: DesignTokens.spaceSm),
-          ],
-          _PaymentMethodTile(
-            icon: Icons.credit_card,
-            title: 'Card',
-            subtitle: 'Visa, Mastercard',
-            onTap: () => Navigator.pop(context, 'card'),
-          ),
-          const SizedBox(height: DesignTokens.spaceSm),
-          if (_paymentMethods(
-                hasCustomer: cart.customer != null,
-                paymentSettings: paymentSettings,
-              ).where((m) => m.$1 != 'credit').length >=
-              2) ...[
-            _PaymentMethodTile(
-              icon: Icons.splitscreen_outlined,
-              title: 'Split payment',
-              subtitle: 'Mix methods (optional credit)',
-              onTap: () => Navigator.pop(context, 'split'),
-            ),
-            const SizedBox(height: DesignTokens.spaceSm),
-          ],
-          _PaymentMethodTile(
-            icon: Icons.handshake_outlined,
-            title: 'Credit / Pay later',
-            subtitle: 'Record as credit sale (customer required)',
-            onTap: () => Navigator.pop(context, 'credit'),
-          ),
-        ],
+        ),
       ),
     );
 
@@ -1382,23 +1582,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         context: context,
         title: title,
         subtitle: 'Optional reference',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: ctrl,
-              decoration: InputDecoration(
-                labelText: hint,
-                prefixIcon: const Icon(Icons.tag_outlined),
+        child: Builder(
+          builder: (sheetContext) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: ctrl,
+                decoration: InputDecoration(
+                  labelText: hint,
+                  prefixIcon: const Icon(Icons.tag_outlined),
+                ),
               ),
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(ctrl.text),
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Continue'),
-            ),
-          ],
+              const SizedBox(height: DesignTokens.spaceLg),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(sheetContext).pop(ctrl.text),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Continue'),
+              ),
+            ],
+          ),
         ),
       );
     } finally {
@@ -1417,53 +1619,55 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         context: context,
         title: 'Credit / Pay later',
         subtitle: customerName,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: DesignTokens.paddingMd,
-              decoration: BoxDecoration(
-                color: DesignTokens.brandAccentLight,
-                borderRadius: DesignTokens.borderRadiusMd,
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.handshake_outlined,
-                    color: DesignTokens.brandPrimary,
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  Expanded(
-                    child: Text(
-                      'Record ${total.toUgx()} as credit for this customer.',
-                      style: DesignTokens.textSmall.copyWith(
-                        color: DesignTokens.brandPrimary,
+        child: Builder(
+          builder: (sheetContext) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: DesignTokens.paddingMd,
+                decoration: BoxDecoration(
+                  color: DesignTokens.brandAccentLight,
+                  borderRadius: DesignTokens.borderRadiusMd,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.handshake_outlined,
+                      color: DesignTokens.brandPrimary,
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: Text(
+                        'Record ${total.toUgx()} as credit for this customer.',
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.brandPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: DesignTokens.spaceSm),
-            TextField(
-              controller: noteCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Note (optional)',
-                prefixIcon: Icon(Icons.note_outlined),
+              const SizedBox(height: DesignTokens.spaceSm),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Note (optional)',
+                  prefixIcon: Icon(Icons.note_outlined),
+                ),
+                minLines: 1,
+                maxLines: 3,
               ),
-              minLines: 1,
-              maxLines: 3,
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(noteCtrl.text),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: DesignTokens.brandPrimary,
+              const SizedBox(height: DesignTokens.spaceLg),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(sheetContext).pop(noteCtrl.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: DesignTokens.brandPrimary,
+                ),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Confirm credit sale'),
               ),
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Confirm credit sale'),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     } finally {
@@ -1996,6 +2200,8 @@ class _ProductTile extends StatelessWidget {
     required this.name,
     required this.price,
     this.stock,
+    this.stockEnabled = true,
+    this.lowStockThreshold = 5,
     this.imageUrl,
     this.onTap,
   });
@@ -2003,23 +2209,33 @@ class _ProductTile extends StatelessWidget {
   final String name;
   final double price;
   final int? stock;
+  final bool stockEnabled;
+  final int lowStockThreshold;
   final String? imageUrl;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final lowStock = stock != null && stock! < 5;
+    final effectiveStock = stockEnabled ? stock : null;
+    final outOfStock = effectiveStock != null && effectiveStock <= 0;
+    final lowStock =
+        effectiveStock != null && effectiveStock > 0 && effectiveStock <= lowStockThreshold;
+    final isDisabled = onTap == null;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         decoration: BoxDecoration(
           color: DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
-          border: lowStock
-              ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
-              : null,
+          border: outOfStock
+              ? Border.all(color: DesignTokens.error.withValues(alpha: 0.55))
+              : lowStock
+                  ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
+                  : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2057,13 +2273,15 @@ class _ProductTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (stock != null)
+                      if (effectiveStock != null)
                         Text(
-                          '$stock',
+                          outOfStock ? 'OUT' : '$effectiveStock',
                           style: DesignTokens.textSmall.copyWith(
-                            color: lowStock
-                                ? DesignTokens.warning
-                                : DesignTokens.grayMedium,
+                            color: outOfStock
+                                ? DesignTokens.error
+                                : lowStock
+                                    ? DesignTokens.warning
+                                    : DesignTokens.grayMedium,
                           ),
                         ),
                     ],
@@ -2072,6 +2290,7 @@ class _ProductTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -2217,7 +2436,7 @@ class _CartPane extends StatelessWidget {
   final Customer? customer;
   final int parkedCount;
   final VoidCallback onSelectCustomer;
-  final void Function(String id, int quantity) onUpdateQuantity;
+  final Future<void> Function(String id, int quantity) onUpdateQuantity;
   final void Function(CartLine line) onEditPrice;
   final VoidCallback onPark;
   final VoidCallback onCheckout;
@@ -2324,10 +2543,13 @@ class _CartPane extends StatelessWidget {
                         title: line.title,
                         price: line.price,
                         quantity: line.quantity,
-                        onIncrement: () =>
-                            onUpdateQuantity(line.id, line.quantity + 1),
-                        onDecrement: () =>
-                            onUpdateQuantity(line.id, line.quantity - 1),
+                        availableStock: line.availableStock,
+                        onIncrement: () => unawaited(
+                          onUpdateQuantity(line.id, line.quantity + 1),
+                        ),
+                        onDecrement: () => unawaited(
+                          onUpdateQuantity(line.id, line.quantity - 1),
+                        ),
                         onEditPrice: () => onEditPrice(line),
                       );
                     },
@@ -2403,6 +2625,7 @@ class _CartItem extends StatelessWidget {
     required this.title,
     required this.price,
     required this.quantity,
+    required this.availableStock,
     required this.onIncrement,
     required this.onDecrement,
     required this.onEditPrice,
@@ -2411,12 +2634,14 @@ class _CartItem extends StatelessWidget {
   final String title;
   final double price;
   final int quantity;
+  final int? availableStock;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
   final VoidCallback onEditPrice;
 
   @override
   Widget build(BuildContext context) {
+    final atMax = availableStock != null && quantity >= availableStock!;
     return GestureDetector(
       onLongPress: onEditPrice,
       child: Padding(
@@ -2437,6 +2662,15 @@ class _CartItem extends StatelessWidget {
                         price.toUgx(),
                         style: DesignTokens.textSmall,
                       ),
+                      if (availableStock != null) ...[
+                        const SizedBox(width: DesignTokens.spaceXs),
+                        Text(
+                          'Stock ${availableStock!}',
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: DesignTokens.spaceXs),
                       Icon(
                         Icons.edit,
@@ -2463,7 +2697,7 @@ class _CartItem extends StatelessWidget {
                   Text('$quantity', style: DesignTokens.textBodyBold),
                   IconButton(
                     icon: const Icon(Icons.add, size: 18),
-                    onPressed: onIncrement,
+                    onPressed: atMax ? null : onIncrement,
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -2555,36 +2789,40 @@ class _PaymentMethodTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: DesignTokens.paddingMd,
-        decoration: BoxDecoration(
-          color: DesignTokens.grayLight.withValues(alpha: 0.3),
-          borderRadius: DesignTokens.borderRadiusMd,
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: DesignTokens.paddingSm,
-              decoration: BoxDecoration(
-                color: DesignTokens.brandPrimary.withValues(alpha: 0.1),
-                borderRadius: DesignTokens.borderRadiusSm,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: DesignTokens.borderRadiusMd,
+        child: Ink(
+          padding: DesignTokens.paddingMd,
+          decoration: BoxDecoration(
+            color: DesignTokens.grayLight.withValues(alpha: 0.3),
+            borderRadius: DesignTokens.borderRadiusMd,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: DesignTokens.paddingSm,
+                decoration: BoxDecoration(
+                  color: DesignTokens.brandPrimary.withValues(alpha: 0.1),
+                  borderRadius: DesignTokens.borderRadiusSm,
+                ),
+                child: Icon(icon, color: DesignTokens.brandPrimary),
               ),
-              child: Icon(icon, color: DesignTokens.brandPrimary),
-            ),
-            const SizedBox(width: DesignTokens.spaceMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: DesignTokens.textBodyBold),
-                  Text(subtitle, style: DesignTokens.textSmall),
-                ],
+              const SizedBox(width: DesignTokens.spaceMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: DesignTokens.textBodyBold),
+                    Text(subtitle, style: DesignTokens.textSmall),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
-          ],
+              const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+            ],
+          ),
         ),
       ),
     );

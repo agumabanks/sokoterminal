@@ -12,11 +12,30 @@ class AppConfig {
   final String logLevel;
 
   factory AppConfig.fromEnv(Map<String, String> env) {
+    const apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
+    const connectTimeoutOverride = int.fromEnvironment(
+      'CONNECT_TIMEOUT_MS',
+      defaultValue: 0,
+    );
+    const receiveTimeoutOverride = int.fromEnvironment(
+      'RECEIVE_TIMEOUT_MS',
+      defaultValue: 0,
+    );
+    const logLevelOverride = String.fromEnvironment('LOG_LEVEL');
+
     return AppConfig(
-      apiBaseUrl: env['API_BASE_URL'] ?? 'https://soko.sanaa.ug/api/',
-      connectTimeoutMs: int.tryParse(env['CONNECT_TIMEOUT_MS'] ?? '') ?? 15000,
-      receiveTimeoutMs: int.tryParse(env['RECEIVE_TIMEOUT_MS'] ?? '') ?? 20000,
-      logLevel: env['LOG_LEVEL'] ?? 'info',
+      apiBaseUrl: apiBaseUrlOverride.isNotEmpty
+          ? apiBaseUrlOverride
+          : (env['API_BASE_URL'] ?? 'https://soko.sanaa.ug/api/'),
+      connectTimeoutMs: connectTimeoutOverride > 0
+          ? connectTimeoutOverride
+          : (int.tryParse(env['CONNECT_TIMEOUT_MS'] ?? '') ?? 15000),
+      receiveTimeoutMs: receiveTimeoutOverride > 0
+          ? receiveTimeoutOverride
+          : (int.tryParse(env['RECEIVE_TIMEOUT_MS'] ?? '') ?? 20000),
+      logLevel: logLevelOverride.isNotEmpty
+          ? logLevelOverride
+          : (env['LOG_LEVEL'] ?? 'info'),
     );
   }
 }

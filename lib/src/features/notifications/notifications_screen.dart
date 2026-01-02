@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_providers.dart';
+import '../../core/db/app_database.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import 'notifications_controller.dart';
@@ -12,6 +16,10 @@ enum NotificationCategory { all, orders, payments, stock, system }
 /// Provider for selected category filter
 final selectedCategoryProvider = StateProvider<NotificationCategory>((ref) => NotificationCategory.all);
 
+final lowStockAlertsProvider = StreamProvider<List<Item>>((ref) {
+  return ref.watch(appDatabaseProvider).watchItems();
+});
+
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
@@ -20,9 +28,20 @@ class NotificationsScreen extends ConsumerWidget {
     final state = ref.watch(notificationsControllerProvider);
     final controller = ref.read(notificationsControllerProvider.notifier);
     final selectedCategory = ref.watch(selectedCategoryProvider);
+    final lowStockItemsAsync = ref.watch(lowStockAlertsProvider);
+    final lowStockCount = lowStockItemsAsync.maybeWhen(
+      data: (items) => items.where((i) {
+        final threshold = i.lowStockWarning ?? 5;
+        return i.stockEnabled && i.stockQty <= threshold;
+      }).length,
+      orElse: () => 0,
+    );
     
     // Filter notifications by category
     final filteredItems = _filterByCategory(state.items, selectedCategory);
+    final unreadCounts = _getUnreadCounts(state.items);
+    unreadCounts[NotificationCategory.stock] =
+        (unreadCounts[NotificationCategory.stock] ?? 0) + lowStockCount;
     
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -50,39 +69,110 @@ class NotificationsScreen extends ConsumerWidget {
       body: Column(
         children: [
           // Summary / Stats bar
-          _StatsSummary(state: state),
+          _StatsSummary(state: state, stockAlertsCount: lowStockCount),
           
           // Category filter chips
           _CategoryFilter(
             selected: selectedCategory,
-            unreadCounts: _getUnreadCounts(state.items),
+            unreadCounts: unreadCounts,
             onSelect: (cat) => ref.read(selectedCategoryProvider.notifier).state = cat,
           ),
           
           // Notifications list
           Expanded(
-            child: state.loading && state.items.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: () => controller.load(),
-                    child: filteredItems.isEmpty
-                        ? _EmptyState(
-                            category: selectedCategory,
-                            error: state.error,
-                          )
-                        : ListView.builder(
-                            padding: DesignTokens.paddingScreen,
-                            itemCount: filteredItems.length,
-                            itemBuilder: (context, index) {
-                              final item = filteredItems[index];
-                              return _NotificationCard(
-                                notification: item,
-                                onTap: () => _handleTap(context, controller, item),
-                                onDismiss: () => _handleDelete(context, controller, item),
-                              );
-                            },
-                          ),
-                  ),
+            child: selectedCategory == NotificationCategory.stock
+                ? lowStockItemsAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => _EmptyState(
+                      category: selectedCategory,
+                      error: e.toString(),
+                    ),
+                    data: (items) {
+                      final low = items.where((i) {
+                        final threshold = i.lowStockWarning ?? 5;
+                        return i.stockEnabled && i.stockQty <= threshold;
+                      }).toList()
+                        ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
+
+                      return RefreshIndicator(
+                        onRefresh: () async {
+                          await ref.read(syncServiceProvider).syncNow();
+                          await controller.load();
+                        },
+                        child: low.isEmpty
+                            ? _EmptyState(category: selectedCategory, error: state.error)
+                            : ListView.separated(
+                                padding: DesignTokens.paddingScreen,
+                                itemCount: low.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: DesignTokens.spaceSm),
+                                itemBuilder: (context, index) {
+                                  final item = low[index];
+                                  final threshold = item.lowStockWarning ?? 5;
+                                  final outOfStock = item.stockQty <= 0;
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: DesignTokens.surfaceWhite,
+                                      borderRadius: DesignTokens.borderRadiusMd,
+                                      boxShadow: DesignTokens.shadowSm,
+                                      border: Border.all(
+                                        color: outOfStock
+                                            ? DesignTokens.error.withValues(alpha: 0.35)
+                                            : DesignTokens.warning.withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: outOfStock
+                                            ? DesignTokens.error
+                                            : DesignTokens.warning,
+                                        child: Icon(
+                                          outOfStock
+                                              ? Icons.inventory_2_outlined
+                                              : Icons.warning_amber_outlined,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      title: Text(item.name, style: DesignTokens.textBodyBold),
+                                      subtitle: Text(
+                                        outOfStock
+                                            ? 'Out of stock • Reorder at $threshold'
+                                            : 'Stock ${item.stockQty} • Reorder at $threshold',
+                                        style: DesignTokens.textSmall,
+                                      ),
+                                      trailing: const Icon(Icons.chevron_right),
+                                      onTap: () => context.go('/home/more/low-stock'),
+                                    ),
+                                  );
+                                },
+                              ),
+                      );
+                    },
+                  )
+                : state.loading && state.items.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: () => controller.load(),
+                        child: filteredItems.isEmpty
+                            ? _EmptyState(
+                                category: selectedCategory,
+                                error: state.error,
+                              )
+                            : ListView.builder(
+                                padding: DesignTokens.paddingScreen,
+                                itemCount: filteredItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = filteredItems[index];
+                                  return _NotificationCard(
+                                    notification: item,
+                                    onTap: () =>
+                                        _handleTap(context, controller, item),
+                                    onDismiss: () =>
+                                        _handleDelete(context, controller, item),
+                                  );
+                                },
+                              ),
+                      ),
           ),
         ],
       ),
@@ -164,8 +254,9 @@ class NotificationsScreen extends ConsumerWidget {
 
 /// Stats summary at the top
 class _StatsSummary extends StatelessWidget {
-  const _StatsSummary({required this.state});
+  const _StatsSummary({required this.state, required this.stockAlertsCount});
   final NotificationsState state;
+  final int stockAlertsCount;
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +272,14 @@ class _StatsSummary extends StatelessWidget {
               icon: Icons.notifications_active,
               value: '${state.unreadCount}',
               label: 'Unread',
+            ),
+          ),
+          Container(width: 1, height: 40, color: Colors.white24),
+          Expanded(
+            child: _StatItem(
+              icon: Icons.inventory_2_outlined,
+              value: '$stockAlertsCount',
+              label: 'Stock',
             ),
           ),
           Container(width: 1, height: 40, color: Colors.white24),

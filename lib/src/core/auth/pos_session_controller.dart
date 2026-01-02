@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app_providers.dart';
 import '../db/app_database.dart';
 import '../network/seller_api.dart';
 import '../storage/secure_storage.dart';
 import '../sync/sync_service.dart';
+import 'pos_staff_prefs.dart';
 
 class PosSessionState {
   const PosSessionState({
@@ -60,11 +62,13 @@ final posSessionProvider =
   final api = ref.watch(sellerApiProvider);
   final db = ref.watch(appDatabaseProvider);
   final sync = ref.watch(syncServiceProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
   return PosSessionController(
     storage: storage,
     api: api,
     db: db,
     syncService: sync,
+    prefs: prefs,
   )..load();
 });
 
@@ -74,16 +78,19 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     required SellerApi api,
     required AppDatabase db,
     required SyncService syncService,
+    required SharedPreferences prefs,
   })  : _storage = storage,
         _api = api,
         _db = db,
         _sync = syncService,
+        _prefs = prefs,
         super(PosSessionState.empty);
 
   final SecureStorage _storage;
   final SellerApi _api;
   final AppDatabase _db;
   final SyncService _sync;
+  final SharedPreferences _prefs;
 
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
@@ -92,15 +99,14 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     final cachedStaffName = await _storage.readPosSessionStaffName();
     final cachedStaffRole = await _storage.readPosSessionStaffRole();
     final cachedExpiresAt = await _storage.readPosSessionExpiresAt();
-    if (token == null || token.trim().isEmpty) {
-      state = PosSessionState.empty;
-      return;
-    }
-
     try {
       final res = await _api.posSessionMe();
       final data = res.data;
       if (data is! Map) {
+        if (token == null || token.trim().isEmpty) {
+          state = PosSessionState.empty;
+          return;
+        }
         state = PosSessionState(
           token: token,
           expiresAt: cachedExpiresAt,
@@ -112,8 +118,19 @@ class PosSessionController extends StateNotifier<PosSessionState> {
         return;
       }
       final map = Map<String, dynamic>.from(data);
+      final staffInitialized = map['staff_initialized'];
+      if (staffInitialized is bool) {
+        await _prefs.setBool(posStaffInitializedPrefKey, staffInitialized);
+      } else if (staffInitialized is num) {
+        await _prefs.setBool(posStaffInitializedPrefKey, staffInitialized != 0);
+      }
+
       final active = map['active'] == true || map['active'] == 1;
       if (!active) {
+        if (token == null || token.trim().isEmpty) {
+          state = PosSessionState.empty;
+          return;
+        }
         await _storage.deletePosSessionToken();
         await _storage.deletePosSessionMeta();
         state = PosSessionState.empty;
@@ -149,6 +166,10 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       }
     } catch (_) {
       // Best-effort: keep the token (offline) but avoid blocking the UI.
+      if (token == null || token.trim().isEmpty) {
+        state = PosSessionState.empty;
+        return;
+      }
       state = PosSessionState(
         token: token,
         expiresAt: cachedExpiresAt,
@@ -199,6 +220,7 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       }
 
       await _storage.writePosSessionToken(token);
+      await _prefs.setBool(posStaffInitializedPrefKey, true);
       if (staffId != null && staffName != null && staffRole != null) {
         await _storage.writePosSessionMeta(
           staffId: staffId,

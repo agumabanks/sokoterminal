@@ -1,15 +1,21 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/sync/sync_service.dart';
+import '../../core/telemetry/telemetry.dart';
 
-final ordersControllerProvider = StateNotifierProvider<OrdersController, OrdersState>((ref) {
+final ordersControllerProvider =
+    StateNotifierProvider<OrdersController, OrdersState>((ref) {
   final api = ref.watch(sellerApiProvider);
   final db = ref.watch(appDatabaseProvider);
-  return OrdersController(api, db)..load();
+  final sync = ref.watch(syncServiceProvider);
+  return OrdersController(api, db, sync)..load();
 });
 
 class OrdersState {
@@ -20,9 +26,11 @@ class OrdersState {
 }
 
 class OrdersController extends StateNotifier<OrdersState> {
-  OrdersController(this.api, this.db) : super(const OrdersState());
+  OrdersController(this.api, this.db, this.sync) : super(const OrdersState());
   final SellerApi api;
   final AppDatabase db;
+  final SyncService sync;
+  static const _uuid = Uuid();
 
   Future<void> load() async {
     state = OrdersState(loading: true, orders: state.orders);
@@ -59,11 +67,60 @@ class OrdersController extends StateNotifier<OrdersState> {
   }) async {
     state = OrdersState(orders: state.orders, loading: true);
     try {
-      await api.updateOrderDeliveryStatus(orderId: orderId, status: delivery);
-      await api.updateOrderPaymentStatus(orderId: orderId, status: payment);
+      if (delivery.trim().isNotEmpty) {
+        await api.updateOrderDeliveryStatus(orderId: orderId, status: delivery);
+      }
+      if (payment.trim().isNotEmpty) {
+        await api.updateOrderPaymentStatus(orderId: orderId, status: payment);
+      }
       await load();
     } catch (e) {
-      state = OrdersState(error: e.toString(), orders: state.orders);
+      // Offline-first: enqueue and optimistically update cache/UI.
+      final opType = 'order_status_update:$orderId';
+      await sync.enqueue(opType, {
+        'order_id': orderId,
+        'delivery_status': delivery,
+        'payment_status': payment,
+        'idempotency_key': _uuid.v4(),
+      });
+
+      final updatedOrders = [
+        for (final o in state.orders)
+          if (o['id']?.toString() == orderId.toString())
+            {
+              ...o,
+              'delivery_status': delivery,
+              'delivery_status_raw': delivery,
+              if (payment.trim().isNotEmpty) 'payment_status': payment,
+              'pending_sync': true,
+            }
+          else
+            o
+      ];
+
+      final existing = updatedOrders.cast<Map<String, dynamic>?>().firstWhere(
+            (o) => o?['id']?.toString() == orderId.toString(),
+            orElse: () => null,
+          );
+      if (existing != null) {
+        await db.upsertCachedOrder(orderId, jsonEncode(existing));
+      }
+
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'order_status_update_queued',
+            props: {'order_id': orderId, 'delivery': delivery, 'payment': payment},
+          ),
+        );
+      }
+
+      state = OrdersState(
+        error: 'Queued for sync: ${e.toString()}',
+        orders: updatedOrders,
+        loading: false,
+      );
     }
   }
 

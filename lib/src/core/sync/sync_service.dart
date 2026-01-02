@@ -47,6 +47,7 @@ class SyncService {
   bool _pumpQueued = false;
   Future<void>? _pullInFlight;
   static const _contactsSyncKey = 'device_contacts_synced_at';
+  static const _contactsOptInKey = 'device_contacts_opt_in';
   static const _contactsSyncInterval = Duration(hours: 12);
 
   void start() {
@@ -108,6 +109,18 @@ class SyncService {
     await db.enqueueSync(type, jsonEncode(payload));
   }
 
+  Future<bool> isDeviceContactsOptedIn() async {
+    final raw = await secureStorage.read(key: _contactsOptInKey);
+    return raw == '1' || raw?.toLowerCase() == 'true';
+  }
+
+  Future<void> setDeviceContactsOptIn(bool enabled) async {
+    await secureStorage.write(
+      key: _contactsOptInKey,
+      value: enabled ? '1' : '0',
+    );
+  }
+
   Future<void> _pump() async {
     if (_isPumping) {
       _pumpQueued = true;
@@ -166,6 +179,14 @@ class SyncService {
       } catch (_) {
         // Best effort: next pump will retry.
       }
+
+      // Keep operational queues warm (Inbox).
+      try {
+        await pullMarketplaceOrders();
+      } catch (_) {}
+      try {
+        await pullServiceBookings();
+      } catch (_) {}
 
       try {
         await _pushTemplates();
@@ -299,6 +320,16 @@ class SyncService {
       final msg = (data is Map ? data['message']?.toString() : null) ?? '';
       final normalized = msg.toLowerCase();
       if (normalized.contains('still being processed')) return false;
+      if (normalized.contains('referenced sale') && normalized.contains('not found')) {
+        return false;
+      }
+      if (normalized.contains('sync the original sale first')) return false;
+      if (data is Map) {
+        final conflicts = data['conflicts'];
+        if (conflicts is List && conflicts.isNotEmpty) {
+          return true;
+        }
+      }
       return true;
     }
     return true;
@@ -472,6 +503,81 @@ class SyncService {
 
   Future<void> _dispatch(SyncOp op) async {
     final payload = jsonDecode(op.payload) as Map<String, dynamic>;
+
+    if (op.opType.startsWith('order_status_update:')) {
+      final orderId = _asInt(payload['order_id']);
+      if (orderId <= 0) {
+        throw DioException(
+          requestOptions: RequestOptions(path: op.opType),
+          error: 'Missing order_id for order status update',
+        );
+      }
+      final delivery = (payload['delivery_status'] ?? payload['delivery'] ?? '')
+          .toString()
+          .trim();
+      final payment = (payload['payment_status'] ?? payload['payment'] ?? '')
+          .toString()
+          .trim();
+      if (delivery.isNotEmpty) {
+        await sellerApi.updateOrderDeliveryStatus(
+          orderId: orderId,
+          status: delivery,
+        );
+      }
+      if (payment.isNotEmpty) {
+        await sellerApi.updateOrderPaymentStatus(
+          orderId: orderId,
+          status: payment,
+        );
+      }
+      try {
+        final res = await sellerApi.fetchOrderDetails(orderId);
+        final raw = res.data;
+        final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
+        final first =
+            (listRaw is List && listRaw.isNotEmpty) ? listRaw.first : null;
+        if (first is Map) {
+          await db.upsertCachedOrder(
+            orderId,
+            jsonEncode(Map<String, dynamic>.from(first)),
+          );
+        }
+      } catch (_) {}
+      return;
+    }
+
+    if (op.opType.startsWith('booking_action:')) {
+      final bookingId = _asInt(payload['booking_id']);
+      if (bookingId <= 0) {
+        throw DioException(
+          requestOptions: RequestOptions(path: op.opType),
+          error: 'Missing booking_id for booking action',
+        );
+      }
+      final action = (payload['action'] ?? '').toString().trim().toLowerCase();
+      switch (action) {
+        case 'confirm':
+          await sellerApi.confirmServiceBooking(bookingId);
+          break;
+        case 'complete':
+          await sellerApi.completeServiceBooking(bookingId);
+          break;
+        case 'cancel':
+          await sellerApi.cancelServiceBooking(
+            bookingId,
+            reason: payload['reason']?.toString(),
+          );
+          break;
+        default:
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Unknown booking action "$action"',
+          );
+      }
+      await pullServiceBookings();
+      return;
+    }
+
     switch (op.opType) {
       case 'item_create':
       case 'item_update':
@@ -768,9 +874,10 @@ class SyncService {
             '';
         final body = Map<String, dynamic>.from(payload);
 
-        // Backend expects `ref_entry_id` for refunds; older client payloads used
+        // Backend expects `ref_entry_id` for refunds/voids; older client payloads used
         // `original_entry_id`.
-        if ((body['type'] ?? '').toString() == 'refund') {
+        final type = (body['type'] ?? '').toString();
+        if (type == 'refund' || type == 'void') {
           body['ref_entry_id'] ??= body['original_entry_id'];
         }
 
@@ -941,6 +1048,52 @@ class SyncService {
             error: 'Audit log ack idempotency mismatch',
           );
         }
+        break;
+      case 'expense_push':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['expense_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for expense',
+          );
+        }
+
+        final expenseId = payload['expense_id']?.toString() ?? '';
+        if (expenseId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing expense_id for expense',
+          );
+        }
+
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final res = await sellerApi.pushExpense(body, idempotencyKey: key);
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid expense ack response shape',
+          );
+        }
+
+        final ack = PosLedgerAck.fromJson(res.data as Map<String, dynamic>);
+        if (ack.idempotencyKey != key) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Expense ack idempotency mismatch',
+          );
+        }
+
+        final remoteId = int.tryParse(ack.serverEntryId);
+        if (remoteId == null) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid server_entry_id for expense',
+          );
+        }
+        await db.markExpenseSynced(expenseId, remoteId);
         break;
       case 'grn_push':
         final key =
@@ -1294,6 +1447,110 @@ class SyncService {
         }
         await sellerApi.deleteServiceVariant(variantId);
         break;
+      case 'business_profile_patch':
+        await sellerApi.updatePosBusinessProfile(
+          payload,
+          idempotencyKey: 'syncop:${op.id}',
+        );
+        break;
+      case 'shift_push':
+      case 'shift_open':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['shift_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for shift',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
+        await sellerApi.pushShift(body, idempotencyKey: key);
+        final shiftId = payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
+        if (shiftId.isNotEmpty) {
+          await (db.update(db.shifts)..where((t) => t.id.equals(shiftId)))
+              .write(const ShiftsCompanion(synced: drift.Value(true)));
+        }
+        break;
+      case 'shift_close':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['shift_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for shift close',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
+        await sellerApi.closeShift(body, idempotencyKey: key);
+        final shiftId = payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
+        if (shiftId.isNotEmpty) {
+          await (db.update(db.shifts)..where((t) => t.id.equals(shiftId)))
+              .write(const ShiftsCompanion(synced: drift.Value(true)));
+        }
+        break;
+      case 'setting_push':
+      case 'settings_push':
+        // Settings sync - just push to server, no local table
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['key']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing key for setting',
+          );
+        }
+        final body = <String, dynamic>{
+          'key': payload['key'],
+          'value': payload['value'],
+        };
+        await sellerApi.pushSetting(body, idempotencyKey: key);
+        break;
+      case 'supplier_push':
+      case 'supplier_create':
+        final key =
+            payload['idempotency_key']?.toString() ??
+            payload['supplier_id']?.toString() ??
+            '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for supplier',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
+        await sellerApi.createSupplier(body, idempotencyKey: key);
+        break;
+      case 'package_purchase_push':
+        final key = payload['idempotency_key']?.toString() ?? '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for package purchase',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        await sellerApi.pushPackagePurchase(body, idempotencyKey: key);
+        break;
+      case 'package_redemption_push':
+        final key = payload['idempotency_key']?.toString() ?? '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for redemption',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        await sellerApi.pushPackageRedemption(body, idempotencyKey: key);
+        break;
       default:
         throw DioException(
           requestOptions: RequestOptions(path: op.opType),
@@ -1472,6 +1729,16 @@ class SyncService {
               updatedAt: drift.Value(s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc()),
             ),
           );
+
+          // Keep low-stock alerts in sync even if no local inventory movements
+          // occurred (e.g., after a server-side stock adjustment).
+          final threshold = p.lowStockQuantity ?? 5;
+          await db.upsertOrResolveStockAlert(
+            itemId: localId,
+            variant: variant,
+            stockQty: s.qty,
+            threshold: threshold,
+          );
         }
         await db.deleteItemStocksNotIn(localId, variants);
       }
@@ -1494,6 +1761,41 @@ class SyncService {
             category: drift.Value(s.category),
             publishedOnline: drift.Value(s.published),
             updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
+            synced: const drift.Value(true),
+          ),
+        );
+      }
+
+      // Upsert service variants from pull
+      for (final v in pull.serviceVariants) {
+        if (v.id.isEmpty || v.serviceId.isEmpty) continue;
+        await db.upsertServiceVariant(
+          ServiceVariantsCompanion(
+            id: drift.Value(v.id),
+            serviceId: drift.Value(v.serviceId),
+            name: drift.Value(v.name),
+            price: drift.Value(v.price),
+            unit: drift.Value(v.unit),
+            isDefault: drift.Value(v.isDefault),
+            updatedAt: drift.Value(v.updatedAt ?? DateTime.now().toUtc()),
+            synced: const drift.Value(true),
+          ),
+        );
+      }
+
+      // Upsert service packages from pull
+      for (final p in pull.servicePackages) {
+        if (p.id.isEmpty) continue;
+        await db.into(db.servicePackages).insertOnConflictUpdate(
+          ServicePackagesCompanion(
+            id: drift.Value(p.id),
+            serviceId: drift.Value(p.serviceId),
+            name: drift.Value(p.name),
+            totalSessions: drift.Value(p.totalSessions),
+            price: drift.Value(p.price),
+            validityDays: drift.Value(p.validityDays),
+            active: drift.Value(p.active),
+            updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
             synced: const drift.Value(true),
           ),
         );
@@ -1537,6 +1839,124 @@ class SyncService {
             updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
           ),
         );
+      }
+
+      _syncStatusController.add('Syncing expenses...');
+      for (final e in pull.expenses) {
+        if (e.id <= 0) continue;
+
+        final clientId = (e.clientExpenseId ?? '').trim();
+        Expense? existing;
+        String localId;
+
+        if (clientId.isNotEmpty) {
+          existing = await db.getExpenseById(clientId);
+          localId = existing?.id ?? clientId;
+        } else {
+          existing = await db.getExpenseByRemoteId(e.id);
+          localId = existing?.id ?? e.id.toString();
+        }
+
+        final occurredAt =
+            e.occurredAt ?? e.updatedAt ?? DateTime.now().toUtc();
+        await db.upsertExpense(
+          ExpensesCompanion.insert(
+            id: drift.Value(localId),
+            remoteId: drift.Value(e.id),
+            outletId: pull.outletId.trim().isNotEmpty
+                ? drift.Value(pull.outletId)
+                : const drift.Value.absent(),
+            staffId: const drift.Value.absent(),
+            amount: e.amount,
+            method: e.method.trim().isEmpty ? 'cash' : e.method.trim(),
+            category: e.category.trim().isEmpty ? 'other' : e.category.trim(),
+            supplierId: e.supplierId != null
+                ? drift.Value(e.supplierId)
+                : const drift.Value.absent(),
+            note: drift.Value(e.note),
+            occurredAt: drift.Value(occurredAt),
+            synced: const drift.Value(true),
+            updatedAt: drift.Value(e.updatedAt ?? DateTime.now().toUtc()),
+          ),
+        );
+      }
+
+      // Sync quotations (pulled from server)
+      _syncStatusController.add('Syncing quotations...');
+      for (final q in pull.quotations) {
+        if (q.id.isEmpty) continue;
+        
+        // Upsert quotation using insertOnConflictUpdate
+        await db.into(db.quotations).insertOnConflictUpdate(QuotationsCompanion(
+          id: drift.Value(q.id),
+          number: drift.Value(q.quotationNumber),
+          customerId: drift.Value(q.customerId),
+          validUntil: drift.Value(DateTime.now().add(Duration(days: q.validityDays))),
+          totalAmount: drift.Value(q.total),
+          notes: drift.Value(q.notes),
+          synced: const drift.Value(true),
+        ));
+      }
+
+      // Sync customer packages
+      _syncStatusController.add('Syncing packages...');
+      for (final p in pull.customerPackages) {
+        if (p.id <= 0) continue;
+        await db.into(db.customerPackages).insertOnConflictUpdate(CustomerPackagesCompanion(
+            id: drift.Value(p.id.toString()),
+            packageId: drift.Value(p.packageId),
+            customerId: drift.Value(p.customerId),
+            remainingSessions: drift.Value(p.remainingSessions),
+            expiresAt: drift.Value(p.expiresAt),
+            synced: const drift.Value(true)
+        ));
+      }
+
+      // Sync redemptions
+      for (final r in pull.packageRedemptions) {
+        if (r.id <= 0) continue;
+        await db.into(db.packageRedemptions).insertOnConflictUpdate(PackageRedemptionsCompanion(
+             id: drift.Value(r.id.toString()),
+             customerPackageId: drift.Value(r.customerPackageId.toString()),
+             sessionsUsed: drift.Value(r.sessionsUsed),
+             note: drift.Value(r.note),
+             synced: const drift.Value(true)
+        ));
+      }
+
+      // Sync shifts (pulled from server)
+      _syncStatusController.add('Syncing shifts...');
+      for (final s in pull.shifts) {
+        if (s.id.isEmpty) continue;
+        
+        await db.into(db.shifts).insertOnConflictUpdate(ShiftsCompanion(
+          id: drift.Value(s.id),
+          outletId: drift.Value(s.outletId?.toString()),
+          staffId: drift.Value(s.staffId?.toString()),
+          openedAt: drift.Value(s.openedAt),
+          closedAt: drift.Value(s.closedAt),
+          openingFloat: drift.Value(s.openingFloat),
+          closingFloat: drift.Value(s.closingFloat ?? 0),
+          synced: const drift.Value(true),
+        ));
+      }
+
+      // Sync cash movements (pulled from server)
+      _syncStatusController.add('Syncing cash movements...');
+      for (final m in pull.cashMovements) {
+        if (m.id <= 0) continue;
+        
+        // CashMovements has auto-increment id, so we can't use insertOnConflictUpdate easily.
+        // Just skip existing records 
+        debugPrint('[SyncService] Received cash movement ${m.id} from server');
+      }
+
+      // Settings sync - store in shared preferences or secure storage
+      // since there's no AppSettings table
+      _syncStatusController.add('Syncing settings...');
+      for (final setting in pull.settings) {
+        if (setting.key.isEmpty) continue;
+        debugPrint('[SyncService] Received setting ${setting.key}=${setting.value} from server');
       }
 
       final outlet = pull.outlet;
@@ -1679,10 +2099,41 @@ class SyncService {
     await pullPosDelta();
   }
 
+  Future<void> pullMarketplaceOrders() async {
+    final res = await sellerApi.fetchOrders();
+    final data = res.data;
+    final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+    final list = List<Map<String, dynamic>>.from(
+      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+    );
+    for (final order in list) {
+      final id = int.tryParse(order['id']?.toString() ?? '');
+      if (id == null) continue;
+      await db.upsertCachedOrder(id, jsonEncode(order));
+    }
+  }
+
+  Future<void> pullServiceBookings() async {
+    final res = await sellerApi.fetchServiceBookings();
+    final data = res.data;
+    final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+    final list = List<Map<String, dynamic>>.from(
+      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+    );
+    for (final booking in list) {
+      final id = int.tryParse(booking['id']?.toString() ?? '');
+      if (id == null) continue;
+      await db.upsertCachedServiceBooking(id, jsonEncode(booking));
+    }
+  }
+
   Future<void> syncDeviceContacts({
     bool force = false,
     List<Contact>? contacts,
   }) async {
+    final optedIn = await isDeviceContactsOptedIn();
+    if (!optedIn) return;
+
     final status = await Permission.contacts.status;
     if (!status.isGranted) return;
 
@@ -1697,19 +2148,22 @@ class SyncService {
       }
     }
 
-    final deviceContacts = contacts ??
-        await FlutterContacts.getContacts(withProperties: true);
-    if (deviceContacts.isEmpty) {
-      await secureStorage.write(
-        key: _contactsSyncKey,
-        value: DateTime.now().toUtc().toIso8601String(),
-      );
-      return;
-    }
+    final sw = Stopwatch()..start();
+    try {
+      final deviceContacts = contacts ??
+          await FlutterContacts.getContacts(withProperties: true);
+      if (deviceContacts.isEmpty) {
+        await secureStorage.write(
+          key: _contactsSyncKey,
+          value: DateTime.now().toUtc().toIso8601String(),
+        );
+        return;
+      }
 
-    _syncStatusController.add('Syncing contacts...');
-    final payloads = _buildContactPayloads(deviceContacts);
-    if (payloads.isEmpty) return;
+      _syncStatusController.add('Syncing contacts...');
+      await importDeviceContacts(deviceContacts);
+      final payloads = _buildContactPayloads(deviceContacts);
+      if (payloads.isEmpty) return;
 
     const batchSize = 200;
     for (var i = 0; i < payloads.length; i += batchSize) {
@@ -1749,23 +2203,120 @@ class SyncService {
         final phones = payload['phones'];
         final emails = payload['emails'];
 
+        final deviceId = payload['external_id']?.toString() ?? '';
+        final phone = _firstString(phones);
+        final email = _firstString(emails);
+
+        String? linkedCustomerId;
+        if (deviceId.isNotEmpty) {
+          final dc = await (db.select(db.deviceContacts)
+                ..where((t) => t.deviceId.equals(deviceId)))
+              .getSingleOrNull();
+          linkedCustomerId = dc?.linkedCustomerId;
+        }
+
+        Customer? existing;
+        if (linkedCustomerId != null && linkedCustomerId.trim().isNotEmpty) {
+          existing = await db.getCustomerById(linkedCustomerId.trim());
+        }
+        existing ??=
+            (contactId.isNotEmpty ? await db.getCustomerByRemoteId(contactId) : null);
+        existing ??=
+            (phone != null && phone.isNotEmpty ? await db.getCustomerByPhoneE164(phone) : null);
+        existing ??=
+            (email != null && email.isNotEmpty ? await db.getCustomerByEmail(email) : null);
+
+        final localCustomerId = existing?.id ?? _uuid.v4();
         await db.upsertCustomer(
           CustomersCompanion.insert(
-            id: drift.Value(contactId),
+            id: drift.Value(localCustomerId),
+            remoteId: drift.Value(contactId),
             name: payload['display_name']?.toString() ?? 'Contact',
-            phone: drift.Value(_firstString(phones)),
-            email: drift.Value(_firstString(emails)),
+            phone: drift.Value(phone),
+            email: drift.Value(email),
             synced: const drift.Value(true),
             updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
           ),
         );
+
+        if (deviceId.isNotEmpty) {
+          await db.linkDeviceContactToCustomer(
+            deviceId: deviceId,
+            customerId: localCustomerId,
+          );
+        }
       }
     }
 
-    await secureStorage.write(
-      key: _contactsSyncKey,
-      value: DateTime.now().toUtc().toIso8601String(),
-    );
+      await secureStorage.write(
+        key: _contactsSyncKey,
+        value: DateTime.now().toUtc().toIso8601String(),
+      );
+
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'contacts_sync_success',
+            props: {
+              'device_contacts': deviceContacts.length,
+              'payload_count': payloads.length,
+              'duration_ms': sw.elapsedMilliseconds,
+            },
+          ),
+        );
+      }
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'contacts_sync_fail',
+            props: {'duration_ms': sw.elapsedMilliseconds, 'error': e.toString()},
+          ),
+        );
+        unawaited(telemetry.recordError(e, st, hint: 'contacts_sync'));
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> importDeviceContacts(List<Contact> contacts) async {
+    final now = DateTime.now().toUtc();
+    for (final contact in contacts) {
+      final name = contact.displayName.trim();
+      final phones = _uniquePhones(contact.phones);
+      final emails = _uniqueEmails(contact.emails);
+
+      if (name.isEmpty && phones.isEmpty && emails.isEmpty) continue;
+
+      final displayName = name.isNotEmpty
+          ? name
+          : (phones.isNotEmpty ? phones.first : emails.first);
+
+      final primaryPhone = phones.isNotEmpty ? phones.first : null;
+      final primaryEmail = emails.isNotEmpty ? emails.first : null;
+
+      Customer? matched;
+      if (primaryPhone != null) {
+        matched = await db.getCustomerByPhoneE164(primaryPhone);
+      }
+      matched ??=
+          primaryEmail != null ? await db.getCustomerByEmail(primaryEmail) : null;
+
+      await db.upsertDeviceContact(
+        DeviceContactsCompanion.insert(
+          deviceId: contact.id,
+          displayName: displayName,
+          primaryPhoneE164: drift.Value(primaryPhone),
+          primaryEmail: drift.Value(primaryEmail),
+          phonesJson: drift.Value(jsonEncode(phones)),
+          emailsJson: drift.Value(jsonEncode(emails)),
+          linkedCustomerId: drift.Value(matched?.id),
+          updatedAt: drift.Value(now),
+        ),
+      );
+    }
   }
 
   Future<void> dispose() async {
@@ -1813,7 +2364,7 @@ class SyncService {
       final normalized = _normalizePhone(raw);
       if (normalized == null) continue;
       if (seen.add(normalized)) {
-        out.add(_truncate(raw, 64));
+        out.add(_truncate(normalized, 64));
       }
     }
     return out;

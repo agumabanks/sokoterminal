@@ -33,8 +33,17 @@ class PosSyncPullResponse {
     required this.outletId,
     required this.products,
     required this.services,
+    required this.serviceVariants,
+    required this.servicePackages,
+    required this.customerPackages,
+    required this.packageRedemptions,
     required this.customers,
     required this.suppliers,
+    required this.expenses,
+    required this.quotations,
+    required this.shifts,
+    required this.cashMovements,
+    required this.settings,
     required this.receiptTemplates,
     required this.quotationTemplates,
     required this.ledgerEntries,
@@ -47,11 +56,22 @@ class PosSyncPullResponse {
   final String outletId;
   final List<PosSyncProduct> products;
   final List<PosSyncService> services;
+  final List<PosSyncServiceVariant> serviceVariants;
+  final List<PosSyncServicePackage> servicePackages;
+  final List<PosSyncCustomerPackage> customerPackages;
+  final List<PosSyncPackageRedemption> packageRedemptions;
   final List<PosSyncCustomer> customers;
   final List<PosSyncSupplier> suppliers;
+  final List<PosSyncExpense> expenses;
+  final List<PosSyncQuotation> quotations;
+  final List<PosSyncShift> shifts;
+  final List<PosSyncCashMovement> cashMovements;
+  final List<PosSyncSetting> settings;
   final List<PosSyncReceiptTemplate> receiptTemplates;
   final List<PosSyncQuotationTemplate> quotationTemplates;
   final PosSyncOutlet? outlet;
+  final List<PosSyncLedgerEntry> ledgerEntries;
+  final PosSyncSellerProfile? sellerProfile;
 
   factory PosSyncPullResponse.fromJson(Map<String, dynamic> json) {
     final receivedAtRaw = json['received_at'];
@@ -65,8 +85,17 @@ class PosSyncPullResponse {
 
     final productsRaw = json['products'];
     final servicesRaw = json['services'];
+    final serviceVariantsRaw = json['service_variants'];
+    final servicePackagesRaw = json['service_packages'];
+    final customerPackagesRaw = json['customer_packages'];
+    final packageRedemptionsRaw = json['package_redemptions'];
     final customersRaw = json['customers'];
     final suppliersRaw = json['suppliers'];
+    final expensesRaw = json['expenses'];
+    final quotationsRaw = json['quotations'];
+    final shiftsRaw = json['shifts'];
+    final cashMovementsRaw = json['cash_movements'];
+    final settingsRaw = json['settings'];
     final receiptTemplatesRaw = json['receipt_templates'];
     final quotationTemplatesRaw = json['quotation_templates'];
     final ledgerEntriesRaw = json['ledger_entries'];
@@ -81,8 +110,17 @@ class PosSyncPullResponse {
       outletId: outletId,
       products: _parseList(productsRaw, PosSyncProduct.fromJson),
       services: _parseList(servicesRaw, PosSyncService.fromJson),
+      serviceVariants: _parseList(serviceVariantsRaw, PosSyncServiceVariant.fromJson),
+      servicePackages: _parseList(servicePackagesRaw, PosSyncServicePackage.fromJson),
+      customerPackages: _parseList(customerPackagesRaw, PosSyncCustomerPackage.fromJson),
+      packageRedemptions: _parseList(packageRedemptionsRaw, PosSyncPackageRedemption.fromJson),
       customers: _parseList(customersRaw, PosSyncCustomer.fromJson),
       suppliers: _parseList(suppliersRaw, PosSyncSupplier.fromJson),
+      expenses: _parseList(expensesRaw, PosSyncExpense.fromJson),
+      quotations: _parseList(quotationsRaw, PosSyncQuotation.fromJson),
+      shifts: _parseList(shiftsRaw, PosSyncShift.fromJson),
+      cashMovements: _parseList(cashMovementsRaw, PosSyncCashMovement.fromJson),
+      settings: _parseList(settingsRaw, PosSyncSetting.fromJson),
       receiptTemplates: _parseList(receiptTemplatesRaw, PosSyncReceiptTemplate.fromJson),
       quotationTemplates: _parseList(quotationTemplatesRaw, PosSyncQuotationTemplate.fromJson),
       ledgerEntries: _parseList(ledgerEntriesRaw, PosSyncLedgerEntry.fromJson),
@@ -92,9 +130,49 @@ class PosSyncPullResponse {
       outlet: outletRaw is Map<String, dynamic> ? PosSyncOutlet.fromJson(outletRaw) : null,
     );
   }
+}
 
-  final List<PosSyncLedgerEntry> ledgerEntries;
-  final PosSyncSellerProfile? sellerProfile;
+class PosSyncExpense {
+  PosSyncExpense({
+    required this.id,
+    required this.amount,
+    required this.method,
+    required this.category,
+    required this.updatedAt,
+    this.clientExpenseId,
+    this.supplierId,
+    this.note,
+    this.occurredAt,
+  });
+
+  final int id;
+  final String? clientExpenseId;
+  final double amount;
+  final String method;
+  final String category;
+  final int? supplierId;
+  final String? note;
+  final DateTime? occurredAt;
+  final DateTime? updatedAt;
+
+  factory PosSyncExpense.fromJson(Map<String, dynamic> json) {
+    final idRaw = json['id'];
+    if (idRaw == null) {
+      throw const FormatException('Missing expense id.');
+    }
+
+    return PosSyncExpense(
+      id: (idRaw as num).toInt(),
+      clientExpenseId: json['client_expense_id']?.toString(),
+      amount: _asDouble(json['amount']),
+      method: (json['method'] ?? '').toString(),
+      category: (json['category'] ?? '').toString(),
+      supplierId: json['supplier_id'] is num ? (json['supplier_id'] as num).toInt() : int.tryParse('${json['supplier_id']}'),
+      note: json['note']?.toString(),
+      occurredAt: _asDateTime(json['occurred_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
 }
 
 class PosSyncProduct {
@@ -269,6 +347,73 @@ class PosSyncService {
       durationMinutes: _asNullableInt(json['duration_minutes']),
       category: json['category']?.toString(),
       published: _asBool(json['published']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncServiceVariant {
+  PosSyncServiceVariant({
+    required this.id,
+    required this.serviceId,
+    required this.name,
+    required this.price,
+    required this.isDefault,
+    this.unit,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String serviceId;
+  final String name;
+  final double price;
+  final String? unit;
+  final bool isDefault;
+  final DateTime? updatedAt;
+
+  factory PosSyncServiceVariant.fromJson(Map<String, dynamic> json) {
+    return PosSyncServiceVariant(
+      id: (json['id'] ?? '').toString(),
+      serviceId: (json['service_id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      price: _asDouble(json['price']),
+      unit: json['unit']?.toString(),
+      isDefault: _asBool(json['is_default']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncServicePackage {
+  PosSyncServicePackage({
+    required this.id,
+    required this.name,
+    required this.totalSessions,
+    required this.price,
+    required this.active,
+    this.serviceId,
+    this.validityDays,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String? serviceId;
+  final String name;
+  final int totalSessions;
+  final double price;
+  final int? validityDays;
+  final bool active;
+  final DateTime? updatedAt;
+
+  factory PosSyncServicePackage.fromJson(Map<String, dynamic> json) {
+    return PosSyncServicePackage(
+      id: (json['id'] ?? '').toString(),
+      serviceId: json['service_id']?.toString(),
+      name: (json['name'] ?? '').toString(),
+      totalSessions: _asInt(json['total_sessions']),
+      price: _asDouble(json['price']),
+      validityDays: _asNullableInt(json['validity_days']),
+      active: _asBool(json['active']),
       updatedAt: _asDateTime(json['updated_at']),
     );
   }
@@ -629,6 +774,243 @@ class PosSyncQuotationTemplate {
       showQr: _asBool(json['show_qr']),
       isActive: _asBool(json['is_active']),
       updatedAt: _asDateTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+/// Quotation DTO for sync pull
+class PosSyncQuotation {
+  PosSyncQuotation({
+    required this.id,
+    required this.quotationNumber,
+    required this.total,
+    required this.validityDays,
+    required this.lines,
+    this.customerId,
+    this.notes,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String quotationNumber;
+  final String? customerId;
+  final int validityDays;
+  final double total;
+  final String? notes;
+  final List<PosSyncQuotationLine> lines;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  factory PosSyncQuotation.fromJson(Map<String, dynamic> json) {
+    return PosSyncQuotation(
+      id: (json['id'] ?? '').toString(),
+      quotationNumber: (json['quotation_number'] ?? '').toString(),
+      customerId: json['customer_id']?.toString(),
+      validityDays: _asInt(json['validity_days']),
+      total: _asDouble(json['total']),
+      notes: json['notes']?.toString(),
+      lines: _parseList(json['lines'], PosSyncQuotationLine.fromJson),
+      createdAt: _asDateTime(json['created_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncQuotationLine {
+  PosSyncQuotationLine({
+    required this.id,
+    required this.title,
+    required this.price,
+    required this.quantity,
+    required this.total,
+  });
+
+  final int id;
+  final String title;
+  final double price;
+  final int quantity;
+  final double total;
+
+  factory PosSyncQuotationLine.fromJson(Map<String, dynamic> json) {
+    return PosSyncQuotationLine(
+      id: _asInt(json['id']),
+      title: (json['title'] ?? '').toString(),
+      price: _asDouble(json['price']),
+      quantity: _asInt(json['quantity']),
+      total: _asDouble(json['total']),
+    );
+  }
+}
+
+/// Shift DTO for sync pull
+class PosSyncShift {
+  PosSyncShift({
+    required this.id,
+    required this.idempotencyKey,
+    required this.openingFloat,
+    required this.openedAt,
+    this.outletId,
+    this.staffId,
+    this.closedAt,
+    this.closingFloat,
+    this.expectedCash,
+    this.actualCash,
+    this.variance,
+    this.notes,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String idempotencyKey;
+  final int? outletId;
+  final int? staffId;
+  final DateTime openedAt;
+  final DateTime? closedAt;
+  final double openingFloat;
+  final double? closingFloat;
+  final double? expectedCash;
+  final double? actualCash;
+  final double? variance;
+  final String? notes;
+  final DateTime? updatedAt;
+
+  factory PosSyncShift.fromJson(Map<String, dynamic> json) {
+    return PosSyncShift(
+      id: (json['id'] ?? '').toString(),
+      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      outletId: _asNullableInt(json['outlet_id']),
+      staffId: _asNullableInt(json['staff_id']),
+      openedAt: _asDateTime(json['opened_at']) ?? DateTime.now(),
+      closedAt: _asDateTime(json['closed_at']),
+      openingFloat: _asDouble(json['opening_float']),
+      closingFloat: _asNullableDouble(json['closing_float']),
+      expectedCash: _asNullableDouble(json['expected_cash']),
+      actualCash: _asNullableDouble(json['actual_cash']),
+      variance: _asNullableDouble(json['variance']),
+      notes: json['notes']?.toString(),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+/// Cash Movement DTO for sync pull
+class PosSyncCashMovement {
+  PosSyncCashMovement({
+    required this.id,
+    required this.idempotencyKey,
+    required this.type,
+    required this.amount,
+    this.note,
+    this.staffId,
+    this.shiftId,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final int id;
+  final String idempotencyKey;
+  final String type;
+  final double amount;
+  final String? note;
+  final int? staffId;
+  final int? shiftId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  factory PosSyncCashMovement.fromJson(Map<String, dynamic> json) {
+    return PosSyncCashMovement(
+      id: _asInt(json['id']),
+      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      type: (json['type'] ?? '').toString(),
+      amount: _asDouble(json['amount']),
+      note: json['note']?.toString(),
+      staffId: _asNullableInt(json['staff_id']),
+      shiftId: _asNullableInt(json['shift_id']),
+      createdAt: _asDateTime(json['created_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+/// Setting DTO for sync pull
+class PosSyncSetting {
+  PosSyncSetting({
+    required this.key,
+    required this.value,
+    this.updatedAt,
+  });
+
+  final String key;
+  final String? value;
+  final DateTime? updatedAt;
+
+  factory PosSyncSetting.fromJson(Map<String, dynamic> json) {
+    return PosSyncSetting(
+      key: (json['key'] ?? '').toString(),
+      value: json['value']?.toString(),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncCustomerPackage {
+  PosSyncCustomerPackage({
+    required this.id,
+    required this.packageId,
+    required this.customerId,
+    required this.idempotencyKey,
+    required this.remainingSessions,
+    this.expiresAt,
+    this.updatedAt,
+  });
+
+  final int id;
+  final String packageId;
+  final String customerId;
+  final String idempotencyKey;
+  final int remainingSessions;
+  final DateTime? expiresAt;
+  final DateTime? updatedAt;
+
+  factory PosSyncCustomerPackage.fromJson(Map<String, dynamic> json) {
+    return PosSyncCustomerPackage(
+      id: _asInt(json['id']),
+      packageId: (json['package_id'] ?? '').toString(),
+      customerId: (json['customer_id'] ?? '').toString(),
+      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      remainingSessions: _asInt(json['remaining_sessions']),
+      expiresAt: _asDateTime(json['expires_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+    );
+  }
+}
+
+class PosSyncPackageRedemption {
+  PosSyncPackageRedemption({
+    required this.id,
+    required this.customerPackageId,
+    required this.idempotencyKey,
+    required this.sessionsUsed,
+    this.note,
+    this.updatedAt,
+  });
+
+  final int id;
+  final int customerPackageId;
+  final String idempotencyKey;
+  final int sessionsUsed;
+  final String? note;
+  final DateTime? updatedAt;
+
+  factory PosSyncPackageRedemption.fromJson(Map<String, dynamic> json) {
+    return PosSyncPackageRedemption(
+      id: _asInt(json['id']),
+      customerPackageId: _asInt(json['customer_package_id']),
+      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      sessionsUsed: _asInt(json['sessions_used']),
+      note: json['note']?.toString(),
+      updatedAt: _asDateTime(json['updated_at']),
     );
   }
 }

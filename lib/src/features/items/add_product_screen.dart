@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
+import '../../core/firebase/remote_config_service.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_button.dart';
@@ -628,8 +629,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   }
 
   Widget _buildPricingTab(ProductFormState state, ProductFormController ctrl) {
+    final remoteConfig = ref.read(remoteConfigProvider);
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: DesignTokens.paddingScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -740,29 +742,31 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
           const SizedBox(height: 24),
 
-          if (widget.existingItem != null) ...[
-            _buildVariantsCard(widget.existingItem!),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: DesignTokens.grayLight),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.layers_outlined, color: DesignTokens.grayMedium),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Variants are available after you save the product.',
-                      style: DesignTokens.textSmall,
+          if (remoteConfig.ffProductVariantsEditor) ...[
+            if (widget.existingItem != null) ...[
+              _buildVariantsCard(widget.existingItem!),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: DesignTokens.grayLight.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: DesignTokens.grayLight),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.layers_outlined, color: DesignTokens.grayMedium),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Variants are available after you save the product.',
+                        style: DesignTokens.textSmall,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ],
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
@@ -121,10 +122,27 @@ class SuppliersScreen extends ConsumerWidget {
         child: const _SupplierForm(),
       );
       if (form == null) return;
+      if (!context.mounted) return;
 
       final api = ref.read(sellerApiProvider);
       final idempotencyKey = const Uuid().v4();
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
       try {
+        final connectivity = await Connectivity().checkConnectivity();
+        final online = connectivity.any((r) => r != ConnectivityResult.none);
+        if (!online) {
+          throw Exception(
+            'Internet required to create suppliers (POS session + idempotency).',
+          );
+        }
+
         await api.createSupplier(
           {
             'name': form.name,
@@ -140,6 +158,7 @@ class SuppliersScreen extends ConsumerWidget {
 
         await ref.read(syncServiceProvider).syncNow();
         if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Supplier created'),
@@ -148,6 +167,7 @@ class SuppliersScreen extends ConsumerWidget {
         );
       } catch (e) {
         if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to create supplier: $e'),
@@ -185,9 +205,18 @@ class SuppliersScreen extends ConsumerWidget {
         ),
       );
       if (form == null) return;
+      if (!context.mounted) return;
 
       final api = ref.read(sellerApiProvider);
       final idempotencyKey = const Uuid().v4();
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
       try {
         if (form.delete == true) {
           await api.deleteSupplier(
@@ -212,6 +241,7 @@ class SuppliersScreen extends ConsumerWidget {
 
         await ref.read(syncServiceProvider).syncNow();
         if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(form.delete == true ? 'Supplier removed' : 'Supplier updated'),
@@ -220,6 +250,7 @@ class SuppliersScreen extends ConsumerWidget {
         );
       } catch (e) {
         if (!context.mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to update supplier: $e'),
@@ -412,4 +443,3 @@ class _SupplierFormState extends State<_SupplierForm> {
     );
   }
 }
-

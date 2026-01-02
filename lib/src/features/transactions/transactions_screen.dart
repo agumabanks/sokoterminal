@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/app_providers.dart';
 import '../../core/auth/pos_session_controller.dart';
 import '../../core/db/app_database.dart';
+import '../../core/firebase/remote_config_service.dart';
 import '../../core/security/manager_approval.dart';
 import '../../core/settings/pos_void_reason_codes.dart';
 import '../../core/sync/sync_service.dart';
@@ -543,6 +544,7 @@ class _POSTransactionTile extends ConsumerWidget {
             return Center(child: Text('Not found', style: DesignTokens.textBody));
           }
           final entry = bundle.entry;
+          final remoteConfig = ref.read(remoteConfigProvider);
           final isReversal = entry.type == 'refund' || entry.type == 'void';
           final sign = isReversal ? '-' : '';
           
@@ -608,7 +610,7 @@ class _POSTransactionTile extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (entry.type == 'sale') ...[
+              if (entry.type == 'sale' && remoteConfig.ffPosVoids) ...[
                 const SizedBox(height: DesignTokens.spaceMd),
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
@@ -726,6 +728,7 @@ class _POSTransactionTile extends ConsumerWidget {
           ..limit(1))
         .getSingleOrNull();
     if (alreadyVoided != null) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sale is already voided.')),
       );
