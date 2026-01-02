@@ -1321,6 +1321,15 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
           .get();
 
+  Stream<int> watchPendingSyncOpsCount() {
+    final count = syncOps.id.count();
+    return (selectOnly(syncOps)
+          ..addColumns([count])
+          ..where(syncOps.status.equals('pending')))
+        .watchSingle()
+        .map((row) => row.read(count) ?? 0);
+  }
+
   Future<List<SyncOp>> blockedSyncOps() =>
       (select(syncOps)
             ..where((tbl) => tbl.status.equals('blocked'))
@@ -1384,6 +1393,22 @@ class AppDatabase extends _$AppDatabase {
       const SyncOpsCompanion(status: Value('pending'), lastTriedAt: Value(null)),
     );
   }
+
+  /// Reset all pending sync operations to retry immediately (clears retry count and backoff)
+  Future<int> resetAllPendingSyncOps() async {
+    final updated = await (update(syncOps)
+          ..where((t) => t.status.equals('pending') | t.status.equals('blocked')))
+        .write(
+      const SyncOpsCompanion(
+        status: Value('pending'),
+        retryCount: Value(0),
+        lastTriedAt: Value(null),
+        lastError: Value(null),
+      ),
+    );
+    return updated;
+  }
+
 
   Future<DateTime?> getLastPulledAt(String key) async {
     final row = await (select(
@@ -2035,6 +2060,79 @@ class AppDatabase extends _$AppDatabase {
       await delete(suppliers).go();
       await delete(receiptTemplates).go();
       await delete(quotationTemplates).go();
+    });
+  }
+
+  // Analytics Helpers
+  Future<List<LedgerEntry>> ledgerEntriesBetween(DateTime start, DateTime end) {
+    return (select(ledgerEntries)
+          ..where((t) => t.createdAt.isBiggerOrEqualValue(start) & t.createdAt.isSmallerOrEqualValue(end))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  Future<List<LedgerLine>> getLinesForEntries(List<String> entryIds) {
+    return (select(ledgerLines)..where((t) => t.entryId.isIn(entryIds))).get();
+  }
+
+  Future<List<Item>> allProducts() => select(items).get();
+
+  /// Comprehensive data import for multi-device migration.
+  /// Overwrites current local data with the provided backup map.
+  Future<void> importBackupData(Map<String, dynamic> data) async {
+    await transaction(() async {
+      // 1. Clear existing data
+      await clearAllData();
+
+      // 2. Import items (products)
+      final products = data['products'] as List<dynamic>? ?? [];
+      for (final p in products) {
+        await into(items).insert(
+          ItemsCompanion.insert(
+            id: Value(p['id'].toString()),
+            name: p['name']?.toString() ?? 'Unnamed',
+            price: (p['unit_price'] as num?)?.toDouble() ?? 0.0,
+            sku: Value(p['sku']?.toString()),
+            stockQty: Value((p['current_stock'] as num?)?.toInt() ?? 0),
+            lowStockWarning: Value((p['min_qty'] as num?)?.toInt()),
+            categoryId: Value(p['category_id']?.toString()),
+            brandId: Value(p['brand_id']?.toString()),
+            imageUrl: Value(p['thumbnail_img']?.toString()),
+            stockEnabled: Value(true),
+            publishedOnline: Value(p['published'] == 1 || p['published'] == true),
+            updatedAt: Value(DateTime.tryParse(p['created_at']?.toString() ?? '') ?? DateTime.now()),
+          ),
+        );
+      }
+
+      // 3. Import customers (note: Customers schema has limited fields)
+      final customersData = data['customers'] as List<dynamic>? ?? [];
+      for (final c in customersData) {
+        await into(customers).insert(
+          CustomersCompanion.insert(
+            id: Value(c['id'].toString()),
+            name: c['name']?.toString() ?? 'Customer',
+            phone: Value(c['phone']?.toString()),
+            email: Value(c['email']?.toString()),
+            note: Value(c['address']?.toString()), // Map address to note field
+          ),
+        );
+      }
+
+      // 4. Import transactions (ledger entries)
+      final transactions = data['transactions'] as List<dynamic>? ?? [];
+      for (final t in transactions) {
+        final txId = t['id']?.toString() ?? _uuid.v4();
+        await into(ledgerEntries).insert(
+          LedgerEntriesCompanion.insert(
+            id: Value(txId),
+            idempotencyKey: 'backup_$txId',
+            type: t['type']?.toString() ?? 'sale',
+            total: Value((t['grand_total'] as num?)?.toDouble() ?? 0.0),
+            createdAt: Value(DateTime.tryParse(t['created_at']?.toString() ?? '') ?? DateTime.now()),
+          ),
+        );
+      }
     });
   }
 }

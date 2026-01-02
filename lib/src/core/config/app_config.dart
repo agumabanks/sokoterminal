@@ -32,7 +32,7 @@ class AppConfig {
           : (int.tryParse(env['CONNECT_TIMEOUT_MS'] ?? '') ?? 15000),
       receiveTimeoutMs: receiveTimeoutOverride > 0
           ? receiveTimeoutOverride
-          : (int.tryParse(env['RECEIVE_TIMEOUT_MS'] ?? '') ?? 20000),
+          : (int.tryParse(env['RECEIVE_TIMEOUT_MS'] ?? '') ?? 60000),
       logLevel: logLevelOverride.isNotEmpty
           ? logLevelOverride
           : (env['LOG_LEVEL'] ?? 'info'),

@@ -10,6 +10,7 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/staff_login_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/auth/seller_registration_screen.dart';
+import 'features/auth/post_registration_welcome_provider.dart';
 import 'features/auth/pos_login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/home/home_shell.dart';
@@ -19,6 +20,7 @@ import 'features/items/items_screen.dart';
 import 'features/services/services_screen.dart';
 import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
+import 'features/marketing/bulk_sms_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/staff_management_screen.dart';
@@ -55,6 +57,7 @@ import 'features/onboarding/business_details_screen.dart';
 import 'features/onboarding/payment_config_screen.dart';
 import 'features/onboarding/onboarding_welcome_screen.dart';
 import 'core/onboarding/onboarding_controller.dart';
+import 'features/analytics/analytics_screen.dart';
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -93,7 +96,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (loggedIn && onOnboarding) return null;
 
       if (!loggedIn && !onLogin && !onRegister) return '/login';
-      if (loggedIn && (onLogin || onRegister)) return '/home/checkout';
+      if (loggedIn && (onLogin || onRegister)) {
+        final postRegistrationPending =
+            ref.read(postRegistrationWelcomePendingProvider);
+        if (onRegister && postRegistrationPending) return null;
+        return '/home/checkout';
+      }
       return null;
     },
     routes: [
@@ -242,6 +250,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const ChatScreen(),
                   ),
                   GoRoute(
+                    path: 'analytics',
+                    name: 'analytics',
+                    builder: (context, state) => const AnalyticsScreen(),
+                  ),
+                  GoRoute(
                     path: 'chat/:conversationId',
                     name: 'chat-detail',
                     builder: (context, state) {
@@ -268,6 +281,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'ads',
                     name: 'ads',
                     builder: (context, state) => const AdsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'bulk-sms',
+                    name: 'bulk-sms',
+                    builder: (context, state) => const BulkSmsScreen(),
                   ),
                   GoRoute(
                     path: 'reports',

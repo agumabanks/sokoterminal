@@ -14,10 +14,13 @@ import '../notifications/notifications_controller.dart';
 import '../../core/sync/sync_service.dart';
 import '../../widgets/pin_prompt_sheet.dart';
 import '../../widgets/connectivity_banner.dart';
+import '../../widgets/sync_status_bar.dart';
 import '../receipts/receipt_providers.dart';
 import '../../core/firebase/remote_config_service.dart';
 import '../../core/settings/business_setup_prefs.dart';
 import '../../core/theme/design_tokens.dart';
+import '../backup/migration_controller.dart';
+import '../backup/restore_prompt_dialog.dart';
 
 final openStockAlertsCountProvider = StreamProvider<int>((ref) {
   return ref.watch(appDatabaseProvider).watchOpenStockAlertsCount();
@@ -49,8 +52,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     });
   }
 
+  void _listenForMigration(WidgetRef ref) {
+    ref.listen(migrationProvider, (previous, next) {
+      if (next.pendingBackup != null && previous?.pendingBackup == null) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const RestorePromptDialog(),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _listenForMigration(ref);
     // Warm up notifications/token registration in background.
     final notifications = ref.watch(notificationsControllerProvider);
     final staffState = ref.watch(staffPinProvider);
@@ -65,6 +81,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       body: Column(
         children: [
           const ConnectivityBanner(),
+          const SyncStatusBar(),
           if (remoteConfig.ffBusinessSetupWizard && !setupCompleted)
             Container(
               width: double.infinity,

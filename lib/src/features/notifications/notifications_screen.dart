@@ -520,6 +520,23 @@ class _NotificationCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (category == NotificationCategory.stock) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.go('/home/more/items'),
+                            icon: const Icon(Icons.add_shopping_cart, size: 16),
+                            label: const Text('Restock Now'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: DesignTokens.warning,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              textStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         children: [

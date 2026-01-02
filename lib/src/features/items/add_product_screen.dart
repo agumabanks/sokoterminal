@@ -1379,6 +1379,34 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final ctrl = ref.read(productFormProvider.notifier);
     
     if (!state.canSubmit) return;
+    
+    // Auto-generate SKU if empty
+    String finalSku = state.sku.trim();
+    if (finalSku.isEmpty) {
+      await ctrl.autoGenerateSKU();
+      final updatedState = ref.read(productFormProvider);
+      finalSku = updatedState.sku;
+    } else {
+      // Validate SKU for duplicates
+      final skuError = await ctrl.validateSKU(editingItemId: widget.existingItem?.id);
+      if (skuError != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(skuError),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Auto-fix',
+              textColor: Colors.white,
+              onPressed: () async {
+                await ctrl.autoGenerateSKU();
+              },
+            ),
+          ),
+        );
+        return;
+      }
+    }
+    
     ctrl.setSubmitting(true);
 
     try {

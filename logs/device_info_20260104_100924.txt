@@ -1,0 +1,5 @@
+timestamp: 2026-01-04T10:09:25+01:00
+device: 192.168.1.80:39411
+model: TPS450M
+android: 11
+build: 20230605.210139

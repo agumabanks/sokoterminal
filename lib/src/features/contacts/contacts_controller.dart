@@ -23,6 +23,7 @@ class ContactItem {
   final bool isFromDevice;
   final bool isFromSoko;
   final String? linkedCustomerId;
+  final String? remoteCustomerId;
   final DateTime? lastInteraction;
 
   ContactItem({
@@ -34,6 +35,7 @@ class ContactItem {
     this.isFromDevice = false,
     this.isFromSoko = false,
     this.linkedCustomerId,
+    this.remoteCustomerId,
     this.lastInteraction,
   });
 
@@ -46,6 +48,7 @@ class ContactItem {
     bool? isFromDevice,
     bool? isFromSoko,
     String? linkedCustomerId,
+    String? remoteCustomerId,
     DateTime? lastInteraction,
   }) {
     return ContactItem(
@@ -57,6 +60,7 @@ class ContactItem {
       isFromDevice: isFromDevice ?? this.isFromDevice,
       isFromSoko: isFromSoko ?? this.isFromSoko,
       linkedCustomerId: linkedCustomerId ?? this.linkedCustomerId,
+      remoteCustomerId: remoteCustomerId ?? this.remoteCustomerId,
       lastInteraction: lastInteraction ?? this.lastInteraction,
     );
   }
@@ -125,18 +129,22 @@ class ContactsController extends StateNotifier<ContactsState> {
   Future<void> refresh() async {
     state = state.copyWith(loading: true, error: null);
     try {
-      var status = await Permission.contacts.status;
-      if (!status.isGranted && !status.isPermanentlyDenied) {
-        status = await Permission.contacts.request();
+      final optedIn = await _syncService.isDeviceContactsOptedIn();
+      PermissionStatus status = PermissionStatus.denied;
+      if (optedIn) {
+        status = await Permission.contacts.status;
+        if (!status.isGranted && !status.isPermanentlyDenied) {
+          status = await Permission.contacts.request();
+        }
       }
-      
-      final hasPermission = status.isGranted;
-      final isPermanentlyDenied = status.isPermanentlyDenied;
-      
+
+      final hasPermission = optedIn ? status.isGranted : true;
+      final isPermanentlyDenied = optedIn ? status.isPermanentlyDenied : false;
+
       List<ContactItem> items = [];
 
-      // 1. Fetch from Device if permitted
-      if (hasPermission) {
+      // 1. Fetch from Device if permitted + opted in
+      if (optedIn && status.isGranted) {
         // Import device contacts into local DB (offline-first) then render from DB.
         final deviceContacts = await FlutterContacts.getContacts(withProperties: true);
         try {
@@ -145,16 +153,18 @@ class ContactsController extends StateNotifier<ContactsState> {
 
         final cached = await _db.getDeviceContacts();
         items.addAll(cached.map((c) => ContactItem(
-          id: c.deviceId,
-          name: c.displayName,
-          phone: c.primaryPhoneE164,
-          email: c.primaryEmail,
-          isFromDevice: true,
-          linkedCustomerId: c.linkedCustomerId,
-        )));
+              id: c.deviceId,
+              name: c.displayName,
+              phone: c.primaryPhoneE164,
+              email: c.primaryEmail,
+              isFromDevice: true,
+              linkedCustomerId: c.linkedCustomerId,
+            )));
         try {
           // Sync device contacts to backend in background
-          await _syncService.syncDeviceContacts(force: true, contacts: deviceContacts);
+          unawaited(
+            _syncService.syncDeviceContacts(force: true, contacts: deviceContacts),
+          );
         } catch (_) {
           // Sync failures should not block local contact display.
         }
@@ -163,12 +173,14 @@ class ContactsController extends StateNotifier<ContactsState> {
       // 2. Fetch from Soko DB (Local Cache of Seller Customers)
       final sokoCustomers = await _db.select(_db.customers).get();
       items.addAll(sokoCustomers.map((c) => ContactItem(
-        id: 'soko_${c.id}',
-        name: c.name,
-        phone: c.phone,
-        email: c.email,
-        isFromSoko: true,
-      )));
+            id: 'soko_${c.id}',
+            name: c.name,
+            phone: c.phone,
+            email: c.email,
+            notes: c.note,
+            isFromSoko: true,
+            remoteCustomerId: c.remoteId,
+          )));
 
       final merged = <String, ContactItem>{};
       for (final item in items) {
@@ -241,6 +253,8 @@ class ContactsController extends StateNotifier<ContactsState> {
 
       final contactId = const Uuid().v4();
       final now = DateTime.now().toUtc();
+      final drift.Value<String?> noteValue =
+          notes == null ? const drift.Value.absent() : drift.Value(notes);
       
       // 1. Save to local database first (offline-first, prevents data loss)
       await _db.upsertCustomer(
@@ -249,6 +263,7 @@ class ContactsController extends StateNotifier<ContactsState> {
           name: name,
           phone: drift.Value(phone),
           email: drift.Value(email),
+          note: noteValue,
           synced: const drift.Value(false),
           updatedAt: drift.Value(now),
         ),
@@ -280,6 +295,7 @@ class ContactsController extends StateNotifier<ContactsState> {
               name: name,
               phone: drift.Value(phone),
               email: drift.Value(email),
+              note: noteValue,
               synced: const drift.Value(true),
               updatedAt: drift.Value(remoteUpdatedAt ?? now),
             ),
@@ -412,8 +428,19 @@ class ContactsController extends StateNotifier<ContactsState> {
   /// Delete a contact - removes locally and syncs deletion to backend
   Future<bool> deleteContact(String id) async {
     try {
-      // Extract the actual ID from soko_ prefix
-      final actualId = id.startsWith('soko_') ? id.substring(5) : id;
+      ContactItem? target;
+      for (final item in state.contacts) {
+        if (item.id == id) {
+          target = item;
+          break;
+        }
+      }
+
+      // Extract the local ID from soko_ prefix
+      final actualId = id.startsWith('soko_')
+          ? id.substring(5)
+          : (target?.linkedCustomerId ?? id);
+      final remoteId = target?.remoteCustomerId?.trim();
       
       // Remove from local database
       await (_db.delete(_db.customers)
@@ -422,7 +449,9 @@ class ContactsController extends StateNotifier<ContactsState> {
       
       // Try to delete from backend if online
       try {
-        await _api.deleteCustomer(actualId);
+        if (remoteId != null && remoteId.isNotEmpty) {
+          await _api.deleteCustomer(remoteId);
+        }
       } catch (_) {
         // Backend delete failed, but local delete succeeded
         // Could enqueue a delete operation for later
@@ -473,9 +502,11 @@ class ContactsController extends StateNotifier<ContactsState> {
       name: name,
       phone: phone,
       email: email,
+      notes: a.notes ?? b.notes,
       isFromDevice: a.isFromDevice || b.isFromDevice,
       isFromSoko: a.isFromSoko || b.isFromSoko,
       linkedCustomerId: a.linkedCustomerId ?? b.linkedCustomerId,
+      remoteCustomerId: a.remoteCustomerId ?? b.remoteCustomerId,
     );
   }
 

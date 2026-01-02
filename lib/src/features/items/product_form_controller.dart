@@ -458,7 +458,73 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     );
   }
   
+  
+  /// Auto-generate a unique SKU based on product name
+  String generateUniqueSKU() {
+    final name = state.name.trim();
+    if (name.isEmpty) return 'PROD-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+    
+    // Extract first 3-4 letters from product name
+    final letters = name.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+    final prefix = letters.isEmpty 
+      ? 'PROD' 
+      : letters.substring(0, letters.length < 4 ? letters.length : 4);
+    
+    // Add timestamp for uniqueness
+    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return '$prefix-$timestamp';
+  }
+  
+  /// Check if SKU already exists locally (for editing, pass current item ID to exclude)
+  Future<bool> isDuplicateSKU(String sku, {String? excludeItemId}) async {
+    if (sku.trim().isEmpty) return false;
+    
+    final db = ref.read(appDatabaseProvider);
+    final existing = await (db.select(db.items)
+      ..where((t) => t.sku.equals(sku.trim())))
+      .get();
+    
+    if (existing.isEmpty) return false;
+    
+    // If editing, exclude current item from check
+    if (excludeItemId != null) {
+      return existing.any((item) => item.id != excludeItemId);
+    }
+    
+    return true;
+  }
+  
+  /// Auto-generate and set unique SKU
+  Future<void> autoGenerateSKU() async {
+    var sku = generateUniqueSKU();
+    
+    // Ensure it's truly unique (rare collision case)
+    while (await isDuplicateSKU(sku)) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      sku = generateUniqueSKU();
+    }
+    
+    setSku(sku);
+  }
+  
+  /// Validate SKU before save - returns error message if invalid, null if valid
+  Future<String?> validateSKU({String? editingItemId}) async {
+    final sku = state.sku.trim();
+    
+    // SKU is optional - if empty, will auto-generate on save
+    if (sku.isEmpty) return null;
+    
+    // Check for duplicate
+    if (await isDuplicateSKU(sku, excludeItemId: editingItemId)) {
+      final suggested = generateUniqueSKU();
+      return 'SKU "$sku" already exists. Try: $suggested';
+    }
+    
+    return null;
+  }
+
   /// Reset form
+
   void reset() => state = const ProductFormState();
   
   /// Set submitting state

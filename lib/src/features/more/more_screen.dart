@@ -72,6 +72,21 @@ class MoreScreen extends ConsumerWidget {
                   onTap: () => context.go('/home/more/expenses'),
                 ),
               ActionTile(
+                title: 'Insights & Analytics',
+                subtitle: 'Sales trends & visualizations',
+                icon: Icons.insights,
+                iconColor: DesignTokens.brandAccent,
+                onTap: () => context.go('/home/more/analytics'),
+              ),
+              if (remoteConfig.ffExpensesV1)
+                ActionTile(
+                  title: 'Expenses',
+                  subtitle: 'Cashouts & operating costs',
+                  icon: Icons.payments_outlined,
+                  iconColor: DesignTokens.error,
+                  onTap: () => context.go('/home/more/expenses'),
+                ),
+              ActionTile(
                 title: 'Customers',
                 subtitle: 'CRM, Phone & WhatsApp',
                 icon: Icons.people_alt_outlined,
@@ -205,6 +220,13 @@ class MoreScreen extends ConsumerWidget {
                 icon: Icons.campaign_outlined,
                 iconColor: DesignTokens.brandPrimary,
                 onTap: () => context.go('/home/more/ads'),
+              ),
+              ActionTile(
+                title: 'Bulk SMS',
+                subtitle: 'Send offers to all contacts',
+                icon: Icons.sms_outlined,
+                iconColor: DesignTokens.brandAccent,
+                onTap: () => context.go('/home/more/bulk-sms'),
               ),
               ActionTile(
                 title: 'Coupons',

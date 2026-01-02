@@ -63,6 +63,14 @@ class FirebaseAnalyticsService {
   Future<void> setUserProperty(String name, String value) async {
     await _analytics.setUserProperty(name: name, value: value);
   }
+  
+  /// Track custom event
+  Future<void> logCustomEvent({
+    required String name,
+    Map<String, Object>? parameters,
+  }) async {
+    await _analytics.logEvent(name: name, parameters: parameters);
+  }
 }
 
 /// Provider for analytics service

@@ -121,6 +121,16 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
   }
 
   Future<void> _load() async {
+    // Check if POS session is active before calling endpoint that requires it
+    final session = ref.read(posSessionProvider);
+    if (!session.isActive) {
+      setState(() {
+        _loading = false;
+        _error = 'No active POS session. Please log in with your PIN to view purchase orders.';
+      });
+      return;
+    }
+    
     setState(() {
       _loading = true;
       _error = null;

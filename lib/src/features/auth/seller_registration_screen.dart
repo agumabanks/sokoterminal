@@ -12,6 +12,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_api_availability/google_api_availability.dart';
 import '../../core/util/phone_normalizer.dart';
+import '../../core/firebase/firebase_analytics_service.dart';
 import 'dart:ui';
 
 import '../../core/app_providers.dart';
@@ -19,6 +20,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/util/country_codes.dart';
 import '../../core/services/places_service.dart';
 import 'auth_controller.dart';
+import 'post_registration_welcome_provider.dart';
 
 /// Ultra-Premium multi-step seller registration
 /// "Steve Jobs" standard: Minimal, Smart, Liquid Animations
@@ -561,6 +563,24 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       debugPrint('[Registration] submit name=$name phone=$phone');
       debugPrint('[Registration] submit address="$address" location=${location.latitude},${location.longitude}');
       debugPrint('[Registration] submit category=$category radius=${_deliveryRadiusKm.toStringAsFixed(0)}km pinLength=${pin.length}');
+      
+      // Get current GPS position for registration location (where user is right now)
+      double? registrationLat;
+      double? registrationLng;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+        ).timeout(const Duration(seconds: 5));
+        registrationLat = position.latitude;
+        registrationLng = position.longitude;
+        debugPrint('[Registration] GPS at signup: ${registrationLat.toStringAsFixed(5)}, ${registrationLng.toStringAsFixed(5)}');
+      } catch (e) {
+        // Use the map location as fallback if GPS fails
+        registrationLat = location.latitude;
+        registrationLng = location.longitude;
+        debugPrint('[Registration] GPS failed, using map location for registration: $e');
+      }
+      
       final registerResponse = await api.registerSeller(
         name: name,
         email: null,
@@ -568,8 +588,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         pin: pin,
         shopName: shopName,
         address: address,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: location.latitude,                     // Shop business location (pinned on map)
+        longitude: location.longitude,                   // Shop business location (pinned on map)
+        registrationLatitude: registrationLat,           // User's GPS at signup
+        registrationLongitude: registrationLng,          // User's GPS at signup
         category: category,
         deliveryRadiusKm: _deliveryRadiusKm,
       );
@@ -584,6 +606,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       final secureStorage = ref.read(secureStorageProvider);
       await secureStorage.writeAccessToken(token);
+      ref.read(postRegistrationWelcomePendingProvider.notifier).state = true;
       await ref.read(authControllerProvider.notifier).bootstrap();
 
       api.upsertDeliveryProfile({
@@ -600,9 +623,13 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       ref.read(syncServiceProvider).forceFullResync().catchError((_) {});
 
-      if (!mounted) return;
+      if (!mounted) {
+        ref.read(postRegistrationWelcomePendingProvider.notifier).state = false;
+        return;
+      }
       setState(() => _isLoading = false);
       HapticFeedback.mediumImpact();
+      debugPrint('[Registration] SUCCESS - showing post-registration welcome dialog');
       await _showPostRegistrationWelcome();
     } on DioException catch (e) {
       debugPrint('[Registration] error: $e');
@@ -693,6 +720,9 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   }
 
   Future<bool> _fallbackRegistrationFlow() async {
+    final postRegistrationPending =
+        ref.read(postRegistrationWelcomePendingProvider.notifier);
+    postRegistrationPending.state = true;
     try {
       final name = _nameController.text.trim();
       final phone = _normalizePhone(_phoneController.text.trim());
@@ -717,6 +747,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       }
 
       if (authState.status != AuthStatus.authenticated) {
+        postRegistrationPending.state = false;
         final message = authState.message ?? 'Registration failed. Please try again.';
         setState(() => _isLoading = false);
         _showError(message, title: 'Registration failed');
@@ -761,13 +792,17 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       ref.read(syncServiceProvider).forceFullResync().catchError((_) {});
 
-      if (!mounted) return true;
+      if (!mounted) {
+        postRegistrationPending.state = false;
+        return true;
+      }
       setState(() => _isLoading = false);
       HapticFeedback.mediumImpact();
       await _showPostRegistrationWelcome();
       return true;
     } catch (e) {
       debugPrint('[Registration] fallback failed: $e');
+      postRegistrationPending.state = false;
       if (!mounted) return false;
       setState(() => _isLoading = false);
       _showError('Registration failed. Please try again.', title: 'Registration failed');
@@ -783,19 +818,50 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       builder: (context) => const _PostRegistrationDialog(),
     );
     if (!mounted) return;
-    switch (choice ?? _PostRegistrationChoice.checkout) {
-      case _PostRegistrationChoice.products:
-        context.go('/home/more/items');
-        return;
-      case _PostRegistrationChoice.services:
-        context.go('/home/more/services');
-        return;
-      case _PostRegistrationChoice.guidedSetup:
-        context.go('/home/more/business-setup');
-        return;
-      case _PostRegistrationChoice.checkout:
-        context.go('/home/checkout');
-        return;
+    
+    final selectedChoice = choice ?? _PostRegistrationChoice.checkout;
+    ref.read(postRegistrationWelcomePendingProvider.notifier).state = false;
+    
+    // Log analytics event
+    try {
+      FirebaseAnalyticsService.instance.logCustomEvent(
+        name: 'post_registration_choice',
+        parameters: {
+          'choice': selectedChoice.name,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      debugPrint('[Analytics] post_registration_choice failed: $e');
+    }
+    
+    // Navigate with error handling
+    try {
+      switch (selectedChoice) {
+        case _PostRegistrationChoice.products:
+          context.go('/home/more/items');
+          return;
+        case _PostRegistrationChoice.services:
+          context.go('/home/more/services');
+          return;
+        case _PostRegistrationChoice.guidedSetup:
+          context.go('/home/more/business-setup');
+          return;
+        case _PostRegistrationChoice.checkout:
+          context.go('/home/checkout');
+          return;
+      }
+    } catch (e) {
+      debugPrint('[Navigation] post_registration failed: $e');
+      if (!mounted) return;
+      // Fallback to checkout on navigation error
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to continue. Try again.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      context.go('/home/checkout');
     }
   }
 
@@ -1674,33 +1740,47 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    TextButton.icon(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.of(context).pop(_PostRegistrationChoice.guidedSetup);
-                      },
-                      icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                      label: const Text(
-                        'Show the guided setup',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: _macTextSecondary,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    Semantics(
+                      label: 'Show the guided setup',
+                      hint: 'Opens a step-by-step setup wizard to help you get started',
+                      button: true,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.of(context).pop(_PostRegistrationChoice.guidedSetup);
+                        },
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                        label: const Text(
+                          'Show the guided setup',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: _macTextSecondary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.of(context).pop(_PostRegistrationChoice.checkout);
-                      },
-                      child: Text(
-                        'Continue to Checkout →',
-                        style: TextStyle(
-                          color: _macTextSecondary.withOpacity(0.8),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                    Semantics(
+                      label: 'Continue to Checkout',
+                      hint: 'Skip setup and go directly to checkout',
+                      button: true,
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.of(context).pop(_PostRegistrationChoice.checkout);
+                        },
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Continue to Checkout →',
+                            style: TextStyle(
+                              color: _macTextSecondary.withOpacity(0.8),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ),

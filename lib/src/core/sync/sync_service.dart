@@ -75,7 +75,21 @@ class SyncService {
     }
   }
 
-  Future<void> syncNow() => _pump();
+  Future<void> syncNow() async {
+    // Reset any failed/blocked sync operations to force immediate retry
+    try {
+      final resetCount = await db.resetAllPendingSyncOps();
+      if (kDebugMode && resetCount > 0) {
+        debugPrint('[SyncService] Reset $resetCount failed sync operations for immediate retry');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Failed to reset sync ops: $e');
+      }
+    }
+    await _pump();
+  }
+
 
   /// Force a complete resync by clearing all sync cursors and pulling from epoch.
   /// This is useful when the initial sync failed or products are missing.
@@ -128,6 +142,7 @@ class SyncService {
     }
 
     _isPumping = true;
+    _syncStatusController.add('Syncing data...');
     try {
       final List<ConnectivityResult> list = await Connectivity()
           .checkConnectivity();
@@ -135,15 +150,46 @@ class SyncService {
       if (!online) return;
 
       final queue = await db.pendingSyncOps();
+      if (kDebugMode) {
+        debugPrint('[SyncService] Sync queue: ${queue.length} pending operations');
+        if (queue.isNotEmpty) {
+          final typeCounts = <String, int>{};
+          for (final op in queue) {
+            typeCounts[op.opType] = (typeCounts[op.opType] ?? 0) + 1;
+          }
+          debugPrint('[SyncService] Queue breakdown: $typeCounts');
+        }
+      }
+      
       for (final op in queue) {
-        if (!_isDue(op)) continue;
+        if (!_isDue(op)) {
+          if (kDebugMode) {
+            debugPrint('[SyncService] Skipping ${op.opType} (not due yet, retry: ${op.retryCount})');
+          }
+          continue;
+        }
+        
+        if (kDebugMode) {
+          debugPrint('[SyncService] Processing ${op.opType} (id: ${op.id}, retry: ${op.retryCount})');
+        }
+        
         try {
-          await _dispatch(op);
+        _syncStatusController.add('Pushing ${op.opType.replaceAll('_', ' ')}...');
+        await _dispatch(op);
           await db.markSynced(op.id);
+          if (kDebugMode) {
+            debugPrint('[SyncService] ✅ ${op.opType} synced successfully');
+          }
         } catch (e) {
           final errorMsg = _formatSyncError(e);
           final nextRetryCount = op.retryCount + 1;
           final blocked = _shouldBlock(e);
+          
+          if (kDebugMode) {
+            debugPrint('[SyncService] ❌ ${op.opType} failed: $errorMsg');
+            debugPrint('[SyncService] ${blocked ? "BLOCKED" : "Will retry"} (retry: $nextRetryCount)');
+          }
+          
           if (blocked) {
             await db.markSyncBlocked(
               op.id,
@@ -206,6 +252,7 @@ class SyncService {
       }
     } finally {
       _isPumping = false;
+      _syncStatusController.add('Idle');
     }
 
     if (_pumpQueued) {
@@ -921,6 +968,50 @@ class SyncService {
           body['lines'] = updated;
         }
 
+        if (type == 'sale') {
+          final saleBody = {
+            'terminal_transaction_id': body['entry_id'],
+            'receipt_number': body['receipt_number'], // Only if available in payload, otherwise backend handles null
+            'sale_date': body['occurred_at'],
+            'subtotal': body['subtotal'],
+            'discount': body['discount'],
+            'tax': body['tax'],
+            'total': body['total'],
+            'payment_method': (body['payments'] as List?)?.firstOrNull?['method'] ?? 'cash',
+            'status': 'paid',
+            'customer_name': body['customer_name'], // Check validity if available
+            'notes': body['note'],
+            'items': (body['lines'] as List).map((l) => {
+              'product_id': l['product_id'],
+              'title': l['name'],
+              'quantity': l['quantity'],
+              'price': l['price'],
+              'total': l['subtotal'],
+            }).toList(),
+          };
+
+          try {
+             final res = await sellerApi.createPosTransaction(saleBody);
+             final remoteId = (res.data is Map) ? res.data['id'] : null;
+             
+             final entryId = payload['entry_id']?.toString();
+             if (entryId != null) {
+                await db.markLedgerSynced(
+                  entryId,
+                  jsonEncode({
+                    'server_entry_id': remoteId,
+                    'idempotency_key': key,
+                    'received_at': DateTime.now().toIso8601String(),
+                  }),
+                );
+             }
+             break; 
+          } catch (e) {
+             // If specific error, handle it. Otherwise rethrow to retry later.
+             rethrow;
+          }
+        }
+
         final res = await sellerApi.pushLedgerEntry(body, idempotencyKey: key);
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
@@ -1143,6 +1234,48 @@ class SyncService {
           );
         }
         break;
+      case 'sale_create':
+        final txId = payload['terminal_transaction_id']?.toString() ?? '';
+        if (txId.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing terminal_transaction_id for sale_create',
+          );
+        }
+
+        final body = Map<String, dynamic>.from(payload);
+        
+        // Resolve product IDs
+        final itemsRaw = body['items'];
+        if (itemsRaw is List) {
+          final updatedItems = <Map<String, dynamic>>[];
+          for (final raw in itemsRaw) {
+            if (raw is! Map) continue;
+            final item = Map<String, dynamic>.from(raw);
+            final localProductId = item['product_id'];
+            
+            // Try to resolve to remote ID if possible
+            if (localProductId != null && localProductId.toString().isNotEmpty) {
+               final resolved = await _resolveRemoteProductId(localProductId);
+               if (resolved != null) {
+                 item['product_id'] = resolved;
+               } 
+               // If not resolved, we still send what we have (maybe null or local ID), 
+               // backend should handle or ignore.
+               // Actually, let's keep it robust: if unresolved, send null or let backend handle mismatch.
+               // My controller logic handles generic IDs.
+            }
+            updatedItems.add(item);
+          }
+          body['items'] = updatedItems;
+        }
+
+        final res = await sellerApi.createPosTransaction(body);
+        if (res.statusCode == 200 || res.statusCode == 201) {
+           await db.markTransactionSynced(txId);
+        }
+        break;
+
       case 'stocktake_push':
         final key =
             payload['idempotency_key']?.toString() ??

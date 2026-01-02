@@ -25,6 +25,10 @@ class SellerApi {
     return client.get('/v2/seller/orders');
   }
 
+  Future<Response<dynamic>> createPosTransaction(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/pos/sales', data: payload);
+  }
+
   Future<Response<dynamic>> fetchOrderItems(int orderId) {
     return client.post('/v2/seller/orders/items/$orderId');
   }
@@ -624,6 +628,15 @@ class SellerApi {
     });
   }
 
+  // CRM Marketing
+  Future<Response<dynamic>> createCrmCampaign(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/crm/campaigns', data: payload);
+  }
+
+  Future<Response<dynamic>> runCrmCampaign(String campaignId) {
+    return client.post('/v2/seller/crm/campaigns/$campaignId/run');
+  }
+
   // POS Staff
   Future<Response<dynamic>> fetchStaff() {
     return client.get('/v2/seller/pos/staff');
@@ -789,8 +802,10 @@ class SellerApi {
     required String pin,
     required String shopName,
     String? address,
-    double? latitude,
-    double? longitude,
+    double? latitude,              // Shop business location
+    double? longitude,             // Shop business location
+    double? registrationLatitude,  // User's GPS at signup (analytics)
+    double? registrationLongitude, // User's GPS at signup (analytics)
     String? category,
     double? deliveryRadiusKm,
   }) {
@@ -837,6 +852,9 @@ class SellerApi {
       if (address != null && address.isNotEmpty) 'address': address,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      // User's registration location (GPS at signup) - separate from shop location
+      if (registrationLatitude != null) 'registration_latitude': registrationLatitude,
+      if (registrationLongitude != null) 'registration_longitude': registrationLongitude,
       if (category != null) 'category': category,
       if (deliveryRadiusKm != null) 'delivery_radius_km': deliveryRadiusKm,
     };
@@ -851,7 +869,9 @@ class SellerApi {
         if (msg.contains("Unknown column 'latitude'") || msg.contains("Unknown column 'longitude'")) {
           final retry = Map<String, dynamic>.from(payload)
             ..remove('latitude')
-            ..remove('longitude');
+            ..remove('longitude')
+            ..remove('registration_latitude')
+            ..remove('registration_longitude');
           debugPrint('[HTTP:public] retry register without coordinates');
           return send(retry);
         }

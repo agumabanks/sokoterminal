@@ -14,6 +14,11 @@ class SecureStorage {
       _storage.write(key: 'last_login_phone', value: phone);
   Future<String?> readLastLoginPhone() => _storage.read(key: 'last_login_phone');
 
+  // Unique seller identity (UUID)
+  Future<void> writeSellerUUID(String uuid) =>
+      _storage.write(key: 'seller_uuid', value: uuid);
+  Future<String?> readSellerUUID() => _storage.read(key: 'seller_uuid');
+
   Future<void> writeSellerQuickPin(String pin) =>
       _storage.write(key: 'seller_quick_pin', value: pin);
   Future<String?> readSellerQuickPin() => _storage.read(key: 'seller_quick_pin');

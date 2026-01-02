@@ -8,6 +8,7 @@ import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/phone_normalizer.dart';
+import '../backup/migration_controller.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated, loading, error }
 
@@ -88,10 +89,24 @@ class AuthController extends StateNotifier<AuthState> {
       );
       final data = response.data ?? {};
       final token = data['access_token'] ?? data['token'] ?? '';
-      if (token.isEmpty) {
-        throw Exception('Missing token from API');
-      }
-      await _storage.writeAccessToken(token);
+    if (token.isEmpty) {
+      throw Exception('Missing token from API');
+    }
+
+    // Ensure local database is cleared before starting a new session
+    // This prevents data bleeding between different users on the same device
+    final db = ref.read(appDatabaseProvider);
+    await db.clearAllData();
+
+    await _storage.writeAccessToken(token);
+    
+    // Store seller UUID for identity persistence
+    final user = data['user'] as Map<String, dynamic>?;
+    final sellerUUID = user?['seller_uuid'] as String?;
+    if (sellerUUID != null && sellerUUID.isNotEmpty) {
+      await _storage.writeSellerUUID(sellerUUID);
+    }
+
       if (normalizedPhone != null && normalizedPhone.isNotEmpty) {
         await _storage.writeLastLoginPhone(normalizedPhone);
       }
@@ -99,6 +114,7 @@ class AuthController extends StateNotifier<AuthState> {
       _scheduleTokenRefresh();
       // Trigger full sync after login
       unawaited(ref.read(syncServiceProvider).syncNow());
+      unawaited(ref.read(migrationProvider.notifier).checkForBackups());
     } on DioException catch (e) {
       state = AuthState(
         status: AuthStatus.error,
@@ -139,6 +155,7 @@ class AuthController extends StateNotifier<AuthState> {
           'password_confirmation': pin,
           'user_type': 'seller',
           'registered_via': 'terminal',
+          'shop_name': name.trim(),
         },
       );
       final data = response.data ?? {};
@@ -162,6 +179,7 @@ class AuthController extends StateNotifier<AuthState> {
       state = AuthState(status: AuthStatus.authenticated, token: token);
       _scheduleTokenRefresh();
       unawaited(ref.read(syncServiceProvider).syncNow());
+      unawaited(ref.read(migrationProvider.notifier).checkForBackups());
     } on DioException catch (e) {
       final errorData = e.response?.data;
       String errorMsg = 'Registration failed';
@@ -194,13 +212,21 @@ class AuthController extends StateNotifier<AuthState> {
       );
       
       final data = response.data ?? {};
-      if (data['result'] == true && data['access_token'] != null) {
-        final token = data['access_token'];
-        await _storage.writeAccessToken(token);
+    if (data['result'] == true && data['access_token'] != null) {
+      final token = data['access_token'];
+
+      // Ensure local database is cleared before starting a new session
+      // This prevents data bleeding between different users on the same device
+      final db = ref.read(appDatabaseProvider);
+      await db.clearAllData();
+
+      await _storage.writeAccessToken(token);
         await _storage.writeLastLoginPhone(normalized);
         state = AuthState(status: AuthStatus.authenticated, token: token);
         _scheduleTokenRefresh();
         unawaited(ref.read(syncServiceProvider).syncNow());
+        // Quick PIN login check for backups
+        unawaited(ref.read(migrationProvider.notifier).checkForBackups());
         return;
       }
     } catch (e) {
