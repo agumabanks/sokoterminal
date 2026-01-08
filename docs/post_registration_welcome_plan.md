@@ -76,7 +76,7 @@ Deliver a post-registration welcome moment that feels Apple-like: minimal, calm,
 - Use `\`Semantics\`` labels for the help action.
 - Ensure contrast ratio for primary/secondary text is acceptable on white.
 
-## Error Handling
+## Error Handlingw
 - If navigation fails, show a small banner: `\`Unable to continue. Try again.\``
 - If guided setup route is unavailable, fallback to `\`/home/checkout\`` with an alert.
 
