@@ -47,7 +47,8 @@ class DigitalProductDto {
   final bool status;
 
   factory DigitalProductDto.fromJson(Map<String, dynamic> json) {
-    final priceRaw = json['price'] ?? json['price\t'] ?? json['price\t '] ?? json['price '];
+    final priceRaw =
+        json['price'] ?? json['price\t'] ?? json['price\t '] ?? json['price '];
     return DigitalProductDto(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: (json['name'] ?? '').toString(),
@@ -88,9 +89,9 @@ class WholesaleState {
 
 final wholesaleControllerProvider =
     StateNotifierProvider<WholesaleController, WholesaleState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return WholesaleController(api)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      return WholesaleController(api)..load();
+    });
 
 class WholesaleController extends StateNotifier<WholesaleState> {
   WholesaleController(this.api) : super(const WholesaleState());
@@ -103,24 +104,32 @@ class WholesaleController extends StateNotifier<WholesaleState> {
       final digitalRes = await api.fetchDigitalProducts();
 
       final wholesaleData = wholesaleRes.data;
-      final wholesaleList =
-          wholesaleData is Map<String, dynamic> ? (wholesaleData['data'] as List? ?? const []) : const [];
+      final wholesaleList = wholesaleData is Map<String, dynamic>
+          ? (wholesaleData['data'] as List? ?? const [])
+          : const [];
       final wholesale = wholesaleList
           .whereType<Map>()
-          .map((e) => WholesaleProductDto.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => WholesaleProductDto.fromJson(Map<String, dynamic>.from(e)),
+          )
           .where((e) => e.id != 0)
           .toList();
 
       final digitalData = digitalRes.data;
-      final digitalList =
-          digitalData is Map<String, dynamic> ? (digitalData['data'] as List? ?? const []) : const [];
+      final digitalList = digitalData is Map<String, dynamic>
+          ? (digitalData['data'] as List? ?? const [])
+          : const [];
       final digital = digitalList
           .whereType<Map>()
           .map((e) => DigitalProductDto.fromJson(Map<String, dynamic>.from(e)))
           .where((e) => e.id != 0)
           .toList();
 
-      state = state.copyWith(loading: false, wholesale: wholesale, digital: digital);
+      state = state.copyWith(
+        loading: false,
+        wholesale: wholesale,
+        digital: digital,
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
@@ -140,18 +149,23 @@ class WholesaleScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(wholesaleControllerProvider.notifier).load(),
+            onPressed: () =>
+                ref.read(wholesaleControllerProvider.notifier).load(),
           ),
         ],
       ),
       body: state.loading && state.wholesale.isEmpty && state.digital.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => ref.read(wholesaleControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(wholesaleControllerProvider.notifier).load(),
               child: ListView(
                 padding: DesignTokens.paddingScreen,
                 children: [
-                  Text('Wholesale products', style: DesignTokens.textTitleMedium),
+                  Text(
+                    'Wholesale products',
+                    style: DesignTokens.textTitleMedium,
+                  ),
                   const SizedBox(height: DesignTokens.spaceSm),
                   if (state.wholesale.isEmpty)
                     _EmptySection(text: state.error ?? 'No wholesale products')
@@ -162,7 +176,9 @@ class WholesaleScreen extends ConsumerWidget {
                         title: p.name.isEmpty ? 'Product #${p.id}' : p.name,
                         subtitle: '${p.priceLabel} • Stock ${p.stockQty}',
                         badge: p.status ? 'Published' : 'Draft',
-                        badgeColor: p.status ? DesignTokens.success : DesignTokens.warning,
+                        badgeColor: p.status
+                            ? DesignTokens.success
+                            : DesignTokens.warning,
                       ),
                     ),
                   const SizedBox(height: DesignTokens.spaceLg),
@@ -175,9 +191,12 @@ class WholesaleScreen extends ConsumerWidget {
                       (p) => _RowCard(
                         icon: Icons.cloud_download_outlined,
                         title: p.name.isEmpty ? 'Digital #${p.id}' : p.name,
-                        subtitle: '${p.category.isEmpty ? 'Digital' : p.category} • UGX ${p.price.toStringAsFixed(0)}',
+                        subtitle:
+                            '${p.category.isEmpty ? 'Digital' : p.category} • UGX ${p.price.toStringAsFixed(0)}',
                         badge: p.status ? 'Published' : 'Draft',
-                        badgeColor: p.status ? DesignTokens.success : DesignTokens.warning,
+                        badgeColor: p.status
+                            ? DesignTokens.success
+                            : DesignTokens.warning,
                       ),
                     ),
                 ],
@@ -240,4 +259,3 @@ class _EmptySection extends StatelessWidget {
     );
   }
 }
-

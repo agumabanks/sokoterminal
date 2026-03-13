@@ -6,10 +6,10 @@ import 'package:flutter/services.dart';
 import '../core/theme/design_tokens.dart';
 
 /// A premium bottom sheet modal with glassmorphism effect.
-/// 
+///
 /// Use this instead of AlertDialog for all modal interactions
 /// to maintain consistent, premium UI.
-/// 
+///
 /// Example usage:
 /// ```dart
 /// BottomSheetModal.show(
@@ -109,7 +109,9 @@ class BottomSheetModal extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(
                     left: DesignTokens.spaceMd,
-                    right: showCloseButton ? DesignTokens.spaceXs : DesignTokens.spaceMd,
+                    right: showCloseButton
+                        ? DesignTokens.spaceXs
+                        : DesignTokens.spaceMd,
                     top: showHandle ? 0 : DesignTokens.spaceMd,
                     bottom: DesignTokens.spaceSm,
                   ),
@@ -136,7 +138,9 @@ class BottomSheetModal extends StatelessWidget {
                           icon: const Icon(Icons.close),
                           color: DesignTokens.grayMedium,
                           style: IconButton.styleFrom(
-                            backgroundColor: DesignTokens.grayLight.withValues(alpha: 0.5),
+                            backgroundColor: DesignTokens.grayLight.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ),
                     ],
@@ -150,7 +154,8 @@ class BottomSheetModal extends StatelessWidget {
                     left: padding?.left ?? DesignTokens.spaceMd,
                     right: padding?.right ?? DesignTokens.spaceMd,
                     top: padding?.top ?? 0,
-                    bottom: bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
+                    bottom:
+                        bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
                   ),
                   child: child,
                 ),
@@ -224,11 +229,7 @@ class ScrollableBottomSheetModal extends StatelessWidget {
 
 /// Quick action bottom sheet with a list of options
 class ActionBottomSheet extends StatelessWidget {
-  const ActionBottomSheet({
-    required this.actions,
-    this.title,
-    super.key,
-  });
+  const ActionBottomSheet({required this.actions, this.title, super.key});
 
   final List<ActionSheetItem> actions;
   final String? title;
@@ -257,12 +258,12 @@ class ActionBottomSheet extends StatelessWidget {
           width: double.infinity,
           child: TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              padding: DesignTokens.paddingMd,
-            ),
+            style: TextButton.styleFrom(padding: DesignTokens.paddingMd),
             child: Text(
               'Cancel',
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
           ),
         ),
@@ -277,7 +278,9 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = action.isDestructive ? DesignTokens.error : DesignTokens.brandPrimary;
+    final color = action.isDestructive
+        ? DesignTokens.error
+        : DesignTokens.brandPrimary;
     return InkWell(
       onTap: () {
         HapticFeedback.selectionClick();

@@ -9,6 +9,9 @@ Release builds are configured to **fail** if signing is not provided.
 ### Preflight (recommended before any release build)
 
 - `bash scripts/release_preflight.sh`
+- Strict Play submission gate:
+  - `bash scripts/play_submission_gate.sh`
+  - This now fails if reviewer credentials are placeholders or login verification fails
 
 ### Option A — `android/key.properties` (recommended for local builds)
 
@@ -27,6 +30,7 @@ Set:
 - `STORE_PASSWORD`
 - `KEY_ALIAS`
 - `KEY_PASSWORD`
+- `GOOGLE_MAPS_API_KEY`
 
 Then build with `flutter build appbundle --release`.
 
@@ -54,6 +58,8 @@ Before submitting to Play Store, complete:
 - Data Safety form (declare contacts usage if you keep `READ_CONTACTS`)
 - Content rating
 - App access instructions (if any auth is required for reviewers)
+  - Keep `PLAY_REVIEWER_ACCESS.md` up to date for the exact build under review
+  - Keep `PLAY_DATA_SAFETY_NOTES.md` aligned with submitted Data Safety answers
 
 ## 4) Release checklist (minimum)
 

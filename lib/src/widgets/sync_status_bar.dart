@@ -11,7 +11,7 @@ class SyncStatusBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(syncStatusProvider);
-    
+
     if (status.state == SyncState.idle && status.pendingCount == 0) {
       return const SizedBox.shrink();
     }
@@ -39,7 +39,6 @@ class SyncStatusBar extends ConsumerWidget {
         label = 'Offline: ${status.pendingCount} items waiting to sync';
         break;
       case SyncState.idle:
-      default:
         if (status.pendingCount > 0) {
           bgColor = Colors.blueGrey;
           icon = Icons.cloud_queue;
@@ -57,9 +56,7 @@ class SyncStatusBar extends ConsumerWidget {
           horizontal: DesignTokens.spaceMd,
           vertical: 6,
         ),
-        decoration: BoxDecoration(
-          color: bgColor,
-        ),
+        decoration: BoxDecoration(color: bgColor),
         child: Row(
           children: [
             if (showProgress)
@@ -90,7 +87,7 @@ class SyncStatusBar extends ConsumerWidget {
               Text(
                 'Synced ${DateFormat('HH:mm').format(status.lastSyncTime!)}',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 10,
                 ),
               ),

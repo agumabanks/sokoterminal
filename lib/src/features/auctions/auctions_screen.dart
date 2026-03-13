@@ -71,12 +71,20 @@ class AuctionBidDto {
 }
 
 class AuctionsState {
-  const AuctionsState({this.loading = false, this.items = const [], this.error});
+  const AuctionsState({
+    this.loading = false,
+    this.items = const [],
+    this.error,
+  });
   final bool loading;
   final List<AuctionProductDto> items;
   final String? error;
 
-  AuctionsState copyWith({bool? loading, List<AuctionProductDto>? items, String? error}) {
+  AuctionsState copyWith({
+    bool? loading,
+    List<AuctionProductDto>? items,
+    String? error,
+  }) {
     return AuctionsState(
       loading: loading ?? this.loading,
       items: items ?? this.items,
@@ -87,9 +95,9 @@ class AuctionsState {
 
 final auctionsControllerProvider =
     StateNotifierProvider<AuctionsController, AuctionsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return AuctionsController(api)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      return AuctionsController(api)..load();
+    });
 
 class AuctionsController extends StateNotifier<AuctionsState> {
   AuctionsController(this.api) : super(const AuctionsState());
@@ -100,7 +108,9 @@ class AuctionsController extends StateNotifier<AuctionsState> {
     try {
       final res = await api.fetchAuctionProducts();
       final data = res.data;
-      final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+      final list = data is Map<String, dynamic>
+          ? (data['data'] as List? ?? const [])
+          : const [];
       final items = list
           .whereType<Map>()
           .map((e) => AuctionProductDto.fromJson(Map<String, dynamic>.from(e)))
@@ -115,7 +125,9 @@ class AuctionsController extends StateNotifier<AuctionsState> {
   Future<List<AuctionBidDto>> loadBids(int productId) async {
     final res = await api.fetchAuctionProductBids(productId);
     final data = res.data;
-    final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+    final list = data is Map<String, dynamic>
+        ? (data['data'] as List? ?? const [])
+        : const [];
     return list
         .whereType<Map>()
         .map((e) => AuctionBidDto.fromJson(Map<String, dynamic>.from(e)))
@@ -141,14 +153,16 @@ class AuctionsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(auctionsControllerProvider.notifier).load(),
+            onPressed: () =>
+                ref.read(auctionsControllerProvider.notifier).load(),
           ),
         ],
       ),
       body: state.loading && state.items.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => ref.read(auctionsControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(auctionsControllerProvider.notifier).load(),
               child: ListView.builder(
                 padding: DesignTokens.paddingScreen,
                 itemCount: state.items.length + (state.items.isEmpty ? 1 : 0),
@@ -166,16 +180,28 @@ class AuctionsScreen extends ConsumerWidget {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: DesignTokens.warning.withValues(alpha: 0.12),
-                        child: const Icon(Icons.gavel_outlined, color: DesignTokens.warning),
+                        backgroundColor: DesignTokens.warning.withValues(
+                          alpha: 0.12,
+                        ),
+                        child: const Icon(
+                          Icons.gavel_outlined,
+                          color: DesignTokens.warning,
+                        ),
                       ),
-                      title: Text(auction.name.isEmpty ? 'Auction #${auction.id}' : auction.name,
-                          style: DesignTokens.textBodyBold),
+                      title: Text(
+                        auction.name.isEmpty
+                            ? 'Auction #${auction.id}'
+                            : auction.name,
+                        style: DesignTokens.textBodyBold,
+                      ),
                       subtitle: Text(
                         '${auction.mainPriceLabel} • ${auction.totalBids} bids',
                         style: DesignTokens.textSmall,
                       ),
-                      trailing: const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: DesignTokens.grayMedium,
+                      ),
                       onTap: () => _openAuction(context, ref, auction),
                     ),
                   );
@@ -185,7 +211,11 @@ class AuctionsScreen extends ConsumerWidget {
     );
   }
 
-  void _openAuction(BuildContext context, WidgetRef ref, AuctionProductDto auction) {
+  void _openAuction(
+    BuildContext context,
+    WidgetRef ref,
+    AuctionProductDto auction,
+  ) {
     BottomSheetModal.show(
       context: context,
       title: auction.name.isEmpty ? 'Auction #${auction.id}' : auction.name,
@@ -201,7 +231,8 @@ class _AuctionDetailSheet extends ConsumerStatefulWidget {
   final AuctionProductDto auction;
 
   @override
-  ConsumerState<_AuctionDetailSheet> createState() => _AuctionDetailSheetState();
+  ConsumerState<_AuctionDetailSheet> createState() =>
+      _AuctionDetailSheetState();
 }
 
 class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
@@ -210,12 +241,16 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
   @override
   void initState() {
     super.initState();
-    _future = ref.read(auctionsControllerProvider.notifier).loadBids(widget.auction.id);
+    _future = ref
+        .read(auctionsControllerProvider.notifier)
+        .loadBids(widget.auction.id);
   }
 
   void _refresh() {
     setState(() {
-      _future = ref.read(auctionsControllerProvider.notifier).loadBids(widget.auction.id);
+      _future = ref
+          .read(auctionsControllerProvider.notifier)
+          .loadBids(widget.auction.id);
     });
   }
 
@@ -234,7 +269,10 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Start: ${auction.startDate}', style: DesignTokens.textSmall),
+              Text(
+                'Start: ${auction.startDate}',
+                style: DesignTokens.textSmall,
+              ),
               Text('End: ${auction.endDate}', style: DesignTokens.textSmall),
             ],
           ),
@@ -260,12 +298,17 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
               }
               if (snapshot.hasError) {
                 return Center(
-                  child: Text('Failed to load bids: ${snapshot.error}', style: DesignTokens.textBody),
+                  child: Text(
+                    'Failed to load bids: ${snapshot.error}',
+                    style: DesignTokens.textBody,
+                  ),
                 );
               }
               final bids = snapshot.data ?? const [];
               if (bids.isEmpty) {
-                return Center(child: Text('No bids yet', style: DesignTokens.textSmall));
+                return Center(
+                  child: Text('No bids yet', style: DesignTokens.textSmall),
+                );
               }
               return ListView.builder(
                 itemCount: bids.length,
@@ -273,16 +316,32 @@ class _AuctionDetailSheetState extends ConsumerState<_AuctionDetailSheet> {
                   final bid = bids[index];
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.08),
-                      child: const Icon(Icons.person_outline, color: DesignTokens.brandPrimary),
+                      backgroundColor: DesignTokens.brandPrimary.withValues(
+                        alpha: 0.08,
+                      ),
+                      child: const Icon(
+                        Icons.person_outline,
+                        color: DesignTokens.brandPrimary,
+                      ),
                     ),
-                    title: Text(bid.customerName, style: DesignTokens.textBodyBold),
-                    subtitle: Text('${bid.amountLabel} • ${bid.dateLabel}', style: DesignTokens.textSmall),
+                    title: Text(
+                      bid.customerName,
+                      style: DesignTokens.textBodyBold,
+                    ),
+                    subtitle: Text(
+                      '${bid.amountLabel} • ${bid.dateLabel}',
+                      style: DesignTokens.textSmall,
+                    ),
                     trailing: IconButton(
                       tooltip: 'Delete bid',
-                      icon: const Icon(Icons.delete_outline, color: DesignTokens.error),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: DesignTokens.error,
+                      ),
                       onPressed: () async {
-                        await ref.read(auctionsControllerProvider.notifier).deleteBid(bid.id);
+                        await ref
+                            .read(auctionsControllerProvider.notifier)
+                            .deleteBid(bid.id);
                         _refresh();
                       },
                     ),
@@ -312,11 +371,14 @@ class _EmptyAuctionsState extends StatelessWidget {
           Text('No auction products', style: DesignTokens.textBodyBold),
           if (error != null) ...[
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error!, style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error!,
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),
     );
   }
 }
-

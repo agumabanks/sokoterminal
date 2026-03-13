@@ -17,4 +17,3 @@ class NotificationsEntryScreen extends ConsumerWidget {
     return const NotificationsScreen();
   }
 }
-

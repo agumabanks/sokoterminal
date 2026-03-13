@@ -26,8 +26,8 @@ class ParkedSale {
 
 final parkedSalesProvider =
     StateNotifierProvider<ParkedSalesController, List<ParkedSale>>((ref) {
-  return ParkedSalesController();
-});
+      return ParkedSalesController();
+    });
 
 class ParkedSalesController extends StateNotifier<List<ParkedSale>> {
   ParkedSalesController() : super(const []);
@@ -53,7 +53,11 @@ class ParkedSalesController extends StateNotifier<List<ParkedSale>> {
     if (idx == -1) return null;
     final sale = state[idx];
     state = [...state]..removeAt(idx);
-    return CartState(lines: sale.lines, notes: sale.notes, customer: sale.customer);
+    return CartState(
+      lines: sale.lines,
+      notes: sale.notes,
+      customer: sale.customer,
+    );
   }
 
   void clear(String id) {

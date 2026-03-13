@@ -16,6 +16,7 @@ import '../notifications/notifications_controller.dart';
 import '../services/service_bookings_controller.dart';
 
 enum InboxBucket { needsAction, inProgress, completed }
+
 enum InboxType { all, orders, bookings, alerts, stock }
 
 final inboxBucketProvider = StateProvider<InboxBucket>(
@@ -27,17 +28,19 @@ final cachedOrdersStreamProvider = StreamProvider<List<CachedOrder>>((ref) {
   return ref.watch(appDatabaseProvider).watchCachedOrders();
 });
 
-final cachedBookingsStreamProvider =
-    StreamProvider<List<CachedServiceBooking>>((ref) {
-  return ref.watch(appDatabaseProvider).watchCachedServiceBookings();
-});
+final cachedBookingsStreamProvider = StreamProvider<List<CachedServiceBooking>>(
+  (ref) {
+    return ref.watch(appDatabaseProvider).watchCachedServiceBookings();
+  },
+);
 
 final pendingSyncOpsStreamProvider = StreamProvider<List<SyncOp>>((ref) {
   return ref.watch(appDatabaseProvider).watchPendingSyncOps();
 });
 
-final stockAlertsStreamProvider =
-    StreamProvider<List<StockAlertWithItem>>((ref) {
+final stockAlertsStreamProvider = StreamProvider<List<StockAlertWithItem>>((
+  ref,
+) {
   return ref.watch(appDatabaseProvider).watchOpenStockAlertsWithItem();
 });
 
@@ -78,21 +81,27 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final items = <_InboxItem>[
       ...ordersAsync.maybeWhen(
         data: (rows) => rows
-            .map((r) => _InboxItem.fromOrderJson(
-                  jsonDecode(r.payloadJson) as Map<String, dynamic>,
-                  pending: pendingIds.pendingOrderIds
-                      .contains(r.orderId.toString()),
-                ))
+            .map(
+              (r) => _InboxItem.fromOrderJson(
+                jsonDecode(r.payloadJson) as Map<String, dynamic>,
+                pending: pendingIds.pendingOrderIds.contains(
+                  r.orderId.toString(),
+                ),
+              ),
+            )
             .toList(),
         orElse: () => const [],
       ),
       ...bookingsAsync.maybeWhen(
         data: (rows) => rows
-            .map((r) => _InboxItem.fromBookingJson(
-                  jsonDecode(r.payloadJson) as Map<String, dynamic>,
-                  pending: pendingIds.pendingBookingIds
-                      .contains(r.bookingId.toString()),
-                ))
+            .map(
+              (r) => _InboxItem.fromBookingJson(
+                jsonDecode(r.payloadJson) as Map<String, dynamic>,
+                pending: pendingIds.pendingBookingIds.contains(
+                  r.bookingId.toString(),
+                ),
+              ),
+            )
             .toList(),
         orElse: () => const [],
       ),
@@ -195,7 +204,10 @@ class _PendingIds {
         bookingIds.add(type.substring('booking_action:'.length));
       }
     }
-    return _PendingIds(pendingOrderIds: orderIds, pendingBookingIds: bookingIds);
+    return _PendingIds(
+      pendingOrderIds: orderIds,
+      pendingBookingIds: bookingIds,
+    );
   }
 }
 
@@ -232,22 +244,23 @@ class _InboxItem {
     required bool pending,
   }) {
     final id = order['id']?.toString() ?? '';
-    final code = order['order_code']?.toString() ??
-        order['code']?.toString() ??
-        id;
-    final customer = order['customer_name']?.toString() ??
+    final code =
+        order['order_code']?.toString() ?? order['code']?.toString() ?? id;
+    final customer =
+        order['customer_name']?.toString() ??
         (order['user'] is Map ? (order['user']['name']?.toString()) : null) ??
         'Customer';
-    final phone = order['customer_phone']?.toString() ??
+    final phone =
+        order['customer_phone']?.toString() ??
         (order['user'] is Map ? (order['user']['phone']?.toString()) : null);
-    final delivery = (order['delivery_status_raw'] ??
-            order['delivery_status'] ??
-            'pending')
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replaceAll(' ', '_');
-    final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '') ??
+    final delivery =
+        (order['delivery_status_raw'] ?? order['delivery_status'] ?? 'pending')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll(' ', '_');
+    final createdAt =
+        DateTime.tryParse(order['created_at']?.toString() ?? '') ??
         DateTime.tryParse(order['date']?.toString() ?? '') ??
         DateTime.now().toUtc();
 
@@ -292,18 +305,25 @@ class _InboxItem {
   }) {
     final id = booking['id']?.toString() ?? '';
     final offeringTitle =
-        (booking['offering'] is Map ? (booking['offering']['title']?.toString()) : null) ??
-            'Booking';
+        (booking['offering'] is Map
+            ? (booking['offering']['title']?.toString())
+            : null) ??
+        'Booking';
     final customerName =
-        (booking['user'] is Map ? (booking['user']['name']?.toString()) : null) ??
-            'Customer';
-    final phone =
-        (booking['user'] is Map ? (booking['user']['phone']?.toString()) : null);
+        (booking['user'] is Map
+            ? (booking['user']['name']?.toString())
+            : null) ??
+        'Customer';
+    final phone = (booking['user'] is Map
+        ? (booking['user']['phone']?.toString())
+        : null);
     final status = (booking['status'] ?? 'pending')
         .toString()
         .trim()
         .toLowerCase();
-    final scheduled = DateTime.tryParse(booking['scheduled_start']?.toString() ?? '');
+    final scheduled = DateTime.tryParse(
+      booking['scheduled_start']?.toString() ?? '',
+    );
     final ts = (scheduled ?? DateTime.now().toUtc()).toUtc();
 
     final bucket = switch (status) {
@@ -432,10 +452,7 @@ class _Actions extends ConsumerWidget {
         itemBuilder: (context) {
           final actions = <PopupMenuEntry<String>>[
             if (!isAck)
-              const PopupMenuItem(
-                value: 'ack',
-                child: Text('Acknowledge'),
-              ),
+              const PopupMenuItem(value: 'ack', child: Text('Acknowledge')),
             const PopupMenuItem(
               value: 'open_low_stock',
               child: Text('Open Low Stock'),
@@ -465,7 +482,9 @@ class _Actions extends ConsumerWidget {
 
           switch (action) {
             case 'ack':
-              await ref.read(appDatabaseProvider).acknowledgeStockAlert(
+              await ref
+                  .read(appDatabaseProvider)
+                  .acknowledgeStockAlert(
                     itemId: alertRow.alert.itemId,
                     variant: alertRow.alert.variant,
                   );
@@ -495,10 +514,12 @@ class _Actions extends ConsumerWidget {
             'cancelled',
           ];
           return actions
-              .map((a) => PopupMenuItem(
-                    value: a,
-                    child: Text(a.toUpperCase().replaceAll('_', ' ')),
-                  ))
+              .map(
+                (a) => PopupMenuItem(
+                  value: a,
+                  child: Text(a.toUpperCase().replaceAll('_', ' ')),
+                ),
+              )
               .toList();
         },
         onSelected: (next) async {
@@ -513,11 +534,9 @@ class _Actions extends ConsumerWidget {
               ),
             );
           }
-          await ref.read(ordersControllerProvider.notifier).updateStatus(
-                orderId: id,
-                delivery: next,
-                payment: '',
-              );
+          await ref
+              .read(ordersControllerProvider.notifier)
+              .updateStatus(orderId: id, delivery: next, payment: '');
         },
       );
     }
@@ -543,7 +562,9 @@ class _Actions extends ConsumerWidget {
               ),
             );
           }
-          final controller = ref.read(serviceBookingsControllerProvider.notifier);
+          final controller = ref.read(
+            serviceBookingsControllerProvider.notifier,
+          );
           switch (action) {
             case 'confirm':
               await controller.confirm(id);

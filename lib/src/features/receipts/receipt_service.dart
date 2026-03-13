@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/db/app_database.dart';
+import '../../core/settings/business_profile_cache.dart';
 import '../../core/settings/shop_payment_settings.dart';
 
 class ReceiptService {
@@ -20,7 +21,7 @@ class ReceiptService {
   // Date formatters
   static final _dateFormat = DateFormat('dd MMM yyyy');
   static final _timeFormat = DateFormat('HH:mm');
-  
+
   // Colors
   static const _primaryColor = PdfColor.fromInt(0xFF1A1A2E);
   static const _accentColor = PdfColor.fromInt(0xFF00A884);
@@ -34,19 +35,21 @@ class ReceiptService {
     final template = await _resolveTemplate();
     final headerText = _cleanText(template?.headerText);
     final footerText = _cleanText(template?.footerText);
-    
+
     // Format data
     final isRefund = entry.type == 'refund';
     final isVoid = entry.type == 'void';
     final isReversal = isRefund || isVoid;
     final sign = isReversal ? '-' : '';
-    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final voidForSale = entry.type == 'sale'
+        ? await db.findVoidForSale(entry.id)
+        : null;
     final isVoided = isVoid || voidForSale != null;
     final receiptNo = _formatReceiptNumber(entry.receiptNumber);
     final dateStr = _dateFormat.format(entry.createdAt.toLocal());
     final timeStr = _timeFormat.format(entry.createdAt.toLocal());
 
-    final paymentSettings = ShopPaymentSettingsCache.read(prefs);
+    final paymentSettings = await _resolvePaymentSettings();
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
         !isReversal &&
@@ -58,7 +61,7 @@ class ReceiptService {
               method == 'bank_transfer' ||
               method == 'credit';
         });
-    
+
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.roll80,
@@ -71,7 +74,9 @@ class ReceiptService {
               pw.Container(
                 padding: const pw.EdgeInsets.only(bottom: 12),
                 decoration: const pw.BoxDecoration(
-                  border: pw.Border(bottom: pw.BorderSide(color: _accentColor, width: 2)),
+                  border: pw.Border(
+                    bottom: pw.BorderSide(color: _accentColor, width: 2),
+                  ),
                 ),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -91,20 +96,26 @@ class ReceiptService {
                         padding: const pw.EdgeInsets.only(top: 4),
                         child: pw.Text(
                           outlet!.address!.trim(),
-                          style: const pw.TextStyle(fontSize: 10, color: _grayMedium),
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: _grayMedium,
+                          ),
                           textAlign: pw.TextAlign.center,
                         ),
                       ),
                     if (outlet?.phone?.trim().isNotEmpty ?? false)
                       pw.Text(
                         'Tel: ${outlet!.phone!.trim()}',
-                        style: const pw.TextStyle(fontSize: 10, color: _grayMedium),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: _grayMedium,
+                        ),
                         textAlign: pw.TextAlign.center,
                       ),
                   ],
                 ),
               ),
-              
+
               pw.SizedBox(height: 12),
 
               if (isVoided) ...[
@@ -127,11 +138,15 @@ class ReceiptService {
                         ),
                         textAlign: pw.TextAlign.center,
                       ),
-                      if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) ...[
+                      if (isVoid &&
+                          entry.originalEntryId?.trim().isNotEmpty == true) ...[
                         pw.SizedBox(height: 6),
                         pw.Text(
                           'Original: ${entry.originalEntryId}',
-                          style: const pw.TextStyle(fontSize: 9, color: _grayMedium),
+                          style: const pw.TextStyle(
+                            fontSize: 9,
+                            color: _grayMedium,
+                          ),
                           textAlign: pw.TextAlign.center,
                         ),
                       ],
@@ -139,7 +154,10 @@ class ReceiptService {
                         pw.SizedBox(height: 6),
                         pw.Text(
                           'Void entry: ${voidForSale.id}',
-                          style: const pw.TextStyle(fontSize: 9, color: _grayMedium),
+                          style: const pw.TextStyle(
+                            fontSize: 9,
+                            color: _grayMedium,
+                          ),
                           textAlign: pw.TextAlign.center,
                         ),
                         if (voidForSale.note?.trim().isNotEmpty == true)
@@ -147,7 +165,10 @@ class ReceiptService {
                             padding: const pw.EdgeInsets.only(top: 4),
                             child: pw.Text(
                               voidForSale.note!.trim(),
-                              style: const pw.TextStyle(fontSize: 8, color: _grayMedium),
+                              style: const pw.TextStyle(
+                                fontSize: 8,
+                                color: _grayMedium,
+                              ),
                               textAlign: pw.TextAlign.center,
                             ),
                           ),
@@ -157,7 +178,7 @@ class ReceiptService {
                 ),
                 pw.SizedBox(height: 12),
               ],
-              
+
               // ============ RECEIPT INFO BOX ============
               pw.Container(
                 padding: const pw.EdgeInsets.all(10),
@@ -170,22 +191,46 @@ class ReceiptService {
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Receipt #', style: const pw.TextStyle(fontSize: 10, color: _grayMedium)),
-                        pw.Text(receiptNo, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          'Receipt #',
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: _grayMedium,
+                          ),
+                        ),
+                        pw.Text(
+                          receiptNo,
+                          style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                     pw.SizedBox(height: 4),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Date', style: const pw.TextStyle(fontSize: 10, color: _grayMedium)),
-                        pw.Text('$dateStr | $timeStr', style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text(
+                          'Date',
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: _grayMedium,
+                          ),
+                        ),
+                        pw.Text(
+                          '$dateStr | $timeStr',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
                       ],
                     ),
                     if (isRefund) ...[
                       pw.SizedBox(height: 4),
                       pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: pw.BoxDecoration(
                           color: const PdfColor.fromInt(0xFFFFEBEE),
                           borderRadius: pw.BorderRadius.circular(4),
@@ -203,22 +248,29 @@ class ReceiptService {
                   ],
                 ),
               ),
-              
+
               // ============ HEADER MESSAGE ============
               if (headerText != null) ...[
                 pw.SizedBox(height: 10),
                 pw.Text(
                   headerText,
-                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: _grayMedium),
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontStyle: pw.FontStyle.italic,
+                    color: _grayMedium,
+                  ),
                   textAlign: pw.TextAlign.center,
                 ),
               ],
-              
+
               pw.SizedBox(height: 16),
-              
+
               // ============ ITEMS TABLE ============
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+                border: pw.TableBorder.all(
+                  color: PdfColors.grey300,
+                  width: 0.5,
+                ),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(3),
                   1: const pw.FlexColumnWidth(1),
@@ -231,40 +283,73 @@ class ReceiptService {
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Item', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Item',
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Qty', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+                        child: pw.Text(
+                          'Qty',
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('Amount', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                        child: pw.Text(
+                          'Amount',
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                          textAlign: pw.TextAlign.right,
+                        ),
                       ),
                     ],
                   ),
                   // Item rows
-                  ...bundle.lines.map((l) => pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(l.title, style: const pw.TextStyle(fontSize: 10)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('${l.quantity}', style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text('$sign${_formatAmount(l.lineTotal)}', style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.right),
-                      ),
-                    ],
-                  )),
+                  ...bundle.lines.map(
+                    (l) => pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                            l.title,
+                            style: const pw.TextStyle(fontSize: 10),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                            '${l.quantity}',
+                            style: const pw.TextStyle(fontSize: 10),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                            '$sign${_formatAmount(l.lineTotal)}',
+                            style: const pw.TextStyle(fontSize: 10),
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              
+
               pw.SizedBox(height: 8),
-              
+
               // ============ TOTAL ============
               pw.Container(
                 padding: const pw.EdgeInsets.all(10),
@@ -275,30 +360,56 @@ class ReceiptService {
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('TOTAL', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                    pw.Text(
+                      'TOTAL',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
                     pw.Text(
                       'UGX $sign${_formatAmount(entry.total)}',
-                      style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
                     ),
                   ],
                 ),
               ),
-              
+
               // ============ PAYMENTS ============
               if (bundle.payments.isNotEmpty) ...[
                 pw.SizedBox(height: 10),
-                pw.Text('Payment Details', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _grayMedium)),
-                pw.SizedBox(height: 4),
-                ...bundle.payments.map((p) => pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(_capitalize(p.method), style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('UGX ${_formatAmount(p.amount)}', style: const pw.TextStyle(fontSize: 10)),
-                    ],
+                pw.Text(
+                  'Payment Details',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _grayMedium,
                   ),
-                )),
+                ),
+                pw.SizedBox(height: 4),
+                ...bundle.payments.map(
+                  (p) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          _capitalize(p.method),
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                        pw.Text(
+                          'UGX ${_formatAmount(p.amount)}',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
 
               if (showPaymentInstructions) ...[
@@ -316,13 +427,13 @@ class ReceiptService {
                   ),
                 ),
               ],
-              
+
               pw.SizedBox(height: 16),
-              
+
               // ============ FOOTER ============
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 8),
-              
+
               if (footerText != null)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 8),
@@ -332,15 +443,18 @@ class ReceiptService {
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
-              
+
               pw.Text(
                 'Thank you for your business!',
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
               pw.SizedBox(height: 6),
               pw.Text(
-                'Powered by Soko 24 | soko.sanaa.ug',
+                'Powered by Soko 24 | soko24.co',
                 style: const pw.TextStyle(fontSize: 8, color: _grayMedium),
                 textAlign: pw.TextAlign.center,
               ),
@@ -390,9 +504,10 @@ class ReceiptService {
         : await db.getCustomerById(bundle.entry.customerId!);
     final outlet = await _resolveOutlet(bundle.entry.outletId);
     final template = await _resolveTemplate();
-    final voidForSale =
-        bundle.entry.type == 'sale' ? await db.findVoidForSale(bundle.entry.id) : null;
-    final text = _buildReceiptText(
+    final voidForSale = bundle.entry.type == 'sale'
+        ? await db.findVoidForSale(bundle.entry.id)
+        : null;
+    final text = await _buildReceiptText(
       bundle,
       customer: customer,
       outlet: outlet,
@@ -459,9 +574,11 @@ class ReceiptService {
     final isVoid = entry.type == 'void';
     final isReversal = isRefund || isVoid;
     final sign = isReversal ? '-' : '';
-    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final voidForSale = entry.type == 'sale'
+        ? await db.findVoidForSale(entry.id)
+        : null;
     final isVoided = isVoid || voidForSale != null;
-    final paymentSettings = ShopPaymentSettingsCache.read(prefs);
+    final paymentSettings = await _resolvePaymentSettings();
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
         !isReversal &&
@@ -542,13 +659,13 @@ class ReceiptService {
     return db.fetchLedgerEntryBundle(id);
   }
 
-  String _buildReceiptText(
+  Future<String> _buildReceiptText(
     LedgerEntryBundle bundle, {
     Customer? customer,
     Outlet? outlet,
     ReceiptTemplate? template,
     LedgerEntry? voidForSale,
-  }) {
+  }) async {
     final entry = bundle.entry;
     final isRefund = entry.type == 'refund';
     final isVoid = entry.type == 'void';
@@ -556,7 +673,7 @@ class ReceiptService {
     final sign = isReversal ? '-' : '';
     final headerText = _cleanText(template?.headerText);
     final footerText = _cleanText(template?.footerText);
-    
+
     final sb = StringBuffer();
     sb.writeln(outlet?.name ?? 'Soko 24');
     if (outlet != null && (outlet.address?.trim().isNotEmpty ?? false)) {
@@ -565,13 +682,13 @@ class ReceiptService {
     if (outlet != null && (outlet.phone?.trim().isNotEmpty ?? false)) {
       sb.writeln(outlet.phone!.trim());
     }
-    
+
     // Template header message
     if (headerText != null) {
       sb.writeln('');
       sb.writeln(headerText);
     }
-    
+
     sb.writeln('');
     sb.writeln('Receipt');
     sb.writeln('Type: ${entry.type.toUpperCase()}');
@@ -609,7 +726,7 @@ class ReceiptService {
       }
     }
 
-    final paymentSettings = ShopPaymentSettingsCache.read(prefs);
+    final paymentSettings = await _resolvePaymentSettings();
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
         !isReversal &&
@@ -625,13 +742,13 @@ class ReceiptService {
       sb.writeln('');
       sb.writeln(paymentInstructions);
     }
-    
+
     // Template footer message
     if (footerText != null) {
       sb.writeln('');
       sb.writeln(footerText);
     }
-    
+
     sb.writeln('');
     sb.writeln('Thank you!');
     sb.writeln('Powered by Soko 24');
@@ -639,11 +756,30 @@ class ReceiptService {
   }
 
   Future<Outlet?> _resolveOutlet(String? outletId) async {
+    final profile = await db.getBusinessProfile();
+    if (profile != null && profile.shopName.trim().isNotEmpty) {
+      return Outlet(
+        id: profile.shopId ?? outletId ?? kPrimaryBusinessProfileId,
+        name: profile.shopName,
+        address: profile.shopAddress,
+        phone: profile.shopPhone,
+        active: true,
+        updatedAt: profile.updatedAt,
+      );
+    }
     if (outletId != null && outletId.trim().isNotEmpty) {
       final outlet = await db.getOutletById(outletId);
       if (outlet != null) return outlet;
     }
     return db.getPrimaryOutlet();
+  }
+
+  Future<ShopPaymentSettings> _resolvePaymentSettings() async {
+    final profile = await db.getBusinessProfile();
+    if (profile != null) {
+      return businessProfileToPaymentSettings(profile);
+    }
+    return ShopPaymentSettingsCache.read(prefs);
   }
 
   Future<ReceiptTemplate?> _resolveTemplate() {

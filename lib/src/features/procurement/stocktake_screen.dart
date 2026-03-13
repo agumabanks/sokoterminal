@@ -59,7 +59,9 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
           const SizedBox(height: DesignTokens.spaceLg),
           Row(
             children: [
-              Expanded(child: Text('Counted items', style: DesignTokens.textBodyBold)),
+              Expanded(
+                child: Text('Counted items', style: DesignTokens.textBodyBold),
+              ),
               TextButton.icon(
                 onPressed: _saving ? null : () => _addLine(context),
                 icon: const Icon(Icons.add),
@@ -78,7 +80,11 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.fact_check_outlined, size: 48, color: DesignTokens.grayMedium),
+                  Icon(
+                    Icons.fact_check_outlined,
+                    size: 48,
+                    color: DesignTokens.grayMedium,
+                  ),
                   const SizedBox(height: DesignTokens.spaceSm),
                   Text('No items counted', style: DesignTokens.textBodyBold),
                   const SizedBox(height: DesignTokens.spaceXxs),
@@ -95,10 +101,14 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
               children: [
                 for (final line in _lines)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+                    padding: const EdgeInsets.only(
+                      bottom: DesignTokens.spaceSm,
+                    ),
                     child: _StocktakeLineCard(
                       line: line,
-                      onRemove: _saving ? null : () => setState(() => _lines.remove(line)),
+                      onRemove: _saving
+                          ? null
+                          : () => setState(() => _lines.remove(line)),
                     ),
                   ),
               ],
@@ -114,7 +124,9 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
                   )
                 : const Icon(Icons.check),
             label: Text(_saving ? 'Saving…' : 'Save stock count'),
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.brandAccent,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceLg),
         ],
@@ -178,9 +190,13 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
 
         var current = item.stockQty;
         if (line.variant.trim().isNotEmpty) {
-          final row = await (db.select(db.itemStocks)
-                ..where((t) => t.itemId.equals(line.itemId) & t.variant.equals(line.variant.trim())))
-              .getSingleOrNull();
+          final row =
+              await (db.select(db.itemStocks)..where(
+                    (t) =>
+                        t.itemId.equals(line.itemId) &
+                        t.variant.equals(line.variant.trim()),
+                  ))
+                  .getSingleOrNull();
           if (row != null) current = row.stockQty;
         }
 
@@ -217,11 +233,13 @@ class _StocktakeScreenState extends ConsumerState<StocktakeScreen> {
           'client_stocktake_id': clientStocktakeId,
           'occurred_at': occurredAt.toIso8601String(),
           'lines': _lines
-              .map((l) => {
-                    'item_id': l.itemId,
-                    'variant': l.variant,
-                    'counted_qty': l.countedQty,
-                  })
+              .map(
+                (l) => {
+                  'item_id': l.itemId,
+                  'variant': l.variant,
+                  'counted_qty': l.countedQty,
+                },
+              )
               .toList(),
         },
       );
@@ -310,9 +328,7 @@ class _ItemPickerState extends State<_ItemPicker> {
     final q = _q.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.items
-        : widget.items
-            .where((i) => i.name.toLowerCase().contains(q))
-            .toList();
+        : widget.items.where((i) => i.name.toLowerCase().contains(q)).toList();
 
     return Padding(
       padding: DesignTokens.paddingScreen,
@@ -355,16 +371,14 @@ class _StocktakeConfig {
 }
 
 class _StocktakeLineConfigForm extends StatefulWidget {
-  const _StocktakeLineConfigForm({
-    required this.item,
-    required this.stocks,
-  });
+  const _StocktakeLineConfigForm({required this.item, required this.stocks});
 
   final Item item;
   final List<ItemStock> stocks;
 
   @override
-  State<_StocktakeLineConfigForm> createState() => _StocktakeLineConfigFormState();
+  State<_StocktakeLineConfigForm> createState() =>
+      _StocktakeLineConfigFormState();
 }
 
 class _StocktakeLineConfigFormState extends State<_StocktakeLineConfigForm> {
@@ -391,12 +405,13 @@ class _StocktakeLineConfigFormState extends State<_StocktakeLineConfigForm> {
 
   @override
   Widget build(BuildContext context) {
-    final variants = widget.stocks
-        .map((s) => s.variant)
-        .toSet()
-        .where((v) => v.trim().isNotEmpty)
-        .toList()
-      ..sort();
+    final variants =
+        widget.stocks
+            .map((s) => s.variant)
+            .toSet()
+            .where((v) => v.trim().isNotEmpty)
+            .toList()
+          ..sort();
 
     return Padding(
       padding: DesignTokens.paddingScreen,
@@ -412,7 +427,9 @@ class _StocktakeLineConfigFormState extends State<_StocktakeLineConfigForm> {
               decoration: const InputDecoration(labelText: 'Variant'),
               items: [
                 const DropdownMenuItem(value: '', child: Text('Default')),
-                ...variants.map((v) => DropdownMenuItem(value: v, child: Text(v))),
+                ...variants.map(
+                  (v) => DropdownMenuItem(value: v, child: Text(v)),
+                ),
               ],
               onChanged: (v) => setState(() => _variant = v ?? ''),
             ),
@@ -430,7 +447,10 @@ class _StocktakeLineConfigFormState extends State<_StocktakeLineConfigForm> {
             onPressed: () {
               final counted = int.tryParse(_qtyCtrl.text.trim()) ?? -1;
               if (counted < 0) return;
-              Navigator.pop(context, _StocktakeConfig(variant: _variant, countedQty: counted));
+              Navigator.pop(
+                context,
+                _StocktakeConfig(variant: _variant, countedQty: counted),
+              );
             },
             child: const Text('Add'),
           ),

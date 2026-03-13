@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/config/build_metadata.dart';
 import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
 
@@ -165,13 +166,15 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
       await api.requestExport(type: type);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export requested ($type). Check email/notifications.')),
+        SnackBar(
+          content: Text('Export requested ($type). Check email/notifications.'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to request export: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to request export: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -183,16 +186,16 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
       final api = ref.read(sellerApiProvider);
       final db = ref.read(appDatabaseProvider);
       final pending = await db.pendingSyncOps();
-      
+
       String? fileUrl;
       // Upload log if exists
       final file = await Telemetry.getLogFile();
       if (await file.exists() && await file.length() > 0) {
         try {
-           final res = await api.uploadSellerFile(file);
-           if (res.data is Map) {
-             fileUrl = (res.data as Map)['url']?.toString();
-           }
+          final res = await api.uploadSellerFile(file);
+          if (res.data is Map) {
+            fileUrl = (res.data as Map)['url']?.toString();
+          }
         } catch (_) {
           // Ignore upload fail, send metadata anyway
         }
@@ -202,21 +205,21 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
         metadata: {
           'pending_ops': pending.length,
           'platform': Platform.operatingSystem,
-          'version': '1.0.0', // TODO: Get real version
+          'version': BuildMetadata.appVersion,
           'timestamp': DateTime.now().toIso8601String(),
         },
         fileUrl: fileUrl,
       );
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Support bundle sent successfully')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send bundle: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send bundle: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -276,7 +279,10 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                 const SizedBox(height: DesignTokens.spaceLg),
                 const Divider(),
                 const SizedBox(height: DesignTokens.spaceMd),
-                Text('Server Exports (Online)', style: DesignTokens.textBodyBold),
+                Text(
+                  'Server Exports (Online)',
+                  style: DesignTokens.textBodyBold,
+                ),
                 const SizedBox(height: DesignTokens.spaceSm),
                 Wrap(
                   spacing: 8,
@@ -285,17 +291,23 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                     ActionChip(
                       avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
                       label: const Text('Products'),
-                      onPressed: _busy ? null : () => _requestServerExport('products'),
+                      onPressed: _busy
+                          ? null
+                          : () => _requestServerExport('products'),
                     ),
                     ActionChip(
-                       avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
+                      avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
                       label: const Text('Ledger'),
-                       onPressed: _busy ? null : () => _requestServerExport('ledger'),
+                      onPressed: _busy
+                          ? null
+                          : () => _requestServerExport('ledger'),
                     ),
                     ActionChip(
-                       avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
+                      avatar: const Icon(Icons.cloud_upload_outlined, size: 16),
                       label: const Text('Inventory'),
-                       onPressed: _busy ? null : () => _requestServerExport('inventory'),
+                      onPressed: _busy
+                          ? null
+                          : () => _requestServerExport('inventory'),
                     ),
                   ],
                 ),

@@ -33,14 +33,14 @@ class StaffMember {
   final DateTime? createdAt;
 
   factory StaffMember.fromJson(Map<String, dynamic> json) => StaffMember(
-        id: (json['id'] as num).toInt(),
-        name: json['name']?.toString() ?? '',
-        role: json['role']?.toString() ?? 'cashier',
-        active: json['active'] == true || json['active'] == 1,
-        createdAt: json['created_at'] != null
-            ? DateTime.tryParse(json['created_at'].toString())
-            : null,
-      );
+    id: (json['id'] as num).toInt(),
+    name: json['name']?.toString() ?? '',
+    role: json['role']?.toString() ?? 'cashier',
+    active: json['active'] == true || json['active'] == 1,
+    createdAt: json['created_at'] != null
+        ? DateTime.tryParse(json['created_at'].toString())
+        : null,
+  );
 }
 
 /// State for staff management
@@ -62,21 +62,20 @@ class StaffState {
     List<StaffMember>? staff,
     String? error,
     bool? initialized,
-  }) =>
-      StaffState(
-        loading: loading ?? this.loading,
-        staff: staff ?? this.staff,
-        error: error,
-        initialized: initialized ?? this.initialized,
-      );
+  }) => StaffState(
+    loading: loading ?? this.loading,
+    staff: staff ?? this.staff,
+    error: error,
+    initialized: initialized ?? this.initialized,
+  );
 }
 
 final staffControllerProvider =
     StateNotifierProvider<StaffController, StaffState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return StaffController(api, prefs)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return StaffController(api, prefs)..load();
+    });
 
 class StaffController extends StateNotifier<StaffState> {
   StaffController(this._api, this._prefs) : super(const StaffState());
@@ -89,8 +88,9 @@ class StaffController extends StateNotifier<StaffState> {
     try {
       final res = await _api.fetchStaff();
       final data = res.data;
-      final List<dynamic> list =
-          (data is Map && data['data'] != null) ? data['data'] as List : [];
+      final List<dynamic> list = (data is Map && data['data'] != null)
+          ? data['data'] as List
+          : [];
       final staff = list
           .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -128,11 +128,7 @@ class StaffController extends StateNotifier<StaffState> {
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      await _api.createStaff({
-        'name': name,
-        'role': role,
-        'pin': pin,
-      });
+      await _api.createStaff({'name': name, 'role': role, 'pin': pin});
       await load();
       return true;
     } catch (e) {
@@ -141,7 +137,13 @@ class StaffController extends StateNotifier<StaffState> {
     }
   }
 
-  Future<bool> update(int id, {String? name, String? role, bool? active, String? pin}) async {
+  Future<bool> update(
+    int id, {
+    String? name,
+    String? role,
+    bool? active,
+    String? pin,
+  }) async {
     state = state.copyWith(loading: true, error: null);
     try {
       await _api.updateStaff(id, {
@@ -241,7 +243,11 @@ class StaffManagementScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: DesignTokens.grayMedium),
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: DesignTokens.grayMedium,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             Text('No staff members', style: DesignTokens.textBody),
             const SizedBox(height: DesignTokens.spaceLg),
@@ -259,7 +265,8 @@ class StaffManagementScreen extends ConsumerWidget {
       child: ListView.separated(
         padding: DesignTokens.paddingScreen,
         itemCount: state.staff.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DesignTokens.spaceSm),
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: DesignTokens.spaceSm),
         itemBuilder: (context, index) {
           final member = state.staff[index];
           return _StaffCard(
@@ -388,7 +395,9 @@ class _PosSessionCard extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(session.isActive ? Icons.switch_account : Icons.login),
+                      : Icon(
+                          session.isActive ? Icons.switch_account : Icons.login,
+                        ),
                   label: Text(session.isActive ? 'Switch staff' : 'Sign in'),
                 ),
               ),
@@ -396,7 +405,9 @@ class _PosSessionCard extends StatelessWidget {
                 const SizedBox(width: DesignTokens.spaceSm),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: session.loading ? null : () => unawaited(onLogout()),
+                    onPressed: session.loading
+                        ? null
+                        : () => unawaited(onLogout()),
                     icon: const Icon(Icons.logout),
                     label: const Text('Sign out'),
                   ),
@@ -465,20 +476,23 @@ class _BootstrapViewState extends State<_BootstrapView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.admin_panel_settings, size: 64, color: DesignTokens.brandPrimary),
+          Icon(
+            Icons.admin_panel_settings,
+            size: 64,
+            color: DesignTokens.brandPrimary,
+          ),
           const SizedBox(height: DesignTokens.spaceLg),
           Text('Set Up Staff Access', style: DesignTokens.textTitle),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
             'Create your manager account to enable staff permissions.',
-            style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+            style: DesignTokens.textBody.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: DesignTokens.spaceLg),
-          AppInput(
-            controller: _nameCtrl,
-            label: 'Your Name (optional)',
-          ),
+          AppInput(controller: _nameCtrl, label: 'Your Name (optional)'),
           const SizedBox(height: DesignTokens.spaceMd),
           OutlinedButton.icon(
             icon: const Icon(Icons.pin),
@@ -498,10 +512,7 @@ class _BootstrapViewState extends State<_BootstrapView> {
           const SizedBox(height: DesignTokens.spaceLg),
           _loading
               ? const CircularProgressIndicator()
-              : AppButton(
-                  label: 'Initialize',
-                  onPressed: _bootstrap,
-                ),
+              : AppButton(label: 'Initialize', onPressed: _bootstrap),
         ],
       ),
     );
@@ -524,7 +535,10 @@ class _StaffCard extends StatelessWidget {
               : DesignTokens.brandAccent,
           child: Text(
             member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         title: Text(member.name),
@@ -558,7 +572,9 @@ class _StaffCard extends StatelessWidget {
                 ),
                 child: Text(
                   'INACTIVE',
-                  style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.error,
+                  ),
                 ),
               ),
             ],
@@ -609,10 +625,7 @@ class _StaffFormState extends State<_StaffForm> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppInput(
-            controller: _nameCtrl,
-            label: 'Name',
-          ),
+          AppInput(controller: _nameCtrl, label: 'Name'),
           const SizedBox(height: DesignTokens.spaceMd),
           DropdownButtonFormField<String>(
             initialValue: _role,
@@ -637,7 +650,9 @@ class _StaffFormState extends State<_StaffForm> {
           const SizedBox(height: DesignTokens.spaceMd),
           OutlinedButton.icon(
             icon: const Icon(Icons.pin),
-            label: Text(_pin == null ? 'Set PIN' : 'PIN: ${'•' * _pin!.length}'),
+            label: Text(
+              _pin == null ? 'Set PIN' : 'PIN: ${'•' * _pin!.length}',
+            ),
             onPressed: () async {
               final pin = await PinPromptSheet.show(
                 context: context,

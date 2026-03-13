@@ -7,7 +7,12 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 
 class ConversationDto {
-  ConversationDto({required this.id, required this.name, required this.title, required this.image});
+  ConversationDto({
+    required this.id,
+    required this.name,
+    required this.title,
+    required this.image,
+  });
 
   final int id;
   final String name;
@@ -56,13 +61,21 @@ class MessageDto {
 }
 
 class ConversationsState {
-  const ConversationsState({this.loading = false, this.items = const [], this.error});
+  const ConversationsState({
+    this.loading = false,
+    this.items = const [],
+    this.error,
+  });
 
   final bool loading;
   final List<ConversationDto> items;
   final String? error;
 
-  ConversationsState copyWith({bool? loading, List<ConversationDto>? items, String? error}) {
+  ConversationsState copyWith({
+    bool? loading,
+    List<ConversationDto>? items,
+    String? error,
+  }) {
     return ConversationsState(
       loading: loading ?? this.loading,
       items: items ?? this.items,
@@ -73,9 +86,9 @@ class ConversationsState {
 
 final conversationsControllerProvider =
     StateNotifierProvider<ConversationsController, ConversationsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return ConversationsController(api)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      return ConversationsController(api)..load();
+    });
 
 class ConversationsController extends StateNotifier<ConversationsState> {
   ConversationsController(this.api) : super(const ConversationsState());
@@ -86,7 +99,9 @@ class ConversationsController extends StateNotifier<ConversationsState> {
     try {
       final res = await api.fetchConversations();
       final data = res.data;
-      final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+      final list = data is Map<String, dynamic>
+          ? (data['data'] as List? ?? const [])
+          : const [];
       final items = list
           .whereType<Map>()
           .map((e) => ConversationDto.fromJson(Map<String, dynamic>.from(e)))
@@ -101,7 +116,9 @@ class ConversationsController extends StateNotifier<ConversationsState> {
   Future<List<MessageDto>> loadMessages(int conversationId) async {
     final res = await api.fetchConversationMessages(conversationId);
     final data = res.data;
-    final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+    final list = data is Map<String, dynamic>
+        ? (data['data'] as List? ?? const [])
+        : const [];
     return list
         .whereType<Map>()
         .map((e) => MessageDto.fromJson(Map<String, dynamic>.from(e)))
@@ -110,7 +127,10 @@ class ConversationsController extends StateNotifier<ConversationsState> {
   }
 
   Future<void> sendMessage(int conversationId, String message) async {
-    await api.sendConversationMessage(conversationId: conversationId, message: message);
+    await api.sendConversationMessage(
+      conversationId: conversationId,
+      message: message,
+    );
   }
 }
 
@@ -128,7 +148,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(conversationsControllerProvider);
-    ref.listen<ConversationsState>(conversationsControllerProvider, (prev, next) {
+    ref.listen<ConversationsState>(conversationsControllerProvider, (
+      prev,
+      next,
+    ) {
       if (_openedInitial) return;
       final targetId = widget.conversationId;
       if (targetId == null) return;
@@ -155,14 +178,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(conversationsControllerProvider.notifier).load(),
+            onPressed: () =>
+                ref.read(conversationsControllerProvider.notifier).load(),
           ),
         ],
       ),
       body: state.loading && state.items.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => ref.read(conversationsControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(conversationsControllerProvider.notifier).load(),
               child: ListView.builder(
                 padding: DesignTokens.paddingScreen,
                 itemCount: state.items.length + (state.items.isEmpty ? 1 : 0),
@@ -180,17 +205,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: DesignTokens.brandAccent.withValues(alpha: 0.12),
-                        child: const Icon(Icons.chat_bubble_outline, color: DesignTokens.brandAccent),
+                        backgroundColor: DesignTokens.brandAccent.withValues(
+                          alpha: 0.12,
+                        ),
+                        child: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: DesignTokens.brandAccent,
+                        ),
                       ),
-                      title: Text(convo.name.isEmpty ? 'Conversation' : convo.name, style: DesignTokens.textBodyBold),
+                      title: Text(
+                        convo.name.isEmpty ? 'Conversation' : convo.name,
+                        style: DesignTokens.textBodyBold,
+                      ),
                       subtitle: Text(
                         convo.title,
                         style: DesignTokens.textSmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: DesignTokens.grayMedium,
+                      ),
                       onTap: () => _openThread(context, ref, convo),
                     ),
                   );
@@ -226,7 +262,9 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
   @override
   void initState() {
     super.initState();
-    _future = ref.read(conversationsControllerProvider.notifier).loadMessages(widget.conversation.id);
+    _future = ref
+        .read(conversationsControllerProvider.notifier)
+        .loadMessages(widget.conversation.id);
   }
 
   @override
@@ -237,7 +275,9 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
 
   void _refresh() {
     setState(() {
-      _future = ref.read(conversationsControllerProvider.notifier).loadMessages(widget.conversation.id);
+      _future = ref
+          .read(conversationsControllerProvider.notifier)
+          .loadMessages(widget.conversation.id);
     });
   }
 
@@ -253,20 +293,31 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return Center(child: Text('Failed to load messages: ${snapshot.error}', style: DesignTokens.textBody));
+                return Center(
+                  child: Text(
+                    'Failed to load messages: ${snapshot.error}',
+                    style: DesignTokens.textBody,
+                  ),
+                );
               }
               final messages = snapshot.data ?? const [];
               if (messages.isEmpty) {
-                return Center(child: Text('No messages yet', style: DesignTokens.textSmall));
+                return Center(
+                  child: Text('No messages yet', style: DesignTokens.textSmall),
+                );
               }
               return ListView.builder(
                 reverse: true,
-                padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceSm),
+                padding: const EdgeInsets.symmetric(
+                  vertical: DesignTokens.spaceSm,
+                ),
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final msg = messages[index];
                   return Align(
-                    alignment: msg.outgoing ? Alignment.centerRight : Alignment.centerLeft,
+                    alignment: msg.outgoing
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
                     child: Container(
                       margin: const EdgeInsets.symmetric(
                         vertical: DesignTokens.spaceXs,
@@ -283,11 +334,16 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
                         borderRadius: DesignTokens.borderRadiusMd,
                       ),
                       child: Column(
-                        crossAxisAlignment: msg.outgoing ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        crossAxisAlignment: msg.outgoing
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                         children: [
                           Text(msg.message, style: DesignTokens.textBody),
                           const SizedBox(height: DesignTokens.spaceXs),
-                          Text('${msg.dateLabel} ${msg.timeLabel}', style: DesignTokens.textSmall),
+                          Text(
+                            '${msg.dateLabel} ${msg.timeLabel}',
+                            style: DesignTokens.textSmall,
+                          ),
                         ],
                       ),
                     ),
@@ -301,12 +357,17 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
           padding: EdgeInsets.only(
             left: DesignTokens.spaceMd,
             right: DesignTokens.spaceMd,
-            bottom: MediaQuery.of(context).viewInsets.bottom + DesignTokens.spaceSm,
+            bottom:
+                MediaQuery.of(context).viewInsets.bottom + DesignTokens.spaceSm,
             top: DesignTokens.spaceSm,
           ),
           decoration: BoxDecoration(
             color: DesignTokens.surfaceWhite,
-            border: Border(top: BorderSide(color: DesignTokens.grayLight.withValues(alpha: 0.7))),
+            border: Border(
+              top: BorderSide(
+                color: DesignTokens.grayLight.withValues(alpha: 0.7),
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -333,7 +394,9 @@ class _ThreadSheetState extends ConsumerState<_ThreadSheet> {
                   final text = _ctrl.text.trim();
                   if (text.isEmpty) return;
                   _ctrl.clear();
-                  await ref.read(conversationsControllerProvider.notifier).sendMessage(widget.conversation.id, text);
+                  await ref
+                      .read(conversationsControllerProvider.notifier)
+                      .sendMessage(widget.conversation.id, text);
                   if (!mounted) return;
                   _refresh();
                 },
@@ -357,12 +420,20 @@ class _EmptyConversationsState extends StatelessWidget {
       padding: DesignTokens.paddingMd,
       child: Column(
         children: [
-          Icon(Icons.chat_bubble_outline, size: 48, color: DesignTokens.grayMedium),
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 48,
+            color: DesignTokens.grayMedium,
+          ),
           const SizedBox(height: DesignTokens.spaceMd),
           Text('No conversations', style: DesignTokens.textBodyBold),
           if (error != null) ...[
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error!, style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error!,
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),

@@ -10,9 +10,12 @@ import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/error_page.dart';
+import '../invoices/invoice_providers.dart';
 import 'quotation_creator.dart';
 
-final quotationsStreamProvider = StreamProvider<List<QuotationWithCustomer>>((ref) {
+final quotationsStreamProvider = StreamProvider<List<QuotationWithCustomer>>((
+  ref,
+) {
   return ref.watch(appDatabaseProvider).watchQuotationsWithCustomer();
 });
 
@@ -46,10 +49,14 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
       while (page <= 10) {
         final res = await api.fetchQuotations(page: page);
         final body = res.data;
-        final root = body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
+        final root = body is Map
+            ? Map<String, dynamic>.from(body)
+            : <String, dynamic>{};
         final data = root['data'];
 
-        final paginator = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        final paginator = data is Map
+            ? Map<String, dynamic>.from(data)
+            : <String, dynamic>{};
         final rawList = paginator['data'];
         final list = rawList is List ? rawList : const <dynamic>[];
         if (list.isEmpty) break;
@@ -61,12 +68,14 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
           final id = (q['id'] ?? '').toString().trim();
           if (id.isEmpty) continue;
 
-          final quotationNumber = (q['quotation_number'] ?? '').toString().trim();
+          final quotationNumber = (q['quotation_number'] ?? '')
+              .toString()
+              .trim();
           final total = (q['total'] as num?)?.toDouble() ?? 0;
           final validityDays = (q['validity_days'] as num?)?.toInt() ?? 30;
           final createdAt =
               DateTime.tryParse((q['created_at'] ?? '').toString())?.toUtc() ??
-                  DateTime.now().toUtc();
+              DateTime.now().toUtc();
           final validUntil = createdAt.add(Duration(days: validityDays));
 
           final remoteCustomerId = (q['customer_id'] ?? '').toString().trim();
@@ -87,7 +96,8 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
             final title = (line['title'] ?? '').toString();
             final qty = (line['quantity'] as num?)?.toInt() ?? 1;
             final price = (line['price'] as num?)?.toDouble() ?? 0;
-            final lineTotal = (line['total'] as num?)?.toDouble() ?? (price * qty);
+            final lineTotal =
+                (line['total'] as num?)?.toDouble() ?? (price * qty);
             lineCompanions.add(
               QuotationLinesCompanion.insert(
                 quotationId: id,
@@ -116,7 +126,10 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
           );
         }
 
-        final hasMore = (paginator['next_page_url'] ?? '').toString().trim().isNotEmpty;
+        final hasMore = (paginator['next_page_url'] ?? '')
+            .toString()
+            .trim()
+            .isNotEmpty;
         if (!hasMore) break;
         page++;
       }
@@ -124,16 +137,18 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(fetchedAny ? 'Quotations updated' : 'No quotations found'),
+            content: Text(
+              fetchedAny ? 'Quotations updated' : 'No quotations found',
+            ),
             backgroundColor: DesignTokens.brandAccent,
           ),
         );
       }
     } catch (e) {
       if (!silent && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Refresh failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Refresh failed: $e')));
       }
     } finally {
       if (mounted) {
@@ -190,13 +205,19 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.description_outlined, size: 64, color: DesignTokens.grayMedium),
+                    Icon(
+                      Icons.description_outlined,
+                      size: 64,
+                      color: DesignTokens.grayMedium,
+                    ),
                     const SizedBox(height: DesignTokens.spaceMd),
                     Text('No quotations yet', style: DesignTokens.textBody),
                     const SizedBox(height: DesignTokens.spaceSm),
                     Text(
                       'Create a quotation to send to your customers',
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: DesignTokens.spaceLg),
@@ -232,18 +253,20 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
   }
 }
 
-class _QuotationCard extends StatelessWidget {
+class _QuotationCard extends ConsumerWidget {
   const _QuotationCard({required this.row});
 
   final QuotationWithCustomer row;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final quotation = row.quotation;
     final customer = row.customer;
     final dateFormat = DateFormat('MMM dd, yyyy');
     final createdAt = quotation.date.toLocal();
-    final isExpired = quotation.validUntil != null && DateTime.now().isAfter(quotation.validUntil!.toLocal());
+    final validUntil = quotation.validUntil?.toLocal();
+    final isExpired =
+        validUntil != null && DateTime.now().isAfter(validUntil);
 
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -273,11 +296,17 @@ class _QuotationCard extends StatelessWidget {
                 const SizedBox(height: DesignTokens.spaceSm),
                 Row(
                   children: [
-                    Icon(Icons.person_outline, size: 16, color: DesignTokens.grayMedium),
+                    Icon(
+                      Icons.person_outline,
+                      size: 16,
+                      color: DesignTokens.grayMedium,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       customer.name,
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                     ),
                   ],
                 ),
@@ -288,15 +317,41 @@ class _QuotationCard extends StatelessWidget {
                 children: [
                   Text(
                     quotation.totalAmount.toUgx(),
-                    style: DesignTokens.textTitle.copyWith(color: DesignTokens.brandPrimary),
+                    style: DesignTokens.textTitle.copyWith(
+                      color: DesignTokens.brandPrimary,
+                    ),
                   ),
                   Text(
                     dateFormat.format(createdAt),
-                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ],
               ),
-              if (quotation.notes != null && quotation.notes!.trim().isNotEmpty) ...[
+              const SizedBox(height: DesignTokens.spaceSm),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MetaChip(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Created ${dateFormat.format(createdAt)}',
+                  ),
+                  _MetaChip(
+                    icon: Icons.event_available_outlined,
+                    label: validUntil == null
+                        ? 'No expiry'
+                        : 'Valid until ${dateFormat.format(validUntil)}',
+                  ),
+                  _MetaChip(
+                    icon: Icons.receipt_long_outlined,
+                    label: customer == null ? 'Walk-in quotation' : 'For ${customer.name}',
+                  ),
+                ],
+              ),
+              if (quotation.notes != null &&
+                  quotation.notes!.trim().isNotEmpty) ...[
                 const SizedBox(height: DesignTokens.spaceSm),
                 Text(
                   quotation.notes!.trim(),
@@ -308,9 +363,68 @@ class _QuotationCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+              const SizedBox(height: DesignTokens.spaceMd),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(invoiceServiceProvider)
+                              .shareQuotationPdf(row);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Quotation export failed: $e'),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Share PDF'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceSm,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: DesignTokens.brandAccentLight,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: DesignTokens.grayMedium),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
+          ),
+        ],
       ),
     );
   }

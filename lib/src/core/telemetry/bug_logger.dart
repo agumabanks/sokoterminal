@@ -8,24 +8,24 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Severity levels for bug reports
 enum BugSeverity {
-  low,       // Minor UI glitches, non-blocking issues
-  medium,    // Feature not working but workaround exists
-  high,      // Feature broken, affects workflow
-  critical,  // App crash, data loss, blocks business operations
+  low, // Minor UI glitches, non-blocking issues
+  medium, // Feature not working but workaround exists
+  high, // Feature broken, affects workflow
+  critical, // App crash, data loss, blocks business operations
 }
 
 /// Categories for bug classification
 enum BugCategory {
-  ui,           // Visual/layout issues
-  sync,         // Sync and network issues
-  database,     // Local database errors
-  payment,      // Payment processing issues
-  printing,     // Thermal printer issues
-  scanner,      // Barcode scanner issues
-  auth,         // Authentication/authorization issues
-  performance,  // Slow operations, memory issues
-  crash,        // App crashes
-  other,        // Uncategorized
+  ui, // Visual/layout issues
+  sync, // Sync and network issues
+  database, // Local database errors
+  payment, // Payment processing issues
+  printing, // Thermal printer issues
+  scanner, // Barcode scanner issues
+  auth, // Authentication/authorization issues
+  performance, // Slow operations, memory issues
+  crash, // App crashes
+  other, // Uncategorized
 }
 
 /// A structured bug report entry
@@ -101,7 +101,7 @@ class BugLogger {
 
   static const String _logFileName = 'production_bugs.jsonl';
   static const String _summaryFileName = 'bug_summary.json';
-  
+
   static BugLogger? _instance;
   static File? _logFile;
   static File? _summaryFile;
@@ -118,10 +118,10 @@ class BugLogger {
     final dir = await _getLogDirectory();
     _logFile = File('${dir.path}/$_logFileName');
     _summaryFile = File('${dir.path}/$_summaryFileName');
-    
+
     await _logFile!.create(recursive: true);
     await _summaryFile!.create(recursive: true);
-    
+
     debugPrint('[BugLogger] Initialized at: ${_logFile!.path}');
   }
 
@@ -137,7 +137,7 @@ class BugLogger {
   }) async {
     final id = _generateId();
     final networkStatus = await _getNetworkStatus();
-    
+
     final report = BugReport(
       id: id,
       timestamp: DateTime.now(),
@@ -145,7 +145,9 @@ class BugLogger {
       category: category,
       title: title,
       description: description,
-      stackTrace: stackTrace?.toString() ?? (error != null ? StackTrace.current.toString() : null),
+      stackTrace:
+          stackTrace?.toString() ??
+          (error != null ? StackTrace.current.toString() : null),
       context: {
         if (context != null) ...context,
         if (error != null) 'error': error.toString(),
@@ -156,11 +158,11 @@ class BugLogger {
 
     await _writeReport(report);
     await _updateSummary();
-    
+
     // Also print to console for immediate visibility
     debugPrint('🐛 [BUG-${severity.name.toUpperCase()}] $title');
     if (error != null) debugPrint('   Error: $error');
-    
+
     return id;
   }
 
@@ -174,8 +176,8 @@ class BugLogger {
     int? retryCount,
   }) async {
     return logBug(
-      severity: retryCount != null && retryCount > 3 
-          ? BugSeverity.high 
+      severity: retryCount != null && retryCount > 3
+          ? BugSeverity.high
           : BugSeverity.medium,
       category: BugCategory.sync,
       title: 'Sync failed: $operation',
@@ -205,10 +207,7 @@ class BugLogger {
       description: 'Database operation failed',
       error: error,
       stackTrace: stackTrace,
-      context: {
-        'operation': operation,
-        'table': table,
-      },
+      context: {'operation': operation, 'table': table},
     );
   }
 
@@ -286,7 +285,7 @@ class BugLogger {
   /// Get bug summary statistics
   Future<Map<String, dynamic>> getSummary() async {
     if (_summaryFile == null) await init();
-    
+
     try {
       final content = await _summaryFile!.readAsString();
       if (content.trim().isEmpty) return _emptyStats();
@@ -300,12 +299,12 @@ class BugLogger {
   Future<String> exportBugsReport() async {
     final bugs = await _readAllBugs();
     final summary = await getSummary();
-    
+
     final buffer = StringBuffer();
     buffer.writeln('# Soko Seller Terminal - Bug Report');
     buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
     buffer.writeln();
-    
+
     buffer.writeln('## Summary');
     buffer.writeln('- Total bugs: ${summary['total'] ?? 0}');
     buffer.writeln('- Critical: ${summary['bySeverity']?['critical'] ?? 0}');
@@ -314,17 +313,17 @@ class BugLogger {
     buffer.writeln('- Low: ${summary['bySeverity']?['low'] ?? 0}');
     buffer.writeln('- Unresolved: ${summary['unresolved'] ?? 0}');
     buffer.writeln();
-    
+
     buffer.writeln('## Bugs by Category');
     final byCategory = summary['byCategory'] as Map<String, dynamic>? ?? {};
     for (final entry in byCategory.entries) {
       buffer.writeln('- ${entry.key}: ${entry.value}');
     }
     buffer.writeln();
-    
+
     buffer.writeln('## Detailed Bug List');
     buffer.writeln();
-    
+
     for (final bug in bugs) {
       buffer.writeln('### [${bug.severity.name.toUpperCase()}] ${bug.title}');
       buffer.writeln('- **ID**: ${bug.id}');
@@ -345,7 +344,7 @@ class BugLogger {
       }
       buffer.writeln();
     }
-    
+
     return buffer.toString();
   }
 
@@ -372,7 +371,7 @@ class BugLogger {
       }
       return b;
     }).toList();
-    
+
     await _writeAllBugs(updatedBugs);
     await _updateSummary();
   }
@@ -413,7 +412,7 @@ class BugLogger {
 
   Future<void> _writeReport(BugReport report) async {
     if (_logFile == null) await init();
-    
+
     try {
       final line = jsonEncode(report.toJson());
       await _logFile!.writeAsString(
@@ -428,17 +427,19 @@ class BugLogger {
 
   Future<List<BugReport>> _readAllBugs() async {
     if (_logFile == null) await init();
-    
+
     try {
       final content = await _logFile!.readAsString();
       if (content.trim().isEmpty) return [];
-      
+
       return content
           .split('\n')
           .where((line) => line.trim().isNotEmpty)
           .map((line) {
             try {
-              return BugReport.fromJson(jsonDecode(line) as Map<String, dynamic>);
+              return BugReport.fromJson(
+                jsonDecode(line) as Map<String, dynamic>,
+              );
             } catch (_) {
               return null;
             }
@@ -452,27 +453,29 @@ class BugLogger {
 
   Future<void> _writeAllBugs(List<BugReport> bugs) async {
     if (_logFile == null) await init();
-    
+
     final lines = bugs.map((b) => jsonEncode(b.toJson())).join('\n');
     await _logFile!.writeAsString(lines.isEmpty ? '' : '$lines\n');
   }
 
   Future<void> _updateSummary() async {
     if (_summaryFile == null) await init();
-    
+
     try {
       final bugs = await _readAllBugs();
-      
+
       final bySeverity = <String, int>{};
       final byCategory = <String, int>{};
       int unresolved = 0;
-      
+
       for (final bug in bugs) {
-        bySeverity[bug.severity.name] = (bySeverity[bug.severity.name] ?? 0) + 1;
-        byCategory[bug.category.name] = (byCategory[bug.category.name] ?? 0) + 1;
+        bySeverity[bug.severity.name] =
+            (bySeverity[bug.severity.name] ?? 0) + 1;
+        byCategory[bug.category.name] =
+            (byCategory[bug.category.name] ?? 0) + 1;
         if (!bug.resolved) unresolved++;
       }
-      
+
       final summary = {
         'lastUpdated': DateTime.now().toUtc().toIso8601String(),
         'total': bugs.length,
@@ -481,7 +484,7 @@ class BugLogger {
         'bySeverity': bySeverity,
         'byCategory': byCategory,
       };
-      
+
       await _summaryFile!.writeAsString(jsonEncode(summary));
     } catch (e) {
       debugPrint('[BugLogger] Failed to update summary: $e');

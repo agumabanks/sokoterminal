@@ -1,16 +1,19 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-class PlacesService {
-  final Dio _dio = Dio();
-  final String _apiKey = 'AIzaSyDTkxOUe2JxRQ18iNIIq5cGe76egsBs2WE';
-  String? _sessionToken;
+import '../config/build_metadata.dart';
 
-  PlacesService() {
+class PlacesService {
+  PlacesService({Dio? dio, String? apiKey})
+    : _dio = dio ?? Dio(),
+      _apiKey = apiKey ?? BuildMetadata.googleMapsApiKey {
     _refreshSessionToken();
   }
+
+  final Dio _dio;
+  final String _apiKey;
+  String? _sessionToken;
 
   void _refreshSessionToken() {
     _sessionToken = const Uuid().v4();
@@ -18,6 +21,10 @@ class PlacesService {
 
   Future<List<PlacePrediction>> search(String query) async {
     if (query.isEmpty) return [];
+    if (_apiKey.isEmpty) {
+      debugPrint('[Places] autocomplete skipped: GOOGLE_MAPS_API_KEY missing');
+      return [];
+    }
 
     try {
       debugPrint('[Places] autocomplete: "$query"');
@@ -34,7 +41,9 @@ class PlacesService {
 
       if (response.statusCode == 200) {
         final predictions = response.data['predictions'] as List;
-        debugPrint('[Places] autocomplete response: ${predictions.length} results');
+        debugPrint(
+          '[Places] autocomplete response: ${predictions.length} results',
+        );
         return predictions.map((p) => PlacePrediction.fromJson(p)).toList();
       }
       debugPrint('[Places] autocomplete status: ${response.statusCode}');
@@ -46,6 +55,11 @@ class PlacesService {
   }
 
   Future<PlaceDetails?> getDetails(String placeId) async {
+    if (_apiKey.isEmpty) {
+      debugPrint('[Places] details skipped: GOOGLE_MAPS_API_KEY missing');
+      return null;
+    }
+
     try {
       debugPrint('[Places] details: $placeId');
       final response = await _dio.get(
@@ -78,12 +92,16 @@ class PlacesService {
     int zoom = 16,
     int size = 900,
   }) {
+    if (_apiKey.isEmpty) {
+      return '';
+    }
+
     final clampedZoom = zoom.clamp(1, 20);
     final clampedSize = size.clamp(200, 1280);
     return 'https://maps.googleapis.com/maps/api/staticmap'
         '?center=$lat,$lng'
         '&zoom=$clampedZoom'
-        '&size=${clampedSize}x${clampedSize}'
+        '&size=$clampedSize' 'x$clampedSize'
         '&maptype=roadmap'
         '&markers=color:0x6C63FF|$lat,$lng'
         '&key=$_apiKey';

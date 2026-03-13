@@ -47,7 +47,9 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
     }
 
     final pendingFailures = pendingOps
-        .where((op) => op.retryCount > 0 && (op.lastError ?? '').trim().isNotEmpty)
+        .where(
+          (op) => op.retryCount > 0 && (op.lastError ?? '').trim().isNotEmpty,
+        )
         .toList();
     final blockedFailures = blockedOps
         .where((op) => (op.lastError ?? '').trim().isNotEmpty)
@@ -114,7 +116,9 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
     if (!online) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are offline. Connect to internet first.')),
+        const SnackBar(
+          content: Text('You are offline. Connect to internet first.'),
+        ),
       );
       return;
     }
@@ -158,15 +162,15 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
     if (confirm != true) return;
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Full resync started…')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Full resync started…')));
     await ref.read(syncServiceProvider).forceFullResync();
     _refresh();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Full resync finished')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Full resync finished')));
   }
 
   Future<void> _retryBlockedOps(BuildContext context) async {
@@ -174,9 +178,9 @@ class _SyncHealthScreenState extends ConsumerState<SyncHealthScreen> {
     final blocked = await db.blockedSyncOps();
     if (blocked.isEmpty) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No blocked operations')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No blocked operations')));
       return;
     }
 
@@ -500,7 +504,9 @@ class _FailuresCard extends ConsumerWidget {
                 child: Row(
                   children: [
                     Icon(
-                      op.status == 'blocked' ? Icons.lock_outline : Icons.error_outline,
+                      op.status == 'blocked'
+                          ? Icons.lock_outline
+                          : Icons.error_outline,
                       color: DesignTokens.error,
                       size: 18,
                     ),

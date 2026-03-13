@@ -24,8 +24,6 @@ class _BusinessDetailsEnhancedScreenState
 
   LatLng? _selectedLocation;
   double _deliveryRadiusKm = 5.0; // Default 5km
-  bool _showMap = false;
-  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -42,7 +40,6 @@ class _BusinessDetailsEnhancedScreenState
     _phoneController.dispose();
     _facebookController.dispose();
     _instagramController.dispose();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -54,8 +51,11 @@ class _BusinessDetailsEnhancedScreenState
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              color: Colors.black, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black,
+            size: 20,
+          ),
           onPressed: () => context.go('/onboarding/shop-basics'),
         ),
         title: const Text(
@@ -109,8 +109,11 @@ class _BusinessDetailsEnhancedScreenState
                                     color: Colors.blue,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.location_on,
-                                      color: Colors.white, size: 24),
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -146,12 +149,15 @@ class _BusinessDetailsEnhancedScreenState
                               child: OutlinedButton.icon(
                                 onPressed: _handleSetLocation,
                                 icon: const Icon(Icons.my_location),
-                                label: Text(_selectedLocation == null
-                                    ? 'Set Location on Map'
-                                    : 'Change Location'),
+                                label: Text(
+                                  _selectedLocation == null
+                                      ? 'Set Location on Map'
+                                      : 'Change Location',
+                                ),
                                 style: OutlinedButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   side: const BorderSide(color: Colors.blue),
                                   foregroundColor: Colors.blue,
                                 ),
@@ -182,8 +188,11 @@ class _BusinessDetailsEnhancedScreenState
                                       color: Colors.green,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Icon(Icons.delivery_dining,
-                                        color: Colors.white, size: 24),
+                                    child: const Icon(
+                                      Icons.delivery_dining,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   const Expanded(
@@ -224,14 +233,17 @@ class _BusinessDetailsEnhancedScreenState
                                           '${_deliveryRadiusKm.toStringAsFixed(0)} km',
                                       activeColor: Colors.green,
                                       onChanged: (value) {
-                                        setState(() =>
-                                            _deliveryRadiusKm = value);
+                                        setState(
+                                          () => _deliveryRadiusKm = value,
+                                        );
                                       },
                                     ),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.green,
                                       borderRadius: BorderRadius.circular(20),
@@ -342,13 +354,18 @@ class _BusinessDetailsEnhancedScreenState
     );
   }
 
-  void _applyOnboardingState(OnboardingState onboarding, {bool notify = false}) {
+  void _applyOnboardingState(
+    OnboardingState onboarding, {
+    bool notify = false,
+  }) {
     final data = onboarding.shopData;
     if (data.isEmpty) return;
 
     bool changed = false;
     final address = data['address']?.toString();
-    if (_addressController.text.isEmpty && address != null && address.isNotEmpty) {
+    if (_addressController.text.isEmpty &&
+        address != null &&
+        address.isNotEmpty) {
       _addressController.text = address;
     }
 
@@ -358,12 +375,16 @@ class _BusinessDetailsEnhancedScreenState
     }
 
     final facebook = data['facebook']?.toString();
-    if (_facebookController.text.isEmpty && facebook != null && facebook.isNotEmpty) {
+    if (_facebookController.text.isEmpty &&
+        facebook != null &&
+        facebook.isNotEmpty) {
       _facebookController.text = facebook;
     }
 
     final instagram = data['instagram']?.toString();
-    if (_instagramController.text.isEmpty && instagram != null && instagram.isNotEmpty) {
+    if (_instagramController.text.isEmpty &&
+        instagram != null &&
+        instagram.isNotEmpty) {
       _instagramController.text = instagram;
     }
 
@@ -453,8 +474,10 @@ class _BusinessDetailsEnhancedScreenState
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
           prefixIcon: Icon(icon, color: Colors.grey[500], size: 22),
           labelText: label,
           hintText: hint,
@@ -535,7 +558,6 @@ class _MapPickerDialog extends StatefulWidget {
 
 class _MapPickerDialogState extends State<_MapPickerDialog> {
   late LatLng _currentLocation;
-  GoogleMapController? _controller;
 
   @override
   void initState() {
@@ -556,8 +578,9 @@ class _MapPickerDialogState extends State<_MapPickerDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.blue,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Row(
                 children: [
@@ -584,7 +607,6 @@ class _MapPickerDialogState extends State<_MapPickerDialog> {
                   target: _currentLocation,
                   zoom: 15,
                 ),
-                onMapCreated: (controller) => _controller = controller,
                 onTap: (location) {
                   setState(() => _currentLocation = location);
                 },

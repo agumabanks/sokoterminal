@@ -24,11 +24,11 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('[Main] Firebase Core initialized');
-    
+
     // Initialize Crashlytics (error reporting)
     await CrashlyticsService.instance.init();
     debugPrint('[Main] Crashlytics initialized');
-    
+
     // Initialize Remote Config
     await RemoteConfigService.instance.init();
     debugPrint('[Main] Remote Config initialized');
@@ -36,7 +36,11 @@ Future<void> main() async {
     debugPrint('[Main] Firebase initialization failed: $e');
     // Log to crashlytics if possible
     try {
-      await CrashlyticsService.instance.recordError(e, stack, reason: 'Firebase init failed');
+      await CrashlyticsService.instance.recordError(
+        e,
+        stack,
+        reason: 'Firebase init failed',
+      );
     } catch (_) {}
   }
 

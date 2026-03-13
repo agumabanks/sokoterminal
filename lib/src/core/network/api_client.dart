@@ -7,9 +7,15 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
 
+typedef AuthExpiredCallback = void Function();
+
 class ApiClient {
-  ApiClient({required AppConfig config, required SecureStorage secureStorage})
-      : _secureStorage = secureStorage {
+  ApiClient({
+    required AppConfig config,
+    required SecureStorage secureStorage,
+    AuthExpiredCallback? onAuthExpired,
+  }) : _secureStorage = secureStorage,
+       _onAuthExpired = onAuthExpired {
     _dio = Dio(
       BaseOptions(
         baseUrl: _normalizeBaseUrl(config.apiBaseUrl),
@@ -37,14 +43,38 @@ class ApiClient {
           _logResponse(response);
           return handler.next(response);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           _logError(error);
+          final statusCode = error.response?.statusCode;
+          if (statusCode == 401) {
+            final path = error.requestOptions.path;
+            // Never trigger logout on auth endpoints
+            final isAuthEndpoint = path.contains('/auth/login') ||
+                path.contains('/auth/refresh') ||
+                path.contains('/auth/signup') ||
+                path.contains('/pos/auth/check') ||
+                path.contains('/pos/pin/verify');
+
+            // Never trigger logout on POS-session-gated endpoints.
+            // These return 401 when POS session hasn't been started yet,
+            // which is normal flow before shift/staff login.
+            final isPosGated = path.contains('/pos/') ||
+                path.contains('/backups') ||
+                path.contains('/service-provider/');
+
+            if (!isAuthEndpoint && !isPosGated) {
+              // Only core seller endpoints that truly need just the
+              // access token should trigger a forced logout.
+              await _secureStorage.deleteAccessToken();
+              _onAuthExpired?.call();
+            }
+          }
           return handler.next(error);
         },
       ),
     );
 
-    if (config.logLevel != 'none') {
+    if (!kReleaseMode && config.logLevel != 'none') {
       _dio.interceptors.add(
         PrettyDioLogger(
           requestHeader: false,
@@ -56,6 +86,7 @@ class ApiClient {
 
   late final Dio _dio;
   final SecureStorage _secureStorage;
+  final AuthExpiredCallback? _onAuthExpired;
 
   Dio get client => _dio;
 
@@ -147,7 +178,9 @@ class ApiClient {
   }
 
   void _logResponse(Response<dynamic> response) {
-    debugPrint('[HTTP] <- ${response.statusCode} ${response.requestOptions.uri}');
+    debugPrint(
+      '[HTTP] <- ${response.statusCode} ${response.requestOptions.uri}',
+    );
     if (response.data != null) {
       debugPrint('[HTTP]    data: ${_redact(response.data)}');
     }

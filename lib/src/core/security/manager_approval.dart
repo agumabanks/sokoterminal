@@ -39,9 +39,9 @@ Future<bool> requireManagerPin(
       if (!ok) {
         final msg =
             ref.read(posSessionProvider).error ?? 'Incorrect manager PIN';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       }
       return ok;
     }
@@ -65,9 +65,9 @@ Future<bool> requireManagerPin(
     final ok = entered.trim() == expected.trim();
     if (!context.mounted) return ok;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Incorrect PIN')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
     }
     return ok;
   }
@@ -90,9 +90,9 @@ Future<bool> requireManagerPin(
   final ok = entered.trim() == expected.trim();
   if (!context.mounted) return ok;
   if (!ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Incorrect PIN')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
   }
   return ok;
 }

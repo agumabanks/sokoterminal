@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/db/app_database.dart';
+import '../../core/settings/business_profile_cache.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 
 class ShopInfoScreen extends ConsumerStatefulWidget {
@@ -50,20 +54,20 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     });
 
     try {
-      final api = ref.read(sellerApiProvider);
-      final res = await api.fetchShopInfo();
-      final data = _unwrapData(res.data);
+      final db = ref.read(appDatabaseProvider);
+      final cached = await db.getBusinessProfile();
+      if (cached != null) {
+        _applyBusinessProfile(cached);
+      }
 
-      _nameCtrl.text = (data['name'] ?? '').toString();
-      _phoneCtrl.text = (data['phone'] ?? '').toString();
-      _addressCtrl.text = (data['address'] ?? '').toString();
+      await ref.read(syncServiceProvider).syncNow();
 
-      _email = (data['email'] ?? '').toString();
-      final metaTitle = (data['title'] ?? '').toString();
-      final metaDescription = (data['description'] ?? '').toString();
-      _logoUploadId = data['upload_id'];
-      _metaTitleCtrl.text = metaTitle;
-      _metaDescCtrl.text = metaDescription;
+      final refreshed = await db.getBusinessProfile();
+      if (refreshed != null) {
+        _applyBusinessProfile(refreshed);
+      } else if (cached == null) {
+        _error = StateError('No business profile found on device');
+      }
     } catch (e) {
       _error = e;
     } finally {
@@ -89,7 +93,9 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
 
     setState(() => _saving = true);
     try {
-      final api = ref.read(sellerApiProvider);
+      final db = ref.read(appDatabaseProvider);
+      final sync = ref.read(syncServiceProvider);
+      final existing = await db.getBusinessProfile();
       final payload = <String, dynamic>{
         'name': name,
         'address': address,
@@ -98,17 +104,95 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
         'meta_description': metaDescription,
         if (_logoUploadId != null) 'logo': _logoUploadId,
       };
-      final res = await api.updateShopInfo(payload);
-      final msg = _extractMessage(res.data) ?? 'Shop info updated';
+      await db.upsertBusinessProfile(
+        BusinessProfilesCompanion.insert(
+          id: kPrimaryBusinessProfileId,
+          sellerId: existing?.sellerId == null
+              ? const Value.absent()
+              : Value(existing!.sellerId),
+          sellerName: existing?.sellerName == null
+              ? const Value.absent()
+              : Value(existing!.sellerName),
+          sellerEmail: Value(_email),
+          sellerPhone: existing?.sellerPhone == null
+              ? const Value.absent()
+              : Value(existing!.sellerPhone),
+          shopId: existing?.shopId == null
+              ? const Value.absent()
+              : Value(existing!.shopId),
+          shopName: name,
+          shopAddress: Value(address),
+          shopPhone: Value(phone),
+          logoUploadId: _logoUploadId is int
+              ? Value(_logoUploadId as int)
+              : const Value.absent(),
+          logoUrl: existing?.logoUrl == null
+              ? const Value.absent()
+              : Value(existing!.logoUrl),
+          metaTitle: Value(metaTitle),
+          metaDescription: Value(metaDescription),
+          thermalPrinterWidth: existing?.thermalPrinterWidth == null
+              ? const Value.absent()
+              : Value(existing!.thermalPrinterWidth),
+          shippingCost: existing?.shippingCost == null
+              ? const Value.absent()
+              : Value(existing!.shippingCost),
+          selfDeliveryActive: Value(existing?.selfDeliveryActive ?? false),
+          deliveryRadiusKm: existing?.deliveryRadiusKm == null
+              ? const Value.absent()
+              : Value(existing!.deliveryRadiusKm),
+          deliveryPickupLatitude: existing?.deliveryPickupLatitude == null
+              ? const Value.absent()
+              : Value(existing!.deliveryPickupLatitude),
+          deliveryPickupLongitude: existing?.deliveryPickupLongitude == null
+              ? const Value.absent()
+              : Value(existing!.deliveryPickupLongitude),
+          cashOnDeliveryEnabled: Value(existing?.cashOnDeliveryEnabled ?? true),
+          bankPaymentEnabled: Value(existing?.bankPaymentEnabled ?? false),
+          mobileMoneyEnabled: Value(existing?.mobileMoneyEnabled ?? true),
+          bankName: existing?.bankName == null
+              ? const Value.absent()
+              : Value(existing!.bankName),
+          bankAccName: existing?.bankAccName == null
+              ? const Value.absent()
+              : Value(existing!.bankAccName),
+          bankAccNo: existing?.bankAccNo == null
+              ? const Value.absent()
+              : Value(existing!.bankAccNo),
+          bankRoutingNo: existing?.bankRoutingNo == null
+              ? const Value.absent()
+              : Value(existing!.bankRoutingNo),
+          mtnMerchantCode: existing?.mtnMerchantCode == null
+              ? const Value.absent()
+              : Value(existing!.mtnMerchantCode),
+          airtelMerchantCode: existing?.airtelMerchantCode == null
+              ? const Value.absent()
+              : Value(existing!.airtelMerchantCode),
+          paybillNumber: existing?.paybillNumber == null
+              ? const Value.absent()
+              : Value(existing!.paybillNumber),
+          receiptPaymentMethodsJson: existing?.receiptPaymentMethodsJson == null
+              ? const Value.absent()
+              : Value(existing!.receiptPaymentMethodsJson),
+          deliveryProfileJson: existing?.deliveryProfileJson == null
+              ? const Value.absent()
+              : Value(existing!.deliveryProfileJson),
+          updatedAt: Value(DateTime.now().toUtc()),
+          synced: const Value(false),
+        ),
+      );
+      await sync.enqueue('business_profile_patch', payload);
+      unawaited(sync.syncNow());
+      const msg = 'Shop info saved locally. Sync will update the server.';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: DesignTokens.brandAccent),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -116,105 +200,115 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     }
   }
 
+  void _applyBusinessProfile(BusinessProfile profile) {
+    _nameCtrl.text = profile.shopName;
+    _phoneCtrl.text = profile.shopPhone ?? '';
+    _addressCtrl.text = profile.shopAddress ?? '';
+    _email = profile.sellerEmail;
+    _logoUploadId = profile.logoUploadId;
+    _metaTitleCtrl.text = profile.metaTitle ?? '';
+    _metaDescCtrl.text = profile.metaDescription ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text('Shop Info', style: DesignTokens.textTitle),
-      ),
+      appBar: AppBar(title: Text('Shop Info', style: DesignTokens.textTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorState(
-                  title: 'Failed to load shop info',
-                  error: _error!,
-                  onRetry: _load,
-                )
-              : ListView(
-                  padding: DesignTokens.paddingScreen,
-                  children: [
-                    _SectionCard(
-                      title: 'Basic info',
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _nameCtrl,
-                            textCapitalization: TextCapitalization.words,
-                            decoration: const InputDecoration(
-                              labelText: 'Shop name',
-                              prefixIcon: Icon(Icons.store_mall_directory_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: 'Contact phone',
-                              prefixIcon: Icon(Icons.phone_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextFormField(
-                            enabled: false,
-                            initialValue: _email ?? '',
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(Icons.mail_outline),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _addressCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Address',
-                              prefixIcon: Icon(Icons.location_on_outlined),
-                            ),
-                          ),
-                        ],
+          ? _ErrorState(
+              title: 'Failed to load shop info',
+              error: _error!,
+              onRetry: _load,
+            )
+          : ListView(
+              padding: DesignTokens.paddingScreen,
+              children: [
+                _SectionCard(
+                  title: 'Basic info',
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Shop name',
+                          prefixIcon: Icon(Icons.store_mall_directory_outlined),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceLg),
-                    _SectionCard(
-                      title: 'Online details',
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _metaTitleCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Shop tagline',
-                              prefixIcon: Icon(Icons.title),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _metaDescCtrl,
-                            maxLines: 3,
-                            decoration: const InputDecoration(
-                              labelText: 'Shop description',
-                              alignLabelWithHint: true,
-                              prefixIcon: Icon(Icons.notes_outlined),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Contact phone',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceLg),
-                    ElevatedButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_saving ? 'Saving…' : 'Save'),
-                      style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
-                    ),
-                  ],
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextFormField(
+                        enabled: false,
+                        initialValue: _email ?? '',
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.mail_outline),
+                        ),
+                      ),
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _addressCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
+                          prefixIcon: Icon(Icons.location_on_outlined),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                _SectionCard(
+                  title: 'Online details',
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _metaTitleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Shop tagline',
+                          prefixIcon: Icon(Icons.title),
+                        ),
+                      ),
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _metaDescCtrl,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Shop description',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.notes_outlined),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_saving ? 'Saving…' : 'Save'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -247,7 +341,11 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.title, required this.error, required this.onRetry});
+  const _ErrorState({
+    required this.title,
+    required this.error,
+    required this.onRetry,
+  });
 
   final String title;
   final Object error;
@@ -261,9 +359,17 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: DesignTokens.textBodyBold, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: DesignTokens.textBodyBold,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error.toString(), style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error.toString(),
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             ElevatedButton.icon(
               onPressed: onRetry,
@@ -275,21 +381,4 @@ class _ErrorState extends StatelessWidget {
       ),
     );
   }
-}
-
-Map<String, dynamic> _unwrapData(dynamic body) {
-  if (body is Map<String, dynamic>) {
-    final data = body['data'];
-    if (data is Map<String, dynamic>) return data;
-    return body;
-  }
-  return <String, dynamic>{};
-}
-
-String? _extractMessage(dynamic body) {
-  if (body is Map<String, dynamic>) {
-    final message = body['message'] ?? body['msg'] ?? body['error'];
-    if (message != null) return message.toString();
-  }
-  return null;
 }

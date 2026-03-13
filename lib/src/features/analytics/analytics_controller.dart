@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_providers.dart';
-import '../../core/db/app_database.dart';
 
 class SaleData {
   final DateTime date;
@@ -57,34 +56,44 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
     // 1. Fetch sales for last 7 days
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-    
+
     // We'll perform the aggregation in Dart for simplicity,
     // though for large datasets we'd use SQL group by.
     final entries = await db.ledgerEntriesBetween(weekAgo, now);
-    
+
     final salesMap = <DateTime, double>{};
     for (int i = 0; i <= 7; i++) {
-      final date = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+      final date = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: i));
       salesMap[date] = 0;
     }
 
     for (final entry in entries) {
       if (entry.type != 'sale') continue;
-      final date = DateTime(entry.createdAt.year, entry.createdAt.month, entry.createdAt.day);
+      final date = DateTime(
+        entry.createdAt.year,
+        entry.createdAt.month,
+        entry.createdAt.day,
+      );
       salesMap[date] = (salesMap[date] ?? 0) + entry.total;
     }
 
-    final dailyData = salesMap.entries
-        .map((e) => SaleData(e.key, e.value))
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final dailyData =
+        salesMap.entries.map((e) => SaleData(e.key, e.value)).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     // 2. Fetch top products
     // This is more complex since we need to join LedgerLines with LedgerEntries
     // For now, we'll use a simpler approach: get all lines from recent successful sales
-    final recentSaleIds = entries.where((e) => e.type == 'sale').map((e) => e.id).toList();
+    final recentSaleIds = entries
+        .where((e) => e.type == 'sale')
+        .map((e) => e.id)
+        .toList();
     final allLines = await db.getLinesForEntries(recentSaleIds);
-    
+
     final productAgg = <String, _Agg>{};
     for (final line in allLines) {
       final key = line.title;
@@ -95,10 +104,11 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
       );
     }
 
-    final topProducts = productAgg.entries
-        .map((e) => TopProduct(e.key, e.value.qty, e.value.rev))
-        .toList()
-      ..sort((a, b) => b.revenue.compareTo(a.revenue));
+    final topProducts =
+        productAgg.entries
+            .map((e) => TopProduct(e.key, e.value.qty, e.value.rev))
+            .toList()
+          ..sort((a, b) => b.revenue.compareTo(a.revenue));
 
     // 3. Inventory Value
     final items = await db.allProducts();
@@ -122,6 +132,7 @@ class _Agg {
   _Agg(this.qty, this.rev);
 }
 
-final analyticsProvider = StateNotifierProvider<AnalyticsNotifier, AnalyticsState>((ref) {
-  return AnalyticsNotifier(ref);
-});
+final analyticsProvider =
+    StateNotifierProvider<AnalyticsNotifier, AnalyticsState>((ref) {
+      return AnalyticsNotifier(ref);
+    });

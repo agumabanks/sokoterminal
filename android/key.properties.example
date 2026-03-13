@@ -1,0 +1,11 @@
+# Copy this file to android/key.properties and fill with real secrets.
+# This file is ignored by git and should never be committed.
+
+storeFile=release-keystore.jks
+storePassword=CHANGE_ME
+keyAlias=soko-seller-release
+keyPassword=CHANGE_ME
+
+# Required for release builds because AndroidManifest uses ${googleMapsApiKey}
+# Restrict this key in Google Cloud Console to your Android app package + SHA-1.
+googleMapsApiKey=CHANGE_ME

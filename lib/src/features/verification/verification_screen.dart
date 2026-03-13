@@ -100,7 +100,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
           break;
         case 'select':
         case 'radio':
-          _singleValues[i] = field.options.isNotEmpty ? field.options.first : null;
+          _singleValues[i] = field.options.isNotEmpty
+              ? field.options.first
+              : null;
           break;
         case 'multi_select':
           _multiValues[i] = <String>[];
@@ -116,7 +118,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   bool get _isSubmitted => _asBool(_shop['is_submitted_form']);
 
   Future<void> _pickFile(int index) async {
-    final result = await FilePicker.platform.pickFiles(withData: false, allowMultiple: false);
+    final result = await FilePicker.platform.pickFiles(
+      withData: false,
+      allowMultiple: false,
+    );
     if (result == null || result.files.isEmpty) return;
     setState(() => _files[index] = result.files.first);
   }
@@ -173,9 +178,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
       unawaited(_load());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Submit failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Submit failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -204,7 +209,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   Future<void> _purchaseFreePackage(_SellerPackage pack) async {
     try {
       final api = ref.read(sellerApiProvider);
-      final res = await api.purchaseSellerPackageFree(packageId: pack.id, amount: pack.price);
+      final res = await api.purchaseSellerPackageFree(
+        packageId: pack.id,
+        amount: pack.price,
+      );
       final msg = _extractMessage(res.data) ?? 'Package selection submitted';
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,9 +221,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
       unawaited(_load());
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Package selection failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Package selection failed: $e')));
     }
   }
 
@@ -286,14 +294,20 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   final res = await api.purchaseSellerPackageOffline(
                     packageId: pack.id,
                     paymentOption: option,
-                    trxId: trxCtrl.text.trim().isEmpty ? null : trxCtrl.text.trim(),
+                    trxId: trxCtrl.text.trim().isEmpty
+                        ? null
+                        : trxCtrl.text.trim(),
                     photoBase64: photoBase64,
                   );
-                  final msg = _extractMessage(res.data) ?? 'Offline payment submitted';
+                  final msg =
+                      _extractMessage(res.data) ?? 'Offline payment submitted';
                   if (!parentContext.mounted) return;
                   Navigator.pop(parentContext);
                   ScaffoldMessenger.of(parentContext).showSnackBar(
-                    SnackBar(content: Text(msg), backgroundColor: DesignTokens.brandAccent),
+                    SnackBar(
+                      content: Text(msg),
+                      backgroundColor: DesignTokens.brandAccent,
+                    ),
                   );
                   unawaited(_load());
                 } catch (e) {
@@ -305,7 +319,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
               },
               icon: const Icon(Icons.send),
               label: const Text('Submit'),
-              style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+              ),
             ),
           ],
         ),
@@ -330,69 +346,88 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorState(
-                  title: 'Failed to load verification',
-                  error: _error!,
-                  onRetry: _load,
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: DesignTokens.paddingScreen,
-                    children: [
-                      _StatusCard(verified: _isVerified, submitted: _isSubmitted),
-                      const SizedBox(height: DesignTokens.spaceLg),
-                      Text('Verification form', style: DesignTokens.textBodyBold),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      _fields.isEmpty
-                          ? Text('No verification form configured.', style: DesignTokens.textSmall)
-                          : _FormCard(
-                              fields: _fields,
-                              textControllers: _textControllers,
-                              singleValues: _singleValues,
-                              multiValues: _multiValues,
-                              files: _files,
-                              onPickFile: _pickFile,
-                              onToggleMulti: _toggleMulti,
-                              onSelectSingle: (index, value) => setState(() => _singleValues[index] = value),
-                            ),
-                      const SizedBox(height: DesignTokens.spaceMd),
-                      ElevatedButton.icon(
-                        onPressed: _submitting ? null : _submitVerification,
-                        icon: _submitting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.upload_file),
-                        label: Text(_submitting ? 'Submitting…' : 'Submit verification'),
-                        style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceXl),
-                      Text('Seller packages', style: DesignTokens.textBodyBold),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      _packages.isEmpty
-                          ? Text('No packages available.', style: DesignTokens.textSmall)
-                          : Column(
-                              children: _packages
-                                  .map((p) => _PackageCard(
-                                        pack: p,
-                                        currentPackage: (_shop['seller_package'] ?? '').toString(),
-                                        onSelect: () => _selectPackage(p),
-                                      ))
-                                  .toList(),
-                            ),
-                      const SizedBox(height: DesignTokens.spaceLg),
-                    ],
+          ? _ErrorState(
+              title: 'Failed to load verification',
+              error: _error!,
+              onRetry: _load,
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: DesignTokens.paddingScreen,
+                children: [
+                  _StatusCard(verified: _isVerified, submitted: _isSubmitted),
+                  const SizedBox(height: DesignTokens.spaceLg),
+                  Text('Verification form', style: DesignTokens.textBodyBold),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  _fields.isEmpty
+                      ? Text(
+                          'No verification form configured.',
+                          style: DesignTokens.textSmall,
+                        )
+                      : _FormCard(
+                          fields: _fields,
+                          textControllers: _textControllers,
+                          singleValues: _singleValues,
+                          multiValues: _multiValues,
+                          files: _files,
+                          onPickFile: _pickFile,
+                          onToggleMulti: _toggleMulti,
+                          onSelectSingle: (index, value) =>
+                              setState(() => _singleValues[index] = value),
+                        ),
+                  const SizedBox(height: DesignTokens.spaceMd),
+                  ElevatedButton.icon(
+                    onPressed: _submitting ? null : _submitVerification,
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.upload_file),
+                    label: Text(
+                      _submitting ? 'Submitting…' : 'Submit verification',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: DesignTokens.brandAccent,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: DesignTokens.spaceXl),
+                  Text('Seller packages', style: DesignTokens.textBodyBold),
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  _packages.isEmpty
+                      ? Text(
+                          'No packages available.',
+                          style: DesignTokens.textSmall,
+                        )
+                      : Column(
+                          children: _packages
+                              .map(
+                                (p) => _PackageCard(
+                                  pack: p,
+                                  currentPackage:
+                                      (_shop['seller_package'] ?? '')
+                                          .toString(),
+                                  onSelect: () => _selectPackage(p),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                  const SizedBox(height: DesignTokens.spaceLg),
+                ],
+              ),
+            ),
     );
   }
 }
 
 class _VerifyField {
-  const _VerifyField({required this.type, required this.label, required this.options});
+  const _VerifyField({
+    required this.type,
+    required this.label,
+    required this.options,
+  });
 
   final String type;
   final String label;
@@ -400,7 +435,11 @@ class _VerifyField {
 
   factory _VerifyField.fromJson(dynamic json) {
     if (json is! Map<String, dynamic>) {
-      return const _VerifyField(type: 'text', label: 'Field', options: <String>[]);
+      return const _VerifyField(
+        type: 'text',
+        label: 'Field',
+        options: <String>[],
+      );
     }
 
     final type = (json['type'] ?? 'text').toString();
@@ -468,13 +507,13 @@ class _StatusCard extends StatelessWidget {
     final statusText = verified
         ? 'VERIFIED'
         : submitted
-            ? 'SUBMITTED'
-            : 'NOT SUBMITTED';
+        ? 'SUBMITTED'
+        : 'NOT SUBMITTED';
     final statusColor = verified
         ? DesignTokens.success
         : submitted
-            ? DesignTokens.warning
-            : DesignTokens.error;
+        ? DesignTokens.warning
+        : DesignTokens.error;
 
     return Container(
       padding: DesignTokens.paddingLg,
@@ -491,7 +530,10 @@ class _StatusCard extends StatelessWidget {
               color: DesignTokens.surfaceWhite.withValues(alpha: 0.18),
               borderRadius: DesignTokens.borderRadiusSm,
             ),
-            child: const Icon(Icons.verified_user, color: DesignTokens.surfaceWhite),
+            child: const Icon(
+              Icons.verified_user,
+              color: DesignTokens.surfaceWhite,
+            ),
           ),
           const SizedBox(width: DesignTokens.spaceMd),
           Expanded(
@@ -504,8 +546,8 @@ class _StatusCard extends StatelessWidget {
                   verified
                       ? 'Your shop is verified.'
                       : submitted
-                          ? 'Your verification is under review.'
-                          : 'Submit your documents to unlock payouts and higher limits.',
+                      ? 'Your verification is under review.'
+                      : 'Submit your documents to unlock payouts and higher limits.',
                   style: DesignTokens.textSmallLight,
                 ),
               ],
@@ -522,7 +564,9 @@ class _StatusCard extends StatelessWidget {
             ),
             child: Text(
               statusText,
-              style: DesignTokens.textSmallLight.copyWith(fontWeight: FontWeight.w700),
+              style: DesignTokens.textSmallLight.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -575,7 +619,8 @@ class _FormCard extends StatelessWidget {
               onToggleMulti: (v) => onToggleMulti(i, v),
               onSelectSingle: (v) => onSelectSingle(i, v),
             ),
-            if (i != fields.length - 1) const SizedBox(height: DesignTokens.spaceMd),
+            if (i != fields.length - 1)
+              const SizedBox(height: DesignTokens.spaceMd),
           ],
         ],
       ),
@@ -615,8 +660,14 @@ class _FieldWidget extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.attach_file),
           title: Text(label, style: DesignTokens.textBodyBold),
-          subtitle: Text(file?.name ?? 'Tap to choose file', style: DesignTokens.textSmall),
-          trailing: TextButton(onPressed: onPickFile, child: const Text('Choose')),
+          subtitle: Text(
+            file?.name ?? 'Tap to choose file',
+            style: DesignTokens.textSmall,
+          ),
+          trailing: TextButton(
+            onPressed: onPickFile,
+            child: const Text('Choose'),
+          ),
         );
       case 'multi_select':
         return Column(
@@ -628,11 +679,13 @@ class _FieldWidget extends StatelessWidget {
               spacing: DesignTokens.spaceSm,
               runSpacing: DesignTokens.spaceSm,
               children: field.options
-                  .map((opt) => FilterChip(
-                        label: Text(opt),
-                        selected: multiValue.contains(opt),
-                        onSelected: (_) => onToggleMulti(opt),
-                      ))
+                  .map(
+                    (opt) => FilterChip(
+                      label: Text(opt),
+                      selected: multiValue.contains(opt),
+                      onSelected: (_) => onToggleMulti(opt),
+                    ),
+                  )
                   .toList(),
             ),
           ],
@@ -664,7 +717,11 @@ class _FieldWidget extends StatelessWidget {
 }
 
 class _PackageCard extends StatelessWidget {
-  const _PackageCard({required this.pack, required this.currentPackage, required this.onSelect});
+  const _PackageCard({
+    required this.pack,
+    required this.currentPackage,
+    required this.onSelect,
+  });
 
   final _SellerPackage pack;
   final String currentPackage;
@@ -672,7 +729,8 @@ class _PackageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCurrent = currentPackage.trim().isNotEmpty && currentPackage == pack.name;
+    final isCurrent =
+        currentPackage.trim().isNotEmpty && currentPackage == pack.name;
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
       padding: DesignTokens.paddingLg,
@@ -687,7 +745,9 @@ class _PackageCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(pack.name, style: DesignTokens.textBodyBold)),
+              Expanded(
+                child: Text(pack.name, style: DesignTokens.textBodyBold),
+              ),
               if (isCurrent)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -698,22 +758,40 @@ class _PackageCard extends StatelessWidget {
                     color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                     borderRadius: DesignTokens.borderRadiusSm,
                   ),
-                  child: Text('Current', style: DesignTokens.textSmall.copyWith(color: DesignTokens.brandAccent)),
+                  child: Text(
+                    'Current',
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.brandAccent,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
-            pack.amountLabel.isNotEmpty ? pack.amountLabel : 'UGX ${pack.price.toStringAsFixed(0)}',
-            style: DesignTokens.textBody.copyWith(color: DesignTokens.brandAccent, fontWeight: FontWeight.w700),
+            pack.amountLabel.isNotEmpty
+                ? pack.amountLabel
+                : 'UGX ${pack.price.toStringAsFixed(0)}',
+            style: DesignTokens.textBody.copyWith(
+              color: DesignTokens.brandAccent,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceSm),
-          Text('Duration: ${pack.durationDays} days', style: DesignTokens.textSmall),
-          Text('Upload limit: ${pack.productUploadLimit}', style: DesignTokens.textSmall),
+          Text(
+            'Duration: ${pack.durationDays} days',
+            style: DesignTokens.textSmall,
+          ),
+          Text(
+            'Upload limit: ${pack.productUploadLimit}',
+            style: DesignTokens.textSmall,
+          ),
           const SizedBox(height: DesignTokens.spaceMd),
           ElevatedButton(
             onPressed: onSelect,
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.brandAccent,
+            ),
             child: Text(pack.price <= 0 ? 'Select' : 'Pay offline'),
           ),
         ],
@@ -723,7 +801,11 @@ class _PackageCard extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.title, required this.error, required this.onRetry});
+  const _ErrorState({
+    required this.title,
+    required this.error,
+    required this.onRetry,
+  });
 
   final String title;
   final Object error;
@@ -737,9 +819,17 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: DesignTokens.textBodyBold, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: DesignTokens.textBodyBold,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error.toString(), style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error.toString(),
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             ElevatedButton.icon(
               onPressed: () => onRetry(),

@@ -67,10 +67,7 @@ class _ManagerPinGateState extends ConsumerState<ManagerPinGate> {
   @override
   Widget build(BuildContext context) {
     if (widget.child != null) {
-      return GestureDetector(
-        onTap: _handleTap,
-        child: widget.child,
-      );
+      return GestureDetector(onTap: _handleTap, child: widget.child);
     }
 
     return ElevatedButton(
@@ -81,10 +78,7 @@ class _ManagerPinGateState extends ConsumerState<ManagerPinGate> {
 }
 
 class _ManagerPinSheet extends ConsumerStatefulWidget {
-  const _ManagerPinSheet({
-    required this.actionLabel,
-    required this.onSuccess,
-  });
+  const _ManagerPinSheet({required this.actionLabel, required this.onSuccess});
 
   final String actionLabel;
   final VoidCallback onSuccess;
@@ -169,10 +163,7 @@ class _ManagerPinSheetState extends ConsumerState<_ManagerPinSheet> {
           ),
           const SizedBox(height: 16),
           // Title
-          Text(
-            'Manager Authorization',
-            style: DesignTokens.textTitle,
-          ),
+          Text('Manager Authorization', style: DesignTokens.textTitle),
           const SizedBox(height: 8),
           Text(
             'Enter manager PIN to ${widget.actionLabel.toLowerCase()}',

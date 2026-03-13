@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'design_tokens.dart';
 
 /// Soko Seller Terminal Theme
-/// 
+///
 /// Premium theme following "Steve Jobs standard" design principles:
 /// - Clean, minimal aesthetics
 /// - Consistent spacing (8pt grid)
@@ -17,7 +17,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      
+
       // Color scheme
       colorScheme: ColorScheme.fromSeed(
         seedColor: DesignTokens.brandPrimary,
@@ -128,9 +128,7 @@ class AppTheme {
 
       // Icon Buttons
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          foregroundColor: DesignTokens.grayDark,
-        ),
+        style: IconButton.styleFrom(foregroundColor: DesignTokens.grayDark),
       ),
 
       // Floating Action Button
@@ -161,7 +159,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.brandPrimary, width: 2),
+          borderSide: const BorderSide(
+            color: DesignTokens.brandPrimary,
+            width: 2,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
@@ -171,8 +172,12 @@ class AppTheme {
           borderRadius: DesignTokens.borderRadiusMd,
           borderSide: const BorderSide(color: DesignTokens.error, width: 2),
         ),
-        labelStyle: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
-        hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+        labelStyle: DesignTokens.textBody.copyWith(
+          color: DesignTokens.grayMedium,
+        ),
+        hintStyle: DesignTokens.textBody.copyWith(
+          color: DesignTokens.grayMedium,
+        ),
         prefixIconColor: DesignTokens.grayMedium,
         suffixIconColor: DesignTokens.grayMedium,
       ),
@@ -275,7 +280,9 @@ class AppTheme {
         bodyMedium: DesignTokens.textBody,
         bodySmall: DesignTokens.textSmall,
         labelLarge: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
-        labelMedium: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+        labelMedium: DesignTokens.textSmall.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
         labelSmall: DesignTokens.textSmall,
       ),
 

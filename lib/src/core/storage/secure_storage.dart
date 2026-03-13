@@ -1,55 +1,125 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 
 class SecureStorage {
   SecureStorage() : _storage = const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
+  static const _maxRetries = 3;
+  int _consecutiveFailures = 0;
+
+  bool get _storageAvailable => _consecutiveFailures < 10;
+
+  void _recordFailure(Object error) {
+    _consecutiveFailures++;
+    debugPrint(
+      '[SecureStorage] operation failed ($_consecutiveFailures): $error',
+    );
+  }
+
+  void _recordSuccess() {
+    _consecutiveFailures = 0;
+  }
+
+  Future<void> _safeWrite(String key, String value) async {
+    if (!_storageAvailable) return;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        await _storage.write(key: key, value: value);
+        _recordSuccess();
+        return;
+      } catch (e) {
+        if (attempt == _maxRetries - 1) _recordFailure(e);
+      }
+    }
+  }
+
+  Future<String?> _safeRead(String key) async {
+    if (!_storageAvailable) return null;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        final result = await _storage.read(key: key);
+        _recordSuccess();
+        return result;
+      } catch (e) {
+        if (attempt == _maxRetries - 1) {
+          _recordFailure(e);
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _safeDelete(String key) async {
+    if (!_storageAvailable) return;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        await _storage.delete(key: key);
+        _recordSuccess();
+        return;
+      } catch (e) {
+        if (attempt == _maxRetries - 1) _recordFailure(e);
+      }
+    }
+  }
+
+  Future<void> _safeDeleteAll() async {
+    if (!_storageAvailable) return;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        await _storage.deleteAll();
+        _recordSuccess();
+        return;
+      } catch (e) {
+        if (attempt == _maxRetries - 1) _recordFailure(e);
+      }
+    }
+  }
 
   Future<void> writeAccessToken(String token) =>
-      _storage.write(key: 'access_token', value: token);
-  Future<String?> readAccessToken() => _storage.read(key: 'access_token');
-  Future<void> deleteAccessToken() => _storage.delete(key: 'access_token');
+      _safeWrite('access_token', token);
+  Future<String?> readAccessToken() => _safeRead('access_token');
+  Future<void> deleteAccessToken() => _safeDelete('access_token');
 
   Future<void> writeLastLoginPhone(String phone) =>
-      _storage.write(key: 'last_login_phone', value: phone);
-  Future<String?> readLastLoginPhone() => _storage.read(key: 'last_login_phone');
+      _safeWrite('last_login_phone', phone);
+  Future<String?> readLastLoginPhone() => _safeRead('last_login_phone');
 
   // Unique seller identity (UUID)
-  Future<void> writeSellerUUID(String uuid) =>
-      _storage.write(key: 'seller_uuid', value: uuid);
-  Future<String?> readSellerUUID() => _storage.read(key: 'seller_uuid');
+  Future<void> writeSellerUUID(String uuid) => _safeWrite('seller_uuid', uuid);
+  Future<String?> readSellerUUID() => _safeRead('seller_uuid');
 
   Future<void> writeSellerQuickPin(String pin) =>
-      _storage.write(key: 'seller_quick_pin', value: pin);
-  Future<String?> readSellerQuickPin() => _storage.read(key: 'seller_quick_pin');
+      _safeWrite('seller_quick_pin', pin);
+  Future<String?> readSellerQuickPin() => _safeRead('seller_quick_pin');
 
   Future<void> writeSellerQuickPassword(String password) =>
-      _storage.write(key: 'seller_quick_password', value: password);
+      _safeWrite('seller_quick_password', password);
   Future<String?> readSellerQuickPassword() =>
-      _storage.read(key: 'seller_quick_password');
+      _safeRead('seller_quick_password');
 
   Future<void> writeSellerQuickPhone(String phone) =>
-      _storage.write(key: 'seller_quick_phone', value: phone);
-  Future<String?> readSellerQuickPhone() =>
-      _storage.read(key: 'seller_quick_phone');
+      _safeWrite('seller_quick_phone', phone);
+  Future<String?> readSellerQuickPhone() => _safeRead('seller_quick_phone');
 
   Future<void> clearSellerQuickLogin() async {
     await Future.wait([
-      _storage.delete(key: 'seller_quick_phone'),
-      _storage.delete(key: 'seller_quick_password'),
-      _storage.delete(key: 'seller_quick_pin'),
+      _safeDelete('seller_quick_phone'),
+      _safeDelete('seller_quick_password'),
+      _safeDelete('seller_quick_pin'),
     ]);
   }
 
-  Future<void> writePin(String pin) => _storage.write(key: 'staff_pin', value: pin);
-  Future<String?> readPin() => _storage.read(key: 'staff_pin');
-  Future<void> deletePin() => _storage.delete(key: 'staff_pin');
+  Future<void> writePin(String pin) => _safeWrite('staff_pin', pin);
+  Future<String?> readPin() => _safeRead('staff_pin');
+  Future<void> deletePin() => _safeDelete('staff_pin');
 
   // POS staff session (server-side RBAC)
   Future<void> writePosSessionToken(String token) =>
-      _storage.write(key: 'pos_session_token', value: token);
-  Future<String?> readPosSessionToken() => _storage.read(key: 'pos_session_token');
-  Future<void> deletePosSessionToken() => _storage.delete(key: 'pos_session_token');
+      _safeWrite('pos_session_token', token);
+  Future<String?> readPosSessionToken() => _safeRead('pos_session_token');
+  Future<void> deletePosSessionToken() => _safeDelete('pos_session_token');
 
   Future<void> writePosSessionMeta({
     required int staffId,
@@ -58,50 +128,50 @@ class SecureStorage {
     DateTime? expiresAt,
   }) async {
     await Future.wait([
-      _storage.write(key: 'pos_session_staff_id', value: staffId.toString()),
-      _storage.write(key: 'pos_session_staff_name', value: staffName),
-      _storage.write(key: 'pos_session_staff_role', value: staffRole),
+      _safeWrite('pos_session_staff_id', staffId.toString()),
+      _safeWrite('pos_session_staff_name', staffName),
+      _safeWrite('pos_session_staff_role', staffRole),
       if (expiresAt != null)
-        _storage.write(
-          key: 'pos_session_expires_at',
-          value: expiresAt.toUtc().toIso8601String(),
+        _safeWrite(
+          'pos_session_expires_at',
+          expiresAt.toUtc().toIso8601String(),
         )
       else
-        _storage.delete(key: 'pos_session_expires_at'),
+        _safeDelete('pos_session_expires_at'),
     ]);
   }
 
   Future<int?> readPosSessionStaffId() async {
-    final raw = await _storage.read(key: 'pos_session_staff_id');
+    final raw = await _safeRead('pos_session_staff_id');
     if (raw == null || raw.trim().isEmpty) return null;
     return int.tryParse(raw.trim());
   }
 
   Future<String?> readPosSessionStaffName() =>
-      _storage.read(key: 'pos_session_staff_name');
+      _safeRead('pos_session_staff_name');
 
   Future<String?> readPosSessionStaffRole() =>
-      _storage.read(key: 'pos_session_staff_role');
+      _safeRead('pos_session_staff_role');
 
   Future<DateTime?> readPosSessionExpiresAt() async {
-    final raw = await _storage.read(key: 'pos_session_expires_at');
+    final raw = await _safeRead('pos_session_expires_at');
     if (raw == null || raw.trim().isEmpty) return null;
     return DateTime.tryParse(raw.trim())?.toUtc();
   }
 
   Future<void> deletePosSessionMeta() async {
     await Future.wait([
-      _storage.delete(key: 'pos_session_staff_id'),
-      _storage.delete(key: 'pos_session_staff_name'),
-      _storage.delete(key: 'pos_session_staff_role'),
-      _storage.delete(key: 'pos_session_expires_at'),
+      _safeDelete('pos_session_staff_id'),
+      _safeDelete('pos_session_staff_name'),
+      _safeDelete('pos_session_staff_role'),
+      _safeDelete('pos_session_expires_at'),
     ]);
   }
 
   Future<void> write({required String key, required String value}) =>
-      _storage.write(key: key, value: value);
-  Future<String?> read({required String key}) => _storage.read(key: key);
-  Future<void> delete({required String key}) => _storage.delete(key: key);
+      _safeWrite(key, value);
+  Future<String?> read({required String key}) => _safeRead(key);
+  Future<void> delete({required String key}) => _safeDelete(key);
 
-  Future<void> clearAll() => _storage.deleteAll();
+  Future<void> clearAll() => _safeDeleteAll();
 }

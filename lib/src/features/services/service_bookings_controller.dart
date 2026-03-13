@@ -11,15 +11,21 @@ import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
 
 final serviceBookingsControllerProvider =
-    StateNotifierProvider<ServiceBookingsController, ServiceBookingsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  final db = ref.watch(appDatabaseProvider);
-  final sync = ref.watch(syncServiceProvider);
-  return ServiceBookingsController(api, db, sync)..load();
-});
+    StateNotifierProvider<ServiceBookingsController, ServiceBookingsState>((
+      ref,
+    ) {
+      final api = ref.watch(sellerApiProvider);
+      final db = ref.watch(appDatabaseProvider);
+      final sync = ref.watch(syncServiceProvider);
+      return ServiceBookingsController(api, db, sync)..load();
+    });
 
 class ServiceBookingsState {
-  const ServiceBookingsState({this.loading = false, this.bookings = const [], this.error});
+  const ServiceBookingsState({
+    this.loading = false,
+    this.bookings = const [],
+    this.error,
+  });
   final bool loading;
   final List<Map<String, dynamic>> bookings;
   final String? error;
@@ -27,7 +33,7 @@ class ServiceBookingsState {
 
 class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
   ServiceBookingsController(this.api, this.db, this.sync)
-      : super(const ServiceBookingsState());
+    : super(const ServiceBookingsState());
 
   final SellerApi api;
   final AppDatabase db;
@@ -39,7 +45,9 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
     try {
       final res = await api.fetchServiceBookings();
       final data = res.data;
-      final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+      final listRaw = data is Map<String, dynamic>
+          ? (data['data'] ?? const [])
+          : data;
       final list = List<Map<String, dynamic>>.from(
         (listRaw as Iterable).map((e) => Map<String, dynamic>.from(e as Map)),
       );
@@ -55,11 +63,17 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
       final cachedRows = await db.getCachedServiceBookings();
       if (cachedRows.isNotEmpty) {
         final list = cachedRows
-            .map((r) => Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map))
+            .map(
+              (r) =>
+                  Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+            )
             .toList();
         state = ServiceBookingsState(error: e.toString(), bookings: list);
       } else {
-        state = ServiceBookingsState(error: e.toString(), bookings: state.bookings);
+        state = ServiceBookingsState(
+          error: e.toString(),
+          bookings: state.bookings,
+        );
       }
     }
   }
@@ -138,13 +152,13 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
         if (b['id']?.toString() == bookingId.toString())
           {...b, 'status': status, 'pending_sync': true}
         else
-          b
+          b,
     ];
 
     final existing = updated.cast<Map<String, dynamic>?>().firstWhere(
-          (b) => b?['id']?.toString() == bookingId.toString(),
-          orElse: () => null,
-        );
+      (b) => b?['id']?.toString() == bookingId.toString(),
+      orElse: () => null,
+    );
     if (existing != null) {
       unawaited(db.upsertCachedServiceBooking(bookingId, jsonEncode(existing)));
     }

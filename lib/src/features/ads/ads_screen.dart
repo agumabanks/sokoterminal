@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -12,8 +13,11 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/db/app_database.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
+import 'ai_ads_tab.dart';
 
 /// Ad template style
 enum AdTemplate { story, square, banner, minimal }
@@ -59,7 +63,9 @@ class AdBuilderState {
   }
 }
 
-final adBuilderStateProvider = StateProvider<AdBuilderState>((ref) => const AdBuilderState());
+final adBuilderStateProvider = StateProvider<AdBuilderState>(
+  (ref) => const AdBuilderState(),
+);
 
 class AdsScreen extends ConsumerStatefulWidget {
   const AdsScreen({super.key});
@@ -68,10 +74,24 @@ class AdsScreen extends ConsumerStatefulWidget {
   ConsumerState<AdsScreen> createState() => _AdsScreenState();
 }
 
-class _AdsScreenState extends ConsumerState<AdsScreen> {
+class _AdsScreenState extends ConsumerState<AdsScreen>
+    with SingleTickerProviderStateMixin {
   final GlobalKey _previewKey = GlobalKey();
   String? _selectedId;
   bool _busy = false;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,16 +101,36 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text('Ad Builder', style: DesignTokens.textTitle),
+        title: Text('Ads & Creatives', style: DesignTokens.textTitle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: 'Ad Settings',
-            onPressed: () => _showSettings(context, ref),
-          ),
+          if (_tabController.index == 1)
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'Ad Settings',
+              onPressed: () => _showSettings(context, ref),
+            ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          onTap: (_) => setState(() {}),
+          tabs: const [
+            Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'AI Studio'),
+            Tab(icon: Icon(Icons.brush, size: 18), text: 'Local Builder'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          const AIAdsTab(),
+          _buildLocalBuilder(items, adState),
         ],
       ),
-      body: items.when(
+    );
+  }
+
+  Widget _buildLocalBuilder(AsyncValue<List<Item>> items, AdBuilderState adState) {
+    return items.when(
         data: (list) {
           if (list.isEmpty) {
             return _EmptyProductsState();
@@ -118,7 +158,8 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: DesignTokens.spaceSm),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: DesignTokens.spaceSm),
                   itemBuilder: (context, index) {
                     final item = list[index];
                     final isSelected = item.id == _selectedId;
@@ -138,8 +179,9 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
               const SizedBox(height: DesignTokens.spaceSm),
               _TemplateSelector(
                 selected: adState.template,
-                onSelect: (t) => ref.read(adBuilderStateProvider.notifier).state = 
-                    adState.copyWith(template: t),
+                onSelect: (t) =>
+                    ref.read(adBuilderStateProvider.notifier).state = adState
+                        .copyWith(template: t),
               ),
 
               const SizedBox(height: DesignTokens.spaceLg),
@@ -192,25 +234,46 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
                     icon: Icons.share,
                     label: 'Share',
                     color: DesignTokens.brandPrimary,
-                    onPressed: _busy ? null : () => _shareAd(context, selected, caption, _AdImageFormat.png),
+                    onPressed: _busy
+                        ? null
+                        : () => _shareAd(
+                            context,
+                            selected,
+                            caption,
+                            _AdImageFormat.png,
+                          ),
                   ),
                   _ShareButton(
                     icon: Icons.chat,
                     label: 'WhatsApp',
                     color: const Color(0xFF25D366),
-                    onPressed: _busy ? null : () => _shareToWhatsApp(context, selected, caption),
+                    onPressed: _busy
+                        ? null
+                        : () => _shareToWhatsApp(context, selected, caption),
                   ),
                   _ShareButton(
                     icon: Icons.image,
                     label: 'Save PNG',
                     color: DesignTokens.info,
-                    onPressed: _busy ? null : () => _saveToGallery(context, selected, _AdImageFormat.png),
+                    onPressed: _busy
+                        ? null
+                        : () => _saveToGallery(
+                            context,
+                            selected,
+                            _AdImageFormat.png,
+                          ),
                   ),
                   _ShareButton(
                     icon: Icons.photo,
                     label: 'Save JPG',
                     color: DesignTokens.brandAccent,
-                    onPressed: _busy ? null : () => _saveToGallery(context, selected, _AdImageFormat.jpg),
+                    onPressed: _busy
+                        ? null
+                        : () => _saveToGallery(
+                            context,
+                            selected,
+                            _AdImageFormat.jpg,
+                          ),
                   ),
                 ],
               ),
@@ -221,8 +284,7 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-      ),
-    );
+      );
   }
 
   String _buildCaption(Item item, AdBuilderState state) {
@@ -232,11 +294,13 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
 
     final buffer = StringBuffer();
     buffer.write('🛒 ${item.name}');
-    
+
     if (state.discount > 0) {
       final originalPrice = item.price / (1 - state.discount / 100);
       buffer.write('\n\n💰 Now: UGX ${item.price.toStringAsFixed(0)}');
-      buffer.write('\n🏷️ Was: UGX ${originalPrice.toStringAsFixed(0)} (${state.discount.toStringAsFixed(0)}% OFF!)');
+      buffer.write(
+        '\n🏷️ Was: UGX ${originalPrice.toStringAsFixed(0)} (${state.discount.toStringAsFixed(0)}% OFF!)',
+      );
     } else {
       buffer.write('\n\n💰 Price: UGX ${item.price.toStringAsFixed(0)}');
     }
@@ -254,7 +318,7 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
 
   void _showSettings(BuildContext context, WidgetRef ref) {
     final state = ref.read(adBuilderStateProvider);
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: DesignTokens.surfaceWhite,
@@ -271,12 +335,13 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
               children: [
                 Text('Ad Settings', style: DesignTokens.textTitle),
                 const SizedBox(height: DesignTokens.spaceLg),
-                
+
                 SwitchListTile(
                   title: const Text('Show Price'),
                   value: state.showPrice,
                   onChanged: (v) {
-                    ref.read(adBuilderStateProvider.notifier).state = state.copyWith(showPrice: v);
+                    ref.read(adBuilderStateProvider.notifier).state = state
+                        .copyWith(showPrice: v);
                     setLocalState(() {});
                   },
                 ),
@@ -284,7 +349,8 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
                   title: const Text('Show QR Code'),
                   value: state.showQr,
                   onChanged: (v) {
-                    ref.read(adBuilderStateProvider.notifier).state = state.copyWith(showQr: v);
+                    ref.read(adBuilderStateProvider.notifier).state = state
+                        .copyWith(showQr: v);
                     setLocalState(() {});
                   },
                 ),
@@ -292,11 +358,12 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
                   title: const Text('Show Stock Level'),
                   value: state.showStock,
                   onChanged: (v) {
-                    ref.read(adBuilderStateProvider.notifier).state = state.copyWith(showStock: v);
+                    ref.read(adBuilderStateProvider.notifier).state = state
+                        .copyWith(showStock: v);
                     setLocalState(() {});
                   },
                 ),
-                
+
                 const SizedBox(height: DesignTokens.spaceMd),
                 Text('Discount (%)', style: DesignTokens.textBodyBold),
                 Slider(
@@ -306,11 +373,12 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
                   divisions: 10,
                   label: '${state.discount.toStringAsFixed(0)}%',
                   onChanged: (v) {
-                    ref.read(adBuilderStateProvider.notifier).state = state.copyWith(discount: v);
+                    ref.read(adBuilderStateProvider.notifier).state = state
+                        .copyWith(discount: v);
                     setLocalState(() {});
                   },
                 ),
-                
+
                 const SizedBox(height: DesignTokens.spaceLg),
               ],
             ),
@@ -320,16 +388,21 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
     );
   }
 
-  Future<void> _shareAd(BuildContext context, Item item, String caption, _AdImageFormat format) async {
+  Future<void> _shareAd(
+    BuildContext context,
+    Item item,
+    String caption,
+    _AdImageFormat format,
+  ) async {
     setState(() => _busy = true);
     try {
       final file = await _exportAdFile(item, format);
       await Share.shareXFiles([XFile(file.path)], text: caption);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -337,19 +410,20 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
     }
   }
 
-  Future<void> _shareToWhatsApp(BuildContext context, Item item, String caption) async {
+  Future<void> _shareToWhatsApp(
+    BuildContext context,
+    Item item,
+    String caption,
+  ) async {
     setState(() => _busy = true);
     try {
       final file = await _exportAdFile(item, _AdImageFormat.jpg);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: caption,
-      );
+      await Share.shareXFiles([XFile(file.path)], text: caption);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('WhatsApp share failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('WhatsApp share failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -357,7 +431,11 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
     }
   }
 
-  Future<void> _saveToGallery(BuildContext context, Item item, _AdImageFormat format) async {
+  Future<void> _saveToGallery(
+    BuildContext context,
+    Item item,
+    _AdImageFormat format,
+  ) async {
     setState(() => _busy = true);
     try {
       final file = await _exportAdFile(item, format);
@@ -373,9 +451,9 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -384,7 +462,9 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
   }
 
   Future<File> _exportAdFile(Item item, _AdImageFormat format) async {
-    final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    final boundary =
+        _previewKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
     if (boundary == null) {
       throw StateError('Preview not ready yet');
     }
@@ -408,14 +488,32 @@ class _AdsScreenState extends ConsumerState<AdsScreen> {
       extension = 'jpg';
     }
 
-    final dir = await getTemporaryDirectory();
+    final root = await getApplicationDocumentsDirectory();
+    final dir = Directory(p.join(root.path, 'generated_ads'));
+    if (!dir.existsSync()) {
+      await dir.create(recursive: true);
+    }
     final safeName = item.name
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
-    final fileName = 'soko-ad-${safeName.isEmpty ? item.id : safeName}.$extension';
+    final stamp = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final fileName =
+        'soko-ad-${safeName.isEmpty ? item.id : safeName}-$stamp.$extension';
     final file = File(p.join(dir.path, fileName));
     await file.writeAsBytes(bytes, flush: true);
+
+    // Best effort: queue upload so generated creatives also reach cloud storage.
+    unawaited(
+      ref.read(syncServiceProvider).enqueue('ad_media_upload', {
+        'file_path': file.path,
+        'item_id': item.id,
+        'remote_item_id': item.remoteId,
+        'generated_at': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+    unawaited(ref.read(syncServiceProvider).syncNow());
+
     return file;
   }
 }
@@ -438,7 +536,7 @@ class _ProductChip extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
   });
-  
+
   final Item item;
   final bool isSelected;
   final VoidCallback onTap;
@@ -451,7 +549,9 @@ class _ProductChip extends StatelessWidget {
         width: 120,
         padding: const EdgeInsets.all(DesignTokens.spaceSm),
         decoration: BoxDecoration(
-          color: isSelected ? DesignTokens.brandAccent : DesignTokens.surfaceWhite,
+          color: isSelected
+              ? DesignTokens.brandAccent
+              : DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
           border: Border.all(
@@ -465,15 +565,17 @@ class _ProductChip extends StatelessWidget {
             if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
               ClipRRect(
                 borderRadius: DesignTokens.borderRadiusSm,
-                child: Image.network(
-                  item.imageUrl!,
+                child: OfflineCachedImage(
+                  imageUrl: item.imageUrl!,
                   width: 40,
                   height: 40,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorWidget: Icon(
                     Icons.image,
                     size: 24,
-                    color: isSelected ? Colors.white70 : DesignTokens.grayMedium,
+                    color: isSelected
+                        ? Colors.white70
+                        : DesignTokens.grayMedium,
                   ),
                 ),
               )
@@ -486,7 +588,9 @@ class _ProductChip extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               item.name,
-              style: isSelected ? DesignTokens.textSmallLight : DesignTokens.textSmall,
+              style: isSelected
+                  ? DesignTokens.textSmallLight
+                  : DesignTokens.textSmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -517,7 +621,9 @@ class _TemplateSelector extends StatelessWidget {
               selected: isSelected,
               onSelected: (_) => onSelect(t),
               selectedColor: DesignTokens.brandPrimary,
-              labelStyle: TextStyle(color: isSelected ? Colors.white : DesignTokens.grayDark),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : DesignTokens.grayDark,
+              ),
               showCheckmark: false,
             ),
           );
@@ -528,10 +634,14 @@ class _TemplateSelector extends StatelessWidget {
 
   String _getLabel(AdTemplate t) {
     switch (t) {
-      case AdTemplate.story: return '📱 Story (9:16)';
-      case AdTemplate.square: return '📷 Square (1:1)';
-      case AdTemplate.banner: return '🖼️ Banner (16:9)';
-      case AdTemplate.minimal: return '✨ Minimal';
+      case AdTemplate.story:
+        return '📱 Story (9:16)';
+      case AdTemplate.square:
+        return '📷 Square (1:1)';
+      case AdTemplate.banner:
+        return '🖼️ Banner (16:9)';
+      case AdTemplate.minimal:
+        return '✨ Minimal';
     }
   }
 }
@@ -543,7 +653,7 @@ class _ShareButton extends StatelessWidget {
     required this.color,
     this.onPressed,
   });
-  
+
   final IconData icon;
   final String label;
   final Color color;
@@ -558,7 +668,9 @@ class _ShareButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: DesignTokens.borderRadiusMd),
+        shape: RoundedRectangleBorder(
+          borderRadius: DesignTokens.borderRadiusMd,
+        ),
       ),
     );
   }
@@ -574,7 +686,7 @@ class _AdPreview extends StatelessWidget {
     required this.showStock,
     required this.discount,
   });
-  
+
   final Item item;
   final AdTemplate template;
   final bool showPrice;
@@ -587,194 +699,259 @@ class _AdPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: _getAspectRatio(),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          gradient: DesignTokens.brandGradient,
-          borderRadius: DesignTokens.borderRadiusLg,
-          boxShadow: DesignTokens.shadowMd,
-        ),
-        child: Stack(
-          children: [
-            // Background image
-            if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 0.3,
-                  child: Image.network(
-                    item.imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(),
-                  ),
-                ),
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shortestSide = constraints.biggest.shortestSide;
+          final longestSide = constraints.biggest.longestSide;
+          final edgePadding = (shortestSide * 0.08).clamp(12.0, 28.0);
+          final imageSize = template == AdTemplate.minimal
+              ? 0.0
+              : (shortestSide * (template == AdTemplate.story ? 0.46 : 0.34))
+                    .clamp(84.0, 168.0);
+          final titleSize = (shortestSide *
+                  (template == AdTemplate.story ? 0.11 : 0.085))
+              .clamp(18.0, template == AdTemplate.story ? 30.0 : 26.0);
+          final priceSize = (shortestSide * 0.08).clamp(16.0, 22.0);
+          final chipFontSize = (shortestSide * 0.042).clamp(11.0, 14.0);
+          final qrSize = (shortestSide * 0.24).clamp(42.0, 76.0);
+          final bottomLabelSize = (shortestSide * 0.04).clamp(10.0, 13.0);
+          final showQrBlock = showQr && shortestSide >= 180 && longestSide >= 240;
 
-            // Content
-            Padding(
-              padding: DesignTokens.paddingLg,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Top row
-                  Row(
+          return Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              gradient: DesignTokens.brandGradient,
+              borderRadius: DesignTokens.borderRadiusLg,
+              boxShadow: DesignTokens.shadowMd,
+            ),
+            child: Stack(
+              children: [
+                if (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.3,
+                      child: OfflineCachedImage(
+                        imageUrl: item.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: const SizedBox(),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: EdgeInsets.all(edgePadding),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DesignTokens.spaceSm,
-                          vertical: DesignTokens.spaceXs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: DesignTokens.borderRadiusSm,
-                        ),
-                        child: Text('Soko 24', style: DesignTokens.textSmallLight),
-                      ),
-                      if (discount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: DesignTokens.spaceSm,
-                            vertical: DesignTokens.spaceXs,
-                          ),
-                          decoration: BoxDecoration(
-                            color: DesignTokens.error,
-                            borderRadius: DesignTokens.borderRadiusSm,
-                          ),
-                          child: Text(
-                            '${discount.toStringAsFixed(0)}% OFF',
-                            style: DesignTokens.textSmallLight.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  // Center content
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Product image
-                        if (item.imageUrl != null && item.imageUrl!.isNotEmpty && template != AdTemplate.minimal)
-                          Container(
-                            width: 120,
-                            height: 120,
-                            margin: const EdgeInsets.only(bottom: DesignTokens.spaceMd),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: DesignTokens.borderRadiusMd,
-                              boxShadow: DesignTokens.shadowMd,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (showBrand)
+                            Flexible(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: (edgePadding * 0.55).clamp(
+                                    6.0,
+                                    12.0,
+                                  ),
+                                  vertical: (edgePadding * 0.28).clamp(
+                                    4.0,
+                                    8.0,
+                                  ),
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: DesignTokens.borderRadiusSm,
+                                ),
+                                child: Text(
+                                  'Soko 24',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: DesignTokens.textSmallLight.copyWith(
+                                    fontSize: chipFontSize,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                          if (discount > 0)
+                            Container(
+                              margin: EdgeInsets.only(
+                                left: showBrand ? 8 : 0,
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: (edgePadding * 0.55).clamp(
+                                  6.0,
+                                  12.0,
+                                ),
+                                vertical: (edgePadding * 0.28).clamp(
+                                  4.0,
+                                  8.0,
+                                ),
+                              ),
+                              decoration: BoxDecoration(
+                                color: DesignTokens.error,
+                                borderRadius: DesignTokens.borderRadiusSm,
+                              ),
+                              child: Text(
+                                '${discount.toStringAsFixed(0)}% OFF',
+                                style: DesignTokens.textSmallLight.copyWith(
+                                  fontSize: chipFontSize,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Image.network(
-                              item.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.image,
-                                size: 48,
-                                color: DesignTokens.grayMedium,
+                        ],
+                      ),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (imageSize > 0 &&
+                                item.imageUrl != null &&
+                                item.imageUrl!.isNotEmpty)
+                              Container(
+                                width: imageSize,
+                                height: imageSize,
+                                margin: EdgeInsets.only(
+                                  bottom: (edgePadding * 0.7).clamp(8.0, 18.0),
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: DesignTokens.borderRadiusMd,
+                                  boxShadow: DesignTokens.shadowMd,
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: OfflineCachedImage(
+                                  imageUrl: item.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorWidget: Icon(
+                                    Icons.image,
+                                    size: (imageSize * 0.4).clamp(28.0, 56.0),
+                                    color: DesignTokens.grayMedium,
+                                  ),
+                                ),
+                              ),
+                            Text(
+                              item.name,
+                              textAlign: TextAlign.center,
+                              style: DesignTokens.textTitleLight.copyWith(
+                                fontSize: titleSize,
+                                height: 1.05,
+                              ),
+                              maxLines: template == AdTemplate.story ? 3 : 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(
+                              height: (edgePadding * 0.7).clamp(8.0, 18.0),
+                            ),
+                            if (showPrice)
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: (edgePadding * 0.95).clamp(
+                                    12.0,
+                                    22.0,
+                                  ),
+                                  vertical: (edgePadding * 0.55).clamp(
+                                    8.0,
+                                    14.0,
+                                  ),
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: DesignTokens.borderRadiusMd,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (discount > 0)
+                                      Text(
+                                        'UGX ${(item.price / (1 - discount / 100)).toStringAsFixed(0)}',
+                                        style: DesignTokens.textSmall.copyWith(
+                                          fontSize: chipFontSize,
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                          color: DesignTokens.grayMedium,
+                                        ),
+                                      ),
+                                    Text(
+                                      'UGX ${item.price.toStringAsFixed(0)}',
+                                      style: DesignTokens.textBodyBold.copyWith(
+                                        color: DesignTokens.brandPrimary,
+                                        fontSize: priceSize,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (showStock && item.stockQty > 0)
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  top: (edgePadding * 0.45).clamp(6.0, 12.0),
+                                ),
+                                child: Text(
+                                  '${item.stockQty} in stock',
+                                  style: DesignTokens.textSmallLight.copyWith(
+                                    fontSize: chipFontSize,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (showQrBlock)
+                            Container(
+                              padding: EdgeInsets.all(
+                                (edgePadding * 0.35).clamp(4.0, 8.0),
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: DesignTokens.borderRadiusSm,
+                              ),
+                              child: QrImageView(
+                                data: 'https://soko24.co/product/${item.id}',
+                                version: QrVersions.auto,
+                                size: qrSize,
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                          Expanded(
+                            child: Text(
+                              'soko24.co',
+                              textAlign: TextAlign.end,
+                              style: DesignTokens.textSmallLight.copyWith(
+                                fontSize: bottomLabelSize,
                               ),
                             ),
                           ),
-
-                        // Product name
-                        Text(
-                          item.name,
-                          textAlign: TextAlign.center,
-                          style: DesignTokens.textTitleLight.copyWith(
-                            fontSize: template == AdTemplate.story ? 28 : 24,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-
-                        const SizedBox(height: DesignTokens.spaceMd),
-
-                        // Price
-                        if (showPrice)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: DesignTokens.spaceLg,
-                              vertical: DesignTokens.spaceSm,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: DesignTokens.borderRadiusMd,
-                            ),
-                            child: Column(
-                              children: [
-                                if (discount > 0)
-                                  Text(
-                                    'UGX ${(item.price / (1 - discount / 100)).toStringAsFixed(0)}',
-                                    style: DesignTokens.textSmall.copyWith(
-                                      decoration: TextDecoration.lineThrough,
-                                      color: DesignTokens.grayMedium,
-                                    ),
-                                  ),
-                                Text(
-                                  'UGX ${item.price.toStringAsFixed(0)}',
-                                  style: DesignTokens.textBodyBold.copyWith(
-                                    color: DesignTokens.brandPrimary,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Stock
-                        if (showStock && item.stockQty > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(top: DesignTokens.spaceSm),
-                            child: Text(
-                              '${item.stockQty} in stock',
-                              style: DesignTokens.textSmallLight,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // Bottom row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (showQr)
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: DesignTokens.borderRadiusSm,
-                          ),
-                          child: QrImageView(
-                            data: 'https://soko24.co/product/${item.id}',
-                            version: QrVersions.auto,
-                            size: 64,
-                          ),
-                        )
-                      else
-                        const SizedBox(),
-                      Text(
-                        'soko24.co',
-                        style: DesignTokens.textSmallLight,
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   double _getAspectRatio() {
     switch (template) {
-      case AdTemplate.story: return 9 / 16;
-      case AdTemplate.square: return 1;
-      case AdTemplate.banner: return 16 / 9;
-      case AdTemplate.minimal: return 1;
+      case AdTemplate.story:
+        return 9 / 16;
+      case AdTemplate.square:
+        return 1;
+      case AdTemplate.banner:
+        return 16 / 9;
+      case AdTemplate.minimal:
+        return 1;
     }
   }
 }
@@ -788,7 +965,11 @@ class _EmptyProductsState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.image_not_supported, size: 64, color: DesignTokens.grayMedium),
+            Icon(
+              Icons.image_not_supported,
+              size: 64,
+              color: DesignTokens.grayMedium,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             Text('No Products Yet', style: DesignTokens.textBodyBold),
             const SizedBox(height: DesignTokens.spaceSm),

@@ -10,6 +10,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../widgets/offline_cached_image.dart';
 import 'service_bookings_screen.dart';
 import 'service_variants_screen.dart';
 
@@ -20,7 +21,8 @@ class ServiceDetailScreen extends ConsumerStatefulWidget {
   final String serviceId;
 
   @override
-  ConsumerState<ServiceDetailScreen> createState() => _ServiceDetailScreenState();
+  ConsumerState<ServiceDetailScreen> createState() =>
+      _ServiceDetailScreenState();
 }
 
 class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
@@ -49,8 +51,12 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     if (service == null) return;
 
     final titleCtrl = TextEditingController(text: service.title);
-    final priceCtrl = TextEditingController(text: service.price.toStringAsFixed(0));
-    final descriptionCtrl = TextEditingController(text: service.description ?? '');
+    final priceCtrl = TextEditingController(
+      text: service.price.toStringAsFixed(0),
+    );
+    final descriptionCtrl = TextEditingController(
+      text: service.description ?? '',
+    );
     final durationCtrl = TextEditingController(
       text: service.durationMinutes?.toString() ?? '',
     );
@@ -138,7 +144,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                       final sync = ref.read(syncServiceProvider);
 
                       await db.upsertService(
-                        service.toCompanion(true).copyWith(
+                        service
+                            .toCompanion(true)
+                            .copyWith(
                               title: Value(title),
                               price: Value(price),
                               description: description.isEmpty
@@ -270,10 +278,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
       appBar: AppBar(
         title: Text(service.title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _showEditService,
-          ),
+          IconButton(icon: const Icon(Icons.edit), onPressed: _showEditService),
         ],
       ),
       body: ListView(
@@ -288,13 +293,12 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 32,
-                        backgroundColor: DesignTokens.brandPrimary,
-                        child: const Icon(
-                          Icons.room_service_outlined,
-                          color: Colors.white,
-                          size: 32,
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _ServiceArtwork(
+                          title: service.title,
+                          imageUrl: service.imageUrl,
+                          size: 64,
                         ),
                       ),
                       const SizedBox(width: DesignTokens.spaceMd),
@@ -385,9 +389,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           // Edit Service
           Card(
             child: ListTile(
-              leading: const CircleAvatar(
-                child: Icon(Icons.edit_outlined),
-              ),
+              leading: const CircleAvatar(child: Icon(Icons.edit_outlined)),
               title: const Text('Edit Service'),
               subtitle: const Text('Update name, price, and details'),
               trailing: const Icon(Icons.chevron_right),
@@ -400,9 +402,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           // Manage Variants
           Card(
             child: ListTile(
-              leading: const CircleAvatar(
-                child: Icon(Icons.style_outlined),
-              ),
+              leading: const CircleAvatar(child: Icon(Icons.style_outlined)),
               title: const Text('Pricing Variants'),
               subtitle: const Text('Manage different pricing options'),
               trailing: const Icon(Icons.chevron_right),
@@ -422,7 +422,10 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: DesignTokens.brandAccent,
-                child: const Icon(Icons.event_note_outlined, color: Colors.white),
+                child: const Icon(
+                  Icons.event_note_outlined,
+                  color: Colors.white,
+                ),
               ),
               title: const Text('Bookings'),
               subtitle: const Text('View customer bookings for this service'),
@@ -478,6 +481,49 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
   }
 }
 
+class _ServiceArtwork extends StatelessWidget {
+  const _ServiceArtwork({
+    required this.title,
+    required this.imageUrl,
+    required this.size,
+  });
+
+  final String title;
+  final String? imageUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = imageUrl?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return OfflineCachedImage(
+        imageUrl: raw,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholder: _fallback(),
+        errorWidget: _fallback(),
+      );
+    }
+
+    return _fallback();
+  }
+
+  Widget _fallback() {
+    return Container(
+      width: size,
+      height: size,
+      color: DesignTokens.brandPrimary,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.room_service_outlined,
+        color: Colors.white,
+        size: 32,
+      ),
+    );
+  }
+}
+
 class _StatItem extends StatelessWidget {
   const _StatItem({
     required this.icon,
@@ -495,10 +541,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Icon(icon, color: DesignTokens.brandPrimary),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: DesignTokens.textTitleMedium,
-        ),
+        Text(value, style: DesignTokens.textTitleMedium),
         Text(
           label,
           style: DesignTokens.textSmall.copyWith(

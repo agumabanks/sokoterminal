@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs}"
-ADB_SOCKET="${ADB_SERVER_SOCKET:-tcp:127.0.0.1:15037}"
+ADB_SOCKET="${ADB_SERVER_SOCKET:-tcp:127.0.0.1:5038}"
 DEVICE_ID="${1:-${DEVICE_ID:-}}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOG_DIR/flutter_run_$TIMESTAMP.log"

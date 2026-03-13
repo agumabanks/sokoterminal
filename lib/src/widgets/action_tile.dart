@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/theme/design_tokens.dart';
 
 /// A unified action tile for list-style navigation.
-/// 
+///
 /// Used in the More screen and similar menus for consistent
 /// navigation and action items.
 class ActionTile extends StatelessWidget {
@@ -114,11 +114,7 @@ class ActionTile extends StatelessWidget {
 }
 
 class _IconContainer extends StatelessWidget {
-  const _IconContainer({
-    required this.icon,
-    this.color,
-    this.backgroundColor,
-  });
+  const _IconContainer({required this.icon, this.color, this.backgroundColor});
 
   final IconData icon;
   final Color? color;
@@ -127,7 +123,8 @@ class _IconContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveColor = color ?? DesignTokens.brandPrimary;
-    final effectiveBackground = backgroundColor ?? effectiveColor.withValues(alpha: 0.1);
+    final effectiveBackground =
+        backgroundColor ?? effectiveColor.withValues(alpha: 0.1);
 
     return Container(
       width: 44,
@@ -136,11 +133,7 @@ class _IconContainer extends StatelessWidget {
         color: effectiveBackground,
         borderRadius: DesignTokens.borderRadiusMd,
       ),
-      child: Icon(
-        icon,
-        color: effectiveColor,
-        size: DesignTokens.iconMd,
-      ),
+      child: Icon(icon, color: effectiveColor, size: DesignTokens.iconMd),
     );
   }
 }
@@ -191,11 +184,7 @@ class ActionTileCompact extends StatelessWidget {
                       color: effectiveColor.withValues(alpha: 0.1),
                       borderRadius: DesignTokens.borderRadiusSm,
                     ),
-                    child: Icon(
-                      icon,
-                      color: effectiveColor,
-                      size: 20,
-                    ),
+                    child: Icon(icon, color: effectiveColor, size: 20),
                   ),
                   const Spacer(),
                   Text(

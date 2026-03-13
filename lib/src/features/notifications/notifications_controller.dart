@@ -1,15 +1,19 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
 import '../../core/app_providers.dart';
+import '../../core/config/build_metadata.dart';
 import '../../core/network/seller_api.dart';
 
 final notificationsControllerProvider =
     StateNotifierProvider<NotificationsController, NotificationsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return NotificationsController(ref, api)..bootstrap();
-});
+      final api = ref.watch(sellerApiProvider);
+      return NotificationsController(ref, api)..bootstrap();
+    });
 
 class NotificationDto {
   NotificationDto({
@@ -34,11 +38,16 @@ class NotificationDto {
     return NotificationDto(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
-      body: (json['notification_text'] ?? '').toString(),
-      dateLabel: (json['date'] ?? '').toString(),
+      body: (json['body'] ?? json['notification_text'] ?? '').toString(),
+      dateLabel: (json['created_at'] ?? json['date'] ?? '').toString(),
       image: json['image']?.toString(),
-      data: json['data'] is Map<String, dynamic> ? Map<String, dynamic>.from(json['data']) : const {},
-      isRead: json['is_read'] == true || json['is_read']?.toString() == '1',
+      data: json['data'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(json['data'])
+          : const {},
+      isRead:
+          json['status'] == 'read' ||
+          json['is_read'] == true ||
+          json['is_read']?.toString() == '1',
     );
   }
 }
@@ -76,27 +85,60 @@ class NotificationsState {
 }
 
 class NotificationsController extends StateNotifier<NotificationsState> {
-  NotificationsController(this.ref, this.api) : super(const NotificationsState());
+  NotificationsController(this.ref, this.api)
+    : super(const NotificationsState());
   final Ref ref;
   final SellerApi api;
+  final List<StreamSubscription> _subscriptions = [];
+
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+    super.dispose();
+  }
 
   Future<void> bootstrap() async {
     try {
       final messaging = FirebaseMessaging.instance;
+      final appVersion = BuildMetadata.appVersion;
       await messaging.requestPermission();
       final token = await messaging.getToken();
       if (token != null) {
-        await api.updateDeviceToken(token);
+        await api.registerDeviceToken(
+          token: token,
+          platform: BuildMetadata.notificationPlatform(),
+          appVersion: appVersion,
+        );
         state = state.copyWith(token: token);
       }
 
-      FirebaseMessaging.onMessage.listen((message) {
-        load();
-      });
+      // Refresh token if it changes
+      _subscriptions.add(
+        FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+          await api.registerDeviceToken(
+            token: newToken,
+            platform: BuildMetadata.notificationPlatform(),
+            appVersion: appVersion,
+          );
+          state = state.copyWith(token: newToken);
+        }),
+      );
 
-      FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        _handleNotificationRoute(message.data);
-      });
+      _subscriptions.add(
+        FirebaseMessaging.onMessage.listen((message) {
+          _ingestForegroundMessage(message);
+        }),
+      );
+
+      _subscriptions.add(
+        FirebaseMessaging.onMessageOpenedApp.listen((message) {
+          _ingestForegroundMessage(message, showToast: false);
+          _handleNotificationRoute(message.data);
+        }),
+      );
 
       await load();
     } catch (e) {
@@ -108,21 +150,31 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     state = state.copyWith(loading: true, error: null);
     try {
       final res = await api.fetchNotifications();
-      final data = res.data;
-      final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
-      final items = list
+      final responseData = res.data;
+
+      // Handle new API response structure: {success, data: [...], meta: {...}, unread_count}
+      List items = [];
+      int unreadCount = 0;
+
+      if (responseData is Map<String, dynamic>) {
+        if (responseData['data'] is List) {
+          items = responseData['data'] as List;
+        }
+        unreadCount =
+            int.tryParse(responseData['unread_count']?.toString() ?? '') ?? 0;
+      }
+
+      final notifications = items
           .whereType<Map>()
           .map((e) => NotificationDto.fromJson(Map<String, dynamic>.from(e)))
           .where((e) => e.id.isNotEmpty)
           .toList();
 
-      final unreadRes = await api.fetchUnreadNotifications();
-      final unreadData = unreadRes.data;
-      final unreadCount = unreadData is Map<String, dynamic>
-          ? int.tryParse(unreadData['count']?.toString() ?? '') ?? 0
-          : 0;
-
-      state = state.copyWith(loading: false, items: items, unreadCount: unreadCount);
+      state = state.copyWith(
+        loading: false,
+        items: notifications,
+        unreadCount: unreadCount,
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
@@ -144,7 +196,7 @@ class NotificationsController extends StateNotifier<NotificationsState> {
               isRead: true,
             )
           else
-            item
+            item,
       ];
       state = state.copyWith(items: updated);
       await refreshUnread();
@@ -164,7 +216,7 @@ class NotificationsController extends StateNotifier<NotificationsState> {
             image: item.image,
             data: item.data,
             isRead: true,
-          )
+          ),
       ];
       state = state.copyWith(items: updated, unreadCount: 0);
     } catch (_) {}
@@ -174,7 +226,7 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     // Optimistically remove from UI
     final updated = state.items.where((i) => i.id != notificationId).toList();
     state = state.copyWith(items: updated);
-    
+
     try {
       await api.deleteNotification(notificationId);
       await refreshUnread();
@@ -186,10 +238,10 @@ class NotificationsController extends StateNotifier<NotificationsState> {
 
   Future<void> refreshUnread() async {
     try {
-      final res = await api.fetchUnreadNotifications();
+      final res = await api.fetchUnreadNotificationCount();
       final data = res.data;
       final count = data is Map<String, dynamic>
-          ? int.tryParse(data['count']?.toString() ?? '') ?? 0
+          ? int.tryParse(data['unread_count']?.toString() ?? '') ?? 0
           : 0;
       state = state.copyWith(unreadCount: count);
     } catch (_) {}
@@ -199,8 +251,70 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     _handleNotificationRoute(notification.data);
   }
 
+  void _ingestForegroundMessage(
+    RemoteMessage message, {
+    bool showToast = true,
+  }) {
+    final title =
+        message.notification?.title?.trim() ??
+        message.data['title']?.toString().trim() ??
+        'New notification';
+    final body =
+        message.notification?.body?.trim() ??
+        message.data['body']?.toString().trim() ??
+        '';
+    final data = Map<String, dynamic>.from(message.data);
+    final item = NotificationDto(
+      id:
+          message.messageId ??
+          'push_${DateTime.now().microsecondsSinceEpoch.toString()}',
+      title: title,
+      body: body,
+      dateLabel: DateTime.now().toIso8601String(),
+      image: null,
+      data: data,
+      isRead: false,
+    );
+
+    final alreadyPresent = state.items.any((n) => n.id == item.id);
+    state = state.copyWith(
+      items: alreadyPresent ? state.items : [item, ...state.items],
+      unreadCount: state.unreadCount + (alreadyPresent ? 0 : 1),
+    );
+
+    if (showToast) {
+      final messenger = rootScaffoldMessengerKey.currentState;
+      if (messenger != null) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(body.isEmpty ? title : '$title\n$body'),
+              action: SnackBarAction(
+                label: 'Open',
+                onPressed: () => _handleNotificationRoute(data),
+              ),
+            ),
+          );
+      }
+    }
+
+    load();
+  }
+
   void _handleNotificationRoute(Map<String, dynamic> data) {
     final router = ref.read(routerProvider);
+    final screen = data['screen']?.toString().toLowerCase();
+    if (screen == 'bulk_sms') {
+      router.go('/home/more/bulk-sms');
+      return;
+    }
+    if (screen == 'sanaa_wallet' ||
+        screen == 'seller_wallet' ||
+        screen == 'wallet') {
+      router.go('/home/more/wallet');
+      return;
+    }
     final convoId = data['conversation_id']?.toString();
     if (convoId != null && convoId.isNotEmpty) {
       router.go('/home/more/chat/$convoId');

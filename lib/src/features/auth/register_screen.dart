@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/sync/sync_service.dart';
+import '../../core/settings/business_setup_prefs.dart';
 import '../../core/util/country_codes.dart';
 import 'auth_controller.dart';
 
@@ -34,22 +34,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   // Palette
   static const Color _bg = Color(0xFF000000);
-  static const Color _surface = Color(0xFF0B0B10);
-  static const Color _glass = Color(0xFF101018);
-  static const Color _stroke = Color(0x22FFFFFF);
-  static const Color _strokeStrong = Color(0x44FFFFFF);
   static const Color _accent = Color(0xFF6C63FF);
 
   @override
   void initState() {
     super.initState();
 
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.black,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
 
     _nameFocus.addListener(() => mounted ? setState(() {}) : null);
     _phoneFocus.addListener(() => mounted ? setState(() {}) : null);
@@ -77,8 +75,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final auth = ref.watch(authControllerProvider);
     final isLoading = auth.status == AuthStatus.loading;
 
-    final bool showError = auth.status == AuthStatus.error && auth.message != null;
-    final bool showSuccess = auth.status == AuthStatus.unauthenticated &&
+    final bool showError =
+        auth.status == AuthStatus.error && auth.message != null;
+    final bool showSuccess =
+        auth.status == AuthStatus.unauthenticated &&
         auth.message != null &&
         auth.message!.contains('created');
 
@@ -94,11 +94,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    _bg,
-                    Color(0xFF05050A),
-                    _bg,
-                  ],
+                  colors: [_bg, Color(0xFF05050A), _bg],
                 ),
               ),
             ),
@@ -112,7 +108,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             Positioned(
               bottom: -160,
               left: -130,
-              child: _GlowBlob(color: Colors.white.withOpacity(0.06), size: 520),
+              child: _GlowBlob(
+                color: Colors.white.withOpacity(0.06),
+                size: 520,
+              ),
             ),
 
             SafeArea(
@@ -186,10 +185,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 label: 'Full name',
                                 icon: Icons.person_outline_rounded,
                               ),
-                              onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
+                              onFieldSubmitted: (_) =>
+                                  _phoneFocus.requestFocus(),
                               validator: (value) {
-                                if (value == null || value.trim().isEmpty) return 'Name is required';
-                                if (value.trim().length < 2) return 'Name is too short';
+                                if (value == null || value.trim().isEmpty)
+                                  return 'Name is required';
+                                if (value.trim().length < 2)
+                                  return 'Name is too short';
                                 return null;
                               },
                             ),
@@ -225,14 +227,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     color: Colors.white.withOpacity(0.35),
                                     size: 20,
                                   ),
-                                  onPressed: () =>
-                                      setState(() => _obscurePassword = !_obscurePassword),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
                                 ),
                               ),
-                              onFieldSubmitted: (_) => _confirmFocus.requestFocus(),
+                              onFieldSubmitted: (_) =>
+                                  _confirmFocus.requestFocus(),
                               validator: (value) {
-                                if (value == null || value.isEmpty) return 'Password is required';
-                                if (value.length < 6) return 'Password must be at least 6 characters';
+                                if (value == null || value.isEmpty)
+                                  return 'Password is required';
+                                if (value.length < 6)
+                                  return 'Password must be at least 6 characters';
                                 return null;
                               },
                             ),
@@ -265,14 +271,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     color: Colors.white.withOpacity(0.35),
                                     size: 20,
                                   ),
-                                  onPressed: () =>
-                                      setState(() => _obscureConfirm = !_obscureConfirm),
+                                  onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm,
+                                  ),
                                 ),
                               ),
-                              onFieldSubmitted: (_) => _handleRegister(isLoading: isLoading),
+                              onFieldSubmitted: (_) =>
+                                  _handleRegister(isLoading: isLoading),
                               validator: (value) {
-                                if (value == null || value.isEmpty) return 'Please confirm your password';
-                                if (value != _passwordController.text) return 'Passwords do not match';
+                                if (value == null || value.isEmpty)
+                                  return 'Please confirm your password';
+                                if (value != _passwordController.text)
+                                  return 'Passwords do not match';
                                 return null;
                               },
                             ),
@@ -281,7 +291,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           if (showError || showSuccess) ...[
                             const SizedBox(height: 18),
                             _StatusPill(
-                              type: showError ? _StatusType.error : _StatusType.success,
+                              type: showError
+                                  ? _StatusType.error
+                                  : _StatusType.success,
                               message: auth.message!,
                             ),
                           ],
@@ -301,7 +313,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             children: [
                               Text(
                                 'Already have an account? ',
-                                style: TextStyle(color: Colors.white.withOpacity(0.50), fontSize: 14),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.50),
+                                  fontSize: 14,
+                                ),
                               ),
                               GestureDetector(
                                 onTap: () => context.go('/login'),
@@ -357,8 +372,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontWeight: FontWeight.w500),
-      floatingLabelStyle: TextStyle(color: Colors.white.withOpacity(0.65), fontWeight: FontWeight.w600),
+      labelStyle: TextStyle(
+        color: Colors.white.withOpacity(0.35),
+        fontWeight: FontWeight.w500,
+      ),
+      floatingLabelStyle: TextStyle(
+        color: Colors.white.withOpacity(0.65),
+        fontWeight: FontWeight.w600,
+      ),
       suffixIcon: suffix,
     );
   }
@@ -372,13 +393,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         children: [
           InkWell(
             onTap: _showCountryPicker,
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(22),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_selectedCountry.flag, style: const TextStyle(fontSize: 20)),
+                  Text(
+                    _selectedCountry.flag,
+                    style: const TextStyle(fontSize: 20),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     _selectedCountry.code,
@@ -390,12 +416,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.white.withOpacity(0.45)),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 18,
+                    color: Colors.white.withOpacity(0.45),
+                  ),
                 ],
               ),
             ),
           ),
-          Container(width: 1, height: 26, color: Colors.white.withOpacity(0.10)),
+          Container(
+            width: 1,
+            height: 26,
+            color: Colors.white.withOpacity(0.10),
+          ),
           Expanded(
             child: TextFormField(
               controller: _phoneController,
@@ -416,13 +450,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               decoration: InputDecoration(
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 18,
+                ),
                 filled: false,
                 fillColor: Colors.transparent,
                 labelText: 'Phone number',
-                labelStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontWeight: FontWeight.w500),
-                floatingLabelStyle:
-                    TextStyle(color: Colors.white.withOpacity(0.65), fontWeight: FontWeight.w600),
+                labelStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontWeight: FontWeight.w500,
+                ),
+                floatingLabelStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontWeight: FontWeight.w600,
+                ),
                 hintText: '706272481',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.18)),
               ),
@@ -441,7 +483,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _showCountryPicker() async {
-    final selected = await showCountryPickerBottomSheet(context, _selectedCountry);
+    final selected = await showCountryPickerBottomSheet(
+      context,
+      _selectedCountry,
+    );
     if (selected != null) {
       setState(() => _selectedCountry = selected);
     }
@@ -463,7 +508,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     if (state.status == AuthStatus.authenticated) {
-      if (mounted) context.go('/onboarding');
+      await ref
+          .read(businessSetupCompletedProvider.notifier)
+          .markSetupRequired();
+      if (mounted) context.go('/home/more/business-setup');
     }
   }
 }
@@ -488,7 +536,11 @@ class _BackPill extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0x22FFFFFF)),
             ),
-            child: Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white.withOpacity(0.85)),
+            child: Icon(
+              Icons.arrow_back_ios_new,
+              size: 18,
+              color: Colors.white.withOpacity(0.85),
+            ),
           ),
         ),
       ),
@@ -518,7 +570,10 @@ class _GlassField extends StatelessWidget {
           decoration: BoxDecoration(
             color: _glass.withOpacity(0.62),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: focused ? _strokeStrong : _stroke, width: 1),
+            border: Border.all(
+              color: focused ? _strokeStrong : _stroke,
+              width: 1,
+            ),
             boxShadow: focused
                 ? [
                     BoxShadow(
@@ -552,7 +607,9 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color tint = type == _StatusType.error ? const Color(0xFFFF453A) : const Color(0xFF34C759);
+    final Color tint = type == _StatusType.error
+        ? const Color(0xFFFF453A)
+        : const Color(0xFF34C759);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -568,7 +625,9 @@ class _StatusPill extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                type == _StatusType.error ? Icons.error_outline : Icons.check_circle_outline,
+                type == _StatusType.error
+                    ? Icons.error_outline
+                    : Icons.check_circle_outline,
                 color: tint.withOpacity(0.95),
                 size: 18,
               ),
@@ -594,7 +653,11 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _PrimaryButton extends StatefulWidget {
-  const _PrimaryButton({required this.text, required this.isLoading, required this.onTap});
+  const _PrimaryButton({
+    required this.text,
+    required this.isLoading,
+    required this.onTap,
+  });
 
   final String text;
   final bool isLoading;
@@ -630,15 +693,26 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
-              BoxShadow(color: Colors.white.withOpacity(0.10), blurRadius: 30, offset: const Offset(0, 14)),
-              BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 16)),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.10),
+                blurRadius: 30,
+                offset: const Offset(0, 14),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 16),
+              ),
             ],
           ),
           child: widget.isLoading
               ? const SizedBox(
                   height: 20,
                   width: 20,
-                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: Colors.black,
+                    strokeWidth: 2,
+                  ),
                 )
               : Text(
                   widget.text,
@@ -669,7 +743,11 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: [
-          BoxShadow(color: color.withOpacity(0.55), blurRadius: 120, spreadRadius: 30),
+          BoxShadow(
+            color: color.withOpacity(0.55),
+            blurRadius: 120,
+            spreadRadius: 30,
+          ),
         ],
       ),
     );

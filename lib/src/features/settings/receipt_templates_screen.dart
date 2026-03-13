@@ -25,19 +25,18 @@ class TemplatesState {
     bool? loading,
     List<ReceiptTemplate>? templates,
     String? error,
-  }) =>
-      TemplatesState(
-        loading: loading ?? this.loading,
-        templates: templates ?? this.templates,
-        error: error,
-      );
+  }) => TemplatesState(
+    loading: loading ?? this.loading,
+    templates: templates ?? this.templates,
+    error: error,
+  );
 }
 
 final receiptTemplatesProvider =
     StateNotifierProvider<ReceiptTemplatesController, TemplatesState>((ref) {
-  final db = ref.watch(appDatabaseProvider);
-  return ReceiptTemplatesController(db)..load();
-});
+      final db = ref.watch(appDatabaseProvider);
+      return ReceiptTemplatesController(db)..load();
+    });
 
 class ReceiptTemplatesController extends StateNotifier<TemplatesState> {
   ReceiptTemplatesController(this._db) : super(const TemplatesState());
@@ -47,9 +46,9 @@ class ReceiptTemplatesController extends StateNotifier<TemplatesState> {
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final templates = await (_db.select(_db.receiptTemplates)
-            ..orderBy([(t) => OrderingTerm.desc(t.isActive)]))
-          .get();
+      final templates = await (_db.select(
+        _db.receiptTemplates,
+      )..orderBy([(t) => OrderingTerm.desc(t.isActive)])).get();
       state = state.copyWith(loading: false, templates: templates);
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
@@ -59,8 +58,9 @@ class ReceiptTemplatesController extends StateNotifier<TemplatesState> {
   Future<void> setActive(String templateId) async {
     try {
       // Deactivate all
-      await (_db.update(_db.receiptTemplates))
-          .write(const ReceiptTemplatesCompanion(isActive: Value(false)));
+      await (_db.update(
+        _db.receiptTemplates,
+      )).write(const ReceiptTemplatesCompanion(isActive: Value(false)));
       // Activate selected
       await (_db.update(_db.receiptTemplates)
             ..where((t) => t.id.equals(templateId)))
@@ -73,9 +73,9 @@ class ReceiptTemplatesController extends StateNotifier<TemplatesState> {
 
   Future<void> delete(String templateId) async {
     try {
-      await (_db.delete(_db.receiptTemplates)
-            ..where((t) => t.id.equals(templateId)))
-          .go();
+      await (_db.delete(
+        _db.receiptTemplates,
+      )..where((t) => t.id.equals(templateId))).go();
       await load();
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -87,10 +87,12 @@ class ReceiptTemplatesScreen extends ConsumerStatefulWidget {
   const ReceiptTemplatesScreen({super.key});
 
   @override
-  ConsumerState<ReceiptTemplatesScreen> createState() => _ReceiptTemplatesScreenState();
+  ConsumerState<ReceiptTemplatesScreen> createState() =>
+      _ReceiptTemplatesScreenState();
 }
 
-class _ReceiptTemplatesScreenState extends ConsumerState<ReceiptTemplatesScreen> {
+class _ReceiptTemplatesScreenState
+    extends ConsumerState<ReceiptTemplatesScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(receiptTemplatesProvider);
@@ -139,13 +141,15 @@ class _ReceiptTemplatesScreenState extends ConsumerState<ReceiptTemplatesScreen>
             const SizedBox(height: DesignTokens.spaceSm),
             Text(
               'Create a template to customize your receipts',
-              style:
-                  DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
             const SizedBox(height: DesignTokens.spaceLg),
             AppButton(
               label: 'Create Template',
-              onPressed: () => _createTemplate(ref.read(receiptTemplatesProvider.notifier)),
+              onPressed: () =>
+                  _createTemplate(ref.read(receiptTemplatesProvider.notifier)),
             ),
           ],
         ),
@@ -267,7 +271,11 @@ class _TemplateCard extends StatelessWidget {
                       color: DesignTokens.grayMedium,
                     ),
                     if (template.showLogo)
-                      Icon(Icons.image, size: 12, color: DesignTokens.grayMedium),
+                      Icon(
+                        Icons.image,
+                        size: 12,
+                        color: DesignTokens.grayMedium,
+                      ),
                   ],
                 ),
               ),
@@ -288,7 +296,9 @@ class _TemplateCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: DesignTokens.success.withValues(alpha: 0.1),
+                              color: DesignTokens.success.withValues(
+                                alpha: 0.1,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(

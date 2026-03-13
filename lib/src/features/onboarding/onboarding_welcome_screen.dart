@@ -10,10 +10,12 @@ class OnboardingWelcomeScreen extends ConsumerStatefulWidget {
   const OnboardingWelcomeScreen({super.key});
 
   @override
-  ConsumerState<OnboardingWelcomeScreen> createState() => _OnboardingWelcomeScreenState();
+  ConsumerState<OnboardingWelcomeScreen> createState() =>
+      _OnboardingWelcomeScreenState();
 }
 
-class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScreen> {
+class _OnboardingWelcomeScreenState
+    extends ConsumerState<OnboardingWelcomeScreen> {
   bool _isLoading = false;
 
   @override
@@ -27,7 +29,7 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              
+
               // Success Icon
               Container(
                 width: 120,
@@ -43,10 +45,10 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               const Text(
                 'Your Shop is Ready!',
-               textAlign: TextAlign.center,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
@@ -54,14 +56,14 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               Text(
                 'Start selling and growing your business',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 18, color: Colors.grey[600]),
               ),
               const SizedBox(height: 48),
-              
+
               // Quick Tips
               _buildTipCard(
                 icon: Icons.inventory_2_outlined,
@@ -70,7 +72,7 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
                 color: const Color(0xFF2196F3),
               ),
               const SizedBox(height: 16),
-              
+
               _buildTipCard(
                 icon: Icons.point_of_sale_outlined,
                 title: 'Make Your First Sale',
@@ -78,7 +80,7 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
                 color: const Color(0xFFFF9800),
               ),
               const SizedBox(height: 16),
-              
+
               _buildTipCard(
                 icon: Icons.analytics_outlined,
                 title: 'Track Your Performance',
@@ -86,7 +88,7 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
                 color: const Color(0xFF9C27B0),
               ),
               const Spacer(),
-              
+
               // Go to Dashboard Button
               SizedBox(
                 height: 56,
@@ -177,7 +179,7 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
 
   Future<void> _handleGoToDashboard() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Save shop data to backend
       final onboarding = ref.read(onboardingControllerProvider);
@@ -185,20 +187,22 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
         final api = ref.read(sellerApiProvider);
         await api.updateShopInfo(onboarding.shopData);
       }
-      
+
       // Mark onboarding as complete
-      await ref.read(onboardingControllerProvider.notifier).completeOnboarding();
-      
+      await ref
+          .read(onboardingControllerProvider.notifier)
+          .completeOnboarding();
+
       // Start sync service
       ref.read(syncServiceProvider).start();
-      
+
       if (!mounted) return;
-      
+
       // Navigate to dashboard
       context.go('/home/checkout');
     } catch (e) {
       if (!mounted) return;
-      
+
       // Show error but allow proceeding
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -206,7 +210,9 @@ class _OnboardingWelcomeScreenState extends ConsumerState<OnboardingWelcomeScree
           action: SnackBarAction(
             label: 'Continue Anyway',
             onPressed: () {
-              ref.read(onboardingControllerProvider.notifier).completeOnboarding();
+              ref
+                  .read(onboardingControllerProvider.notifier)
+                  .completeOnboarding();
               ref.read(syncServiceProvider).start();
               context.go('/home/checkout');
             },

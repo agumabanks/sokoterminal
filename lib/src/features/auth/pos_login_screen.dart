@@ -66,9 +66,38 @@ class _PosLoginScreenState extends ConsumerState<PosLoginScreen> {
             ),
             const SizedBox(height: DesignTokens.spaceMd),
             if ((session.error ?? '').trim().isNotEmpty)
-              Text(
-                session.error!,
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceMd,
+                  vertical: DesignTokens.spaceSm,
+                ),
+                decoration: BoxDecoration(
+                  color: DesignTokens.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: DesignTokens.error.withValues(alpha: 0.22),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: DesignTokens.error,
+                      size: 18,
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: Text(
+                        session.error!,
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             const Spacer(),
             ElevatedButton.icon(
@@ -84,8 +113,18 @@ class _PosLoginScreenState extends ConsumerState<PosLoginScreen> {
             ),
             const SizedBox(height: DesignTokens.spaceSm),
             OutlinedButton(
-              onPressed: () => context.go(widget.redirectTo ?? '/home/checkout'),
-              child: const Text('Continue offline'),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Offline mode: sales will sync when connection is restored.',
+                    ),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+                context.go(widget.redirectTo ?? '/home/checkout');
+              },
+              child: const Text('Continue offline (limited)'),
             ),
             const SizedBox(height: DesignTokens.spaceLg),
           ],
@@ -110,4 +149,3 @@ class _PosLoginScreenState extends ConsumerState<PosLoginScreen> {
     }
   }
 }
-

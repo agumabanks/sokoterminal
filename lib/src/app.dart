@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/app_providers.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/staff_login_screen.dart';
-import 'features/auth/register_screen.dart';
 import 'features/auth/seller_registration_screen.dart';
 import 'features/auth/post_registration_welcome_provider.dart';
 import 'features/auth/pos_login_screen.dart';
@@ -33,6 +33,7 @@ import 'features/profile/seller_profile_edit_screen.dart';
 import 'features/profile/shop_info_screen.dart';
 import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
+import 'features/wallet/seller_wallet_screen.dart';
 import 'features/auctions/auctions_screen.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/coupons/coupons_screen.dart';
@@ -51,13 +52,11 @@ import 'features/procurement/receive_stock_screen.dart';
 import 'features/procurement/stocktake_screen.dart';
 import 'features/procurement/low_stock_screen.dart';
 import 'features/setup/business_setup_wizard_screen.dart';
-import 'features/onboarding/quick_onboarding_screen.dart';
-import 'features/onboarding/shop_basics_screen.dart';
-import 'features/onboarding/business_details_screen.dart';
-import 'features/onboarding/payment_config_screen.dart';
-import 'features/onboarding/onboarding_welcome_screen.dart';
-import 'core/onboarding/onboarding_controller.dart';
+import 'core/settings/business_setup_prefs.dart';
 import 'features/analytics/analytics_screen.dart';
+import 'features/catalog/catalog_screen.dart';
+
+final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
@@ -69,6 +68,7 @@ class SokoSellerApp extends ConsumerWidget {
       title: 'Soko 24 Seller Terminal',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       routerConfig: router,
     );
   }
@@ -89,17 +89,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onRegister = state.matchedLocation == '/register';
       final onSplash = state.matchedLocation == '/splash';
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
+      final onBusinessSetup =
+          state.matchedLocation == '/home/more/business-setup';
+      final setupCompleted = ref.watch(businessSetupCompletedProvider);
+      final setupRequired =
+          ref
+              .read(sharedPreferencesProvider)
+              .getBool(businessSetupRequiredPrefKey) ??
+          false;
 
       if (onSplash) return null; // Let splash handle logic
-      
-      // Allow onboarding routes when authenticated
-      if (loggedIn && onOnboarding) return null;
+
+      if (loggedIn && onOnboarding) {
+        return '/home/more/business-setup';
+      }
 
       if (!loggedIn && !onLogin && !onRegister) return '/login';
-      if (loggedIn && (onLogin || onRegister)) {
-        final postRegistrationPending =
-            ref.read(postRegistrationWelcomePendingProvider);
+      if (loggedIn && setupRequired && !setupCompleted && !onBusinessSetup) {
+        final postRegistrationPending = ref.read(
+          postRegistrationWelcomePendingProvider,
+        );
         if (onRegister && postRegistrationPending) return null;
+        return '/home/more/business-setup';
+      }
+      if (loggedIn && (onLogin || onRegister)) {
+        final postRegistrationPending = ref.read(
+          postRegistrationWelcomePendingProvider,
+        );
+        if (onRegister && postRegistrationPending) return null;
+        if (setupRequired && !setupCompleted) {
+          return '/home/more/business-setup';
+        }
         return '/home/checkout';
       }
       return null;
@@ -139,27 +159,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const QuickOnboardingScreen(),
+        redirect: (context, state) => '/home/more/business-setup',
       ),
       GoRoute(
         path: '/onboarding/shop-basics',
         name: 'onboarding-shop-basics',
-        builder: (context, state) => const ShopBasicsScreen(),
+        redirect: (context, state) => '/home/more/business-setup',
       ),
       GoRoute(
         path: '/onboarding/business-details',
         name: 'onboarding-business-details',
-        builder: (context, state) => const BusinessDetailsEnhancedScreen(),
+        redirect: (context, state) => '/home/more/business-setup',
       ),
       GoRoute(
         path: '/onboarding/payment-config',
         name: 'onboarding-payment-config',
-        builder: (context, state) => const PaymentConfigScreen(),
+        redirect: (context, state) => '/home/more/business-setup',
       ),
       GoRoute(
         path: '/onboarding/welcome',
         name: 'onboarding-welcome',
-        builder: (context, state) => const OnboardingWelcomeScreen(),
+        redirect: (context, state) => '/home/more/business-setup',
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -258,7 +278,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'chat/:conversationId',
                     name: 'chat-detail',
                     builder: (context, state) {
-                      final convoId = int.tryParse(state.pathParameters['conversationId'] ?? '');
+                      final convoId = int.tryParse(
+                        state.pathParameters['conversationId'] ?? '',
+                      );
                       return ChatScreen(conversationId: convoId);
                     },
                   ),
@@ -271,6 +293,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'orders',
                     name: 'orders',
                     builder: (context, state) => const OrdersScreen(),
+                  ),
+                  GoRoute(
+                    path: 'catalog',
+                    name: 'catalog',
+                    builder: (context, state) => const CatalogScreen(),
                   ),
                   GoRoute(
                     path: 'wholesale',
@@ -359,6 +386,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const PaymentSettingsScreen(),
                   ),
                   GoRoute(
+                    path: 'wallet',
+                    name: 'wallet',
+                    builder: (context, state) => const SellerWalletScreen(),
+                  ),
+                  GoRoute(
                     path: 'verification',
                     name: 'verification',
                     builder: (context, state) => const VerificationScreen(),
@@ -396,7 +428,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'business-setup',
                     name: 'business-setup',
-                    builder: (context, state) => const BusinessSetupWizardScreen(),
+                    builder: (context, state) =>
+                        const BusinessSetupWizardScreen(),
                   ),
                 ],
               ),

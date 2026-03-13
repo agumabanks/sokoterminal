@@ -11,6 +11,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
 import 'service_bookings_screen.dart';
 import 'service_detail_screen.dart';
@@ -45,8 +46,9 @@ class ServicesScreen extends ConsumerWidget {
             onPressed: () async {
               await ref.read(syncServiceProvider).pullSellerServices();
               if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('Services synced')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Services synced')),
+                );
               }
             },
           ),
@@ -55,7 +57,9 @@ class ServicesScreen extends ConsumerWidget {
       body: services.when(
         data: (list) {
           if (list.isEmpty) {
-            return _EmptyServicesView(onAddPressed: () => _showAddService(context, ref));
+            return _EmptyServicesView(
+              onAddPressed: () => _showAddService(context, ref),
+            );
           }
           return RefreshIndicator(
             onRefresh: () => ref.read(syncServiceProvider).pullSellerServices(),
@@ -69,20 +73,24 @@ class ServicesScreen extends ConsumerWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ServiceDetailScreen(serviceId: service.id),
+                      builder: (_) =>
+                          ServiceDetailScreen(serviceId: service.id),
                     ),
                   ),
                   onVariantsTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ServiceVariantsScreen(serviceId: service.id),
+                      builder: (_) =>
+                          ServiceVariantsScreen(serviceId: service.id),
                     ),
                   ),
                   onTogglePublish: (value) async {
                     final db = ref.read(appDatabaseProvider);
                     final sync = ref.read(syncServiceProvider);
                     await db.upsertService(
-                      service.toCompanion(true).copyWith(
+                      service
+                          .toCompanion(true)
+                          .copyWith(
                             publishedOnline: Value(value),
                             synced: const Value(false),
                             updatedAt: Value(DateTime.now().toUtc()),
@@ -91,7 +99,8 @@ class ServicesScreen extends ConsumerWidget {
 
                     final payload = <String, dynamic>{
                       'local_id': service.id,
-                      if (service.remoteId != null) 'remote_id': service.remoteId,
+                      if (service.remoteId != null)
+                        'remote_id': service.remoteId,
                       'title': service.title,
                       'description': service.description,
                       'base_price': service.price,
@@ -186,8 +195,9 @@ class ServicesScreen extends ConsumerWidget {
               onPressed: () async {
                 final title = titleCtrl.text.trim();
                 final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
-                final durationMinutes =
-                    int.tryParse(durationCtrl.text.trim().replaceAll(',', ''));
+                final durationMinutes = int.tryParse(
+                  durationCtrl.text.trim().replaceAll(',', ''),
+                );
                 final description = descriptionCtrl.text.trim();
                 if (title.isEmpty || price <= 0) return;
 
@@ -199,7 +209,9 @@ class ServicesScreen extends ConsumerWidget {
                     id: Value(id),
                     title: title,
                     price: price,
-                    description: description.isEmpty ? const Value.absent() : Value(description),
+                    description: description.isEmpty
+                        ? const Value.absent()
+                        : Value(description),
                     durationMinutes: durationMinutes == null
                         ? const Value.absent()
                         : Value(durationMinutes),
@@ -230,7 +242,9 @@ class ServicesScreen extends ConsumerWidget {
               },
               icon: const Icon(Icons.save),
               label: const Text('Save'),
-              style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+              ),
             ),
           ],
         ),
@@ -262,7 +276,7 @@ class _ServiceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasDescription = service.description?.isNotEmpty == true;
     final description = hasDescription ? service.description!.plainText : null;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceMd),
       decoration: BoxDecoration(
@@ -284,25 +298,13 @@ class _ServiceCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Service Icon with gradient background
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            DesignTokens.brandPrimary,
-                            DesignTokens.brandPrimary.withValues(alpha: 0.7),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.room_service_outlined,
-                        color: Colors.white,
-                        size: 28,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: _ServiceArtwork(
+                        title: service.title,
+                        imageUrl: service.imageUrl,
+                        width: 56,
+                        height: 56,
                       ),
                     ),
                     const SizedBox(width: DesignTokens.spaceMd),
@@ -328,7 +330,9 @@ class _ServiceCard extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: DesignTokens.brandAccent.withValues(alpha: 0.1),
+                                  color: DesignTokens.brandAccent.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -410,7 +414,9 @@ class _ServiceCard extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: DesignTokens.brandPrimary,
                           side: BorderSide(
-                            color: DesignTokens.brandPrimary.withValues(alpha: 0.3),
+                            color: DesignTokens.brandPrimary.withValues(
+                              alpha: 0.3,
+                            ),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -434,7 +440,9 @@ class _ServiceCard extends StatelessWidget {
                           value: service.publishedOnline,
                           onChanged: onTogglePublish,
                           thumbColor: WidgetStatePropertyAll(
-                            service.publishedOnline ? DesignTokens.success : null,
+                            service.publishedOnline
+                                ? DesignTokens.success
+                                : null,
                           ),
                         ),
                       ],
@@ -450,10 +458,63 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
+class _ServiceArtwork extends StatelessWidget {
+  const _ServiceArtwork({
+    required this.title,
+    required this.imageUrl,
+    required this.width,
+    required this.height,
+  });
+
+  final String title;
+  final String? imageUrl;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = imageUrl?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return OfflineCachedImage(
+        imageUrl: raw,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        placeholder: _fallback(),
+        errorWidget: _fallback(),
+      );
+    }
+
+    return _fallback();
+  }
+
+  Widget _fallback() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            DesignTokens.brandPrimary,
+            DesignTokens.brandPrimary.withValues(alpha: 0.7),
+          ],
+        ),
+      ),
+      child: const Icon(
+        Icons.room_service_outlined,
+        color: Colors.white,
+        size: 28,
+      ),
+    );
+  }
+}
+
 /// Empty state with call to action
 class _EmptyServicesView extends StatelessWidget {
   const _EmptyServicesView({required this.onAddPressed});
-  
+
   final VoidCallback onAddPressed;
 
   @override
@@ -477,10 +538,7 @@ class _EmptyServicesView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DesignTokens.spaceLg),
-            Text(
-              'No services yet',
-              style: DesignTokens.textTitle,
-            ),
+            Text('No services yet', style: DesignTokens.textTitle),
             const SizedBox(height: DesignTokens.spaceSm),
             Text(
               'Add your first service to start accepting bookings and selling from your terminal.',

@@ -26,7 +26,7 @@ class AppConfig {
     return AppConfig(
       apiBaseUrl: apiBaseUrlOverride.isNotEmpty
           ? apiBaseUrlOverride
-          : (env['API_BASE_URL'] ?? 'https://soko.sanaa.ug/api/'),
+          : (env['API_BASE_URL'] ?? 'https://soko24.co/api/'),
       connectTimeoutMs: connectTimeoutOverride > 0
           ? connectTimeoutOverride
           : (int.tryParse(env['CONNECT_TIMEOUT_MS'] ?? '') ?? 15000),

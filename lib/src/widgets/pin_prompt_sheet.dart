@@ -71,10 +71,7 @@ class _PinPromptSheetState extends State<PinPromptSheet> {
           onSubmitted: (_) => _submit(),
         ),
         const SizedBox(height: DesignTokens.spaceLg),
-        ElevatedButton(
-          onPressed: _submit,
-          child: Text(widget.actionLabel),
-        ),
+        ElevatedButton(onPressed: _submit, child: Text(widget.actionLabel)),
       ],
     );
   }

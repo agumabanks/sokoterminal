@@ -30,12 +30,12 @@ class OnboardingState {
   }
 
   // Stage completion checks
-  bool get shopBasicsComplete => 
+  bool get shopBasicsComplete =>
       shopData['name'] != null && shopData['name'].toString().isNotEmpty;
-  
-  bool get businessDetailsComplete => 
+
+  bool get businessDetailsComplete =>
       shopData['address'] != null && shopData['address'].toString().isNotEmpty;
-  
+
   bool get paymentConfigComplete =>
       shopData['cash_on_delivery_status'] == 1 ||
       shopData['bank_payment_status'] == 1;
@@ -55,7 +55,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final isComplete = _prefs.getBool(_onboardingCompleteKey) ?? false;
     final shopDataJson = _prefs.getString(_shopDataKey);
     final savedStage = _prefs.getInt(_onboardingStageKey);
-    
+
     Map<String, dynamic> shopData = {};
     if (shopDataJson != null) {
       try {
@@ -78,9 +78,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   }
 
   void updateShopData(Map<String, dynamic> data) {
-    state = state.copyWith(
-      shopData: {...state.shopData, ...data},
-    );
+    state = state.copyWith(shopData: {...state.shopData, ...data});
     _saveState();
   }
 
@@ -137,9 +135,9 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
 final onboardingControllerProvider =
     StateNotifierProvider<OnboardingController, OnboardingState>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return OnboardingController(prefs);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return OnboardingController(prefs);
+    });
 
 /// Check if user needs onboarding
 final needsOnboardingProvider = Provider<bool>((ref) {

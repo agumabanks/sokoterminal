@@ -75,11 +75,18 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
             data: (enabled) => _SyncBanner(
               enabled: enabled,
               onChanged: (next) async {
-                await ref.read(syncServiceProvider).setDeviceContactsOptIn(next);
+                await ref
+                    .read(syncServiceProvider)
+                    .setDeviceContactsOptIn(next);
                 ref.invalidate(deviceContactsOptInProvider);
                 final telemetry = Telemetry.instance;
                 if (telemetry != null) {
-                  unawaited(telemetry.event('contacts_opt_in_changed', props: {'enabled': next}));
+                  unawaited(
+                    telemetry.event(
+                      'contacts_opt_in_changed',
+                      props: {'enabled': next},
+                    ),
+                  );
                 }
                 // Refresh immediately to import + (if enabled) sync.
                 await controller.refresh();
@@ -145,7 +152,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   }
 
   PreferredSizeWidget _buildAppBar(
-      ContactsState state, ContactsController controller) {
+    ContactsState state,
+    ContactsController controller,
+  ) {
     if (_showSearch) {
       return AppBar(
         backgroundColor: _headerBg,
@@ -209,7 +218,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           padding: const EdgeInsets.only(right: 12),
           child: GestureDetector(
             onTap: () => _showAddContactSheet(
-                context, ref.read(contactsControllerProvider.notifier)),
+              context,
+              ref.read(contactsControllerProvider.notifier),
+            ),
             child: Container(
               width: 40,
               height: 40,
@@ -284,7 +295,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     );
   }
 
-  Widget _buildContactsList(ContactsState state, ContactsController controller) {
+  Widget _buildContactsList(
+    ContactsState state,
+    ContactsController controller,
+  ) {
     if (state.loading && state.contacts.isEmpty) {
       return Container(
         color: _bgBlack,
@@ -310,16 +324,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     color: _cardBg,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.contacts_outlined,
-                      size: 40, color: Colors.grey),
+                  child: const Icon(
+                    Icons.contacts_outlined,
+                    size: 40,
+                    color: Colors.grey,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
                   'Contacts Permission',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -331,22 +349,30 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 ElevatedButton(
                   onPressed: () {
                     if (state.isPermanentlyDenied) {
-                       openAppSettings();
+                      openAppSettings();
                     } else {
-                       controller.refresh();
+                      controller.refresh();
                     }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _whatsappGreen,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 14),
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: Text(state.isPermanentlyDenied ? 'Open Settings' : 'Grant Access',
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    state.isPermanentlyDenied
+                        ? 'Open Settings'
+                        : 'Grant Access',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -391,7 +417,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           itemBuilder: (context, index) {
             final contact = state.filteredContacts[index];
             final canDelete =
-                contact.isFromSoko && contact.id.startsWith('soko_') && !contact.isFromDevice;
+                contact.isFromSoko &&
+                contact.id.startsWith('soko_') &&
+                !contact.isFromDevice;
             final tile = _ContactListTile(
               contact: contact,
               onTap: () => _showContactDetails(context, contact),
@@ -404,8 +432,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 24),
                 color: _missedRed,
-                child: const Icon(Icons.delete_outline,
-                    color: Colors.white, size: 28),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
               confirmDismiss: (direction) => _confirmDelete(context, contact),
               onDismissed: (direction) => controller.deleteContact(contact.id),
@@ -423,8 +454,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: _cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title:
-            const Text('Delete Contact', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Delete Contact',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           'Remove ${contact.name} from your contacts?',
           style: TextStyle(color: Colors.grey.shade400),
@@ -432,7 +465,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade400)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade400),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -445,6 +481,47 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
 
   void _showContactDetails(BuildContext context, ContactItem contact) {
     HapticFeedback.selectionClick();
+    if ((contact.remoteCustomerId ?? '').trim().isNotEmpty) {
+      _showCrmContactDetails(context, contact);
+      return;
+    }
+    _showQuickContactDetails(context, contact);
+  }
+
+  Future<_CrmContactDetail> _fetchCrmContactDetail(String remoteCustomerId) async {
+    final response = await ref
+        .read(sellerApiProvider)
+        .fetchSellerCustomerDetails(remoteCustomerId);
+    final body = response.data is Map<String, dynamic>
+        ? Map<String, dynamic>.from(response.data as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final data = body['data'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(body['data'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    return _CrmContactDetail.fromJson(data);
+  }
+
+  void _showCrmContactDetails(BuildContext context, ContactItem contact) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.92,
+        child: SafeArea(
+          child: _CrmContactDetailSheet(
+            contact: contact,
+            detailsFuture: _fetchCrmContactDetail(contact.remoteCustomerId!),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQuickContactDetails(BuildContext context, ContactItem contact) {
     final controller = ref.read(contactsControllerProvider.notifier);
     showModalBottomSheet(
       context: context,
@@ -519,7 +596,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                         Navigator.pop(context);
                         launchUrl(
                           Uri.parse(
-                              'https://wa.me/${contact.phone?.replaceAll(RegExp(r"\D"), "")}'),
+                            'https://wa.me/${contact.phone?.replaceAll(RegExp(r"\D"), "")}',
+                          ),
                           mode: LaunchMode.externalApplication,
                         );
                       },
@@ -561,17 +639,23 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                       const SizedBox(height: 6),
                       Text(
                         'Save this contact as a customer so you can attach sales, send receipts, and track history.',
-                        style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       ElevatedButton.icon(
                         onPressed: () async {
                           Navigator.pop(context);
-                          final id = await controller.createCustomerFromDeviceContact(contact);
+                          final id = await controller
+                              .createCustomerFromDeviceContact(contact);
                           if (!context.mounted) return;
                           if (id != null) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Saved to Soko CRM')),
+                              const SnackBar(
+                                content: Text('Saved to Soko CRM'),
+                              ),
                             );
                           }
                         },
@@ -620,7 +704,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   Future<Customer?> _pickExistingCustomer(BuildContext context) async {
     final db = ref.read(appDatabaseProvider);
     final customers = await db.select(db.customers).get();
-    customers.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    customers.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
     if (!context.mounted) return null;
     if (customers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -639,7 +725,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         child: ListView.separated(
           shrinkWrap: true,
           itemCount: customers.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white12),
+          separatorBuilder: (_, __) =>
+              const Divider(height: 1, color: Colors.white12),
           itemBuilder: (context, index) {
             final c = customers[index];
             return ListTile(
@@ -657,7 +744,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   }
 
   void _showAddContactSheet(
-      BuildContext context, ContactsController controller) {
+    BuildContext context,
+    ContactsController controller,
+  ) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final emailController = TextEditingController();
@@ -673,7 +762,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) => Padding(
           padding: EdgeInsets.fromLTRB(
-              24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+            24,
+            16,
+            24,
+            MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,11 +845,17 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Share with team',
-                              style: TextStyle(color: Colors.white)),
-                          Text('Visible to all staff members',
-                              style: TextStyle(
-                                  color: Colors.grey.shade500, fontSize: 12)),
+                          const Text(
+                            'Share with team',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          Text(
+                            'Visible to all staff members',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -939,10 +1038,7 @@ class _QuickActionButton extends StatelessWidget {
 
 /// Recent contact circular avatar with name
 class _RecentContactAvatar extends StatelessWidget {
-  const _RecentContactAvatar({
-    required this.contact,
-    required this.onTap,
-  });
+  const _RecentContactAvatar({required this.contact, required this.onTap});
 
   final ContactItem contact;
   final VoidCallback onTap;
@@ -1017,10 +1113,7 @@ class _RecentContactAvatar extends StatelessWidget {
 
 /// Contact list tile with WhatsApp styling
 class _ContactListTile extends StatelessWidget {
-  const _ContactListTile({
-    required this.contact,
-    required this.onTap,
-  });
+  const _ContactListTile({required this.contact, required this.onTap});
 
   final ContactItem contact;
   final VoidCallback onTap;
@@ -1104,8 +1197,11 @@ class _ContactListTile extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.grey.shade700, width: 1),
               ),
-              child: Icon(Icons.info_outline,
-                  size: 16, color: Colors.grey.shade500),
+              child: Icon(
+                Icons.info_outline,
+                size: 16,
+                color: Colors.grey.shade500,
+              ),
             ),
           ],
         ),
@@ -1211,11 +1307,7 @@ class _SourceBadges extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+  const _Badge({required this.icon, required this.label, required this.color});
 
   final IconData icon;
   final String label;
@@ -1286,6 +1378,745 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
+class _CrmContactDetailSheet extends StatelessWidget {
+  const _CrmContactDetailSheet({
+    required this.contact,
+    required this.detailsFuture,
+  });
+
+  final ContactItem contact;
+  final Future<_CrmContactDetail> detailsFuture;
+
+  static const _sectionBg = Color(0xFF1F2C34);
+  static const _accent = Color(0xFF00A884);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_CrmContactDetail>(
+      future: detailsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: _accent),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade700,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _LargeAvatar(name: contact.name),
+                const SizedBox(height: 16),
+                Text(
+                  contact.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Failed to load CRM history right now.',
+                  style: TextStyle(color: Colors.grey.shade400),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final detail = snapshot.data!;
+        final primaryPhone = detail.contact.phones.isNotEmpty
+            ? detail.contact.phones.first
+            : contact.phone;
+        final primaryEmail = detail.contact.emails.isNotEmpty
+            ? detail.contact.emails.first
+            : contact.email;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade700,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Center(child: _LargeAvatar(name: detail.contact.name)),
+              const SizedBox(height: 16),
+              Center(
+                child: Text(
+                  detail.contact.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if ((primaryPhone ?? primaryEmail ?? '').isNotEmpty)
+                Center(
+                  child: Text(
+                    primaryPhone ?? primaryEmail ?? '',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 16),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Center(child: _SourceBadges(contact: contact)),
+              const SizedBox(height: 18),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  if ((primaryPhone ?? '').isNotEmpty)
+                    _ActionChip(
+                      icon: Icons.call,
+                      label: 'Call',
+                      color: _accent,
+                      onTap: () => launchUrl(Uri.parse('tel:$primaryPhone')),
+                    ),
+                  if ((primaryPhone ?? '').isNotEmpty)
+                    _ActionChip(
+                      icon: Icons.chat_bubble,
+                      label: 'WhatsApp',
+                      color: const Color(0xFF25D366),
+                      onTap: () => launchUrl(
+                        Uri.parse(
+                          'https://wa.me/${primaryPhone!.replaceAll(RegExp(r"\D"), "")}',
+                        ),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  if ((primaryPhone ?? '').isNotEmpty)
+                    _ActionChip(
+                      icon: Icons.message,
+                      label: 'SMS',
+                      color: Colors.blue,
+                      onTap: () => launchUrl(Uri.parse('sms:$primaryPhone')),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _CrmSection(
+                title: 'Client summary',
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _MetricCard(
+                      label: 'Orders',
+                      value: detail.summary.totalOrders.toString(),
+                    ),
+                    _MetricCard(
+                      label: 'Revenue',
+                      value: 'UGX ${_formatCurrency(detail.summary.totalRevenue)}',
+                    ),
+                    _MetricCard(
+                      label: 'Average',
+                      value:
+                          'UGX ${_formatCurrency(detail.summary.avgOrderValue)}',
+                    ),
+                    _MetricCard(
+                      label: 'Outstanding',
+                      value:
+                          'UGX ${_formatCurrency(detail.summary.outstandingBalance)}',
+                    ),
+                    _MetricCard(
+                      label: 'Segment',
+                      value: detail.summary.segment,
+                    ),
+                    _MetricCard(
+                      label: 'Loyalty',
+                      value: detail.summary.loyaltyLevel,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _CrmSection(
+                title: 'Profile',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ProfileLine(
+                      label: 'Role',
+                      value: detail.contact.roleCategory ?? 'Customer',
+                    ),
+                    if ((detail.contact.businessType ?? '').isNotEmpty)
+                      _ProfileLine(
+                        label: 'Business',
+                        value: detail.contact.businessType!,
+                      ),
+                    if ((detail.contact.location ?? '').isNotEmpty)
+                      _ProfileLine(
+                        label: 'Location',
+                        value: detail.contact.location!,
+                      ),
+                    if (detail.summary.lastPurchaseAt != null)
+                      _ProfileLine(
+                        label: 'Last purchase',
+                        value: _formatDateTime(detail.summary.lastPurchaseAt!),
+                      ),
+                    if (detail.summary.purchaseFrequencyDays != null)
+                      _ProfileLine(
+                        label: 'Purchase frequency',
+                        value: '${detail.summary.purchaseFrequencyDays} days',
+                      ),
+                    _ProfileLine(
+                      label: 'Churn risk',
+                      value: detail.summary.churnRisk,
+                    ),
+                    if ((detail.contact.notes ?? '').isNotEmpty)
+                      _ProfileLine(
+                        label: 'Notes',
+                        value: detail.contact.notes!,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _CrmSection(
+                title: 'Orders',
+                child: detail.orders.isEmpty
+                    ? Text(
+                        'No seller orders linked to this contact yet.',
+                        style: TextStyle(color: Colors.grey.shade400),
+                      )
+                    : Column(
+                        children: detail.orders
+                            .map((order) => _OrderCard(order: order))
+                            .toList(),
+                      ),
+              ),
+              if (detail.timeline.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _CrmSection(
+                  title: 'Timeline',
+                  child: Column(
+                    children: detail.timeline
+                        .take(8)
+                        .map((event) => _TimelineRow(event: event))
+                        .toList(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CrmSection extends StatelessWidget {
+  const _CrmSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _CrmContactDetailSheet._sectionBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileLine extends StatelessWidget {
+  const _ProfileLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 108,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.order});
+
+  final _CrmOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  order.code,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                'UGX ${_formatCurrency(order.grandTotal)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _formatDateTime(order.createdAt),
+            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusPill(label: order.paymentStatus, color: Colors.blue),
+              _StatusPill(label: order.deliveryStatus, color: Colors.orange),
+              _StatusPill(label: '${order.items.length} item(s)', color: Colors.green),
+            ],
+          ),
+          if (order.items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...order.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '${item.name} • ${item.quantity} x UGX ${_formatCurrency(item.price)}',
+                  style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({required this.event});
+
+  final _CrmTimelineEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            margin: const EdgeInsets.only(top: 5),
+            decoration: const BoxDecoration(
+              color: Color(0xFF00A884),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if ((event.description ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      event.description!,
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                    ),
+                  ),
+                const SizedBox(height: 3),
+                Text(
+                  _formatDateTime(event.date),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CrmContactDetail {
+  const _CrmContactDetail({
+    required this.contact,
+    required this.summary,
+    required this.orders,
+    required this.timeline,
+  });
+
+  factory _CrmContactDetail.fromJson(Map<String, dynamic> json) {
+    final contactJson = json['contact'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['contact'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final summaryJson = json['summary'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['summary'] as Map<String, dynamic>)
+        : const <String, dynamic>{};
+    final ordersJson = json['orders'] is List ? json['orders'] as List : const [];
+    final timelineJson = json['timeline'] is List
+        ? json['timeline'] as List
+        : const [];
+
+    return _CrmContactDetail(
+      contact: _CrmContactProfile.fromJson(contactJson),
+      summary: _CrmContactSummary.fromJson(summaryJson),
+      orders: ordersJson
+          .whereType<Map>()
+          .map((e) => _CrmOrder.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      timeline: timelineJson
+          .whereType<Map>()
+          .map((e) => _CrmTimelineEvent.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+
+  final _CrmContactProfile contact;
+  final _CrmContactSummary summary;
+  final List<_CrmOrder> orders;
+  final List<_CrmTimelineEvent> timeline;
+}
+
+class _CrmContactProfile {
+  const _CrmContactProfile({
+    required this.name,
+    required this.phones,
+    required this.emails,
+    this.roleCategory,
+    this.notes,
+    this.location,
+    this.businessType,
+  });
+
+  factory _CrmContactProfile.fromJson(Map<String, dynamic> json) {
+    return _CrmContactProfile(
+      name: json['display_name']?.toString() ?? '',
+      phones: _stringList(json['phones']),
+      emails: _stringList(json['emails']),
+      roleCategory: json['role_category']?.toString(),
+      notes: json['notes']?.toString(),
+      location: json['location']?.toString(),
+      businessType: json['business_type']?.toString(),
+    );
+  }
+
+  final String name;
+  final List<String> phones;
+  final List<String> emails;
+  final String? roleCategory;
+  final String? notes;
+  final String? location;
+  final String? businessType;
+}
+
+class _CrmContactSummary {
+  const _CrmContactSummary({
+    required this.totalOrders,
+    required this.totalRevenue,
+    required this.avgOrderValue,
+    required this.outstandingBalance,
+    required this.segment,
+    required this.loyaltyLevel,
+    required this.churnRisk,
+    this.lastPurchaseAt,
+    this.purchaseFrequencyDays,
+  });
+
+  factory _CrmContactSummary.fromJson(Map<String, dynamic> json) {
+    return _CrmContactSummary(
+      totalOrders: _asInt(json['total_orders']),
+      totalRevenue: _asDouble(json['total_revenue']),
+      avgOrderValue: _asDouble(json['avg_order_value']),
+      outstandingBalance: _asDouble(json['outstanding_balance']),
+      segment: json['segment']?.toString() ?? 'New',
+      loyaltyLevel: json['loyalty_level']?.toString() ?? 'Standard',
+      churnRisk: json['churn_risk']?.toString() ?? 'Low',
+      lastPurchaseAt: DateTime.tryParse(json['last_purchase_at']?.toString() ?? ''),
+      purchaseFrequencyDays: json['purchase_frequency_days'] == null
+          ? null
+          : _asDouble(json['purchase_frequency_days']),
+    );
+  }
+
+  final int totalOrders;
+  final double totalRevenue;
+  final double avgOrderValue;
+  final double outstandingBalance;
+  final String segment;
+  final String loyaltyLevel;
+  final String churnRisk;
+  final DateTime? lastPurchaseAt;
+  final double? purchaseFrequencyDays;
+}
+
+class _CrmOrder {
+  const _CrmOrder({
+    required this.code,
+    required this.grandTotal,
+    required this.paymentStatus,
+    required this.deliveryStatus,
+    required this.createdAt,
+    required this.items,
+  });
+
+  factory _CrmOrder.fromJson(Map<String, dynamic> json) {
+    final itemsJson = json['items'] is List ? json['items'] as List : const [];
+    return _CrmOrder(
+      code: json['code']?.toString() ?? '#',
+      grandTotal: _asDouble(json['grand_total']),
+      paymentStatus: json['payment_status']?.toString() ?? 'unknown',
+      deliveryStatus: json['delivery_status']?.toString() ?? 'unknown',
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      items: itemsJson
+          .whereType<Map>()
+          .map((e) => _CrmOrderItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+
+  final String code;
+  final double grandTotal;
+  final String paymentStatus;
+  final String deliveryStatus;
+  final DateTime? createdAt;
+  final List<_CrmOrderItem> items;
+}
+
+class _CrmOrderItem {
+  const _CrmOrderItem({
+    required this.name,
+    required this.quantity,
+    required this.price,
+  });
+
+  factory _CrmOrderItem.fromJson(Map<String, dynamic> json) {
+    return _CrmOrderItem(
+      name: json['name']?.toString() ?? 'Item',
+      quantity: _asDouble(json['quantity']),
+      price: _asDouble(json['price']),
+    );
+  }
+
+  final String name;
+  final double quantity;
+  final double price;
+}
+
+class _CrmTimelineEvent {
+  const _CrmTimelineEvent({
+    required this.title,
+    this.description,
+    this.date,
+  });
+
+  factory _CrmTimelineEvent.fromJson(Map<String, dynamic> json) {
+    return _CrmTimelineEvent(
+      title: json['title']?.toString() ?? 'Activity',
+      description: json['description']?.toString(),
+      date: DateTime.tryParse(json['date']?.toString() ?? ''),
+    );
+  }
+
+  final String title;
+  final String? description;
+  final DateTime? date;
+}
+
+List<String> _stringList(dynamic value) {
+  if (value is! List) return const [];
+  return value.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
+}
+
+double _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+int _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+String _formatCurrency(double value) {
+  final rounded = value.round();
+  final digits = rounded.toString().split('').reversed.toList();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && i % 3 == 0) {
+      buffer.write(',');
+    }
+    buffer.write(digits[i]);
+  }
+  return buffer.toString().split('').reversed.join();
+}
+
+String _formatDateTime(DateTime? value) {
+  if (value == null) return 'Unknown';
+  final local = value.toLocal();
+  final month = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][local.month - 1];
+  final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+  final minute = local.minute.toString().padLeft(2, '0');
+  final suffix = local.hour >= 12 ? 'PM' : 'AM';
+  return '${local.day} $month ${local.year}, $hour:$minute $suffix';
+}
+
 /// Premium text field for add contact sheet
 class _PremiumTextField extends StatelessWidget {
   const _PremiumTextField({
@@ -1324,8 +2155,10 @@ class _PremiumTextField extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF00A884), width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
     );
   }

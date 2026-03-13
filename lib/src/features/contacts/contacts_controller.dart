@@ -108,15 +108,15 @@ class ContactsState {
 
 final contactsControllerProvider =
     StateNotifierProvider<ContactsController, ContactsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  final db = ref.watch(appDatabaseProvider);
-  final sync = ref.watch(syncServiceProvider);
-  return ContactsController(api, db, sync)..init();
-});
+      final api = ref.watch(sellerApiProvider);
+      final db = ref.watch(appDatabaseProvider);
+      final sync = ref.watch(syncServiceProvider);
+      return ContactsController(api, db, sync)..init();
+    });
 
 class ContactsController extends StateNotifier<ContactsState> {
   ContactsController(this._api, this._db, this._syncService)
-      : super(ContactsState());
+    : super(ContactsState());
 
   final SellerApi _api;
   final AppDatabase _db;
@@ -132,10 +132,12 @@ class ContactsController extends StateNotifier<ContactsState> {
       final optedIn = await _syncService.isDeviceContactsOptedIn();
       PermissionStatus status = PermissionStatus.denied;
       if (optedIn) {
-        status = await Permission.contacts.status;
-        if (!status.isGranted && !status.isPermanentlyDenied) {
-          status = await Permission.contacts.request();
-        }
+        // Request contacts and location together for better UX
+        final results = await [
+          Permission.contacts.request(),
+          Permission.locationWhenInUse.request(),
+        ].wait;
+        status = results[0];
       }
 
       final hasPermission = optedIn ? status.isGranted : true;
@@ -146,24 +148,33 @@ class ContactsController extends StateNotifier<ContactsState> {
       // 1. Fetch from Device if permitted + opted in
       if (optedIn && status.isGranted) {
         // Import device contacts into local DB (offline-first) then render from DB.
-        final deviceContacts = await FlutterContacts.getContacts(withProperties: true);
+        final deviceContacts = await FlutterContacts.getContacts(
+          withProperties: true,
+        );
         try {
           await _syncService.importDeviceContacts(deviceContacts);
         } catch (_) {}
 
         final cached = await _db.getDeviceContacts();
-        items.addAll(cached.map((c) => ContactItem(
+        items.addAll(
+          cached.map(
+            (c) => ContactItem(
               id: c.deviceId,
               name: c.displayName,
               phone: c.primaryPhoneE164,
               email: c.primaryEmail,
               isFromDevice: true,
               linkedCustomerId: c.linkedCustomerId,
-            )));
+            ),
+          ),
+        );
         try {
           // Sync device contacts to backend in background
           unawaited(
-            _syncService.syncDeviceContacts(force: true, contacts: deviceContacts),
+            _syncService.syncDeviceContacts(
+              force: true,
+              contacts: deviceContacts,
+            ),
           );
         } catch (_) {
           // Sync failures should not block local contact display.
@@ -172,7 +183,9 @@ class ContactsController extends StateNotifier<ContactsState> {
 
       // 2. Fetch from Soko DB (Local Cache of Seller Customers)
       final sokoCustomers = await _db.select(_db.customers).get();
-      items.addAll(sokoCustomers.map((c) => ContactItem(
+      items.addAll(
+        sokoCustomers.map(
+          (c) => ContactItem(
             id: 'soko_${c.id}',
             name: c.name,
             phone: c.phone,
@@ -180,7 +193,9 @@ class ContactsController extends StateNotifier<ContactsState> {
             notes: c.note,
             isFromSoko: true,
             remoteCustomerId: c.remoteId,
-          )));
+          ),
+        ),
+      );
 
       final merged = <String, ContactItem>{};
       for (final item in items) {
@@ -197,8 +212,8 @@ class ContactsController extends StateNotifier<ContactsState> {
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       state = state.copyWith(
-        loading: false, 
-        contacts: uniqueItems, 
+        loading: false,
+        contacts: uniqueItems,
         filteredContacts: _applySearch(uniqueItems, state.searchQuery),
         permissionGranted: hasPermission,
         isPermanentlyDenied: isPermanentlyDenied,
@@ -227,10 +242,7 @@ class ContactsController extends StateNotifier<ContactsState> {
   }
 
   void clearSearch() {
-    state = state.copyWith(
-      searchQuery: '',
-      filteredContacts: state.contacts,
-    );
+    state = state.copyWith(searchQuery: '', filteredContacts: state.contacts);
   }
 
   /// Create a new contact - saves locally first, then syncs IMMEDIATELY to backend
@@ -242,20 +254,20 @@ class ContactsController extends StateNotifier<ContactsState> {
     bool shareWithTeam = false,
   }) async {
     try {
-
       // Smart formatting: Ensure phone has +256 prefix if it's a UG number
       if (phone != null && phone.isNotEmpty) {
         final normalized = normalizeUgPhone(phone);
         if (normalized.isNotEmpty && normalized.startsWith('256')) {
-           phone = '+$normalized';
+          phone = '+$normalized';
         }
       }
 
       final contactId = const Uuid().v4();
       final now = DateTime.now().toUtc();
-      final drift.Value<String?> noteValue =
-          notes == null ? const drift.Value.absent() : drift.Value(notes);
-      
+      final drift.Value<String?> noteValue = notes == null
+          ? const drift.Value.absent()
+          : drift.Value(notes);
+
       // 1. Save to local database first (offline-first, prevents data loss)
       await _db.upsertCustomer(
         CustomersCompanion.insert(
@@ -279,19 +291,23 @@ class ContactsController extends StateNotifier<ContactsState> {
           'shared_with_business': shareWithTeam,
           'source': 'pos_terminal',
         }, idempotencyKey: contactId);
-        
+
         // If API call succeeded, mark as synced
         if (response.statusCode == 200 || response.statusCode == 201) {
-          final data =
-              response.data is Map ? Map<String, dynamic>.from(response.data as Map) : null;
+          final data = response.data is Map
+              ? Map<String, dynamic>.from(response.data as Map)
+              : null;
           final remoteId = data?['contact_id']?.toString();
-          final remoteUpdatedAt =
-              DateTime.tryParse(data?['updated_at']?.toString() ?? '')?.toUtc();
+          final remoteUpdatedAt = DateTime.tryParse(
+            data?['updated_at']?.toString() ?? '',
+          )?.toUtc();
 
           await _db.upsertCustomer(
             CustomersCompanion.insert(
               id: drift.Value(contactId),
-              remoteId: remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
+              remoteId: remoteId == null
+                  ? const drift.Value.absent()
+                  : drift.Value(remoteId),
               name: name,
               phone: drift.Value(phone),
               email: drift.Value(email),
@@ -301,13 +317,17 @@ class ContactsController extends StateNotifier<ContactsState> {
             ),
           );
           if (kDebugMode) {
-            debugPrint('[Contacts] Contact "$name" synced to cloud immediately');
+            debugPrint(
+              '[Contacts] Contact "$name" synced to cloud immediately',
+            );
           }
         }
       } catch (e) {
         // API call failed - enqueue for later sync (offline mode)
         if (kDebugMode) {
-          debugPrint('[Contacts] Immediate sync failed, enqueueing for later: $e');
+          debugPrint(
+            '[Contacts] Immediate sync failed, enqueueing for later: $e',
+          );
         }
         await _syncService.enqueue('customer_push', {
           'idempotency_key': contactId,
@@ -340,8 +360,12 @@ class ContactsController extends StateNotifier<ContactsState> {
 
     final customerId = const Uuid().v4();
     final now = DateTime.now().toUtc();
-    final phone = contact.phone?.trim().isEmpty ?? true ? null : contact.phone!.trim();
-    final email = contact.email?.trim().isEmpty ?? true ? null : contact.email!.trim();
+    final phone = contact.phone?.trim().isEmpty ?? true
+        ? null
+        : contact.phone!.trim();
+    final email = contact.email?.trim().isEmpty ?? true
+        ? null
+        : contact.email!.trim();
 
     await _db.upsertCustomer(
       CustomersCompanion.insert(
@@ -365,18 +389,26 @@ class ContactsController extends StateNotifier<ContactsState> {
       }, idempotencyKey: customerId);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data =
-            response.data is Map ? Map<String, dynamic>.from(response.data as Map) : null;
+        final data = response.data is Map
+            ? Map<String, dynamic>.from(response.data as Map)
+            : null;
         final remoteId = data?['contact_id']?.toString();
-        final remoteUpdatedAt =
-            DateTime.tryParse(data?['updated_at']?.toString() ?? '')?.toUtc();
+        final remoteUpdatedAt = DateTime.tryParse(
+          data?['updated_at']?.toString() ?? '',
+        )?.toUtc();
         await _db.upsertCustomer(
           CustomersCompanion.insert(
             id: drift.Value(customerId),
-            remoteId: remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
+            remoteId: remoteId == null
+                ? const drift.Value.absent()
+                : drift.Value(remoteId),
             name: name,
-            phone: phone == null ? const drift.Value.absent() : drift.Value(phone),
-            email: email == null ? const drift.Value.absent() : drift.Value(email),
+            phone: phone == null
+                ? const drift.Value.absent()
+                : drift.Value(phone),
+            email: email == null
+                ? const drift.Value.absent()
+                : drift.Value(email),
             synced: const drift.Value(true),
             updatedAt: drift.Value(remoteUpdatedAt ?? now),
           ),
@@ -394,7 +426,10 @@ class ContactsController extends StateNotifier<ContactsState> {
       });
     }
 
-    await _db.linkDeviceContactToCustomer(deviceId: contact.id, customerId: customerId);
+    await _db.linkDeviceContactToCustomer(
+      deviceId: contact.id,
+      customerId: customerId,
+    );
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
       unawaited(
@@ -412,7 +447,10 @@ class ContactsController extends StateNotifier<ContactsState> {
     required String deviceId,
     required String customerId,
   }) async {
-    await _db.linkDeviceContactToCustomer(deviceId: deviceId, customerId: customerId);
+    await _db.linkDeviceContactToCustomer(
+      deviceId: deviceId,
+      customerId: customerId,
+    );
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
       unawaited(
@@ -441,12 +479,12 @@ class ContactsController extends StateNotifier<ContactsState> {
           ? id.substring(5)
           : (target?.linkedCustomerId ?? id);
       final remoteId = target?.remoteCustomerId?.trim();
-      
+
       // Remove from local database
-      await (_db.delete(_db.customers)
-        ..where((c) => c.id.equals(actualId)))
-        .go();
-      
+      await (_db.delete(
+        _db.customers,
+      )..where((c) => c.id.equals(actualId))).go();
+
       // Try to delete from backend if online
       try {
         if (remoteId != null && remoteId.isNotEmpty) {
@@ -456,7 +494,7 @@ class ContactsController extends StateNotifier<ContactsState> {
         // Backend delete failed, but local delete succeeded
         // Could enqueue a delete operation for later
       }
-      
+
       // Remove from local state immediately
       final updated = state.contacts.where((c) => c.id != id).toList();
       state = state.copyWith(

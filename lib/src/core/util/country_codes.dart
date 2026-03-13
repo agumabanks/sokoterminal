@@ -11,10 +11,13 @@ class CountryCode {
 
   /// Display code like "+256"
   final String code;
+
   /// Country name
   final String name;
+
   /// Flag emoji
   final String flag;
+
   /// Just the digits, e.g. "256"
   final String digitCode;
 
@@ -29,7 +32,12 @@ const List<CountryCode> eastAfricanCountryCodes = [
   CountryCode(code: '+255', name: 'Tanzania', flag: '🇹🇿', digitCode: '255'),
   CountryCode(code: '+250', name: 'Rwanda', flag: '🇷🇼', digitCode: '250'),
   CountryCode(code: '+257', name: 'Burundi', flag: '🇧🇮', digitCode: '257'),
-  CountryCode(code: '+211', name: 'South Sudan', flag: '🇸🇸', digitCode: '211'),
+  CountryCode(
+    code: '+211',
+    name: 'South Sudan',
+    flag: '🇸🇸',
+    digitCode: '211',
+  ),
   CountryCode(code: '+243', name: 'DR Congo', flag: '🇨🇩', digitCode: '243'),
 ];
 
@@ -75,7 +83,10 @@ String formatPhoneForDisplay(String normalizedPhone) {
 }
 
 /// Shows a polished bottom sheet for country selection
-Future<CountryCode?> showCountryPickerBottomSheet(BuildContext context, CountryCode current) async {
+Future<CountryCode?> showCountryPickerBottomSheet(
+  BuildContext context,
+  CountryCode current,
+) async {
   return showModalBottomSheet<CountryCode>(
     context: context,
     isScrollControlled: true,
@@ -176,7 +187,10 @@ Future<CountryCode?> showCountryPickerBottomSheet(BuildContext context, CountryC
                             ),
                           ),
                           if (isSelected)
-                            const Icon(Icons.check_circle_rounded, color: Colors.blue),
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.blue,
+                            ),
                         ],
                       ),
                     ),

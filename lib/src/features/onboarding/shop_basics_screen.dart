@@ -15,7 +15,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _shopNameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   String? _selectedCategory;
   final List<String> _categories = [
     'Fashion & Apparel',
@@ -55,7 +55,11 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black,
+            size: 20,
+          ),
           onPressed: () => context.go('/login'),
         ),
         title: const Text(
@@ -68,7 +72,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
           children: [
             // Progress Indicator
             _buildProgressIndicator(2, 5),
-            
+
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -91,7 +95,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Shop Name
                       _buildModernField(
                         controller: _shopNameController,
@@ -109,11 +113,11 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Category Dropdown
                       _buildCategoryDropdown(),
                       const SizedBox(height: 16),
-                      
+
                       // Description (Optional)
                       _buildModernField(
                         controller: _descriptionController,
@@ -123,7 +127,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
                         maxLines: 3,
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Continue Button
                       SizedBox(
                         height: 56,
@@ -147,7 +151,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Skip Button
                       TextButton(
                         onPressed: _handleSkip,
@@ -170,7 +174,10 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
     );
   }
 
-  void _applyOnboardingState(OnboardingState onboarding, {bool notify = false}) {
+  void _applyOnboardingState(
+    OnboardingState onboarding, {
+    bool notify = false,
+  }) {
     final data = onboarding.shopData;
     if (data.isEmpty) return;
 
@@ -252,17 +259,21 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
         value: _selectedCategory,
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: Icon(Icons.category_outlined, color: Colors.grey[500], size: 22),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+          prefixIcon: Icon(
+            Icons.category_outlined,
+            color: Colors.grey[500],
+            size: 22,
+          ),
           labelText: 'Category',
           floatingLabelStyle: TextStyle(color: Colors.grey[800]),
           labelStyle: TextStyle(color: Colors.grey[500]),
         ),
         items: _categories.map((category) {
-          return DropdownMenuItem(
-            value: category,
-            child: Text(category),
-          );
+          return DropdownMenuItem(value: category, child: Text(category));
         }).toList(),
         onChanged: (value) {
           setState(() => _selectedCategory = value);
@@ -296,7 +307,10 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
           prefixIcon: Icon(icon, color: Colors.grey[500], size: 22),
           labelText: label,
           hintText: hint,
@@ -311,7 +325,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
 
   void _handleContinue() {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // Save data to onboarding state
     final controller = ref.read(onboardingControllerProvider.notifier);
     controller.updateShopData({
@@ -320,7 +334,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
       'category': _selectedCategory,
     });
     controller.goToStage(3);
-    
+
     // Navigate to next stage
     context.go('/onboarding/business-details');
   }

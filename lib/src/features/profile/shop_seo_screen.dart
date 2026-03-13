@@ -72,7 +72,9 @@ class _ShopSeoScreenState extends ConsumerState<ShopSeoScreen> {
 
     if (_shopName.isEmpty || _shopAddress.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shop info missing. Open “Shop Info” first.')),
+        const SnackBar(
+          content: Text('Shop info missing. Open “Shop Info” first.'),
+        ),
       );
       return;
     }
@@ -95,9 +97,9 @@ class _ShopSeoScreenState extends ConsumerState<ShopSeoScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -109,73 +111,77 @@ class _ShopSeoScreenState extends ConsumerState<ShopSeoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text('Shop SEO', style: DesignTokens.textTitle),
-      ),
+      appBar: AppBar(title: Text('Shop SEO', style: DesignTokens.textTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorState(
-                  title: 'Failed to load shop SEO',
-                  error: _error!,
-                  onRetry: _load,
-                )
-              : ListView(
-                  padding: DesignTokens.paddingScreen,
-                  children: [
-                    Container(
-                      padding: DesignTokens.paddingLg,
-                      decoration: BoxDecoration(
-                        color: DesignTokens.surfaceWhite,
-                        borderRadius: DesignTokens.borderRadiusLg,
-                        boxShadow: DesignTokens.shadowSm,
+          ? _ErrorState(
+              title: 'Failed to load shop SEO',
+              error: _error!,
+              onRetry: _load,
+            )
+          : ListView(
+              padding: DesignTokens.paddingScreen,
+              children: [
+                Container(
+                  padding: DesignTokens.paddingLg,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.surfaceWhite,
+                    borderRadius: DesignTokens.borderRadiusLg,
+                    boxShadow: DesignTokens.shadowSm,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Search metadata', style: DesignTokens.textBodyBold),
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _metaTitleCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Meta title',
+                          prefixIcon: Icon(Icons.title),
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Search metadata', style: DesignTokens.textBodyBold),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _metaTitleCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Meta title',
-                              prefixIcon: Icon(Icons.title),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _metaDescCtrl,
-                            maxLines: 4,
-                            decoration: const InputDecoration(
-                              labelText: 'Meta description',
-                              alignLabelWithHint: true,
-                              prefixIcon: Icon(Icons.notes_outlined),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _metaDescCtrl,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Meta description',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(Icons.notes_outlined),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceLg),
-                    ElevatedButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_saving ? 'Saving…' : 'Save'),
-                      style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_saving ? 'Saving…' : 'Save'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.title, required this.error, required this.onRetry});
+  const _ErrorState({
+    required this.title,
+    required this.error,
+    required this.onRetry,
+  });
 
   final String title;
   final Object error;
@@ -189,9 +195,17 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: DesignTokens.textBodyBold, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: DesignTokens.textBodyBold,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error.toString(), style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error.toString(),
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             ElevatedButton.icon(
               onPressed: onRetry,

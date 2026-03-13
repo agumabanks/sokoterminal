@@ -62,16 +62,14 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
                 ..sort((a, b) => a.name.compareTo(b.name));
               return DropdownButtonFormField<Supplier?>(
                 initialValue: _supplier,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('No supplier')),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('No supplier'),
+                  ),
                   ...active.map(
-                    (s) => DropdownMenuItem(
-                      value: s,
-                      child: Text(s.name),
-                    ),
+                    (s) => DropdownMenuItem(value: s, child: Text(s.name)),
                   ),
                 ],
                 onChanged: (v) => setState(() => _supplier = v),
@@ -92,9 +90,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
           const SizedBox(height: DesignTokens.spaceLg),
           Row(
             children: [
-              Expanded(
-                child: Text('Items', style: DesignTokens.textBodyBold),
-              ),
+              Expanded(child: Text('Items', style: DesignTokens.textBodyBold)),
               TextButton.icon(
                 onPressed: _saving ? null : () => _addLine(context),
                 icon: const Icon(Icons.add),
@@ -113,7 +109,11 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 48, color: DesignTokens.grayMedium),
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 48,
+                    color: DesignTokens.grayMedium,
+                  ),
                   const SizedBox(height: DesignTokens.spaceSm),
                   Text('No items added', style: DesignTokens.textBodyBold),
                   const SizedBox(height: DesignTokens.spaceXxs),
@@ -130,7 +130,9 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
               children: [
                 for (final line in _lines)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
+                    padding: const EdgeInsets.only(
+                      bottom: DesignTokens.spaceSm,
+                    ),
                     child: _ReceiveLineCard(
                       line: line,
                       onRemove: _saving
@@ -151,7 +153,9 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
                   )
                 : const Icon(Icons.check),
             label: Text(_saving ? 'Saving…' : 'Save receipt'),
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.brandAccent,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceLg),
         ],
@@ -177,10 +181,7 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
     final config = await BottomSheetModal.show<_LineConfig>(
       context: context,
       title: 'Receive quantity',
-      child: _ReceiveLineConfigForm(
-        item: chosen,
-        stocks: stocks,
-      ),
+      child: _ReceiveLineConfigForm(item: chosen, stocks: stocks),
     );
     if (config == null) return;
 
@@ -231,7 +232,8 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
         'lines': _lines
             .map(
               (l) => {
-                'product_id': l.itemId, // resolved to remote id during sync dispatch
+                'product_id':
+                    l.itemId, // resolved to remote id during sync dispatch
                 if (l.variant.trim().isNotEmpty) 'variation': l.variant.trim(),
                 'quantity': l.quantity,
                 if (l.unitCost != null) 'unit_cost': l.unitCost,
@@ -248,12 +250,14 @@ class _ReceiveStockScreenState extends ConsumerState<ReceiveStockScreen> {
           'supplier_id': _supplier?.id,
           'received_at': occurredAt.toIso8601String(),
           'lines': _lines
-              .map((l) => {
-                    'item_id': l.itemId,
-                    'variant': l.variant,
-                    'quantity': l.quantity,
-                    if (l.unitCost != null) 'unit_cost': l.unitCost,
-                  })
+              .map(
+                (l) => {
+                  'item_id': l.itemId,
+                  'variant': l.variant,
+                  'quantity': l.quantity,
+                  if (l.unitCost != null) 'unit_cost': l.unitCost,
+                },
+              )
               .toList(),
         },
       );
@@ -345,9 +349,7 @@ class _ItemPickerState extends State<_ItemPicker> {
     final q = _q.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.items
-        : widget.items
-            .where((i) => i.name.toLowerCase().contains(q))
-            .toList();
+        : widget.items.where((i) => i.name.toLowerCase().contains(q)).toList();
 
     return Padding(
       padding: DesignTokens.paddingScreen,
@@ -391,10 +393,7 @@ class _LineConfig {
 }
 
 class _ReceiveLineConfigForm extends StatefulWidget {
-  const _ReceiveLineConfigForm({
-    required this.item,
-    required this.stocks,
-  });
+  const _ReceiveLineConfigForm({required this.item, required this.stocks});
 
   final Item item;
   final List<ItemStock> stocks;
@@ -428,12 +427,13 @@ class _ReceiveLineConfigFormState extends State<_ReceiveLineConfigForm> {
 
   @override
   Widget build(BuildContext context) {
-    final variants = widget.stocks
-        .map((s) => s.variant)
-        .toSet()
-        .where((v) => v.trim().isNotEmpty)
-        .toList()
-      ..sort();
+    final variants =
+        widget.stocks
+            .map((s) => s.variant)
+            .toSet()
+            .where((v) => v.trim().isNotEmpty)
+            .toList()
+          ..sort();
 
     return Padding(
       padding: DesignTokens.paddingScreen,
@@ -449,7 +449,9 @@ class _ReceiveLineConfigFormState extends State<_ReceiveLineConfigForm> {
               decoration: const InputDecoration(labelText: 'Variant'),
               items: [
                 const DropdownMenuItem(value: '', child: Text('Default')),
-                ...variants.map((v) => DropdownMenuItem(value: v, child: Text(v))),
+                ...variants.map(
+                  (v) => DropdownMenuItem(value: v, child: Text(v)),
+                ),
               ],
               onChanged: (v) => setState(() => _variant = v ?? ''),
             ),
@@ -477,8 +479,17 @@ class _ReceiveLineConfigFormState extends State<_ReceiveLineConfigForm> {
               final qty = int.tryParse(_qtyCtrl.text.trim()) ?? 0;
               if (qty <= 0) return;
               final unitCostRaw = _costCtrl.text.trim();
-              final unitCost = unitCostRaw.isEmpty ? null : double.tryParse(unitCostRaw);
-              Navigator.pop(context, _LineConfig(variant: _variant, quantity: qty, unitCost: unitCost));
+              final unitCost = unitCostRaw.isEmpty
+                  ? null
+                  : double.tryParse(unitCostRaw);
+              Navigator.pop(
+                context,
+                _LineConfig(
+                  variant: _variant,
+                  quantity: qty,
+                  unitCost: unitCost,
+                ),
+              );
             },
             child: const Text('Add'),
           ),

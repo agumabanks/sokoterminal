@@ -25,17 +25,18 @@ class CartState {
   final String? notes;
   final Customer? customer;
 
-  double get subtotal => lines.fold(0, (sum, line) => sum + line.total);
+  double get subtotal =>
+      lines.fold<double>(0, (sum, line) => sum + line.total).roundToDouble();
 
   CartState copyWith({
     List<CartLine>? lines,
     String? notes,
-    Customer? customer,
+    Customer? Function()? customer,
   }) {
     return CartState(
       lines: lines ?? this.lines,
       notes: notes ?? this.notes,
-      customer: customer ?? this.customer,
+      customer: customer != null ? customer() : this.customer,
     );
   }
 }
@@ -61,7 +62,7 @@ class CartLine {
   final int? availableStock;
   final int quantity;
 
-  double get total => price * quantity;
+  double get total => (price * quantity).roundToDouble();
 
   CartLine copyWith({int? quantity, double? price, int? availableStock}) {
     return CartLine(
@@ -82,10 +83,10 @@ class CartController extends StateNotifier<CartState> {
     required AppDatabase db,
     required SyncService syncService,
     required SecureStorage secureStorage,
-  })  : _db = db,
-        _syncService = syncService,
-        _storage = secureStorage,
-        super(const CartState());
+  }) : _db = db,
+       _syncService = syncService,
+       _storage = secureStorage,
+       super(const CartState());
 
   final AppDatabase _db;
   final SyncService _syncService;
@@ -224,8 +225,7 @@ class CartController extends StateNotifier<CartState> {
     // Check for existing line with same service + variant
     final existingIndex = state.lines.indexWhere(
       (line) =>
-          line.serviceId == service.id &&
-          (line.variant ?? '') == normalized,
+          line.serviceId == service.id && (line.variant ?? '') == normalized,
     );
 
     if (existingIndex != -1) {
@@ -276,8 +276,7 @@ class CartController extends StateNotifier<CartState> {
     state = state.copyWith(
       lines: state.lines
           .map(
-            (line) =>
-                line.id == id ? line.copyWith(quantity: nextQty) : line,
+            (line) => line.id == id ? line.copyWith(quantity: nextQty) : line,
           )
           .toList(),
     );
@@ -322,12 +321,11 @@ class CartController extends StateNotifier<CartState> {
       final item = await _db.getItemById(itemId);
       if (item != null && item.stockEnabled) {
         final variant = (current.variant ?? '').trim();
-        final stockRow = await (_db.select(_db.itemStocks)
-              ..where(
-                (t) =>
-                    t.itemId.equals(itemId) & t.variant.equals(variant),
-              ))
-            .getSingleOrNull();
+        final stockRow =
+            await (_db.select(_db.itemStocks)..where(
+                  (t) => t.itemId.equals(itemId) & t.variant.equals(variant),
+                ))
+                .getSingleOrNull();
         if (stockRow != null) {
           maxQty = stockRow.stockQty;
         } else {
@@ -401,7 +399,7 @@ class CartController extends StateNotifier<CartState> {
   void apply(CartState next) => state = next;
 
   void setCustomer(Customer? customer) =>
-      state = state.copyWith(customer: customer);
+      state = state.copyWith(customer: () => customer);
 
   Future<String> checkout({
     required List<CheckoutPayment> payments,
@@ -409,13 +407,17 @@ class CartController extends StateNotifier<CartState> {
     Customer? customer,
   }) async {
     var resolvedCustomer = customer ?? state.customer;
-    
+
     // Auto-assign walk-in customer if cart has services but no customer
-    final hasServiceLine = state.lines.any((l) => l.serviceId != null && l.serviceId!.isNotEmpty);
+    final hasServiceLine = state.lines.any(
+      (l) => l.serviceId != null && l.serviceId!.isNotEmpty,
+    );
     if (hasServiceLine && resolvedCustomer == null) {
-      resolvedCustomer = await _db.getOrCreateWalkInCustomerForDate(DateTime.now());
+      resolvedCustomer = await _db.getOrCreateWalkInCustomerForDate(
+        DateTime.now(),
+      );
     }
-    
+
     if (payments.isEmpty) {
       throw ArgumentError.value(
         payments,
@@ -444,9 +446,11 @@ class CartController extends StateNotifier<CartState> {
 
       final variant = (line.variant ?? '').trim();
       var available = variant.isEmpty ? item.stockQty : 0;
-      final stockRow = await (_db.select(_db.itemStocks)
-            ..where((t) => t.itemId.equals(itemId) & t.variant.equals(variant)))
-          .getSingleOrNull();
+      final stockRow =
+          await (_db.select(_db.itemStocks)..where(
+                (t) => t.itemId.equals(itemId) & t.variant.equals(variant),
+              ))
+              .getSingleOrNull();
       if (stockRow != null) {
         available = stockRow.stockQty;
       }
@@ -458,9 +462,7 @@ class CartController extends StateNotifier<CartState> {
       }
     }
     if (stockShortages.isNotEmpty) {
-      throw StateError(
-        'Insufficient stock: ${stockShortages.join(', ')}',
-      );
+      throw StateError('Insufficient stock: ${stockShortages.join(', ')}');
     }
 
     final transactionId = _uuid.v4();

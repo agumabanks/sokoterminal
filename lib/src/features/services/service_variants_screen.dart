@@ -23,9 +23,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: const Text('Pricing Variants'),
-      ),
+      appBar: AppBar(title: const Text('Pricing Variants')),
       body: variantsAsync.when(
         data: (variants) {
           if (variants.isEmpty) {
@@ -33,7 +31,11 @@ class ServiceVariantsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.style_outlined, size: 64, color: Colors.grey),
+                  const Icon(
+                    Icons.style_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   Text('No variants added', style: DesignTokens.textBody),
                   const SizedBox(height: 24),
@@ -54,18 +56,26 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
                 child: ListTile(
                   title: Text(v.name),
-                  subtitle: Text('UGX ${v.price.toStringAsFixed(0)} / ${v.unit ?? "unit"}'),
+                  subtitle: Text(
+                    'UGX ${v.price.toStringAsFixed(0)} / ${v.unit ?? "unit"}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (v.isDefault)
-                        const Chip(label: Text('Default'), visualDensity: VisualDensity.compact),
+                        const Chip(
+                          label: Text('Default'),
+                          visualDensity: VisualDensity.compact,
+                        ),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined),
                         onPressed: () => _showEditor(context, ref, variant: v),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
                         onPressed: () => _deleteVariant(context, ref, v),
                       ),
                     ],
@@ -78,7 +88,8 @@ class ServiceVariantsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
-      floatingActionButton: variantsAsync.hasValue && variantsAsync.value!.isNotEmpty
+      floatingActionButton:
+          variantsAsync.hasValue && variantsAsync.value!.isNotEmpty
           ? FloatingActionButton(
               onPressed: () => _showEditor(context, ref),
               child: const Icon(Icons.add),
@@ -87,14 +98,21 @@ class ServiceVariantsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _deleteVariant(BuildContext context, WidgetRef ref, ServiceVariant v) async {
+  Future<void> _deleteVariant(
+    BuildContext context,
+    WidgetRef ref,
+    ServiceVariant v,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete variant?'),
         content: Text('Delete "${v.name}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -114,7 +132,11 @@ class ServiceVariantsScreen extends ConsumerWidget {
     unawaited(sync.syncNow());
   }
 
-  Future<void> _showEditor(BuildContext context, WidgetRef ref, {ServiceVariant? variant}) async {
+  Future<void> _showEditor(
+    BuildContext context,
+    WidgetRef ref, {
+    ServiceVariant? variant,
+  }) async {
     final nameCtrl = TextEditingController(text: variant?.name);
     final priceCtrl = TextEditingController(text: variant?.price.toString());
     final unitCtrl = TextEditingController(text: variant?.unit ?? 'unit');
@@ -137,10 +159,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: DesignTokens.spaceMd),
-            AppInput(
-              controller: unitCtrl,
-              label: 'Unit (e.g. page, hr)',
-            ),
+            AppInput(controller: unitCtrl, label: 'Unit (e.g. page, hr)'),
             const SizedBox(height: DesignTokens.spaceMd),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -167,7 +186,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
 
                 // If setting as default, unset others
                 if (isDefault) {
-                   await db.unsetDefaultVariants(serviceId);
+                  await db.unsetDefaultVariants(serviceId);
                 }
 
                 final companion = ServiceVariantsCompanion(
@@ -191,7 +210,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
                   'unit': unit,
                   'is_default': isDefault ? 1 : 0,
                 });
-                
+
                 // Trigger immediate sync attempt
                 unawaited(sync.syncNow());
               },
@@ -203,7 +222,8 @@ class ServiceVariantsScreen extends ConsumerWidget {
   }
 }
 
-final serviceVariantsStreamProvider = StreamProvider.family<List<ServiceVariant>, String>((ref, serviceId) {
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchServiceVariants(serviceId);
-});
+final serviceVariantsStreamProvider =
+    StreamProvider.family<List<ServiceVariant>, String>((ref, serviceId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchServiceVariants(serviceId);
+    });

@@ -12,11 +12,11 @@ import '../../core/telemetry/telemetry.dart';
 
 final ordersControllerProvider =
     StateNotifierProvider<OrdersController, OrdersState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  final db = ref.watch(appDatabaseProvider);
-  final sync = ref.watch(syncServiceProvider);
-  return OrdersController(api, db, sync)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      final db = ref.watch(appDatabaseProvider);
+      final sync = ref.watch(syncServiceProvider);
+      return OrdersController(api, db, sync)..load();
+    });
 
 class OrdersState {
   const OrdersState({this.loading = false, this.orders = const [], this.error});
@@ -37,8 +37,12 @@ class OrdersController extends StateNotifier<OrdersState> {
     try {
       final res = await api.fetchOrders();
       final data = res.data;
-      final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
-      final list = List<Map<String, dynamic>>.from((listRaw as Iterable).map((e) => Map<String, dynamic>.from(e as Map)));
+      final listRaw = data is Map<String, dynamic>
+          ? (data['data'] ?? const [])
+          : data;
+      final list = List<Map<String, dynamic>>.from(
+        (listRaw as Iterable).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
 
       for (final order in list) {
         final id = int.tryParse(order['id']?.toString() ?? '');
@@ -51,7 +55,10 @@ class OrdersController extends StateNotifier<OrdersState> {
       final cachedRows = await db.getCachedOrders();
       if (cachedRows.isNotEmpty) {
         final list = cachedRows
-            .map((r) => Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map))
+            .map(
+              (r) =>
+                  Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+            )
             .toList();
         state = OrdersState(error: e.toString(), orders: list);
       } else {
@@ -95,13 +102,13 @@ class OrdersController extends StateNotifier<OrdersState> {
               'pending_sync': true,
             }
           else
-            o
+            o,
       ];
 
       final existing = updatedOrders.cast<Map<String, dynamic>?>().firstWhere(
-            (o) => o?['id']?.toString() == orderId.toString(),
-            orElse: () => null,
-          );
+        (o) => o?['id']?.toString() == orderId.toString(),
+        orElse: () => null,
+      );
       if (existing != null) {
         await db.upsertCachedOrder(orderId, jsonEncode(existing));
       }
@@ -111,7 +118,11 @@ class OrdersController extends StateNotifier<OrdersState> {
         unawaited(
           telemetry.event(
             'order_status_update_queued',
-            props: {'order_id': orderId, 'delivery': delivery, 'payment': payment},
+            props: {
+              'order_id': orderId,
+              'delivery': delivery,
+              'payment': payment,
+            },
           ),
         );
       }
@@ -128,7 +139,9 @@ class OrdersController extends StateNotifier<OrdersState> {
     try {
       final res = await api.fetchOrderItems(orderId);
       final data = res.data;
-      final list = data is Map<String, dynamic> ? data['data'] ?? data['items'] ?? [] : data;
+      final list = data is Map<String, dynamic>
+          ? data['data'] ?? data['items'] ?? []
+          : data;
       return List<Map<String, dynamic>>.from(list as Iterable);
     } catch (_) {
       return [];
@@ -145,7 +158,9 @@ class OrdersController extends StateNotifier<OrdersState> {
       final res = await api.fetchOrderDetails(orderId);
       final raw = res.data;
       final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
-      final first = (listRaw is List && listRaw.isNotEmpty) ? listRaw.first : null;
+      final first = (listRaw is List && listRaw.isNotEmpty)
+          ? listRaw.first
+          : null;
       if (first is! Map) {
         throw const FormatException('Invalid order details response shape');
       }
@@ -172,6 +187,15 @@ class OrdersController extends StateNotifier<OrdersState> {
         orElse: () => null,
       );
     }
+  }
+
+  Future<String> requestSokoDelivery(int orderId) async {
+    final res = await api.requestSokoDelivery(orderId);
+    final body = res.data;
+    await load();
+    return body is Map<String, dynamic>
+        ? (body['message'] ?? 'Soko24 delivery requested').toString()
+        : 'Soko24 delivery requested';
   }
 
   Future<void> pullCached() async {

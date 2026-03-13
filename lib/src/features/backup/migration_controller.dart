@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
-import '../../core/network/api_client.dart';
 
 class MigrationState {
   final bool checking;
@@ -31,9 +30,10 @@ class MigrationState {
   }
 }
 
-final migrationProvider = StateNotifierProvider<MigrationController, MigrationState>((ref) {
-  return MigrationController(ref);
-});
+final migrationProvider =
+    StateNotifierProvider<MigrationController, MigrationState>((ref) {
+      return MigrationController(ref);
+    });
 
 class MigrationController extends StateNotifier<MigrationState> {
   MigrationController(this.ref) : super(MigrationState());
@@ -44,8 +44,10 @@ class MigrationController extends StateNotifier<MigrationState> {
     state = state.copyWith(checking: true, error: null);
     try {
       final client = ref.read(apiClientProvider);
-      final response = await client.get<Map<String, dynamic>>('/v2/seller/backups/latest');
-      
+      final response = await client.get<Map<String, dynamic>>(
+        '/v2/seller/backups/latest',
+      );
+
       if (response.data?['available'] == true) {
         state = state.copyWith(
           checking: false,
@@ -63,8 +65,10 @@ class MigrationController extends StateNotifier<MigrationState> {
     state = state.copyWith(restoring: true, error: null);
     try {
       final client = ref.read(apiClientProvider);
-      final response = await client.get<Map<String, dynamic>>('/v2/seller/backups/$backupId');
-      
+      final response = await client.get<Map<String, dynamic>>(
+        '/v2/seller/backups/$backupId',
+      );
+
       if (response.data?['success'] == true) {
         final backupData = response.data?['data'] as Map<String, dynamic>?;
         if (backupData != null) {

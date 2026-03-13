@@ -26,7 +26,7 @@ class ProductFormState {
   final bool refundable;
   final bool cashOnDelivery;
   final bool publishOnline;
-  
+
   // Images
   final File? thumbnailFile;
   final String? thumbnailUrl;
@@ -34,13 +34,13 @@ class ProductFormState {
   final List<File> galleryFiles;
   final List<String> galleryUrls;
   final List<int> galleryUploadIds;
-  
+
   // Loaded data
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> brands;
   final bool isLoadingCategories;
   final bool isLoadingBrands;
-  
+
   // UI State
   final int currentTab;
   final bool isSubmitting;
@@ -156,14 +156,15 @@ class ProductFormState {
       error: error,
     );
   }
-  
+
   double? get priceValue => double.tryParse(price.trim());
   int? get stockValue => int.tryParse(stock.trim());
   double? get discountValue =>
       discount.trim().isEmpty ? 0 : double.tryParse(discount.trim());
   int? get minQtyValue => int.tryParse(minQty.trim());
-  int? get lowStockWarningValue =>
-      lowStockWarning.trim().isEmpty ? null : int.tryParse(lowStockWarning.trim());
+  int? get lowStockWarningValue => lowStockWarning.trim().isEmpty
+      ? null
+      : int.tryParse(lowStockWarning.trim());
   double? get weightValue =>
       weight.trim().isEmpty ? null : double.tryParse(weight.trim());
   int? get shippingDaysValue =>
@@ -173,10 +174,10 @@ class ProductFormState {
 
   /// Check if basic info is valid
   bool get isBasicInfoValid => name.trim().isNotEmpty && unit.isNotEmpty;
-  
+
   /// Check if category is valid for online
   bool get isCategoryValid => !publishOnline || categoryId != null;
-  
+
   /// Check if pricing is valid
   bool get isPricingValid {
     final p = priceValue;
@@ -209,7 +210,8 @@ class ProductFormState {
     if (weight.trim().isNotEmpty && weightValue == null) return false;
     final w = weightValue;
     if (w != null && w < 0) return false;
-    if (shippingDays.trim().isNotEmpty && shippingDaysValue == null) return false;
+    if (shippingDays.trim().isNotEmpty && shippingDaysValue == null)
+      return false;
     final days = shippingDaysValue;
     if (days != null && days < 0) return false;
     if (shippingFee.trim().isNotEmpty && shippingFeeValue == null) return false;
@@ -222,7 +224,7 @@ class ProductFormState {
       !publishOnline ||
       thumbnailFile != null ||
       (thumbnailUrl != null && thumbnailUrl!.trim().isNotEmpty);
-  
+
   /// Check if ready to submit
   bool get isOnlineDetailsValid {
     if (!publishOnline) return true;
@@ -252,25 +254,26 @@ class ProductFormState {
 class ProductFormController extends StateNotifier<ProductFormState> {
   final Ref ref;
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   ProductFormController(this.ref) : super(const ProductFormState());
-  
+
   // Tab navigation
   void setTab(int tab) => state = state.copyWith(currentTab: tab);
-  
+
   // Basic info
   void setName(String v) => state = state.copyWith(name: v);
   void setUnit(String v) => state = state.copyWith(unit: v);
   void setWeight(String v) => state = state.copyWith(weight: v);
-  
+
   // Category/Brand
   void setCategory(String? id, String? name) {
     state = state.copyWith(categoryId: id, categoryName: name);
   }
+
   void setBrand(String? id, String? name) {
     state = state.copyWith(brandId: id, brandName: name);
   }
-  
+
   // Pricing
   void setPrice(String v) => state = state.copyWith(price: v);
   void setStock(String v) => state = state.copyWith(stock: v);
@@ -278,30 +281,28 @@ class ProductFormController extends StateNotifier<ProductFormState> {
   void setDiscountType(String v) => state = state.copyWith(discountType: v);
   void setSku(String v) => state = state.copyWith(sku: v);
   void setMinQty(String v) => state = state.copyWith(minQty: v);
-  void setLowStockWarning(String v) => state = state.copyWith(lowStockWarning: v);
-  
+  void setLowStockWarning(String v) =>
+      state = state.copyWith(lowStockWarning: v);
+
   // Description
   void setDescription(String v) => state = state.copyWith(description: v);
   void setTags(String v) => state = state.copyWith(tags: v);
-  
+
   // Shipping
   void setShippingDays(String v) => state = state.copyWith(shippingDays: v);
   void setShippingFee(String v) => state = state.copyWith(shippingFee: v);
   void setRefundable(bool v) => state = state.copyWith(refundable: v);
   void setCashOnDelivery(bool v) => state = state.copyWith(cashOnDelivery: v);
-  
+
   /// Toggle publish online - triggers smart prefetch
   Future<void> setPublishOnline(bool v) async {
     state = state.copyWith(publishOnline: v);
     if (v && state.categories.isEmpty) {
       // Smart prefetch when going online
-      await Future.wait([
-        _loadCategories(),
-        _loadBrands(),
-      ]);
+      await Future.wait([_loadCategories(), _loadBrands()]);
     }
   }
-  
+
   /// Load categories from API
   Future<void> _loadCategories() async {
     if (state.isLoadingCategories) return;
@@ -316,12 +317,18 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       } else if (data is List) {
         categories = List<Map<String, dynamic>>.from(data);
       }
-      state = state.copyWith(categories: categories, isLoadingCategories: false);
+      state = state.copyWith(
+        categories: categories,
+        isLoadingCategories: false,
+      );
     } catch (e) {
-      state = state.copyWith(isLoadingCategories: false, error: 'Failed to load categories');
+      state = state.copyWith(
+        isLoadingCategories: false,
+        error: 'Failed to load categories',
+      );
     }
   }
-  
+
   /// Load brands from API
   Future<void> _loadBrands() async {
     if (state.isLoadingBrands) return;
@@ -338,10 +345,13 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       }
       state = state.copyWith(brands: brands, isLoadingBrands: false);
     } catch (e) {
-      state = state.copyWith(isLoadingBrands: false, error: 'Failed to load brands');
+      state = state.copyWith(
+        isLoadingBrands: false,
+        error: 'Failed to load brands',
+      );
     }
   }
-  
+
   /// Pick thumbnail image
   Future<void> pickThumbnail() async {
     final XFile? image = await _imagePicker.pickImage(
@@ -354,7 +364,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       state = state.copyWith(thumbnailFile: File(image.path));
     }
   }
-  
+
   /// Take photo for thumbnail
   Future<void> takeThumbnailPhoto() async {
     final XFile? image = await _imagePicker.pickImage(
@@ -367,7 +377,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       state = state.copyWith(thumbnailFile: File(image.path));
     }
   }
-  
+
   /// Pick gallery images (multiple)
   Future<void> pickGalleryImages() async {
     final List<XFile> images = await _imagePicker.pickMultiImage(
@@ -377,12 +387,10 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     );
     if (images.isNotEmpty) {
       final files = images.map((x) => File(x.path)).toList();
-      state = state.copyWith(
-        galleryFiles: [...state.galleryFiles, ...files],
-      );
+      state = state.copyWith(galleryFiles: [...state.galleryFiles, ...files]);
     }
   }
-  
+
   /// Remove gallery image
   void removeGalleryImage(int index) {
     final newList = List<File>.from(state.galleryFiles);
@@ -418,7 +426,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       thumbnailFile: pendingThumbnailFile,
     );
   }
-  
+
   /// Remove thumbnail
   void removeThumbnail() {
     state = ProductFormState(
@@ -457,84 +465,85 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       isSubmitting: state.isSubmitting,
     );
   }
-  
-  
+
   /// Auto-generate a unique SKU based on product name
   String generateUniqueSKU() {
     final name = state.name.trim();
-    if (name.isEmpty) return 'PROD-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
-    
+    if (name.isEmpty)
+      return 'PROD-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+
     // Extract first 3-4 letters from product name
     final letters = name.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
-    final prefix = letters.isEmpty 
-      ? 'PROD' 
-      : letters.substring(0, letters.length < 4 ? letters.length : 4);
-    
+    final prefix = letters.isEmpty
+        ? 'PROD'
+        : letters.substring(0, letters.length < 4 ? letters.length : 4);
+
     // Add timestamp for uniqueness
     final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     return '$prefix-$timestamp';
   }
-  
+
   /// Check if SKU already exists locally (for editing, pass current item ID to exclude)
   Future<bool> isDuplicateSKU(String sku, {String? excludeItemId}) async {
     if (sku.trim().isEmpty) return false;
-    
+
     final db = ref.read(appDatabaseProvider);
-    final existing = await (db.select(db.items)
-      ..where((t) => t.sku.equals(sku.trim())))
-      .get();
-    
+    final existing = await (db.select(
+      db.items,
+    )..where((t) => t.sku.equals(sku.trim()))).get();
+
     if (existing.isEmpty) return false;
-    
+
     // If editing, exclude current item from check
     if (excludeItemId != null) {
       return existing.any((item) => item.id != excludeItemId);
     }
-    
+
     return true;
   }
-  
+
   /// Auto-generate and set unique SKU
   Future<void> autoGenerateSKU() async {
     var sku = generateUniqueSKU();
-    
+
     // Ensure it's truly unique (rare collision case)
     while (await isDuplicateSKU(sku)) {
       await Future.delayed(const Duration(milliseconds: 100));
       sku = generateUniqueSKU();
     }
-    
+
     setSku(sku);
   }
-  
+
   /// Validate SKU before save - returns error message if invalid, null if valid
   Future<String?> validateSKU({String? editingItemId}) async {
     final sku = state.sku.trim();
-    
+
     // SKU is optional - if empty, will auto-generate on save
     if (sku.isEmpty) return null;
-    
+
     // Check for duplicate
     if (await isDuplicateSKU(sku, excludeItemId: editingItemId)) {
       final suggested = generateUniqueSKU();
       return 'SKU "$sku" already exists. Try: $suggested';
     }
-    
+
     return null;
   }
 
   /// Reset form
 
   void reset() => state = const ProductFormState();
-  
+
   /// Set submitting state
   void setSubmitting(bool v) => state = state.copyWith(isSubmitting: v);
-  
+
   /// Clear error
   void clearError() => state = state.copyWith(error: null);
 }
 
 /// Provider for product form
-final productFormProvider = StateNotifierProvider.autoDispose<ProductFormController, ProductFormState>(
-  (ref) => ProductFormController(ref),
-);
+final productFormProvider =
+    StateNotifierProvider.autoDispose<ProductFormController, ProductFormState>(
+      (ref) => ProductFormController(ref),
+    );

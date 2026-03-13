@@ -15,7 +15,7 @@ import 'add_product_screen.dart';
 import 'product_preview_screen.dart';
 
 /// Items Screen — Product catalog management.
-/// 
+///
 /// Redesigned with premium UI following "Steve Jobs standard":
 /// - Clean list with sync status
 /// - Bottom sheet for add/edit
@@ -65,11 +65,17 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 boxShadow: DesignTokens.shadowSm,
               ),
               child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                onChanged: (v) =>
+                    setState(() => _searchQuery = v.toLowerCase()),
                 decoration: InputDecoration(
                   hintText: 'Search products...',
-                  hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
-                  prefixIcon: const Icon(Icons.search, color: DesignTokens.grayMedium),
+                  hintStyle: DesignTokens.textBody.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: DesignTokens.grayMedium,
+                  ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -81,7 +87,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
               ),
             ),
           ),
-          
+
           // Items list
           Expanded(
             child: StreamBuilder<List<Item>>(
@@ -90,28 +96,36 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 final items = (snapshot.data ?? [])
-                    .where((item) => _searchQuery.isEmpty || 
-                        item.name.toLowerCase().contains(_searchQuery))
+                    .where(
+                      (item) =>
+                          _searchQuery.isEmpty ||
+                          item.name.toLowerCase().contains(_searchQuery),
+                    )
                     .toList();
-                
+
                 if (items.isEmpty) {
                   return _EmptyState(
-                    onAddProduct: () => unawaited(_showItemEditor(context, null)),
+                    onAddProduct: () =>
+                        unawaited(_showItemEditor(context, null)),
                   );
                 }
-                
+
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DesignTokens.spaceMd,
+                  ),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return _ItemCard(
                       item: item,
                       onTap: () => unawaited(_showItemEditor(context, item)),
-                      onPreview: () => unawaited(_showItemPreview(context, item)),
-                      onStockTap: () => unawaited(_showStockAdjust(context, item)),
+                      onPreview: () =>
+                          unawaited(_showItemPreview(context, item)),
+                      onStockTap: () =>
+                          unawaited(_showStockAdjust(context, item)),
                       onDelete: () => _confirmDelete(context, item),
                       onToggleOnline: (v) => _toggleOnline(item, v),
                     );
@@ -147,9 +161,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   Future<void> _showItemPreview(BuildContext context, Item item) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProductPreviewScreen(itemId: item.id),
-      ),
+      MaterialPageRoute(builder: (_) => ProductPreviewScreen(itemId: item.id)),
     );
   }
 
@@ -230,17 +242,15 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                   const SizedBox(height: DesignTokens.spaceXs),
                   DropdownButtonFormField<String>(
                     initialValue: selectedVariant,
-                    items: stocks
-                        .map((s) {
-                          final label = s.variant.trim().isEmpty
-                              ? 'Default'
-                              : s.variant.replaceAll('-', ' • ');
-                          return DropdownMenuItem(
-                            value: s.variant,
-                            child: Text(label),
-                          );
-                        })
-                        .toList(),
+                    items: stocks.map((s) {
+                      final label = s.variant.trim().isEmpty
+                          ? 'Default'
+                          : s.variant.replaceAll('-', ' • ');
+                      return DropdownMenuItem(
+                        value: s.variant,
+                        child: Text(label),
+                      );
+                    }).toList(),
                     onChanged: (v) {
                       if (v == null) return;
                       setLocalState(() => selectedVariant = v);
@@ -287,7 +297,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     if (qty <= 0) return;
 
                     final requestedDelta = reason == 'stock_in' ? qty : -qty;
-                    final appliedDelta = requestedDelta < 0 && current + requestedDelta < 0
+                    final appliedDelta =
+                        requestedDelta < 0 && current + requestedDelta < 0
                         ? -current
                         : requestedDelta;
                     if (appliedDelta == 0) return;
@@ -377,9 +388,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 ),
               ),
               const SizedBox(width: DesignTokens.spaceMd),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
                     final db = ref.read(appDatabaseProvider);
                     final remoteId = item.remoteId ?? int.tryParse(item.id);
 
@@ -418,8 +429,11 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   }
 
   Future<void> _toggleOnline(Item item, bool value) async {
-    final ok =
-        await requireManagerPin(context, ref, reason: 'publish products online');
+    final ok = await requireManagerPin(
+      context,
+      ref,
+      reason: 'publish products online',
+    );
     if (!ok || !mounted) return;
 
     if (value) {
@@ -476,7 +490,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
 
   List<String> _missingMarketplaceFields(Item item) {
     final missing = <String>[];
-    final hasPhoto = ((item.thumbnailUrl ?? item.imageUrl) ?? '').trim().isNotEmpty;
+    final hasPhoto = ((item.thumbnailUrl ?? item.imageUrl) ?? '')
+        .trim()
+        .isNotEmpty;
     if (!hasPhoto) missing.add('photo');
     if ((item.categoryId ?? '').trim().isEmpty) missing.add('category');
     final desc = (item.description ?? '').trim();
@@ -527,9 +543,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         );
       } catch (e) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sync failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
       }
     }());
   }
@@ -560,7 +576,7 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final threshold = item.lowStockWarning ?? 5;
     final lowStock = item.stockEnabled && item.stockQty <= threshold;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
       decoration: BoxDecoration(
@@ -592,7 +608,7 @@ class _ItemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: DesignTokens.spaceMd),
-              
+
               // Details
               Expanded(
                 child: Column(
@@ -635,7 +651,9 @@ class _ItemCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: lowStock
                                   ? DesignTokens.warning.withValues(alpha: 0.1)
-                                  : DesignTokens.grayLight.withValues(alpha: 0.5),
+                                  : DesignTokens.grayLight.withValues(
+                                      alpha: 0.5,
+                                    ),
                               borderRadius: DesignTokens.borderRadiusSm,
                             ),
                             child: Row(
@@ -667,7 +685,7 @@ class _ItemCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Actions
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -748,7 +766,9 @@ class _ReasonChip extends StatelessWidget {
       child: Container(
         padding: DesignTokens.paddingMd,
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : DesignTokens.grayLight.withValues(alpha: 0.3),
+          color: selected
+              ? color.withValues(alpha: 0.1)
+              : DesignTokens.grayLight.withValues(alpha: 0.3),
           borderRadius: DesignTokens.borderRadiusMd,
           border: Border.all(
             color: selected ? color : Colors.transparent,
@@ -797,7 +817,9 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: DesignTokens.spaceSm),
             Text(
               'Add your first product to start selling',
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: DesignTokens.spaceLg),

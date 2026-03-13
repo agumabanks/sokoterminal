@@ -15,7 +15,6 @@ import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 
-
 class QuotationCreator extends ConsumerStatefulWidget {
   const QuotationCreator({super.key});
 
@@ -30,7 +29,8 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   int _validityDays = 7;
   bool _saving = false;
 
-  double get _total => _lines.fold(0, (sum, line) => sum + (line.unitPrice * line.quantity));
+  double get _total =>
+      _lines.fold(0, (sum, line) => sum + (line.unitPrice * line.quantity));
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +48,15 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.1),
+                    backgroundColor: DesignTokens.brandPrimary.withValues(
+                      alpha: 0.1,
+                    ),
                     child: Icon(Icons.person, color: DesignTokens.brandPrimary),
                   ),
                   title: Text(_selectedCustomer?.name ?? 'Select Customer'),
-                  subtitle: _selectedCustomer != null ? Text(_selectedCustomer!.phone ?? '') : null,
+                  subtitle: _selectedCustomer != null
+                      ? Text(_selectedCustomer!.phone ?? '')
+                      : null,
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _selectCustomer,
                 ),
@@ -63,11 +67,18 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 if (_lines.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: Text('No items added', style: DesignTokens.textSmall)),
+                    child: Center(
+                      child: Text(
+                        'No items added',
+                        style: DesignTokens.textSmall,
+                      ),
+                    ),
                   )
                 else
-                  ..._lines.asMap().entries.map((entry) => _buildLineItem(entry.key, entry.value)),
-                
+                  ..._lines.asMap().entries.map(
+                    (entry) => _buildLineItem(entry.key, entry.value),
+                  ),
+
                 AppButton(
                   label: 'Add Item',
                   variant: AppButtonVariant.outline,
@@ -97,7 +108,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
               ],
             ),
           ),
-          
+
           // Bottom Bar
           Container(
             padding: DesignTokens.paddingScreen,
@@ -113,17 +124,17 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Total', style: DesignTokens.textBody),
-                      Text(
-                        _total.toUgx(),
-                        style: DesignTokens.textTitle, 
-                      ),
+                      Text(_total.toUgx(), style: DesignTokens.textTitle),
                     ],
                   ),
                   const SizedBox(height: DesignTokens.spaceMd),
                   AppButton(
                     label: _saving ? 'Saving…' : 'Save Quotation',
                     isLoading: _saving,
-                    onPressed: _saving || _selectedCustomer == null || _lines.isEmpty ? null : _saveQuotation,
+                    onPressed:
+                        _saving || _selectedCustomer == null || _lines.isEmpty
+                        ? null
+                        : _saveQuotation,
                   ),
                 ],
               ),
@@ -136,7 +147,10 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm, top: DesignTokens.spaceMd),
+      padding: const EdgeInsets.only(
+        bottom: DesignTokens.spaceSm,
+        top: DesignTokens.spaceMd,
+      ),
       child: Text(title, style: DesignTokens.textBodyBold),
     );
   }
@@ -156,7 +170,10 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   }
 
   Future<void> _selectCustomer() async {
-    final customers = await ref.read(appDatabaseProvider).select(ref.read(appDatabaseProvider).customers).get();
+    final customers = await ref
+        .read(appDatabaseProvider)
+        .select(ref.read(appDatabaseProvider).customers)
+        .get();
     if (!mounted) return;
 
     await showModalBottomSheet(
@@ -192,25 +209,43 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: AppInput(controller: qtyCtrl, label: 'Qty', keyboardType: TextInputType.number)),
+              Expanded(
+                child: AppInput(
+                  controller: qtyCtrl,
+                  label: 'Qty',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: AppInput(controller: priceCtrl, label: 'Price', keyboardType: TextInputType.number)),
+              Expanded(
+                child: AppInput(
+                  controller: priceCtrl,
+                  label: 'Price',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
           AppButton(
-             label: 'Add',
-             onPressed: () {
-               final desc = descCtrl.text.trim();
-               final qty = int.tryParse(qtyCtrl.text) ?? 1;
-               final price = double.tryParse(priceCtrl.text) ?? 0;
-               if (desc.isNotEmpty && price > 0) {
-                 setState(() {
-                   _lines.add(QuotationLineItem(description: desc, quantity: qty, unitPrice: price));
-                 });
-                 Navigator.pop(context);
-               }
-             },
+            label: 'Add',
+            onPressed: () {
+              final desc = descCtrl.text.trim();
+              final qty = int.tryParse(qtyCtrl.text) ?? 1;
+              final price = double.tryParse(priceCtrl.text) ?? 0;
+              if (desc.isNotEmpty && price > 0) {
+                setState(() {
+                  _lines.add(
+                    QuotationLineItem(
+                      description: desc,
+                      quantity: qty,
+                      unitPrice: price,
+                    ),
+                  );
+                });
+                Navigator.pop(context);
+              }
+            },
           ),
         ],
       ),
@@ -224,9 +259,10 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
     try {
       final db = ref.read(appDatabaseProvider);
       final sync = ref.read(syncServiceProvider);
-      
+
       final quotationId = const Uuid().v4();
-      final number = 'QT-${DateFormat('yyyy').format(DateTime.now())}-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+      final number =
+          'QT-${DateFormat('yyyy').format(DateTime.now())}-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
       final expiry = DateTime.now().add(Duration(days: _validityDays));
 
       await db.saveQuotation(
@@ -241,14 +277,18 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
           notes: Value(_notesCtrl.text),
           synced: const Value(false),
         ),
-        lines: _lines.map((l) => QuotationLinesCompanion.insert(
-          id: Value(const Uuid().v4()),
-          quotationId: quotationId,
-          description: l.description,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          total: l.quantity * l.unitPrice,
-        )).toList(),
+        lines: _lines
+            .map(
+              (l) => QuotationLinesCompanion.insert(
+                id: Value(const Uuid().v4()),
+                quotationId: quotationId,
+                description: l.description,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                total: l.quantity * l.unitPrice,
+              ),
+            )
+            .toList(),
       );
 
       final customerId = _selectedCustomer!.remoteId ?? _selectedCustomer!.id;
@@ -262,24 +302,31 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
         'total': _total,
         if (notes.isNotEmpty) 'notes': notes,
         'lines': _lines
-            .map((l) => {
-                  'title': l.description,
-                  'price': l.unitPrice,
-                  'quantity': l.quantity,
-                  'total': l.quantity * l.unitPrice,
-                })
+            .map(
+              (l) => {
+                'title': l.description,
+                'price': l.unitPrice,
+                'quantity': l.quantity,
+                'total': l.quantity * l.unitPrice,
+              },
+            )
             .toList(),
       });
       unawaited(sync.syncNow());
 
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quotation saved')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Quotation saved')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save quotation: $e'), backgroundColor: DesignTokens.error),
+        SnackBar(
+          content: Text('Failed to save quotation: $e'),
+          backgroundColor: DesignTokens.error,
+        ),
       );
     }
   }
@@ -290,5 +337,9 @@ class QuotationLineItem {
   final int quantity;
   final double unitPrice;
 
-  QuotationLineItem({required this.description, required this.quantity, required this.unitPrice});
+  QuotationLineItem({
+    required this.description,
+    required this.quantity,
+    required this.unitPrice,
+  });
 }

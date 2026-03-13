@@ -30,6 +30,7 @@ val releaseStoreFile = readSecret("storeFile", "STORE_FILE")
 val releaseStorePassword = readSecret("storePassword", "STORE_PASSWORD")
 val releaseKeyAlias = readSecret("keyAlias", "KEY_ALIAS")
 val releaseKeyPassword = readSecret("keyPassword", "KEY_PASSWORD")
+val googleMapsApiKey = readSecret("googleMapsApiKey", "GOOGLE_MAPS_API_KEY")
 
 val hasReleaseSigning =
     releaseStoreFile != null &&
@@ -42,6 +43,12 @@ if (isReleaseBuild && !hasReleaseSigning) {
     throw GradleException(
         "Release signing is not configured. Create android/key.properties (see key.properties.example) " +
             "or set STORE_FILE/STORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD env vars.",
+    )
+}
+if (isReleaseBuild && googleMapsApiKey == null) {
+    throw GradleException(
+        "Google Maps API key is not configured. Set googleMapsApiKey in android/key.properties " +
+            "or export GOOGLE_MAPS_API_KEY for release builds.",
     )
 }
 
@@ -68,6 +75,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["googleMapsApiKey"] =
+            googleMapsApiKey ?: "MISSING_GOOGLE_MAPS_API_KEY"
     }
 
     signingConfigs {

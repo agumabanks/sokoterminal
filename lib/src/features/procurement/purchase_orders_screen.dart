@@ -17,7 +17,8 @@ class PurchaseOrdersScreen extends ConsumerStatefulWidget {
   const PurchaseOrdersScreen({super.key});
 
   @override
-  ConsumerState<PurchaseOrdersScreen> createState() => _PurchaseOrdersScreenState();
+  ConsumerState<PurchaseOrdersScreen> createState() =>
+      _PurchaseOrdersScreenState();
 }
 
 class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
@@ -72,7 +73,11 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.playlist_add_check_outlined, size: 56, color: DesignTokens.grayMedium),
+              Icon(
+                Icons.playlist_add_check_outlined,
+                size: 56,
+                color: DesignTokens.grayMedium,
+              ),
               const SizedBox(height: DesignTokens.spaceMd),
               Text('No purchase orders yet', style: DesignTokens.textBodyBold),
               const SizedBox(height: DesignTokens.spaceXs),
@@ -98,7 +103,8 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
       child: ListView.separated(
         padding: DesignTokens.paddingScreen,
         itemCount: _rows.length,
-        separatorBuilder: (_, __) => const SizedBox(height: DesignTokens.spaceSm),
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: DesignTokens.spaceSm),
         itemBuilder: (context, index) {
           final po = _rows[index];
           return Card(
@@ -126,11 +132,12 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
     if (!session.isActive) {
       setState(() {
         _loading = false;
-        _error = 'No active POS session. Please log in with your PIN to view purchase orders.';
+        _error =
+            'No active POS session. Please log in with your PIN to view purchase orders.';
       });
       return;
     }
-    
+
     setState(() {
       _loading = true;
       _error = null;
@@ -138,10 +145,14 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
     try {
       final res = await ref.read(sellerApiProvider).fetchPurchaseOrders();
       final data = res.data;
-      final list = data is Map && data['data'] is List ? data['data'] as List : const <dynamic>[];
+      final list = data is Map && data['data'] is List
+          ? data['data'] as List
+          : const <dynamic>[];
       final rows = list
           .whereType<Map>()
-          .map((e) => _PurchaseOrderSummary.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => _PurchaseOrderSummary.fromJson(Map<String, dynamic>.from(e)),
+          )
           .toList();
       setState(() {
         _rows = rows;
@@ -193,12 +204,16 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
           'supplier_id': result.supplier?.id,
           'status': 'draft',
           'occurred_at': occurredAt.toIso8601String(),
-          'note': result.note?.trim().isNotEmpty == true ? result.note!.trim() : null,
+          'note': result.note?.trim().isNotEmpty == true
+              ? result.note!.trim()
+              : null,
           'lines': result.lines
               .map(
                 (l) => {
-                  'product_id': l.itemId, // resolved to remote id during sync dispatch
-                  if (l.variant.trim().isNotEmpty) 'variation': l.variant.trim(),
+                  'product_id':
+                      l.itemId, // resolved to remote id during sync dispatch
+                  if (l.variant.trim().isNotEmpty)
+                    'variation': l.variant.trim(),
                   'quantity': l.quantity,
                   if (l.unitCost != null) 'unit_cost': l.unitCost,
                 },
@@ -214,12 +229,14 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
             'occurred_at': occurredAt.toIso8601String(),
             'supplier_id': result.supplier?.id,
             'lines': result.lines
-                .map((l) => {
-                      'item_id': l.itemId,
-                      'variant': l.variant,
-                      'quantity': l.quantity,
-                      if (l.unitCost != null) 'unit_cost': l.unitCost,
-                    })
+                .map(
+                  (l) => {
+                    'item_id': l.itemId,
+                    'variant': l.variant,
+                    'quantity': l.quantity,
+                    if (l.unitCost != null) 'unit_cost': l.unitCost,
+                  },
+                )
                 .toList(),
           },
         );
@@ -333,10 +350,17 @@ class _CreatePoFormState extends ConsumerState<_CreatePoForm> {
                 ..sort((a, b) => a.name.compareTo(b.name));
               return DropdownButtonFormField<Supplier?>(
                 initialValue: _supplier,
-                decoration: const InputDecoration(labelText: 'Supplier (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Supplier (optional)',
+                ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('No supplier')),
-                  ...sorted.map((s) => DropdownMenuItem(value: s, child: Text(s.name))),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('No supplier'),
+                  ),
+                  ...sorted.map(
+                    (s) => DropdownMenuItem(value: s, child: Text(s.name)),
+                  ),
                 ],
                 onChanged: (v) => setState(() => _supplier = v),
               );
@@ -369,7 +393,9 @@ class _CreatePoFormState extends ConsumerState<_CreatePoForm> {
                 for (final l in _lines)
                   ListTile(
                     title: Text(l.title),
-                    subtitle: Text('Qty ${l.quantity}${l.variant.trim().isEmpty ? '' : ' • ${l.variant}'}'),
+                    subtitle: Text(
+                      'Qty ${l.quantity}${l.variant.trim().isEmpty ? '' : ' • ${l.variant}'}',
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => setState(() => _lines.remove(l)),
@@ -528,12 +554,13 @@ class _PoLineConfigFormState extends State<_PoLineConfigForm> {
 
   @override
   Widget build(BuildContext context) {
-    final variants = widget.stocks
-        .map((s) => s.variant)
-        .toSet()
-        .where((v) => v.trim().isNotEmpty)
-        .toList()
-      ..sort();
+    final variants =
+        widget.stocks
+            .map((s) => s.variant)
+            .toSet()
+            .where((v) => v.trim().isNotEmpty)
+            .toList()
+          ..sort();
 
     return Padding(
       padding: DesignTokens.paddingScreen,
@@ -549,7 +576,9 @@ class _PoLineConfigFormState extends State<_PoLineConfigForm> {
               decoration: const InputDecoration(labelText: 'Variant'),
               items: [
                 const DropdownMenuItem(value: '', child: Text('Default')),
-                ...variants.map((v) => DropdownMenuItem(value: v, child: Text(v))),
+                ...variants.map(
+                  (v) => DropdownMenuItem(value: v, child: Text(v)),
+                ),
               ],
               onChanged: (v) => setState(() => _variant = v ?? ''),
             ),
@@ -563,7 +592,9 @@ class _PoLineConfigFormState extends State<_PoLineConfigForm> {
           TextField(
             controller: _costCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Unit cost (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Unit cost (optional)',
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceLg),
           ElevatedButton(
@@ -572,7 +603,10 @@ class _PoLineConfigFormState extends State<_PoLineConfigForm> {
               if (qty <= 0) return;
               final costRaw = _costCtrl.text.trim();
               final cost = costRaw.isEmpty ? null : double.tryParse(costRaw);
-              Navigator.pop(context, _PoLineConfig(variant: _variant, quantity: qty, unitCost: cost));
+              Navigator.pop(
+                context,
+                _PoLineConfig(variant: _variant, quantity: qty, unitCost: cost),
+              );
             },
             child: const Text('Add line'),
           ),

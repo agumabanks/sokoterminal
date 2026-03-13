@@ -39,7 +39,8 @@ class OrdersScreen extends ConsumerWidget {
           final orders = state.orders;
 
           final totalRevenue = orders.fold<double>(0, (sum, order) {
-            return sum + (double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0);
+            return sum +
+                (double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0);
           });
 
           return Column(
@@ -58,7 +59,8 @@ class OrdersScreen extends ConsumerWidget {
               ),
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: () => ref.read(ordersControllerProvider.notifier).load(),
+                  onRefresh: () =>
+                      ref.read(ordersControllerProvider.notifier).load(),
                   child: ListView.builder(
                     padding: DesignTokens.paddingScreen,
                     itemCount: orders.length,
@@ -82,10 +84,11 @@ class OrdersScreen extends ConsumerWidget {
   void _showDetails(BuildContext context, Map<String, dynamic> order) {
     final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
     if (orderId == 0) return;
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OrderDetailsScreen(orderId: orderId, initialData: order),
+        builder: (_) =>
+            OrderDetailsScreen(orderId: orderId, initialData: order),
       ),
     );
   }
@@ -129,7 +132,9 @@ class _OrderTile extends StatelessWidget {
     final total = double.tryParse(order['grand_total']?.toString() ?? '') ?? 0;
 
     final statusColor = _statusColor(status);
-    final paymentColor = paymentStatus == 'paid' ? DesignTokens.success : DesignTokens.warning;
+    final paymentColor = paymentStatus == 'paid'
+        ? DesignTokens.success
+        : DesignTokens.warning;
 
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -149,9 +154,7 @@ class _OrderTile extends StatelessWidget {
         ),
         title: Row(
           children: [
-            Expanded(
-              child: Text(id, style: DesignTokens.textBodyBold),
-            ),
+            Expanded(child: Text(id, style: DesignTokens.textBodyBold)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(

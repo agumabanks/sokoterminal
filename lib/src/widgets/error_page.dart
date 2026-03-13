@@ -23,51 +23,51 @@ class ErrorPage extends StatelessWidget {
 
   /// Factory for offline errors
   factory ErrorPage.offline({VoidCallback? onRetry}) => ErrorPage(
-        title: 'No Internet Connection',
-        message: 'Please check your network settings and try again.',
-        errorCode: 'OFFLINE',
-        onRetry: onRetry,
-      );
+    title: 'No Internet Connection',
+    message: 'Please check your network settings and try again.',
+    errorCode: 'OFFLINE',
+    onRetry: onRetry,
+  );
 
   /// Factory for timeout errors
   factory ErrorPage.timeout({VoidCallback? onRetry}) => ErrorPage(
-        title: 'Request Timed Out',
-        message: 'The server is taking too long to respond. Please try again.',
-        errorCode: 'TIMEOUT',
-        onRetry: onRetry,
-      );
+    title: 'Request Timed Out',
+    message: 'The server is taking too long to respond. Please try again.',
+    errorCode: 'TIMEOUT',
+    onRetry: onRetry,
+  );
 
   /// Factory for 401 Unauthorized errors
   factory ErrorPage.unauthorized({VoidCallback? onRetry}) => ErrorPage(
-        title: 'Session Expired',
-        message: 'Please log in again to continue.',
-        errorCode: '401',
-        onRetry: onRetry,
-      );
+    title: 'Session Expired',
+    message: 'Please log in again to continue.',
+    errorCode: '401',
+    onRetry: onRetry,
+  );
 
   /// Factory for 403 Forbidden errors
   factory ErrorPage.forbidden({VoidCallback? onRetry}) => ErrorPage(
-        title: 'Access Denied',
-        message: 'You don\'t have permission to access this resource.',
-        errorCode: '403',
-        onRetry: onRetry,
-      );
+    title: 'Access Denied',
+    message: 'You don\'t have permission to access this resource.',
+    errorCode: '403',
+    onRetry: onRetry,
+  );
 
   /// Factory for 404 Not Found errors
   factory ErrorPage.notFound({VoidCallback? onRetry}) => ErrorPage(
-        title: 'Not Found',
-        message: 'The requested resource could not be found.',
-        errorCode: '404',
-        onRetry: onRetry,
-      );
+    title: 'Not Found',
+    message: 'The requested resource could not be found.',
+    errorCode: '404',
+    onRetry: onRetry,
+  );
 
   /// Factory for 500 Server errors
   factory ErrorPage.serverError({VoidCallback? onRetry}) => ErrorPage(
-        title: 'Server Error',
-        message: 'Something went wrong on our end. Please try again later.',
-        errorCode: '500',
-        onRetry: onRetry,
-      );
+    title: 'Server Error',
+    message: 'Something went wrong on our end. Please try again later.',
+    errorCode: '500',
+    onRetry: onRetry,
+  );
 
   /// Factory from HTTP status code
   factory ErrorPage.fromStatusCode(
@@ -137,11 +137,7 @@ class ErrorPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              _icon,
-              size: 80,
-              color: _iconColor,
-            ),
+            Icon(_icon, size: 80, color: _iconColor),
             const SizedBox(height: DesignTokens.spaceLg),
             Text(
               title,
@@ -228,11 +224,7 @@ class ErrorPage extends StatelessWidget {
 
 /// A wrapper that catches errors and shows ErrorPage
 class ErrorBoundary extends StatefulWidget {
-  const ErrorBoundary({
-    super.key,
-    required this.child,
-    this.onRetry,
-  });
+  const ErrorBoundary({super.key, required this.child, this.onRetry});
 
   final Widget child;
   final VoidCallback? onRetry;

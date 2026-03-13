@@ -5,9 +5,9 @@ import '../../core/app_providers.dart';
 
 final staffPinProvider =
     StateNotifierProvider<StaffPinController, StaffPinState>((ref) {
-  final storage = ref.watch(secureStorageProvider);
-  return StaffPinController(storage)..load();
-});
+      final storage = ref.watch(secureStorageProvider);
+      return StaffPinController(storage)..load();
+    });
 
 class StaffPinState {
   const StaffPinState({this.enabled = false, this.locked = false});

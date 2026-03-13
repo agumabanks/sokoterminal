@@ -145,23 +145,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             leading: const Icon(Icons.fact_check_outlined),
             title: const Text('Test print'),
             subtitle: const Text('Send a test slip to the selected printer'),
-              onTap: () async {
-                try {
-                  await ref.read(printQueueServiceProvider).testPrint();
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Test print sent'),
-                      backgroundColor: DesignTokens.brandAccent,
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Test print failed: $e')),
-                  );
-                }
-              },
+            onTap: () async {
+              try {
+                await ref.read(printQueueServiceProvider).testPrint();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Test print sent'),
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Test print failed: $e')),
+                );
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.sync),
@@ -217,10 +217,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy policy'),
-            subtitle: Text(
-              privacyPolicyUrl,
-              style: DesignTokens.textSmall,
-            ),
+            subtitle: Text(privacyPolicyUrl, style: DesignTokens.textSmall),
             onTap: () async {
               final uri = Uri.tryParse(privacyPolicyUrl);
               if (uri == null) {
@@ -229,10 +226,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 );
                 return;
               }
-              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+              final ok = await launchUrl(
+                uri,
+                mode: LaunchMode.externalApplication,
+              );
               if (!ok && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Could not open privacy policy')),
+                  const SnackBar(
+                    content: Text('Could not open privacy policy'),
+                  ),
                 );
               }
             },

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/design_tokens.dart';
 
 /// A premium stat card for displaying metrics on dashboards.
-/// 
+///
 /// Features:
 /// - Gradient backgrounds for premium feel
 /// - Trend indicators (up/down arrows)
@@ -73,7 +73,8 @@ class StatCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (trend != null) _TrendBadge(trend: trend!, label: trendLabel),
+                if (trend != null)
+                  _TrendBadge(trend: trend!, label: trendLabel),
               ],
             ),
             const SizedBox(height: DesignTokens.spaceSm),
@@ -101,14 +102,14 @@ class _TrendBadge extends StatelessWidget {
     final color = trend == StatTrend.up
         ? DesignTokens.success
         : trend == StatTrend.down
-            ? DesignTokens.error
-            : DesignTokens.grayMedium;
+        ? DesignTokens.error
+        : DesignTokens.grayMedium;
 
     final icon = trend == StatTrend.up
         ? Icons.trending_up
         : trend == StatTrend.down
-            ? Icons.trending_down
-            : Icons.trending_flat;
+        ? Icons.trending_down
+        : Icons.trending_flat;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -224,12 +225,16 @@ class StatCardRow extends StatelessWidget {
           // Wide layout: all cards in one row
           return Row(
             children: cards
-                .map((card) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: DesignTokens.spaceSm),
-                        child: card,
+                .map(
+                  (card) => Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        right: DesignTokens.spaceSm,
                       ),
-                    ))
+                      child: card,
+                    ),
+                  ),
+                )
                 .toList(),
           );
         }
@@ -238,10 +243,12 @@ class StatCardRow extends StatelessWidget {
           spacing: DesignTokens.spaceSm,
           runSpacing: DesignTokens.spaceSm,
           children: cards
-              .map((card) => SizedBox(
-                    width: (constraints.maxWidth - DesignTokens.spaceSm) / 2,
-                    child: card,
-                  ))
+              .map(
+                (card) => SizedBox(
+                  width: (constraints.maxWidth - DesignTokens.spaceSm) / 2,
+                  child: card,
+                ),
+              )
               .toList(),
         );
       },

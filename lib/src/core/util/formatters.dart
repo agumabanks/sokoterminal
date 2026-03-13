@@ -37,7 +37,7 @@ extension DateExtensions on DateTime {
     if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
     if (difference.inHours < 24) return '${difference.inHours}h ago';
     if (difference.inDays < 7) return '${difference.inDays}d ago';
-    
+
     return DateFormat('MMM dd').format(this);
   }
 }
@@ -46,10 +46,10 @@ extension DateExtensions on DateTime {
 /// Returns clean plain text.
 String stripHtml(String? html) {
   if (html == null || html.isEmpty) return '';
-  
+
   // Remove HTML tags
   var result = html.replaceAll(RegExp(r'<[^>]*>'), '');
-  
+
   // Decode common HTML entities
   result = result
       .replaceAll('&amp;', '&')
@@ -61,10 +61,10 @@ String stripHtml(String? html) {
       .replaceAll('&mdash;', '—')
       .replaceAll('&ndash;', '–')
       .replaceAll('&bull;', '•');
-  
+
   // Normalize whitespace
   result = result.replaceAll(RegExp(r'\s+'), ' ').trim();
-  
+
   return result;
 }
 

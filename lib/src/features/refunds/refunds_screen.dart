@@ -66,9 +66,9 @@ class RefundsState {
 
 final refundsControllerProvider =
     StateNotifierProvider<RefundsController, RefundsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return RefundsController(api)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      return RefundsController(api)..load();
+    });
 
 class RefundsController extends StateNotifier<RefundsState> {
   RefundsController(this.api) : super(const RefundsState());
@@ -92,7 +92,9 @@ class RefundsController extends StateNotifier<RefundsState> {
     try {
       final res = await api.fetchRefundRequests();
       final data = res.data;
-      final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+      final list = data is Map<String, dynamic>
+          ? (data['data'] as List? ?? const [])
+          : const [];
       final items = list
           .whereType<Map>()
           .map((e) => RefundRequestDto.fromJson(Map<String, dynamic>.from(e)))
@@ -138,14 +140,16 @@ class RefundsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(refundsControllerProvider.notifier).load(),
+            onPressed: () =>
+                ref.read(refundsControllerProvider.notifier).load(),
           ),
         ],
       ),
       body: state.loading && state.items.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => ref.read(refundsControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(refundsControllerProvider.notifier).load(),
               child: ListView.builder(
                 padding: DesignTokens.paddingScreen,
                 itemCount: state.items.length + (state.items.isEmpty ? 1 : 0),
@@ -165,14 +169,21 @@ class RefundsScreen extends ConsumerWidget {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: color.withValues(alpha: 0.12),
-                        child: Icon(Icons.assignment_return_outlined, color: color),
+                        child: Icon(
+                          Icons.assignment_return_outlined,
+                          color: color,
+                        ),
                       ),
                       title: Text(
-                        refund.orderCode.isEmpty ? 'Refund #${refund.id}' : refund.orderCode,
+                        refund.orderCode.isEmpty
+                            ? 'Refund #${refund.id}'
+                            : refund.orderCode,
                         style: DesignTokens.textBodyBold,
                       ),
                       subtitle: Text(
-                        refund.productName.isEmpty ? refund.reason : '${refund.productName} • ${refund.reason}',
+                        refund.productName.isEmpty
+                            ? refund.reason
+                            : '${refund.productName} • ${refund.reason}',
                         style: DesignTokens.textSmall,
                       ),
                       trailing: Chip(
@@ -189,10 +200,16 @@ class RefundsScreen extends ConsumerWidget {
     );
   }
 
-  void _showDecision(BuildContext context, WidgetRef ref, RefundRequestDto refund) {
+  void _showDecision(
+    BuildContext context,
+    WidgetRef ref,
+    RefundRequestDto refund,
+  ) {
     BottomSheetModal.show(
       context: context,
-      title: refund.orderCode.isEmpty ? 'Refund #${refund.id}' : refund.orderCode,
+      title: refund.orderCode.isEmpty
+          ? 'Refund #${refund.id}'
+          : refund.orderCode,
       subtitle: refund.dateLabel.isEmpty ? null : refund.dateLabel,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -207,13 +224,21 @@ class RefundsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(refund.productName.isEmpty ? 'Refund request' : refund.productName,
-                    style: DesignTokens.textBodyBold),
+                Text(
+                  refund.productName.isEmpty
+                      ? 'Refund request'
+                      : refund.productName,
+                  style: DesignTokens.textBodyBold,
+                ),
                 const SizedBox(height: DesignTokens.spaceXs),
                 Text(refund.reason, style: DesignTokens.textBody),
-                if (refund.rejectReason != null && refund.rejectReason!.isNotEmpty) ...[
+                if (refund.rejectReason != null &&
+                    refund.rejectReason!.isNotEmpty) ...[
                   const SizedBox(height: DesignTokens.spaceSm),
-                  Text('Reject reason: ${refund.rejectReason}', style: DesignTokens.textSmall),
+                  Text(
+                    'Reject reason: ${refund.rejectReason}',
+                    style: DesignTokens.textSmall,
+                  ),
                 ],
               ],
             ),
@@ -228,7 +253,9 @@ class RefundsScreen extends ConsumerWidget {
                   onPressed: refund.refundStatus == 1
                       ? null
                       : () async {
-                          await ref.read(refundsControllerProvider.notifier).approve(refund.id);
+                          await ref
+                              .read(refundsControllerProvider.notifier)
+                              .approve(refund.id);
                           if (context.mounted) Navigator.pop(context);
                         },
                 ),
@@ -278,7 +305,9 @@ class RefundsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: DesignTokens.spaceLg),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.error,
+            ),
             onPressed: () {
               final text = ctrl.text.trim();
               Navigator.pop(context, text.isEmpty ? null : text);
@@ -302,12 +331,20 @@ class _EmptyRefundsState extends StatelessWidget {
       padding: DesignTokens.paddingMd,
       child: Column(
         children: [
-          Icon(Icons.assignment_return_outlined, size: 48, color: DesignTokens.grayMedium),
+          Icon(
+            Icons.assignment_return_outlined,
+            size: 48,
+            color: DesignTokens.grayMedium,
+          ),
           const SizedBox(height: DesignTokens.spaceMd),
           Text('No refund requests', style: DesignTokens.textBodyBold),
           if (error != null) ...[
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error!, style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error!,
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),

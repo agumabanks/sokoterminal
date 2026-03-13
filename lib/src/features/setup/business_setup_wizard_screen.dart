@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:drift/drift.dart' as drift;
@@ -10,6 +11,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
+import '../../core/settings/business_profile_cache.dart';
 import '../../core/settings/shop_payment_settings.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
@@ -22,20 +24,22 @@ import '../../core/settings/business_setup_prefs.dart';
 
 final _primaryOutletProvider = StreamProvider<Outlet?>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  final query = (db.select(db.outlets)
-        ..where((t) => t.active.equals(true))
-        ..orderBy([(t) => drift.OrderingTerm.desc(t.updatedAt)])
-        ..limit(1))
-      .watchSingleOrNull();
+  final query =
+      (db.select(db.outlets)
+            ..where((t) => t.active.equals(true))
+            ..orderBy([(t) => drift.OrderingTerm.desc(t.updatedAt)])
+            ..limit(1))
+          .watchSingleOrNull();
   return query;
 });
 
 final _activeReceiptTemplateProvider = StreamProvider<ReceiptTemplate?>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  final query = (db.select(db.receiptTemplates)
-        ..where((t) => t.isActive.equals(true))
-        ..limit(1))
-      .watchSingleOrNull();
+  final query =
+      (db.select(db.receiptTemplates)
+            ..where((t) => t.isActive.equals(true))
+            ..limit(1))
+          .watchSingleOrNull();
   return query;
 });
 
@@ -98,15 +102,24 @@ class _BusinessSetupWizardScreenState
 
   Future<void> _load() async {
     final db = ref.read(appDatabaseProvider);
-    final outlet = await db.getPrimaryOutlet();
-    if (outlet != null) {
-      _shopNameCtrl.text = outlet.name;
-      _shopPhoneCtrl.text = outlet.phone ?? '';
-      _shopAddressCtrl.text = outlet.address ?? '';
+    final profile = await db.getBusinessProfile();
+    if (profile != null) {
+      _shopNameCtrl.text = profile.shopName;
+      _shopPhoneCtrl.text = profile.shopPhone ?? '';
+      _shopAddressCtrl.text = profile.shopAddress ?? '';
+    } else {
+      final outlet = await db.getPrimaryOutlet();
+      if (outlet != null) {
+        _shopNameCtrl.text = outlet.name;
+        _shopPhoneCtrl.text = outlet.phone ?? '';
+        _shopAddressCtrl.text = outlet.address ?? '';
+      }
     }
 
     final prefs = ref.read(sharedPreferencesProvider);
-    final cached = ShopPaymentSettingsCache.tryRead(prefs);
+    final cached = profile != null
+        ? businessProfileToPaymentSettings(profile)
+        : ShopPaymentSettingsCache.tryRead(prefs);
     final settings = cached ?? ShopPaymentSettings.defaults();
     _cashEnabled = settings.cashEnabled;
     _bankEnabled = settings.bankEnabled;
@@ -128,7 +141,7 @@ class _BusinessSetupWizardScreenState
   bool _paymentsComplete() {
     final prefs = ref.read(sharedPreferencesProvider);
     final cached = ShopPaymentSettingsCache.tryRead(prefs);
-    return cached != null;
+    return hasRequiredPaymentSetup(cached);
   }
 
   bool _printerComplete() {
@@ -137,8 +150,6 @@ class _BusinessSetupWizardScreenState
     return printer.hasPreferredPrinter;
   }
 
-  bool get _pinComplete => ref.read(staffPinProvider).enabled;
-
   bool _receiptsComplete(ReceiptTemplate? activeTemplate) {
     return activeTemplate != null;
   }
@@ -146,8 +157,6 @@ class _BusinessSetupWizardScreenState
   bool _setupComplete(ReceiptTemplate? activeTemplate) {
     return _businessComplete &&
         _paymentsComplete() &&
-        _printerComplete() &&
-        _pinComplete &&
         _receiptsComplete(activeTemplate);
   }
 
@@ -171,14 +180,50 @@ class _BusinessSetupWizardScreenState
         OutletsCompanion.insert(
           id: drift.Value(id),
           name: name,
-          address: drift.Value(_shopAddressCtrl.text.trim().isEmpty
-              ? null
-              : _shopAddressCtrl.text.trim()),
-          phone: drift.Value(_shopPhoneCtrl.text.trim().isEmpty
-              ? null
-              : _shopPhoneCtrl.text.trim()),
+          address: drift.Value(
+            _shopAddressCtrl.text.trim().isEmpty
+                ? null
+                : _shopAddressCtrl.text.trim(),
+          ),
+          phone: drift.Value(
+            _shopPhoneCtrl.text.trim().isEmpty
+                ? null
+                : _shopPhoneCtrl.text.trim(),
+          ),
           updatedAt: drift.Value(DateTime.now().toUtc()),
           active: const drift.Value(true),
+        ),
+      );
+      final existingProfile = await db.getBusinessProfile();
+      await db.upsertBusinessProfile(
+        BusinessProfilesCompanion.insert(
+          id: kPrimaryBusinessProfileId,
+          sellerId: existingProfile?.sellerId == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerId),
+          sellerName: existingProfile?.sellerName == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerName),
+          sellerEmail: existingProfile?.sellerEmail == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerEmail),
+          sellerPhone: existingProfile?.sellerPhone == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerPhone),
+          shopId: drift.Value(id),
+          shopName: name,
+          shopAddress: drift.Value(
+            _shopAddressCtrl.text.trim().isEmpty
+                ? null
+                : _shopAddressCtrl.text.trim(),
+          ),
+          shopPhone: drift.Value(
+            _shopPhoneCtrl.text.trim().isEmpty
+                ? null
+                : _shopPhoneCtrl.text.trim(),
+          ),
+          updatedAt: drift.Value(DateTime.now().toUtc()),
+          synced: const drift.Value(false),
         ),
       );
 
@@ -196,10 +241,13 @@ class _BusinessSetupWizardScreenState
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
         unawaited(
-          telemetry.event('setup_business_profile_saved', props: {
-            'has_address': _shopAddressCtrl.text.trim().isNotEmpty,
-            'has_phone': _shopPhoneCtrl.text.trim().isNotEmpty,
-          }),
+          telemetry.event(
+            'setup_business_profile_saved',
+            props: {
+              'has_address': _shopAddressCtrl.text.trim().isNotEmpty,
+              'has_phone': _shopPhoneCtrl.text.trim().isNotEmpty,
+            },
+          ),
         );
       }
 
@@ -212,9 +260,9 @@ class _BusinessSetupWizardScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) setState(() => _savingBusiness = false);
     }
@@ -241,6 +289,85 @@ class _BusinessSetupWizardScreenState
       final prefs = ref.read(sharedPreferencesProvider);
       final settings = _collectPaymentSettings();
       await ShopPaymentSettingsCache.write(prefs, settings);
+      final db = ref.read(appDatabaseProvider);
+      final existingProfile = await db.getBusinessProfile();
+      await db.upsertBusinessProfile(
+        BusinessProfilesCompanion.insert(
+          id: kPrimaryBusinessProfileId,
+          sellerId: existingProfile?.sellerId == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerId),
+          sellerName: existingProfile?.sellerName == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerName),
+          sellerEmail: existingProfile?.sellerEmail == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerEmail),
+          sellerPhone: existingProfile?.sellerPhone == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.sellerPhone),
+          shopId: existingProfile?.shopId == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.shopId),
+          shopName: existingProfile?.shopName ?? 'Shop',
+          shopAddress: existingProfile?.shopAddress == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.shopAddress),
+          shopPhone: existingProfile?.shopPhone == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.shopPhone),
+          logoUploadId: existingProfile?.logoUploadId == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.logoUploadId),
+          logoUrl: existingProfile?.logoUrl == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.logoUrl),
+          metaTitle: existingProfile?.metaTitle == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.metaTitle),
+          metaDescription: existingProfile?.metaDescription == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.metaDescription),
+          thermalPrinterWidth: existingProfile?.thermalPrinterWidth == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.thermalPrinterWidth),
+          shippingCost: existingProfile?.shippingCost == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.shippingCost),
+          selfDeliveryActive: drift.Value(
+            existingProfile?.selfDeliveryActive ?? false,
+          ),
+          deliveryRadiusKm: existingProfile?.deliveryRadiusKm == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryRadiusKm),
+          deliveryPickupLatitude:
+              existingProfile?.deliveryPickupLatitude == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryPickupLatitude),
+          deliveryPickupLongitude:
+              existingProfile?.deliveryPickupLongitude == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryPickupLongitude),
+          cashOnDeliveryEnabled: drift.Value(settings.cashEnabled),
+          bankPaymentEnabled: drift.Value(settings.bankEnabled),
+          mobileMoneyEnabled: drift.Value(settings.mobileMoneyEnabled),
+          bankName: drift.Value(settings.bankName),
+          bankAccName: drift.Value(settings.bankAccountName),
+          bankAccNo: drift.Value(settings.bankAccountNumber),
+          bankRoutingNo: drift.Value(settings.bankRoutingNumber),
+          mtnMerchantCode: drift.Value(settings.mtnMerchantCode),
+          airtelMerchantCode: drift.Value(settings.airtelMerchantCode),
+          paybillNumber: drift.Value(settings.paybillNumber),
+          receiptPaymentMethodsJson: drift.Value(
+            jsonEncode(settings.receiptPaymentMethods ?? const {}),
+          ),
+          deliveryProfileJson: existingProfile?.deliveryProfileJson == null
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryProfileJson),
+          updatedAt: drift.Value(DateTime.now().toUtc()),
+          synced: const drift.Value(false),
+        ),
+      );
 
       final sync = ref.read(syncServiceProvider);
       await sync.enqueue('business_profile_patch', settings.toUpdatePayload());
@@ -249,13 +376,16 @@ class _BusinessSetupWizardScreenState
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
         unawaited(
-          telemetry.event('setup_payment_settings_saved', props: {
-            'cash_enabled': settings.cashEnabled,
-            'bank_enabled': settings.bankEnabled,
-            'mobile_money_enabled': settings.mobileMoneyEnabled,
-            'has_bank_details': settings.hasBankDetails,
-            'has_mobile_money_codes': settings.hasMobileMoneyCodes,
-          }),
+          telemetry.event(
+            'setup_payment_settings_saved',
+            props: {
+              'cash_enabled': settings.cashEnabled,
+              'bank_enabled': settings.bankEnabled,
+              'mobile_money_enabled': settings.mobileMoneyEnabled,
+              'has_bank_details': settings.hasBankDetails,
+              'has_mobile_money_codes': settings.hasMobileMoneyCodes,
+            },
+          ),
         );
       }
 
@@ -269,9 +399,9 @@ class _BusinessSetupWizardScreenState
       setState(() {});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) setState(() => _savingPayments = false);
     }
@@ -330,7 +460,9 @@ class _BusinessSetupWizardScreenState
     if (devices.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No paired printers found. Pair one in Bluetooth settings first.'),
+          content: Text(
+            'No paired printers found. Pair one in Bluetooth settings first.',
+          ),
         ),
       );
       return;
@@ -358,7 +490,9 @@ class _BusinessSetupWizardScreenState
               const SizedBox(height: 8),
               Text(
                 'Pair in OS Bluetooth first',
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.grayMedium,
+                ),
               ),
               const SizedBox(height: 16),
               Flexible(
@@ -370,10 +504,15 @@ class _BusinessSetupWizardScreenState
                     return ListTile(
                       leading: const Icon(Icons.print_outlined),
                       title: Text(d.name ?? 'Printer'),
-                      subtitle: Text(d.address ?? '', style: DesignTokens.textSmall),
+                      subtitle: Text(
+                        d.address ?? '',
+                        style: DesignTokens.textSmall,
+                      ),
                       onTap: () async {
                         try {
-                          await ref.read(printQueueServiceProvider).setPreferredPrinter(d);
+                          await ref
+                              .read(printQueueServiceProvider)
+                              .setPreferredPrinter(d);
                           await BlueThermalPrinter.instance.connect(d);
                           unawaited(ref.read(printQueueServiceProvider).pump());
                           if (ctx.mounted) Navigator.pop(ctx);
@@ -381,14 +520,18 @@ class _BusinessSetupWizardScreenState
                           setState(() {});
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             SnackBar(
-                              content: Text('Selected printer: ${d.name ?? d.address ?? ''}'),
+                              content: Text(
+                                'Selected printer: ${d.name ?? d.address ?? ''}',
+                              ),
                               backgroundColor: DesignTokens.brandAccent,
                             ),
                           );
                         } catch (e) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(content: Text('Failed to select printer: $e')),
+                            SnackBar(
+                              content: Text('Failed to select printer: $e'),
+                            ),
                           );
                         }
                       },
@@ -436,7 +579,9 @@ class _BusinessSetupWizardScreenState
               const SizedBox(height: 8),
               Text(
                 'This locks the terminal until PIN unlock.',
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.grayMedium,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -483,7 +628,9 @@ class _BusinessSetupWizardScreenState
                         final confirm = confirmCtrl.text.trim();
                         if (pin.length < 4) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('PIN must be at least 4 digits')),
+                            const SnackBar(
+                              content: Text('PIN must be at least 4 digits'),
+                            ),
                           );
                           return;
                         }
@@ -560,16 +707,14 @@ class _BusinessSetupWizardScreenState
     final staffPin = ref.watch(staffPinProvider);
     final printer = ref.watch(printQueueServiceProvider);
 
-    final prefs = ref.watch(sharedPreferencesProvider);
-    final cachedPayments = ShopPaymentSettingsCache.tryRead(prefs);
-
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
         title: Text('Business Setup', style: DesignTokens.textTitle),
         actions: [
           TextButton(
-            onPressed: () => ref.read(businessSetupCompletedProvider.notifier).reset(),
+            onPressed: () =>
+                ref.read(businessSetupCompletedProvider.notifier).reset(),
             child: const Text('Reset'),
           ),
         ],
@@ -588,7 +733,7 @@ class _BusinessSetupWizardScreenState
                   title: '1) Business profile',
                   subtitle: _businessComplete
                       ? 'Complete'
-                      : 'Add your business name (required)',
+                      : 'Add your business name and contact details',
                   complete: _businessComplete,
                   child: Column(
                     children: [
@@ -616,12 +761,16 @@ class _BusinessSetupWizardScreenState
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _savingBusiness ? null : _saveBusinessInfo,
+                              onPressed: _savingBusiness
+                                  ? null
+                                  : _saveBusinessInfo,
                               icon: _savingBusiness
                                   ? const SizedBox(
                                       width: 18,
                                       height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(Icons.save_outlined),
                               label: Text(_savingBusiness ? 'Saving…' : 'Save'),
@@ -631,10 +780,14 @@ class _BusinessSetupWizardScreenState
                           Expanded(
                             child: Text(
                               outletAsync.maybeWhen(
-                                data: (o) => o == null ? 'No outlet yet' : 'Outlet: ${o.name}',
+                                data: (o) => o == null
+                                    ? 'No outlet yet'
+                                    : 'Outlet: ${o.name}',
                                 orElse: () => 'Outlet: …',
                               ),
-                              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                              style: DesignTokens.textSmall.copyWith(
+                                color: DesignTokens.grayMedium,
+                              ),
                               textAlign: TextAlign.right,
                             ),
                           ),
@@ -648,10 +801,10 @@ class _BusinessSetupWizardScreenState
 
                 _StepCard(
                   title: '2) Payment methods',
-                  subtitle: cachedPayments != null
+                  subtitle: _paymentsComplete()
                       ? 'Complete'
-                      : 'Configure what customers can pay with',
-                  complete: cachedPayments != null,
+                      : 'Save at least one accepted payment method',
+                  complete: _paymentsComplete(),
                   child: Column(
                     children: [
                       SwitchListTile(
@@ -670,7 +823,8 @@ class _BusinessSetupWizardScreenState
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Accept mobile money'),
                         value: _mobileMoneyEnabled,
-                        onChanged: (v) => setState(() => _mobileMoneyEnabled = v),
+                        onChanged: (v) =>
+                            setState(() => _mobileMoneyEnabled = v),
                       ),
                       if (_mobileMoneyEnabled) ...[
                         const SizedBox(height: DesignTokens.spaceSm),
@@ -719,12 +873,16 @@ class _BusinessSetupWizardScreenState
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: _savingPayments ? null : _savePaymentSettings,
+                          onPressed: _savingPayments
+                              ? null
+                              : _savePaymentSettings,
                           icon: _savingPayments
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(Icons.save_outlined),
                           label: Text(_savingPayments ? 'Saving…' : 'Save'),
@@ -739,7 +897,9 @@ class _BusinessSetupWizardScreenState
                 _StepCard(
                   title: '3) Receipts',
                   subtitle: activeTemplateAsync.maybeWhen(
-                    data: (t) => t == null ? 'Create a receipt template' : 'Active: ${t.name}',
+                    data: (t) => t == null
+                        ? 'Create a receipt template'
+                        : 'Active: ${t.name}',
                     orElse: () => 'Loading…',
                   ),
                   complete: activeTemplateAsync.asData?.value != null,
@@ -753,7 +913,8 @@ class _BusinessSetupWizardScreenState
                         ),
                       const SizedBox(height: DesignTokens.spaceSm),
                       OutlinedButton.icon(
-                        onPressed: () => context.go('/home/more/receipt-templates'),
+                        onPressed: () =>
+                            context.go('/home/more/receipt-templates'),
                         icon: const Icon(Icons.receipt_outlined),
                         label: const Text('Open receipt templates'),
                       ),
@@ -764,12 +925,12 @@ class _BusinessSetupWizardScreenState
                 const SizedBox(height: DesignTokens.spaceMd),
 
                 _StepCard(
-                  title: '4) Printer',
+                  title: '4) Printer (optional)',
                   subtitle: printer.printerEnabled
                       ? (printer.hasPreferredPrinter
-                          ? 'Selected: ${printer.preferredPrinterLabel()}'
-                          : 'Choose a printer')
-                      : 'Printing disabled',
+                            ? 'Selected: ${printer.preferredPrinterLabel()}'
+                            : 'Choose a printer when ready')
+                      : 'Printing disabled for now',
                   complete: _printerComplete(),
                   child: Column(
                     children: [
@@ -778,7 +939,9 @@ class _BusinessSetupWizardScreenState
                         title: const Text('Enable Bluetooth printing'),
                         value: printer.printerEnabled,
                         onChanged: (v) async {
-                          await ref.read(printQueueServiceProvider).setPrinterEnabled(v);
+                          await ref
+                              .read(printQueueServiceProvider)
+                              .setPrinterEnabled(v);
                           if (!mounted) return;
                           setState(() {});
                         },
@@ -797,10 +960,14 @@ class _BusinessSetupWizardScreenState
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Compatibility mode'),
-                          subtitle: const Text('Disable paper-cut for some models'),
+                          subtitle: const Text(
+                            'Disable paper-cut for some models',
+                          ),
                           value: printer.compatibilityMode,
                           onChanged: (v) async {
-                            await ref.read(printQueueServiceProvider).setCompatibilityMode(v);
+                            await ref
+                                .read(printQueueServiceProvider)
+                                .setCompatibilityMode(v);
                             if (!mounted) return;
                             setState(() {});
                           },
@@ -813,8 +980,10 @@ class _BusinessSetupWizardScreenState
                 const SizedBox(height: DesignTokens.spaceMd),
 
                 _StepCard(
-                  title: '5) Terminal PIN',
-                  subtitle: staffPin.enabled ? 'Enabled' : 'Set a PIN to lock this device',
+                  title: '5) Terminal PIN (recommended)',
+                  subtitle: staffPin.enabled
+                      ? 'Enabled'
+                      : 'Add a PIN to lock this device later',
                   complete: staffPin.enabled,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -879,7 +1048,7 @@ class _SetupHeaderCard extends StatelessWidget {
             child: Text(
               completed
                   ? 'Setup completed. You can re-open this screen anytime.'
-                  : 'Complete setup to ensure receipts, payments, and printing work smoothly.',
+                  : 'Complete business, payments, and receipts now. Printer and terminal PIN can be added later.',
               style: DesignTokens.textSmall,
             ),
           ),
@@ -920,7 +1089,9 @@ class _StepCard extends StatelessWidget {
               Icon(
                 complete ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 18,
-                color: complete ? DesignTokens.success : DesignTokens.grayMedium,
+                color: complete
+                    ? DesignTokens.success
+                    : DesignTokens.grayMedium,
               ),
               const SizedBox(width: DesignTokens.spaceSm),
               Expanded(child: Text(title, style: DesignTokens.textBodyBold)),
@@ -929,7 +1100,9 @@ class _StepCard extends StatelessWidget {
           const SizedBox(height: DesignTokens.spaceXs),
           Text(
             subtitle,
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
           child,

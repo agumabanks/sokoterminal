@@ -34,13 +34,15 @@ class CustomersScreen extends ConsumerWidget {
           padding: DesignTokens.paddingScreen,
           children: [
             const SectionHeader(title: 'Contacts'),
-            ...list.map((c) => Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(c.name),
-                    subtitle: Text(c.phone ?? '-'),
-                  ),
-                )),
+            ...list.map(
+              (c) => Card(
+                child: ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text(c.name),
+                  subtitle: Text(c.phone ?? '-'),
+                ),
+              ),
+            ),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -84,7 +86,9 @@ class CustomersScreen extends ConsumerWidget {
             onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) return;
-              await ref.read(appDatabaseProvider).upsertCustomer(
+              await ref
+                  .read(appDatabaseProvider)
+                  .upsertCustomer(
                     CustomersCompanion.insert(
                       name: name,
                       phone: phoneCtrl.text.trim().isEmpty
@@ -103,7 +107,9 @@ class CustomersScreen extends ConsumerWidget {
             },
             icon: const Icon(Icons.save),
             label: const Text('Save'),
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.brandAccent,
+            ),
           ),
         ],
       ),

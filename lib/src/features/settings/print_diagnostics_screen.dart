@@ -19,10 +19,12 @@ class PrintDiagnosticsScreen extends ConsumerStatefulWidget {
   const PrintDiagnosticsScreen({super.key});
 
   @override
-  ConsumerState<PrintDiagnosticsScreen> createState() => _PrintDiagnosticsScreenState();
+  ConsumerState<PrintDiagnosticsScreen> createState() =>
+      _PrintDiagnosticsScreenState();
 }
 
-class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen> {
+class _PrintDiagnosticsScreenState
+    extends ConsumerState<PrintDiagnosticsScreen> {
   bool _loading = false;
   Map<String, PermissionStatus> _permissions = const {};
   List<BluetoothDevice> _paired = const [];
@@ -65,8 +67,10 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
       if (Platform.isAndroid) {
         statuses['bluetoothConnect'] = await Permission.bluetoothConnect.status;
         statuses['bluetoothScan'] = await Permission.bluetoothScan.status;
-        statuses['bluetoothAdvertise'] = await Permission.bluetoothAdvertise.status;
-        statuses['locationWhenInUse'] = await Permission.locationWhenInUse.status;
+        statuses['bluetoothAdvertise'] =
+            await Permission.bluetoothAdvertise.status;
+        statuses['locationWhenInUse'] =
+            await Permission.locationWhenInUse.status;
       }
 
       final paired = await BlueThermalPrinter.instance.getBondedDevices();
@@ -157,7 +161,9 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                     padding: DesignTokens.paddingMd,
                     child: Text(
                       _error!,
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.error,
+                      ),
                     ),
                   ),
                 ),
@@ -191,7 +197,9 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                 subtitle: const Text('Disables QR + paper cut for reliability'),
                 value: printer.compatibilityMode,
                 onChanged: (v) async {
-                  await ref.read(printQueueServiceProvider).setCompatibilityMode(v);
+                  await ref
+                      .read(printQueueServiceProvider)
+                      .setCompatibilityMode(v);
                   if (!mounted) return;
                   setState(() {});
                 },
@@ -205,7 +213,9 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                           ? null
                           : () async {
                               try {
-                                await ref.read(printQueueServiceProvider).testPrint();
+                                await ref
+                                    .read(printQueueServiceProvider)
+                                    .testPrint();
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -216,7 +226,9 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                               } catch (e) {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Test print failed: $e')),
+                                  SnackBar(
+                                    content: Text('Test print failed: $e'),
+                                  ),
                                 );
                               }
                             },
@@ -265,7 +277,9 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                         if (!context.mounted) return;
                         if (!ok) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Could not open app settings')),
+                            const SnackBar(
+                              content: Text('Could not open app settings'),
+                            ),
                           );
                         }
                       },
@@ -281,23 +295,30 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
               if (_paired.isEmpty)
                 Text(
                   'No paired printers found. Pair in Android Bluetooth settings first.',
-                  style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
                 )
               else
                 ..._paired.map((d) {
                   final addr = (d.address ?? '').trim();
                   final name = (d.name ?? 'Printer').trim();
-                  final isPreferred = preferredAddr != null && preferredAddr == addr;
+                  final isPreferred =
+                      preferredAddr != null && preferredAddr == addr;
                   final isCertified = _isCertifiedPrinter(name);
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
                       isPreferred
                           ? (isCertified ? Icons.verified : Icons.check_circle)
-                          : (isCertified ? Icons.verified_outlined : Icons.print_outlined),
+                          : (isCertified
+                                ? Icons.verified_outlined
+                                : Icons.print_outlined),
                       color: isPreferred
                           ? DesignTokens.brandAccent
-                          : (isCertified ? DesignTokens.brandAccent : DesignTokens.grayMedium),
+                          : (isCertified
+                                ? DesignTokens.brandAccent
+                                : DesignTokens.grayMedium),
                     ),
                     title: Text(name, style: DesignTokens.textBody),
                     subtitle: Text(
@@ -310,17 +331,25 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
               Text('Permissions', style: DesignTokens.textBodyBold),
               const SizedBox(height: DesignTokens.spaceSm),
               if (!Platform.isAndroid)
-                Text('Permissions diagnostics are Android-only.', style: DesignTokens.textSmall)
+                Text(
+                  'Permissions diagnostics are Android-only.',
+                  style: DesignTokens.textSmall,
+                )
               else ...[
                 if (_permissions.isEmpty)
-                  Text('No permission info available.', style: DesignTokens.textSmall)
+                  Text(
+                    'No permission info available.',
+                    style: DesignTokens.textSmall,
+                  )
                 else
                   ..._permissions.entries.map(
                     (e) => _StatusTile(
                       title: e.key,
                       subtitle: e.value.toString(),
                       leading: Icons.verified_user_outlined,
-                      tone: e.value.isGranted ? DesignTokens.brandAccent : DesignTokens.warning,
+                      tone: e.value.isGranted
+                          ? DesignTokens.brandAccent
+                          : DesignTokens.warning,
                     ),
                   ),
                 const SizedBox(height: DesignTokens.spaceSm),
@@ -331,7 +360,10 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                 ),
               ],
               const SizedBox(height: DesignTokens.spaceLg),
-              Text('Certified printers (initial list)', style: DesignTokens.textBodyBold),
+              Text(
+                'Certified printers (initial list)',
+                style: DesignTokens.textBodyBold,
+              ),
               const SizedBox(height: DesignTokens.spaceSm),
               ..._certifiedPrinterHints.map(
                 (s) => Padding(
@@ -340,13 +372,13 @@ class _PrintDiagnosticsScreenState extends ConsumerState<PrintDiagnosticsScreen>
                 ),
               ),
               const SizedBox(height: DesignTokens.spaceLg),
-              if (_loading)
-                const Center(child: CircularProgressIndicator()),
+              if (_loading) const Center(child: CircularProgressIndicator()),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load print diagnostics: $e')),
+        error: (e, _) =>
+            Center(child: Text('Failed to load print diagnostics: $e')),
       ),
     );
   }

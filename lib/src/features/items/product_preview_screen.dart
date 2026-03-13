@@ -9,20 +9,29 @@ import '../../core/db/app_database.dart';
 import '../../core/security/manager_approval.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
+import '../../widgets/offline_cached_image.dart';
 import 'add_product_screen.dart';
 
-final _previewItemProvider = StreamProvider.family<Item?, String>((ref, itemId) {
+final _previewItemProvider = StreamProvider.family<Item?, String>((
+  ref,
+  itemId,
+) {
   final db = ref.watch(appDatabaseProvider);
   return db.watchItemById(itemId);
 });
 
-final _previewStocksProvider =
-    StreamProvider.family<List<ItemStock>, String>((ref, itemId) {
+final _previewStocksProvider = StreamProvider.family<List<ItemStock>, String>((
+  ref,
+  itemId,
+) {
   final db = ref.watch(appDatabaseProvider);
   return db.watchItemStocksForItem(itemId);
 });
 
-final _previewNetUnits7dProvider = StreamProvider.family<int, String>((ref, itemId) {
+final _previewNetUnits7dProvider = StreamProvider.family<int, String>((
+  ref,
+  itemId,
+) {
   final db = ref.watch(appDatabaseProvider);
   final since = DateTime.now().toUtc().subtract(const Duration(days: 7));
   return db.watchNetUnitsMovedForItemSince(itemId, since);
@@ -33,7 +42,8 @@ class ProductPreviewScreen extends ConsumerStatefulWidget {
   final String itemId;
 
   @override
-  ConsumerState<ProductPreviewScreen> createState() => _ProductPreviewScreenState();
+  ConsumerState<ProductPreviewScreen> createState() =>
+      _ProductPreviewScreenState();
 }
 
 class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
@@ -72,12 +82,13 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
   Widget build(BuildContext context) {
     final itemAsync = ref.watch(_previewItemProvider(widget.itemId));
     final stocksAsync = ref.watch(_previewStocksProvider(widget.itemId));
-    final netUnits7dAsync = ref.watch(_previewNetUnits7dProvider(widget.itemId));
+    final netUnits7dAsync = ref.watch(
+      _previewNetUnits7dProvider(widget.itemId),
+    );
 
     return itemAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         backgroundColor: DesignTokens.surface,
         appBar: AppBar(title: Text('Preview', style: DesignTokens.textTitle)),
@@ -87,7 +98,9 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
         if (item == null) {
           return Scaffold(
             backgroundColor: DesignTokens.surface,
-            appBar: AppBar(title: Text('Preview', style: DesignTokens.textTitle)),
+            appBar: AppBar(
+              title: Text('Preview', style: DesignTokens.textTitle),
+            ),
             body: const Center(child: Text('Product not found')),
           );
         }
@@ -98,7 +111,8 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
         final stockNow = selectedStock?.stockQty ?? item.stockQty;
         final stockEnabled = item.stockEnabled;
         final lowStockThreshold = item.lowStockWarning ?? 5;
-        final isLowStock = stockEnabled && stockNow > 0 && stockNow <= lowStockThreshold;
+        final isLowStock =
+            stockEnabled && stockNow > 0 && stockNow <= lowStockThreshold;
         final isOutOfStock = stockEnabled && stockNow <= 0;
         final netUnits7d = netUnits7dAsync.valueOrNull;
         final isFastMoving = netUnits7d != null && netUnits7d >= 20;
@@ -132,7 +146,8 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => AddProductScreen(existingItem: item),
+                            builder: (_) =>
+                                AddProductScreen(existingItem: item),
                           ),
                         );
                       },
@@ -304,7 +319,9 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                           : () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Preview only (no order placed).'),
+                                  content: Text(
+                                    'Preview only (no order placed).',
+                                  ),
                                 ),
                               );
                             },
@@ -348,7 +365,10 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
     return null;
   }
 
-  List<String> _buildImageUris({required Item item, required ItemStock? stock}) {
+  List<String> _buildImageUris({
+    required Item item,
+    required ItemStock? stock,
+  }) {
     final images = <String>[];
     final seen = <String>{};
 
@@ -415,7 +435,9 @@ class _OverviewTab extends StatelessWidget {
                   .map(
                     (t) => Chip(
                       label: Text(t, style: DesignTokens.textSmall),
-                      backgroundColor: DesignTokens.grayLight.withValues(alpha: 0.3),
+                      backgroundColor: DesignTokens.grayLight.withValues(
+                        alpha: 0.3,
+                      ),
                     ),
                   )
                   .toList(),
@@ -442,13 +464,18 @@ class _SpecsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final variantCount = stocks.where((s) => s.variant.trim().isNotEmpty).length;
+    final variantCount = stocks
+        .where((s) => s.variant.trim().isNotEmpty)
+        .length;
     return ListView(
       padding: DesignTokens.paddingScreen,
       children: [
         _SpecRow(label: 'SKU', value: item.sku),
         _SpecRow(label: 'Barcode', value: item.barcode),
-        _SpecRow(label: 'Category', value: item.categoryName ?? item.categoryId),
+        _SpecRow(
+          label: 'Category',
+          value: item.categoryName ?? item.categoryId,
+        ),
         _SpecRow(label: 'Brand', value: item.brandName ?? item.brandId),
         _SpecRow(label: 'Unit', value: item.unit),
         _SpecRow(label: 'Weight (kg)', value: item.weight?.toString()),
@@ -491,12 +518,12 @@ class _LogisticsTab extends StatelessWidget {
     return ListView(
       padding: DesignTokens.paddingScreen,
       children: [
-        _SpecRow(label: 'Min purchase qty', value: item.minPurchaseQty.toString()),
-        _SpecRow(label: 'Shipping days', value: item.shippingDays?.toString()),
         _SpecRow(
-          label: 'Shipping fee',
-          value: item.shippingFee?.toUgx(),
+          label: 'Min purchase qty',
+          value: item.minPurchaseQty.toString(),
         ),
+        _SpecRow(label: 'Shipping days', value: item.shippingDays?.toString()),
+        _SpecRow(label: 'Shipping fee', value: item.shippingFee?.toUgx()),
         _SpecRow(label: 'Refundable', value: item.refundable ? 'Yes' : 'No'),
         _SpecRow(
           label: 'Cash on delivery',
@@ -551,9 +578,7 @@ class _SpecRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(label, style: DesignTokens.textBodyBold),
-          ),
+          Expanded(child: Text(label, style: DesignTokens.textBodyBold)),
           const SizedBox(width: DesignTokens.spaceSm),
           Flexible(
             child: Text(
@@ -593,11 +618,7 @@ class _Pill extends StatelessWidget {
 }
 
 class _QtyStepper extends StatelessWidget {
-  const _QtyStepper({
-    required this.qty,
-    required this.onChanged,
-    this.max,
-  });
+  const _QtyStepper({required this.qty, required this.onChanged, this.max});
 
   final int qty;
   final int? max;
@@ -675,7 +696,12 @@ class _ImageCarousel extends StatelessWidget {
                           child: ClipRRect(
                             borderRadius: DesignTokens.borderRadiusLg,
                             child: isNetwork
-                                ? Image.network(uri, fit: BoxFit.cover)
+                                ? OfflineCachedImage(
+                                    imageUrl: uri,
+                                    fit: BoxFit.cover,
+                                    placeholder: _imagePlaceholder(),
+                                    errorWidget: _imagePlaceholder(),
+                                  )
                                 : (fileExists
                                       ? Image.file(file, fit: BoxFit.cover)
                                       : _imagePlaceholder()),
@@ -828,7 +854,14 @@ class _ImageGalleryScreenState extends State<_ImageGalleryScreen> {
           return InteractiveViewer(
             child: Center(
               child: isNetwork
-                  ? Image.network(uri, fit: BoxFit.contain)
+                  ? OfflineCachedImage(
+                      imageUrl: uri,
+                      fit: BoxFit.contain,
+                      errorWidget: const Text(
+                        'Image not found',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    )
                   : (fileExists
                         ? Image.file(file, fit: BoxFit.contain)
                         : const Text(

@@ -47,14 +47,23 @@ class ServiceBookingsScreen extends ConsumerWidget {
               final id = int.tryParse(booking['id']?.toString() ?? '') ?? 0;
               final status = booking['status']?.toString() ?? 'pending';
               final offeringTitle =
-                  (booking['offering'] is Map ? (booking['offering']['title']?.toString()) : null) ??
+                  (booking['offering'] is Map
+                      ? (booking['offering']['title']?.toString())
+                      : null) ??
                   'Booking';
               final customerName =
-                  (booking['user'] is Map ? (booking['user']['name']?.toString()) : null) ??
+                  (booking['user'] is Map
+                      ? (booking['user']['name']?.toString())
+                      : null) ??
                   'Customer';
-              final scheduledStart = DateTime.tryParse(booking['scheduled_start']?.toString() ?? '');
-              final whenLabel = scheduledStart == null ? '' : _formatWhen(scheduledStart);
-              final price = double.tryParse(booking['price']?.toString() ?? '') ?? 0;
+              final scheduledStart = DateTime.tryParse(
+                booking['scheduled_start']?.toString() ?? '',
+              );
+              final whenLabel = scheduledStart == null
+                  ? ''
+                  : _formatWhen(scheduledStart);
+              final price =
+                  double.tryParse(booking['price']?.toString() ?? '') ?? 0;
 
               final actions = _actionsForStatus(status);
 
@@ -63,9 +72,10 @@ class ServiceBookingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.event_note_outlined),
                   title: Text(offeringTitle),
                   subtitle: Text(
-                    [customerName, if (whenLabel.isNotEmpty) whenLabel]
-                        .where((e) => e.trim().isNotEmpty)
-                        .join(' • '),
+                    [
+                      customerName,
+                      if (whenLabel.isNotEmpty) whenLabel,
+                    ].where((e) => e.trim().isNotEmpty).join(' • '),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -102,40 +112,58 @@ class ServiceBookingsScreen extends ConsumerWidget {
                                 await controller.complete(id);
                                 break;
                               case _BookingAction.cancel:
-                                final reason = await _promptCancelReason(context);
+                                final reason = await _promptCancelReason(
+                                  context,
+                                );
                                 if (!context.mounted) return;
                                 await controller.cancel(id, reason: reason);
                                 break;
                               case _BookingAction.createSale:
                                 // Pre-fill checkout with booking data
-                                final offeringId = booking['offering_id']?.toString() ?? booking['offering']?['id']?.toString();
+                                final offeringId =
+                                    booking['offering_id']?.toString() ??
+                                    booking['offering']?['id']?.toString();
                                 if (offeringId == null || offeringId.isEmpty) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Cannot find service for this booking')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Cannot find service for this booking',
+                                        ),
+                                      ),
                                     );
                                   }
                                   return;
                                 }
                                 final db = ref.read(appDatabaseProvider);
                                 // Try to find local service by remote ID
-                                final serviceRemoteId = int.tryParse(offeringId);
-                                final service = serviceRemoteId != null 
-                                    ? await db.getServiceByRemoteId(serviceRemoteId)
+                                final serviceRemoteId = int.tryParse(
+                                  offeringId,
+                                );
+                                final service = serviceRemoteId != null
+                                    ? await db.getServiceByRemoteId(
+                                        serviceRemoteId,
+                                      )
                                     : await db.getServiceById(offeringId);
                                 if (service == null) {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Service not found locally. Sync first.')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Service not found locally. Sync first.',
+                                        ),
+                                      ),
                                     );
                                   }
                                   return;
                                 }
                                 // Add to cart
-                                ref.read(cartControllerProvider.notifier).addService(
-                                  service: service,
-                                  variantPrice: price > 0 ? price : null,
-                                );
+                                ref
+                                    .read(cartControllerProvider.notifier)
+                                    .addService(
+                                      service: service,
+                                      variantPrice: price > 0 ? price : null,
+                                    );
                                 // Navigate to checkout
                                 if (context.mounted) {
                                   context.go('/checkout');
@@ -158,8 +186,18 @@ class ServiceBookingsScreen extends ConsumerWidget {
 
   static List<_BookingAction> _actionsForStatus(String statusRaw) {
     final status = statusRaw.toLowerCase().trim();
-    if (status == 'pending') return [_BookingAction.confirm, _BookingAction.createSale, _BookingAction.cancel];
-    if (status == 'confirmed') return [_BookingAction.complete, _BookingAction.createSale, _BookingAction.cancel];
+    if (status == 'pending')
+      return [
+        _BookingAction.confirm,
+        _BookingAction.createSale,
+        _BookingAction.cancel,
+      ];
+    if (status == 'confirmed')
+      return [
+        _BookingAction.complete,
+        _BookingAction.createSale,
+        _BookingAction.cancel,
+      ];
     return const [];
   }
 
@@ -200,9 +238,15 @@ class ServiceBookingsScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(
+              ctx,
+              ctrl.text.trim().isEmpty ? null : ctrl.text.trim(),
+            ),
             child: const Text('Cancel booking'),
           ),
         ],

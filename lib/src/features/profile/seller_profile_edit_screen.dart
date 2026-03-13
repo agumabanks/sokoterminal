@@ -10,10 +10,12 @@ class SellerProfileEditScreen extends ConsumerStatefulWidget {
   const SellerProfileEditScreen({super.key});
 
   @override
-  ConsumerState<SellerProfileEditScreen> createState() => _SellerProfileEditScreenState();
+  ConsumerState<SellerProfileEditScreen> createState() =>
+      _SellerProfileEditScreenState();
 }
 
-class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScreen> {
+class _SellerProfileEditScreenState
+    extends ConsumerState<SellerProfileEditScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -67,9 +69,9 @@ class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScree
     final password = _passwordCtrl.text.trim();
 
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name is required')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Name is required')));
       return;
     }
 
@@ -90,9 +92,9 @@ class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScree
       _passwordCtrl.clear();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -110,74 +112,76 @@ class _SellerProfileEditScreenState extends ConsumerState<SellerProfileEditScree
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorState(
-                  title: 'Failed to load profile',
-                  error: _error!,
-                  onRetry: _load,
-                )
-              : ListView(
-                  padding: DesignTokens.paddingScreen,
-                  children: [
-                    _SectionCard(
-                      title: 'Account',
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _nameCtrl,
-                            textCapitalization: TextCapitalization.words,
-                            decoration: const InputDecoration(
-                              labelText: 'Name',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextField(
-                            controller: _phoneCtrl,
-                            keyboardType: TextInputType.phone,
-                            decoration: const InputDecoration(
-                              labelText: 'Phone',
-                              prefixIcon: Icon(Icons.phone_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: DesignTokens.spaceMd),
-                          TextFormField(
-                            enabled: false,
-                            initialValue: _email,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(Icons.mail_outline),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceMd),
-                    _SectionCard(
-                      title: 'Change password (optional)',
-                      child: TextField(
-                        controller: _passwordCtrl,
-                        obscureText: true,
+          ? _ErrorState(
+              title: 'Failed to load profile',
+              error: _error!,
+              onRetry: _load,
+            )
+          : ListView(
+              padding: DesignTokens.paddingScreen,
+              children: [
+                _SectionCard(
+                  title: 'Account',
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameCtrl,
+                        textCapitalization: TextCapitalization.words,
                         decoration: const InputDecoration(
-                          labelText: 'New password',
-                          prefixIcon: Icon(Icons.lock_outline),
+                          labelText: 'Name',
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceLg),
-                    ElevatedButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_saving ? 'Saving…' : 'Save'),
-                      style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
-                    ),
-                  ],
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: DesignTokens.spaceMd),
+                      TextFormField(
+                        enabled: false,
+                        initialValue: _email,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.mail_outline),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: DesignTokens.spaceMd),
+                _SectionCard(
+                  title: 'Change password (optional)',
+                  child: TextField(
+                    controller: _passwordCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'New password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                ElevatedButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_saving ? 'Saving…' : 'Save'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DesignTokens.brandAccent,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -210,7 +214,11 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.title, required this.error, required this.onRetry});
+  const _ErrorState({
+    required this.title,
+    required this.error,
+    required this.onRetry,
+  });
 
   final String title;
   final Object error;
@@ -224,9 +232,17 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: DesignTokens.textBodyBold, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: DesignTokens.textBodyBold,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error.toString(), style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error.toString(),
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             ElevatedButton.icon(
               onPressed: onRetry,

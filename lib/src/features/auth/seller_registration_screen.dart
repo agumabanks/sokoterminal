@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,9 @@ import '../../core/firebase/firebase_analytics_service.dart';
 import 'dart:ui';
 
 import '../../core/app_providers.dart';
+import '../../core/db/app_database.dart';
+import '../../core/settings/business_profile_cache.dart';
+import '../../core/settings/business_setup_prefs.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/util/country_codes.dart';
 import '../../core/services/places_service.dart';
@@ -30,10 +34,12 @@ class SellerRegistrationScreen extends ConsumerStatefulWidget {
   final String? initialPhone;
 
   @override
-  ConsumerState<SellerRegistrationScreen> createState() => _SellerRegistrationScreenState();
+  ConsumerState<SellerRegistrationScreen> createState() =>
+      _SellerRegistrationScreenState();
 }
 
-class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScreen>
+class _SellerRegistrationScreenState
+    extends ConsumerState<SellerRegistrationScreen>
     with TickerProviderStateMixin {
   final _pageController = PageController();
   int _currentStep = 0;
@@ -53,7 +59,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _pinFocus = FocusNode();
-  
+
   CountryCode _selectedCountry = defaultCountryCode;
   bool _obscurePin = true;
 
@@ -63,18 +69,19 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   final _shopNameFocus = FocusNode();
   final _addressFocus = FocusNode();
   String? _selectedCategory;
-  
+  bool _loadingPlans = true;
+  List<_RegistrationPlan> _plans = const [];
+  _RegistrationPlan? _selectedPlan;
+
   // Smart Address Logic
   final _placesService = PlacesService();
   Timer? _debounce;
   final _addressLayerLink = LayerLink();
   OverlayEntry? _overlayEntry;
-  bool _isSearchingAddress = false;
-
   // Step 3: Location (Hybrid)
   bool _useGoogleMaps = false;
   bool _checkingMaps = true;
-  LatLng? _location; 
+  LatLng? _location;
   double _deliveryRadiusKm = 5.0;
   bool _isLoadingLocation = false;
   bool _isResolvingAddress = false;
@@ -82,22 +89,38 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   bool _fallbackTilesFailed = false;
   double _fallbackZoom = 15;
   final fmap.MapController _fallbackMapController = fmap.MapController();
-  
+
   GoogleMapController? _mapController;
   Set<Circle> _circles = {};
   Set<Marker> _markers = {};
   String? _gpsLabel;
 
   static const List<Map<String, dynamic>> _allCategories = [
-    {'name': 'Supermarket & Groceries', 'icon': Icons.shopping_cart, 'group': 'Retail'},
+    {
+      'name': 'Supermarket & Groceries',
+      'icon': Icons.shopping_cart,
+      'group': 'Retail',
+    },
     {'name': 'Mini Mart / Duka', 'icon': Icons.store, 'group': 'Retail'},
-    {'name': 'Wholesale & Distribution', 'icon': Icons.inventory_2, 'group': 'Retail'},
+    {
+      'name': 'Wholesale & Distribution',
+      'icon': Icons.inventory_2,
+      'group': 'Retail',
+    },
     {'name': 'Fashion & Clothing', 'icon': Icons.checkroom, 'group': 'Retail'},
     {'name': 'Shoes & Footwear', 'icon': Icons.hiking, 'group': 'Retail'},
     {'name': 'Jewelry & Accessories', 'icon': Icons.diamond, 'group': 'Retail'},
-    {'name': 'Cosmetics & Beauty', 'icon': Icons.face_retouching_natural, 'group': 'Retail'},
+    {
+      'name': 'Cosmetics & Beauty',
+      'icon': Icons.face_retouching_natural,
+      'group': 'Retail',
+    },
     {'name': 'Electronics', 'icon': Icons.devices, 'group': 'Retail'},
-    {'name': 'Phones & Accessories', 'icon': Icons.phone_android, 'group': 'Retail'},
+    {
+      'name': 'Phones & Accessories',
+      'icon': Icons.phone_android,
+      'group': 'Retail',
+    },
     {'name': 'Computers & IT', 'icon': Icons.computer, 'group': 'Retail'},
     {'name': 'Home Appliances', 'icon': Icons.kitchen, 'group': 'Retail'},
     {'name': 'Furniture', 'icon': Icons.chair, 'group': 'Retail'},
@@ -115,13 +138,25 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     {'name': 'Butchery', 'icon': Icons.set_meal, 'group': 'Food'},
     {'name': 'Fresh Produce', 'icon': Icons.eco, 'group': 'Food'},
     {'name': 'Drinks & Liquor', 'icon': Icons.local_drink, 'group': 'Food'},
-    {'name': 'Street Food / Rolex', 'icon': Icons.lunch_dining, 'group': 'Food'},
-    {'name': 'Mobile Money', 'icon': Icons.account_balance_wallet, 'group': 'Services'},
+    {
+      'name': 'Street Food / Rolex',
+      'icon': Icons.lunch_dining,
+      'group': 'Food',
+    },
+    {
+      'name': 'Mobile Money',
+      'icon': Icons.account_balance_wallet,
+      'group': 'Services',
+    },
     {'name': 'Salon & Barber', 'icon': Icons.content_cut, 'group': 'Services'},
     {'name': 'Spa & Beauty', 'icon': Icons.spa, 'group': 'Services'},
     {'name': 'Pharmacy', 'icon': Icons.local_pharmacy, 'group': 'Health'},
     {'name': 'Clinic', 'icon': Icons.local_hospital, 'group': 'Health'},
-    {'name': 'Dry Cleaning', 'icon': Icons.local_laundry_service, 'group': 'Services'},
+    {
+      'name': 'Dry Cleaning',
+      'icon': Icons.local_laundry_service,
+      'group': 'Services',
+    },
     {'name': 'Tailoring', 'icon': Icons.straighten, 'group': 'Services'},
     {'name': 'Car Wash', 'icon': Icons.local_car_wash, 'group': 'Services'},
     {'name': 'Auto Repair', 'icon': Icons.car_repair, 'group': 'Services'},
@@ -131,8 +166,16 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     {'name': 'Events', 'icon': Icons.celebration, 'group': 'Services'},
     {'name': 'Cleaning', 'icon': Icons.cleaning_services, 'group': 'Services'},
     {'name': 'Security', 'icon': Icons.security, 'group': 'Services'},
-    {'name': 'Professional Services', 'icon': Icons.business_center, 'group': 'Services'},
-    {'name': 'Internet Cafe', 'icon': Icons.videogame_asset, 'group': 'Services'},
+    {
+      'name': 'Professional Services',
+      'icon': Icons.business_center,
+      'group': 'Services',
+    },
+    {
+      'name': 'Internet Cafe',
+      'icon': Icons.videogame_asset,
+      'group': 'Services',
+    },
     {'name': 'Agriculture', 'icon': Icons.agriculture, 'group': 'Other'},
     {'name': 'Construction', 'icon': Icons.construction, 'group': 'Other'},
     {'name': 'Education', 'icon': Icons.school, 'group': 'Other'},
@@ -146,6 +189,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   @override
   void initState() {
     super.initState();
+    _requestLocationPermissionEarly();
     _checkGooglePlayServices();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 500),
@@ -155,7 +199,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       parent: _fadeController,
       curve: Curves.easeOutBack,
     );
-    
+
     // Listen to address focus to close overlay on blur
     _addressFocus.addListener(() {
       if (!_addressFocus.hasFocus) {
@@ -167,14 +211,58 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       _phoneController.text = widget.initialPhone!;
     }
     _fadeController.forward();
+    unawaited(_loadPlans());
+  }
+
+  Future<void> _loadPlans() async {
+    try {
+      final response = await ref
+          .read(sellerApiProvider)
+          .fetchSellerRegistrationPlans();
+      final body = response.data is Map<String, dynamic>
+          ? Map<String, dynamic>.from(response.data as Map<String, dynamic>)
+          : const <String, dynamic>{};
+      final rawPlans = body['data'] is List
+          ? List<dynamic>.from(body['data'] as List)
+          : body['plans'] is List
+          ? List<dynamic>.from(body['plans'] as List)
+          : const <dynamic>[];
+      final plans =
+          rawPlans
+              .whereType<Map>()
+              .map(
+                (e) => _RegistrationPlan.fromJson(Map<String, dynamic>.from(e)),
+              )
+              .where((plan) => plan.isActive)
+              .toList()
+            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      if (!mounted) return;
+      setState(() {
+        _plans = plans;
+        _selectedPlan = plans.isEmpty
+            ? null
+            : plans.firstWhere(
+                (plan) => plan.slug == 'start',
+                orElse: () => plans.first,
+              );
+        _loadingPlans = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingPlans = false;
+      });
+    }
   }
 
   Future<void> _checkGooglePlayServices() async {
     try {
-      final availability = await GoogleApiAvailability.instance.checkGooglePlayServicesAvailability();
+      final availability = await GoogleApiAvailability.instance
+          .checkGooglePlayServicesAvailability();
       if (mounted) {
         setState(() {
-          _useGoogleMaps = availability == GooglePlayServicesAvailability.success;
+          _useGoogleMaps =
+              availability == GooglePlayServicesAvailability.success;
           _checkingMaps = false;
         });
       }
@@ -211,7 +299,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
   void _onAddressChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
+
     // Clear location if user types manually (to ensure integrity)
     // But we keep it until they select a new one or clear it
     if (query.isEmpty) {
@@ -265,20 +353,37 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                     padding: EdgeInsets.zero,
                     shrinkWrap: true,
                     itemCount: predictions.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.white.withOpacity(0.05)),
+                    separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: Colors.white.withOpacity(0.05),
+                    ),
                     itemBuilder: (context, index) {
                       final p = predictions[index];
                       return ListTile(
                         dense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        leading: const Icon(Icons.location_on_outlined, color: Color(0xFF6C63FF), size: 20),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        leading: const Icon(
+                          Icons.location_on_outlined,
+                          color: Color(0xFF6C63FF),
+                          size: 20,
+                        ),
                         title: Text(
                           p.mainText,
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         subtitle: Text(
                           p.secondaryText,
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 12,
+                          ),
                         ),
                         onTap: () => _selectSuggestion(p),
                       );
@@ -303,12 +408,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   Future<void> _selectSuggestion(PlacePrediction prediction) async {
     _removeOverlay();
     _addressFocus.unfocus();
-    
+
     // Optimistic UI update
     _addressController.text = prediction.description;
     HapticFeedback.selectionClick();
-
-    setState(() => _isSearchingAddress = true);
 
     try {
       final details = await _placesService.getDetails(prediction.placeId);
@@ -319,13 +422,49 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         });
         _updateLocationMap(LatLng(details.lat, details.lng));
         if (_useGoogleMaps && _mapController != null) {
-           _mapController!.animateCamera(CameraUpdate.newLatLngZoom(_location!, 16));
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(_location!, 16),
+          );
         }
         HapticFeedback.mediumImpact();
       }
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _isSearchingAddress = false);
+    } catch (_) {}
+  }
+
+  void _schedulePostRegistrationTasks({
+    required LatLng location,
+    required String address,
+  }) {
+    unawaited(_upsertDeliveryProfile(location: location, address: address));
+    unawaited(_forceRegistrationResync());
+  }
+
+  Future<void> _upsertDeliveryProfile({
+    required LatLng location,
+    required String address,
+  }) async {
+    try {
+      await ref.read(sellerApiProvider).upsertDeliveryProfile({
+        'enabled': true,
+        'origin_lat': location.latitude,
+        'origin_lng': location.longitude,
+        'origin_label': address,
+        'radius_km': _deliveryRadiusKm,
+        'pricing_mode': 'base_per_km',
+        'base_fee': 2000,
+        'per_km_fee': 500,
+        'min_fee': 2000,
+      });
+    } catch (e) {
+      debugPrint('[Registration] delivery profile update failed: $e');
+    }
+  }
+
+  Future<void> _forceRegistrationResync() async {
+    try {
+      await ref.read(syncServiceProvider).forceFullResync();
+    } catch (e) {
+      debugPrint('[Registration] resync failed: $e');
     }
   }
 
@@ -365,13 +504,20 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        if (_nameController.text.trim().isEmpty) return _showError('Can\'t assume your name!');
-        if (_phoneController.text.trim().isEmpty) return _showError('Phone number required');
-        if (_pinController.text.length < 5) return _showError('PIN must be 5-6 digits');
+        if (_nameController.text.trim().isEmpty)
+          return _showError('Can\'t assume your name!');
+        if (_phoneController.text.trim().isEmpty)
+          return _showError('Phone number required');
+        if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text))
+          return _showError('PIN must be exactly 6 digits');
         return true;
       case 1:
-        if (_shopNameController.text.trim().isEmpty) return _showError('Business needs a name');
+        if (_shopNameController.text.trim().isEmpty)
+          return _showError('Business needs a name');
         if (_selectedCategory == null) return _showError('Select a category');
+        if (_plans.isNotEmpty && _selectedPlan == null) {
+          return _showError('Choose a Sanaa plan');
+        }
         return true;
       default:
         return true;
@@ -399,21 +545,34 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     return false;
   }
 
+  Future<void> _requestLocationPermissionEarly() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+    } catch (_) {}
+  }
+
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoadingLocation = true);
     HapticFeedback.mediumImpact();
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
-      
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied)
+        permission = await Geolocator.requestPermission();
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         _showError('Allow location to proceed');
         setState(() => _isLoadingLocation = false);
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+      );
       final latLng = LatLng(position.latitude, position.longitude);
 
       if (_useGoogleMaps && _mapController != null) {
@@ -423,7 +582,8 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         HapticFeedback.mediumImpact();
         setState(() {
           _location = latLng;
-          _gpsLabel = '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+          _gpsLabel =
+              '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
           _lastResolvedQuery = null;
         });
       }
@@ -438,7 +598,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     _updateLocationMapWithOptions(location, withHaptics: true);
   }
 
-  void _updateLocationMapWithOptions(LatLng location, {required bool withHaptics}) {
+  void _updateLocationMapWithOptions(
+    LatLng location, {
+    required bool withHaptics,
+  }) {
     if (withHaptics) HapticFeedback.selectionClick();
     setState(() {
       _location = location;
@@ -507,7 +670,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     await _resolveAddressToLocation(query, force: false);
   }
 
-  Future<void> _resolveAddressToLocation(String query, {required bool force}) async {
+  Future<void> _resolveAddressToLocation(
+    String query, {
+    required bool force,
+  }) async {
     if (query.isEmpty || _isResolvingAddress) return;
     if (!force && _lastResolvedQuery == query && _location != null) return;
 
@@ -517,7 +683,9 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       final predictions = await _placesService.search(query);
       if (predictions.isEmpty) return;
 
-      final details = await _placesService.getDetails(predictions.first.placeId);
+      final details = await _placesService.getDetails(
+        predictions.first.placeId,
+      );
       if (details == null) return;
 
       final nextLocation = LatLng(details.lat, details.lng);
@@ -528,7 +696,9 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       _updateLocationMap(nextLocation);
       if (_useGoogleMaps && _mapController != null) {
-        _mapController!.animateCamera(CameraUpdate.newLatLngZoom(nextLocation, 16));
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(nextLocation, 16),
+        );
       }
       HapticFeedback.mediumImpact();
     } catch (_) {
@@ -539,7 +709,9 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
   Future<void> _handleSubmit() async {
     if (_location == null) {
-      _showError(_useGoogleMaps ? 'Pin location on map' : 'Tap GPS button first');
+      _showError(
+        _useGoogleMaps ? 'Pin location on map' : 'Tap GPS button first',
+      );
       return;
     }
 
@@ -559,11 +731,16 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       final address = _addressController.text.trim();
       final location = _location!;
       final category = _selectedCategory;
+      final plan = _selectedPlan;
 
-      debugPrint('[Registration] submit name=$name phone=$phone');
-      debugPrint('[Registration] submit address="$address" location=${location.latitude},${location.longitude}');
-      debugPrint('[Registration] submit category=$category radius=${_deliveryRadiusKm.toStringAsFixed(0)}km pinLength=${pin.length}');
-      
+      if (kDebugMode) debugPrint('[Registration] submit initiated');
+      debugPrint(
+        '[Registration] submit address="$address" location=${location.latitude},${location.longitude}',
+      );
+      debugPrint(
+        '[Registration] submit category=$category radius=${_deliveryRadiusKm.toStringAsFixed(0)}km pinLength=${pin.length}',
+      );
+
       // Get current GPS position for registration location (where user is right now)
       double? registrationLat;
       double? registrationLng;
@@ -573,14 +750,18 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         ).timeout(const Duration(seconds: 5));
         registrationLat = position.latitude;
         registrationLng = position.longitude;
-        debugPrint('[Registration] GPS at signup: ${registrationLat.toStringAsFixed(5)}, ${registrationLng.toStringAsFixed(5)}');
+        debugPrint(
+          '[Registration] GPS at signup: ${registrationLat.toStringAsFixed(5)}, ${registrationLng.toStringAsFixed(5)}',
+        );
       } catch (e) {
         // Use the map location as fallback if GPS fails
         registrationLat = location.latitude;
         registrationLng = location.longitude;
-        debugPrint('[Registration] GPS failed, using map location for registration: $e');
+        debugPrint(
+          '[Registration] GPS failed, using map location for registration: $e',
+        );
       }
-      
+
       final registerResponse = await api.registerSeller(
         name: name,
         email: null,
@@ -588,40 +769,53 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         pin: pin,
         shopName: shopName,
         address: address,
-        latitude: location.latitude,                     // Shop business location (pinned on map)
-        longitude: location.longitude,                   // Shop business location (pinned on map)
-        registrationLatitude: registrationLat,           // User's GPS at signup
-        registrationLongitude: registrationLng,          // User's GPS at signup
+        latitude: location.latitude, // Shop business location (pinned on map)
+        longitude: location.longitude, // Shop business location (pinned on map)
+        registrationLatitude: registrationLat, // User's GPS at signup
+        registrationLongitude: registrationLng, // User's GPS at signup
         category: category,
         deliveryRadiusKm: _deliveryRadiusKm,
+        planId: plan?.id,
+        planSlug: plan?.slug,
       );
 
-      if (registerResponse.statusCode != 200 && registerResponse.statusCode != 201) {
+      if (registerResponse.statusCode != 200 &&
+          registerResponse.statusCode != 201) {
         throw Exception('Registration Failed');
       }
 
       final data = registerResponse.data as Map<String, dynamic>;
-      final token = data['access_token']?.toString() ?? data['token']?.toString();
+      final token =
+          data['access_token']?.toString() ?? data['token']?.toString();
       if (token == null) throw Exception('No access token');
 
       final secureStorage = ref.read(secureStorageProvider);
       await secureStorage.writeAccessToken(token);
+      final user = data['user'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(data['user'] as Map<String, dynamic>)
+          : null;
+      final sellerUuid = user?['seller_uuid']?.toString();
+      if (sellerUuid != null && sellerUuid.isNotEmpty) {
+        await secureStorage.writeSellerUUID(sellerUuid);
+      }
+      await _seedLocalBusinessCache(
+        registrationData: data,
+        sellerName: name,
+        phone: phone,
+        shopName: shopName,
+        address: address,
+        location: location,
+      );
+      await ref
+          .read(businessSetupCompletedProvider.notifier)
+          .markSetupRequired();
       ref.read(postRegistrationWelcomePendingProvider.notifier).state = true;
       await ref.read(authControllerProvider.notifier).bootstrap();
 
-      api.upsertDeliveryProfile({
-        'enabled': true,
-        'origin_lat': _location!.latitude,
-        'origin_lng': _location!.longitude,
-        'origin_label': _addressController.text.trim(),
-        'radius_km': _deliveryRadiusKm,
-        'pricing_mode': 'base_per_km',
-        'base_fee': 2000,
-        'per_km_fee': 500,
-        'min_fee': 2000,
-      }).catchError((_) {});
-
-      ref.read(syncServiceProvider).forceFullResync().catchError((_) {});
+      _schedulePostRegistrationTasks(
+        location: _location!,
+        address: _addressController.text.trim(),
+      );
 
       if (!mounted) {
         ref.read(postRegistrationWelcomePendingProvider.notifier).state = false;
@@ -629,7 +823,9 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       }
       setState(() => _isLoading = false);
       HapticFeedback.mediumImpact();
-      debugPrint('[Registration] SUCCESS - showing post-registration welcome dialog');
+      debugPrint(
+        '[Registration] SUCCESS - showing post-registration welcome dialog',
+      );
       await _showPostRegistrationWelcome();
     } on DioException catch (e) {
       debugPrint('[Registration] error: $e');
@@ -639,10 +835,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         return;
       }
       setState(() => _isLoading = false);
-      _showError(
-        _extractErrorMessage(e),
-        title: 'Registration failed',
-      );
+      _showError(_extractErrorMessage(e), title: 'Registration failed');
     } catch (e) {
       debugPrint('[Registration] error: $e');
       setState(() => _isLoading = false);
@@ -693,8 +886,77 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     return message;
   }
 
+  Future<void> _seedLocalBusinessCache({
+    required Map<String, dynamic> registrationData,
+    required String sellerName,
+    required String phone,
+    required String shopName,
+    required String address,
+    required LatLng location,
+  }) async {
+    final db = ref.read(appDatabaseProvider);
+    final existingProfile = await db.getBusinessProfile();
+    final user = registrationData['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(
+            registrationData['user'] as Map<String, dynamic>,
+          )
+        : const <String, dynamic>{};
+    final sellerId = user['id']?.toString() ?? existingProfile?.sellerId;
+    final sellerEmail = user['email']?.toString() ?? existingProfile?.sellerEmail;
+    final outletId =
+        registrationData['shop_id']?.toString() ??
+        registrationData['outlet_id']?.toString() ??
+        existingProfile?.shopId ??
+        'primary-outlet';
+    final cleanedAddress = address.trim();
+    final cleanedPhone = phone.trim();
+    final cleanedShopName = shopName.trim().isEmpty ? sellerName.trim() : shopName.trim();
+
+    await db.upsertOutlet(
+      OutletsCompanion.insert(
+        id: drift.Value(outletId),
+        name: cleanedShopName,
+        address: drift.Value(cleanedAddress.isEmpty ? null : cleanedAddress),
+        phone: drift.Value(cleanedPhone.isEmpty ? null : cleanedPhone),
+        updatedAt: drift.Value(DateTime.now().toUtc()),
+        active: const drift.Value(true),
+      ),
+    );
+
+    await db.upsertBusinessProfile(
+      BusinessProfilesCompanion.insert(
+        id: kPrimaryBusinessProfileId,
+        sellerId: sellerId == null
+            ? const drift.Value.absent()
+            : drift.Value(sellerId),
+        sellerName: drift.Value(sellerName.trim()),
+        sellerEmail: sellerEmail == null || sellerEmail.trim().isEmpty
+            ? const drift.Value.absent()
+            : drift.Value(sellerEmail.trim()),
+        sellerPhone: cleanedPhone.isEmpty
+            ? const drift.Value.absent()
+            : drift.Value(cleanedPhone),
+        shopId: drift.Value(outletId),
+        shopName: cleanedShopName,
+        shopAddress: drift.Value(cleanedAddress.isEmpty ? null : cleanedAddress),
+        shopPhone: cleanedPhone.isEmpty
+            ? const drift.Value.absent()
+            : drift.Value(cleanedPhone),
+        selfDeliveryActive: const drift.Value(false),
+        deliveryRadiusKm: drift.Value(_deliveryRadiusKm),
+        deliveryPickupLatitude: drift.Value(location.latitude),
+        deliveryPickupLongitude: drift.Value(location.longitude),
+        updatedAt: drift.Value(DateTime.now().toUtc()),
+        synced: const drift.Value(false),
+      ),
+    );
+  }
+
   String? _extractUnknownColumn(String message) {
-    final match = RegExp("Unknown column '([^']+)'", caseSensitive: false).firstMatch(message);
+    final match = RegExp(
+      "Unknown column '([^']+)'",
+      caseSensitive: false,
+    ).firstMatch(message);
     return match?.group(1);
   }
 
@@ -702,7 +964,8 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     final detail = _extractBackendDetail(error);
     if (detail == null) return false;
     final lower = detail.toLowerCase();
-    return lower.contains('unknown column') || lower.contains('sqlstate[42s22]');
+    return lower.contains('unknown column') ||
+        lower.contains('sqlstate[42s22]');
   }
 
   String? _extractBackendDetail(DioException error) {
@@ -716,12 +979,15 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
   bool _looksLikeAccountExists(String message) {
     final lower = message.toLowerCase();
-    return lower.contains('already') || lower.contains('exists') || lower.contains('taken');
+    return lower.contains('already') ||
+        lower.contains('exists') ||
+        lower.contains('taken');
   }
 
   Future<bool> _fallbackRegistrationFlow() async {
-    final postRegistrationPending =
-        ref.read(postRegistrationWelcomePendingProvider.notifier);
+    final postRegistrationPending = ref.read(
+      postRegistrationWelcomePendingProvider.notifier,
+    );
     postRegistrationPending.state = true;
     try {
       final name = _nameController.text.trim();
@@ -738,8 +1004,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       var authState = ref.read(authControllerProvider);
       if (authState.status != AuthStatus.authenticated) {
-        final message = authState.message ?? 'Registration failed. Please try again.';
-        if (authState.status == AuthStatus.error && _looksLikeAccountExists(message)) {
+        final message =
+            authState.message ?? 'Registration failed. Please try again.';
+        if (authState.status == AuthStatus.error &&
+            _looksLikeAccountExists(message)) {
           debugPrint('[Registration] fallback to /v2/auth/login');
           await authController.login(emailOrPhone: phone, password: pin);
           authState = ref.read(authControllerProvider);
@@ -748,11 +1016,16 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
       if (authState.status != AuthStatus.authenticated) {
         postRegistrationPending.state = false;
-        final message = authState.message ?? 'Registration failed. Please try again.';
+        final message =
+            authState.message ?? 'Registration failed. Please try again.';
         setState(() => _isLoading = false);
         _showError(message, title: 'Registration failed');
         return false;
       }
+
+      await ref
+          .read(businessSetupCompletedProvider.notifier)
+          .markSetupRequired();
 
       final api = ref.read(sellerApiProvider);
       final shopPayload = <String, dynamic>{
@@ -776,21 +1049,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         debugPrint('[Registration] shop update failed: $e');
       }
 
-      api.upsertDeliveryProfile({
-        'enabled': true,
-        'origin_lat': location.latitude,
-        'origin_lng': location.longitude,
-        'origin_label': address,
-        'radius_km': _deliveryRadiusKm,
-        'pricing_mode': 'base_per_km',
-        'base_fee': 2000,
-        'per_km_fee': 500,
-        'min_fee': 2000,
-      }).catchError((e) {
-        debugPrint('[Registration] delivery profile update failed: $e');
-      });
-
-      ref.read(syncServiceProvider).forceFullResync().catchError((_) {});
+      _schedulePostRegistrationTasks(location: location, address: address);
 
       if (!mounted) {
         postRegistrationPending.state = false;
@@ -805,7 +1064,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       postRegistrationPending.state = false;
       if (!mounted) return false;
       setState(() => _isLoading = false);
-      _showError('Registration failed. Please try again.', title: 'Registration failed');
+      _showError(
+        'Registration failed. Please try again.',
+        title: 'Registration failed',
+      );
       return false;
     }
   }
@@ -818,10 +1080,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       builder: (context) => const _PostRegistrationDialog(),
     );
     if (!mounted) return;
-    
-    final selectedChoice = choice ?? _PostRegistrationChoice.checkout;
+
+    final selectedChoice = choice ?? _PostRegistrationChoice.guidedSetup;
     ref.read(postRegistrationWelcomePendingProvider.notifier).state = false;
-    
+
     // Log analytics event
     try {
       FirebaseAnalyticsService.instance.logCustomEvent(
@@ -834,7 +1096,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     } catch (e) {
       debugPrint('[Analytics] post_registration_choice failed: $e');
     }
-    
+
     // Navigate with error handling
     try {
       switch (selectedChoice) {
@@ -872,14 +1134,20 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       body: Stack(
         children: [
           Positioned(
-            top: -100, right: -100,
+            top: -100,
+            right: -100,
             child: Container(
-              width: 300, height: 300,
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _mintAccentColor.withOpacity(0.18),
                 boxShadow: [
-                   BoxShadow(color: _mintAccentColor.withOpacity(0.25), blurRadius: 80, spreadRadius: 40),
+                  BoxShadow(
+                    color: _mintAccentColor.withOpacity(0.25),
+                    blurRadius: 80,
+                    spreadRadius: 40,
+                  ),
                 ],
               ),
             ),
@@ -905,7 +1173,8 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
           if (_errorMessage != null)
             Positioned(
               top: MediaQuery.of(context).padding.top + 80,
-              left: 24, right: 24,
+              left: 24,
+              right: 24,
               child: _buildErrorSnack(),
             ),
         ],
@@ -919,11 +1188,21 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       child: Row(
         children: [
           GestureDetector(
-            onTap: _currentStep > 0 ? _previousStep : () => context.go('/login'),
+            onTap: _currentStep > 0
+                ? _previousStep
+                : () => context.go('/login'),
             child: Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), shape: BoxShape.circle),
-              child: Icon(_currentStep > 0 ? Icons.arrow_back_ios_new : Icons.close, color: Colors.white, size: 18),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _currentStep > 0 ? Icons.arrow_back_ios_new : Icons.close,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -934,7 +1213,12 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                 color: Colors.transparent,
                 child: Text(
                   _getStepTitle(),
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ),
@@ -947,10 +1231,14 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
   String _getStepTitle() {
     switch (_currentStep) {
-      case 0: return 'Account Details';
-      case 1: return 'Business Profile';
-      case 2: return 'Location';
-      default: return '';
+      case 0:
+        return 'Account Details';
+      case 1:
+        return 'Business Profile';
+      case 2:
+        return 'Location';
+      default:
+        return '';
     }
   }
 
@@ -963,7 +1251,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
           margin: const EdgeInsets.only(left: 6),
           width: isActive ? 24 : 8,
           height: 8,
-          decoration: BoxDecoration(color: isActive ? Colors.white : Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+          decoration: BoxDecoration(
+            color: isActive ? Colors.white : Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(4),
+          ),
         );
       }),
     );
@@ -977,7 +1268,7 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOutBack,
       builder: (context, value, child) {
-        final clamped = value.clamp(0.0, 1.0) as double;
+        final clamped = value.clamp(0.0, 1.0);
         return Transform.translate(
           offset: Offset(0, -20.0 * (1.0 - clamped)),
           child: Opacity(opacity: clamped, child: child),
@@ -1018,7 +1309,11 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                       color: _errorAccentColor.withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.error_rounded, color: _errorAccentColor, size: 16),
+                    child: const Icon(
+                      Icons.error_rounded,
+                      color: _errorAccentColor,
+                      size: 16,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1047,7 +1342,11 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(Icons.close, color: _macTextSecondary.withOpacity(0.8), size: 18),
+                  Icon(
+                    Icons.close,
+                    color: _macTextSecondary.withOpacity(0.8),
+                    size: 18,
+                  ),
                 ],
               ),
             ),
@@ -1064,15 +1363,30 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         padding: const EdgeInsets.symmetric(horizontal: 24),
         children: [
           const SizedBox(height: 20),
-          const Text('Let\'s get\nyou started.', style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w700, letterSpacing: -2, height: 1.0)),
+          const Text(
+            'Let\'s get\nyou started.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 48,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -2,
+              height: 1.0,
+            ),
+          ),
           const SizedBox(height: 48),
-          _PremiumTextField(label: 'Full Name', controller: _nameController, focusNode: _nameFocus, icon: Icons.person_rounded, autoFocus: true),
+          _PremiumTextField(
+            label: 'Full Name',
+            controller: _nameController,
+            focusNode: _nameFocus,
+            icon: Icons.person_rounded,
+            autoFocus: true,
+          ),
           const SizedBox(height: 24),
           _buildPhoneField(),
           const SizedBox(height: 24),
           const SizedBox(height: 24),
           _PremiumTextField(
-            label: 'Create PIN (5-6 digits)',
+            label: 'Create PIN (6 digits)',
             controller: _pinController,
             focusNode: _pinFocus,
             icon: Icons.pin_rounded,
@@ -1099,11 +1413,28 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         padding: const EdgeInsets.symmetric(horizontal: 24),
         children: [
           const SizedBox(height: 20),
-          const Text('Tell us about\nyour business.', style: TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w700, letterSpacing: -2, height: 1.0)),
+          const Text(
+            'Tell us about\nyour business.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 48,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -2,
+              height: 1.0,
+            ),
+          ),
           const SizedBox(height: 48),
-          _PremiumTextField(label: 'Business Name', controller: _shopNameController, focusNode: _shopNameFocus, icon: Icons.store_rounded, autoFocus: true),
+          _PremiumTextField(
+            label: 'Business Name',
+            controller: _shopNameController,
+            focusNode: _shopNameFocus,
+            icon: Icons.store_rounded,
+            autoFocus: true,
+          ),
           const SizedBox(height: 24),
           _buildCategorySelector(),
+          const SizedBox(height: 24),
+          _buildPlanSelector(),
           const SizedBox(height: 24),
           CompositedTransformTarget(
             link: _addressLayerLink,
@@ -1112,11 +1443,11 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
               controller: _addressController,
               focusNode: _addressFocus,
               icon: Icons.location_on_rounded,
-              onChanged: _onAddressChanged, 
+              onChanged: _onAddressChanged,
               // Address Smartness
             ),
           ),
-          
+
           const SizedBox(height: 48),
           _MainButton(text: 'Next Step', onTap: _nextStep),
           const SizedBox(height: 32),
@@ -1126,14 +1457,20 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
   }
 
   Widget _buildLocationStep() {
-    if (_checkingMaps) return const Center(child: CircularProgressIndicator(color: Colors.white));
+    if (_checkingMaps)
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     return Stack(
       children: [
         Positioned.fill(
           child: _useGoogleMaps ? _buildGoogleMap() : _buildFallbackMap(),
         ),
         Positioned(
-          top: 0, left: 0, right: 0, height: 160,
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 160,
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -1145,27 +1482,45 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
           ),
         ),
         Positioned(
-          top: 20, left: 24, right: 88,
+          top: 20,
+          left: 24,
+          right: 88,
           child: _buildLocationInfoCard(),
         ),
         Positioned(
-          top: 20, right: 24,
-          child: _GlassButton(icon: Icons.gps_fixed_rounded, isLoading: _isLoadingLocation, onTap: _getCurrentLocation),
+          top: 20,
+          right: 24,
+          child: _GlassButton(
+            icon: Icons.gps_fixed_rounded,
+            isLoading: _isLoadingLocation,
+            onTap: _getCurrentLocation,
+          ),
         ),
         Positioned(
-          left: 0, right: 0, bottom: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: ClipRRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1)))),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  border: Border(
+                    top: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildRadiusSlider(),
                     const SizedBox(height: 24),
-                    _MainButton(text: 'Create Account', isLoading: _isLoading, onTap: _location != null ? _handleSubmit : null),
+                    _MainButton(
+                      text: 'Create Account',
+                      isLoading: _isLoading,
+                      onTap: _location != null ? _handleSubmit : null,
+                    ),
                     SizedBox(height: MediaQuery.of(context).padding.bottom),
                   ],
                 ),
@@ -1177,9 +1532,181 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     );
   }
 
+  Widget _buildPlanSelector() {
+    if (_loadingPlans) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: const [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Loading Sanaa business plans…',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_plans.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Sanaa plan',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Plans are temporarily unavailable. The default starter plan will be applied.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.72),
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Choose your Sanaa plan',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ..._plans.map((plan) {
+          final selected = _selectedPlan?.id == plan.id;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedPlan = plan),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? _mintAccentColor.withOpacity(0.14)
+                      : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: selected
+                        ? _mintAccentColor
+                        : Colors.white.withOpacity(0.08),
+                    width: selected ? 1.5 : 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            plan.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            plan.priceLabel,
+                            style: TextStyle(
+                              color: selected ? _mintAccentColor : Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if ((plan.description ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        plan.description!,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.72),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _PlanTag(
+                          'Products ${plan.limitLabel(plan.productLimit)}',
+                        ),
+                        _PlanTag(
+                          'Services ${plan.limitLabel(plan.serviceLimit)}',
+                        ),
+                        _PlanTag('Staff ${plan.limitLabel(plan.staffLimit)}'),
+                        if (plan.trialDays > 0)
+                          _PlanTag('${plan.trialDays}-day trial'),
+                        if (plan.posEnabled) const _PlanTag('POS'),
+                        if (plan.analyticsEnabled) const _PlanTag('Analytics'),
+                        if (plan.deliveryEnabled) const _PlanTag('Delivery'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildGoogleMap() {
     return GoogleMap(
-      initialCameraPosition: CameraPosition(target: _location ?? const LatLng(0.3476, 32.5825), zoom: 15),
+      initialCameraPosition: CameraPosition(
+        target: _location ?? const LatLng(0.3476, 32.5825),
+        zoom: 15,
+      ),
       gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
         Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
       },
@@ -1282,7 +1809,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
               child: Text(
                 'Map tiles failed to load. Check your connection or use GPS.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14,
+                ),
               ),
             ),
           ),
@@ -1301,14 +1831,18 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
     final address = _addressController.text.trim();
     final hasAddress = address.isNotEmpty;
     final hasLocation = _location != null;
-    final title = hasAddress ? address : (_gpsLabel ?? 'Set your shop location');
+    final title = hasAddress
+        ? address
+        : (_gpsLabel ?? 'Set your shop location');
     final subtitle = _isResolvingAddress
         ? 'Finding your address on the map...'
         : hasLocation
-            ? (hasAddress ? 'Drag the pin or adjust the radius below.' : 'Pinned from GPS. Adjust the radius below.')
-            : hasAddress
-                ? 'Use address or GPS to drop a pin.'
-                : 'Use GPS or go back to add an address.';
+        ? (hasAddress
+              ? 'Drag the pin or adjust the radius below.'
+              : 'Pinned from GPS. Adjust the radius below.')
+        : hasAddress
+        ? 'Use address or GPS to drop a pin.'
+        : 'Use GPS or go back to add an address.';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -1331,14 +1865,21 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -1350,7 +1891,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                       : () => _resolveAddressToLocation(address, force: true),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                   ),
                   child: Text(hasLocation ? 'Recenter' : 'Use address'),
                 ),
@@ -1369,25 +1913,54 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: hasLoc ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.white.withOpacity(0.05),
+          color: hasLoc
+              ? const Color(0xFF6C63FF).withOpacity(0.1)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: hasLoc ? const Color(0xFF6C63FF).withOpacity(0.5) : Colors.white.withOpacity(0.1), width: 1.5),
+          border: Border.all(
+            color: hasLoc
+                ? const Color(0xFF6C63FF).withOpacity(0.5)
+                : Colors.white.withOpacity(0.1),
+            width: 1.5,
+          ),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: hasLoc ? const Color(0xFF6C63FF) : Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
-              child: Icon(hasLoc ? Icons.check_rounded : Icons.satellite_alt_rounded, color: Colors.white, size: 24),
+              decoration: BoxDecoration(
+                color: hasLoc
+                    ? const Color(0xFF6C63FF)
+                    : Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                hasLoc ? Icons.check_rounded : Icons.satellite_alt_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(hasLoc ? 'Location Secured' : 'Get GPS Location', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                  Text(
+                    hasLoc ? 'Location Secured' : 'Get GPS Location',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(_gpsLabel ?? 'Tap to acquire coordinates', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
+                  Text(
+                    _gpsLabel ?? 'Tap to acquire coordinates',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 14,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1404,28 +1977,56 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Delivery Radius', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+            const Text(
+              'Delivery Radius',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text('${_deliveryRadiusKm.toStringAsFixed(0)} km', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${_deliveryRadiusKm.toStringAsFixed(0)} km',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
         SliderTheme(
-          data: SliderThemeData(activeTrackColor: const Color(0xFF6C63FF), inactiveTrackColor: Colors.white.withOpacity(0.1), thumbColor: Colors.white, overlayColor: const Color(0xFF6C63FF).withOpacity(0.2), trackHeight: 4, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10, pressedElevation: 8)),
+          data: SliderThemeData(
+            activeTrackColor: const Color(0xFF6C63FF),
+            inactiveTrackColor: Colors.white.withOpacity(0.1),
+            thumbColor: Colors.white,
+            overlayColor: const Color(0xFF6C63FF).withOpacity(0.2),
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(
+              enabledThumbRadius: 10,
+              pressedElevation: 8,
+            ),
+          ),
           child: Slider(
-              value: _deliveryRadiusKm,
-              min: 1,
-              max: 50,
-              divisions: 49,
-              onChanged: (val) {
-                setState(() => _deliveryRadiusKm = val);
-                if (_location != null) {
-                  _updateLocationMapWithOptions(_location!, withHaptics: false);
-                }
-              }),
+            value: _deliveryRadiusKm,
+            min: 1,
+            max: 50,
+            divisions: 49,
+            onChanged: (val) {
+              setState(() => _deliveryRadiusKm = val);
+              if (_location != null) {
+                _updateLocationMapWithOptions(_location!, withHaptics: false);
+              }
+            },
+          ),
         ),
       ],
     );
@@ -1433,18 +2034,38 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
 
   Widget _buildPhoneField() {
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFF1E1E2C), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.1))),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E2C),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
           GestureDetector(
             onTap: () async {
-              final s = await showCountryPickerBottomSheet(context, _selectedCountry);
+              final s = await showCountryPickerBottomSheet(
+                context,
+                _selectedCountry,
+              );
               if (s != null) setState(() => _selectedCountry = s);
             },
             child: Container(
               padding: const EdgeInsets.all(16),
-              child: Row(children: [Text(_selectedCountry.flag, style: const TextStyle(fontSize: 24)), const SizedBox(width: 8), Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white.withOpacity(0.5), size: 16)]),
+              child: Row(
+                children: [
+                  Text(
+                    _selectedCountry.flag,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white.withOpacity(0.5),
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
           Container(width: 1, height: 32, color: Colors.white.withOpacity(0.1)),
@@ -1454,7 +2075,11 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
               focusNode: _phoneFocus,
               keyboardType: TextInputType.phone,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+              ),
               cursorColor: const Color(0xFF6C63FF),
               decoration: InputDecoration(
                 hintText: '700 000 000',
@@ -1462,7 +2087,10 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 prefixText: '${_selectedCountry.code} ',
-                prefixStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 18),
+                prefixStyle: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 18,
+                ),
                 filled: false,
                 fillColor: Colors.transparent,
               ),
@@ -1479,8 +2107,40 @@ class _SellerRegistrationScreenState extends ConsumerState<SellerRegistrationScr
       onTap: _showCategoryPicker,
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: cat != null ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20), border: Border.all(color: cat != null ? const Color(0xFF6C63FF).withOpacity(0.5) : Colors.white.withOpacity(0.1))),
-        child: Row(children: [Icon(cat != null ? Icons.category_rounded : Icons.search_rounded, color: cat != null ? const Color(0xFF6C63FF) : Colors.white.withOpacity(0.5)), const SizedBox(width: 16), Expanded(child: Text(cat ?? 'Search Categories', style: TextStyle(color: cat != null ? Colors.white : Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w500)))]),
+        decoration: BoxDecoration(
+          color: cat != null
+              ? const Color(0xFF6C63FF).withOpacity(0.1)
+              : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: cat != null
+                ? const Color(0xFF6C63FF).withOpacity(0.5)
+                : Colors.white.withOpacity(0.1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              cat != null ? Icons.category_rounded : Icons.search_rounded,
+              color: cat != null
+                  ? const Color(0xFF6C63FF)
+                  : Colors.white.withOpacity(0.5),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                cat ?? 'Search Categories',
+                style: TextStyle(
+                  color: cat != null
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.5),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1520,14 +2180,24 @@ class _PremiumTextFieldState extends State<_PremiumTextField> {
   @override
   void initState() {
     super.initState();
-    widget.focusNode.addListener(() => setState(() => _isFocused = widget.focusNode.hasFocus));
+    widget.focusNode.addListener(
+      () => setState(() => _isFocused = widget.focusNode.hasFocus),
+    );
   }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      decoration: BoxDecoration(color: const Color(0xFF1E1E2C), borderRadius: BorderRadius.circular(20), border: Border.all(color: _isFocused ? const Color(0xFF6C63FF) : Colors.transparent, width: 1.5)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E2C),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isFocused ? const Color(0xFF6C63FF) : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
       child: TextField(
         controller: widget.controller,
         focusNode: widget.focusNode,
@@ -1536,14 +2206,39 @@ class _PremiumTextFieldState extends State<_PremiumTextField> {
         onChanged: widget.onChanged,
         keyboardType: widget.keyboardType,
         inputFormatters: widget.inputFormatters,
-        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
         cursorColor: const Color(0xFF6C63FF),
         decoration: InputDecoration(
           labelText: widget.label,
-          labelStyle: TextStyle(color: _isFocused ? const Color(0xFF6C63FF) : Colors.white.withOpacity(0.5)),
-          icon: Icon(widget.icon, color: _isFocused ? const Color(0xFF6C63FF) : Colors.white.withOpacity(0.3), size: 20),
+          labelStyle: TextStyle(
+            color: _isFocused
+                ? const Color(0xFF6C63FF)
+                : Colors.white.withOpacity(0.5),
+          ),
+          icon: Icon(
+            widget.icon,
+            color: _isFocused
+                ? const Color(0xFF6C63FF)
+                : Colors.white.withOpacity(0.3),
+            size: 20,
+          ),
           border: InputBorder.none,
-          suffixIcon: widget.onToggleObscure != null ? IconButton(icon: Icon(widget.obscureText ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.white.withOpacity(0.3), size: 20), onPressed: widget.onToggleObscure) : null,
+          suffixIcon: widget.onToggleObscure != null
+              ? IconButton(
+                  icon: Icon(
+                    widget.obscureText
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: Colors.white.withOpacity(0.3),
+                    size: 20,
+                  ),
+                  onPressed: widget.onToggleObscure,
+                )
+              : null,
           filled: false,
           fillColor: Colors.transparent,
         ),
@@ -1566,8 +2261,46 @@ class _MainButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         height: 64,
         width: double.infinity,
-        decoration: BoxDecoration(gradient: isDisabled ? null : const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)]), color: isDisabled ? Colors.white.withOpacity(0.1) : null, borderRadius: BorderRadius.circular(20), boxShadow: isDisabled ? [] : [BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8))]),
-        child: Center(child: isLoading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)) : Text(text, style: TextStyle(color: isDisabled ? Colors.white.withOpacity(0.3) : Colors.white, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 0.5))),
+        decoration: BoxDecoration(
+          gradient: isDisabled
+              ? null
+              : const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+                ),
+          color: isDisabled ? Colors.white.withOpacity(0.1) : null,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isDisabled
+              ? []
+              : [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF).withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: isLoading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : Text(
+                  text,
+                  style: TextStyle(
+                    color: isDisabled
+                        ? Colors.white.withOpacity(0.3)
+                        : Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+        ),
       ),
     );
   }
@@ -1577,7 +2310,11 @@ class _GlassButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final bool isLoading;
-  const _GlassButton({required this.icon, required this.onTap, this.isLoading = false});
+  const _GlassButton({
+    required this.icon,
+    required this.onTap,
+    this.isLoading = false,
+  });
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1586,7 +2323,27 @@ class _GlassButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(width: 50, height: 50, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1))), child: Center(child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Icon(icon, color: Colors.white))),
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white),
+            ),
+          ),
         ),
       ),
     );
@@ -1599,7 +2356,8 @@ class _PostRegistrationDialog extends StatefulWidget {
   const _PostRegistrationDialog();
 
   @override
-  State<_PostRegistrationDialog> createState() => _PostRegistrationDialogState();
+  State<_PostRegistrationDialog> createState() =>
+      _PostRegistrationDialogState();
 }
 
 class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
@@ -1647,7 +2405,10 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 26,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
@@ -1673,9 +2434,15 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _mintAccentColor.withOpacity(0.14),
-                        border: Border.all(color: _mintAccentColor.withOpacity(0.5)),
+                        border: Border.all(
+                          color: _mintAccentColor.withOpacity(0.5),
+                        ),
                       ),
-                      child: const Icon(Icons.check_rounded, color: _mintAccentColor, size: 22),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: _mintAccentColor,
+                        size: 22,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -1717,7 +2484,9 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       isPrimary: true,
                       onTap: () {
                         HapticFeedback.mediumImpact();
-                        Navigator.of(context).pop(_PostRegistrationChoice.products);
+                        Navigator.of(
+                          context,
+                        ).pop(_PostRegistrationChoice.products);
                       },
                     ),
                     const SizedBox(height: 12),
@@ -1728,7 +2497,9 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       isPrimary: false,
                       onTap: () {
                         HapticFeedback.mediumImpact();
-                        Navigator.of(context).pop(_PostRegistrationChoice.services);
+                        Navigator.of(
+                          context,
+                        ).pop(_PostRegistrationChoice.services);
                       },
                     ),
                     const SizedBox(height: 14),
@@ -1742,21 +2513,27 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                     ),
                     Semantics(
                       label: 'Show the guided setup',
-                      hint: 'Opens a step-by-step setup wizard to help you get started',
+                      hint:
+                          'Opens a step-by-step setup wizard to help you get started',
                       button: true,
                       child: TextButton.icon(
                         onPressed: () {
                           HapticFeedback.lightImpact();
-                          Navigator.of(context).pop(_PostRegistrationChoice.guidedSetup);
+                          Navigator.of(
+                            context,
+                          ).pop(_PostRegistrationChoice.guidedSetup);
                         },
                         icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                         label: const Text(
-                          'Show the guided setup',
+                          'Start guided setup',
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         style: TextButton.styleFrom(
                           foregroundColor: _macTextSecondary,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                         ),
                       ),
                     ),
@@ -1768,7 +2545,9 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.lightImpact();
-                          Navigator.of(context).pop(_PostRegistrationChoice.checkout);
+                          Navigator.of(
+                            context,
+                          ).pop(_PostRegistrationChoice.checkout);
                         },
                         child: Container(
                           constraints: const BoxConstraints(minHeight: 44),
@@ -1815,10 +2594,16 @@ class _WelcomeChoiceButton extends StatelessWidget {
     final backgroundColor = isPrimary ? _mintAccentColor : Colors.white;
     final borderColor = isPrimary ? _mintAccentColor : _macBorderColor;
     final titleColor = isPrimary ? Colors.white : _macTextPrimary;
-    final subtitleColor = isPrimary ? Colors.white.withOpacity(0.85) : _macTextSecondary;
-    final iconBackground = isPrimary ? Colors.white.withOpacity(0.25) : const Color(0xFFF2F2F7);
+    final subtitleColor = isPrimary
+        ? Colors.white.withOpacity(0.85)
+        : _macTextSecondary;
+    final iconBackground = isPrimary
+        ? Colors.white.withOpacity(0.25)
+        : const Color(0xFFF2F2F7);
     final iconColor = isPrimary ? Colors.white : _macTextPrimary;
-    final arrowColor = isPrimary ? Colors.white.withOpacity(0.9) : _macTextSecondary;
+    final arrowColor = isPrimary
+        ? Colors.white.withOpacity(0.9)
+        : _macTextSecondary;
     final hasIcon = icon != null;
     final hasSubtitle = subtitle != null && subtitle!.trim().isNotEmpty;
     return Material(
@@ -1830,7 +2615,9 @@ class _WelcomeChoiceButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             gradient: isPrimary
-                ? LinearGradient(colors: [_mintAccentColor, const Color(0xFF3FB49F)])
+                ? LinearGradient(
+                    colors: [_mintAccentColor, const Color(0xFF3FB49F)],
+                  )
                 : null,
             color: isPrimary ? null : backgroundColor,
             borderRadius: BorderRadius.circular(18),
@@ -1855,7 +2642,11 @@ class _WelcomeChoiceButton extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(color: titleColor, fontSize: 16, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: titleColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     if (hasSubtitle) const SizedBox(height: 4),
                     if (hasSubtitle)
@@ -1879,7 +2670,11 @@ class _CategoryPickerSheet extends StatefulWidget {
   final List<Map<String, dynamic>> categories;
   final String? selected;
   final Function(String) onSelect;
-  const _CategoryPickerSheet({required this.categories, required this.selected, required this.onSelect});
+  const _CategoryPickerSheet({
+    required this.categories,
+    required this.selected,
+    required this.onSelect,
+  });
   @override
   State<_CategoryPickerSheet> createState() => _CategoryPickerSheetState();
 }
@@ -1888,36 +2683,87 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
   String _query = '';
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.categories.where((c) => c['name'].toString().toLowerCase().contains(_query.toLowerCase())).toList();
+    final filtered = widget.categories
+        .where(
+          (c) =>
+              c['name'].toString().toLowerCase().contains(_query.toLowerCase()),
+        )
+        .toList();
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(color: Color(0xFF16161E), borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      decoration: const BoxDecoration(
+        color: Color(0xFF16161E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       child: Column(
         children: [
           const SizedBox(height: 12),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(2))),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(24),
             child: TextField(
               onChanged: (v) => setState(() => _query = v),
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(hintText: 'Search Categories', hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)), prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.3)), filled: true, fillColor: Colors.white.withOpacity(0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+              decoration: InputDecoration(
+                hintText: 'Search Categories',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
             ),
           ),
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+              separatorBuilder: (_, __) =>
+                  Divider(color: Colors.white.withOpacity(0.05), height: 1),
               itemBuilder: (context, index) {
                 final item = filtered[index];
                 final isSelected = widget.selected == item['name'];
                 return ListTile(
                   onTap: () => widget.onSelect(item['name']),
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                  leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: isSelected ? const Color(0xFF6C63FF) : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)), child: Icon(item['icon'] as IconData, color: Colors.white, size: 20)),
-                  title: Text(item['name'] as String, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
-                  trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF6C63FF)) : null,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF6C63FF)
+                          : Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      item['icon'] as IconData,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(
+                    item['name'] as String,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Color(0xFF6C63FF))
+                      : null,
                 );
               },
             ),
@@ -1926,6 +2772,138 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
       ),
     );
   }
+}
+
+class _RegistrationPlan {
+  const _RegistrationPlan({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.priceMonthly,
+    required this.trialDays,
+    required this.productLimit,
+    required this.serviceLimit,
+    required this.staffLimit,
+    required this.posEnabled,
+    required this.deliveryEnabled,
+    required this.analyticsEnabled,
+    required this.isActive,
+    required this.sortOrder,
+    this.description,
+  });
+
+  factory _RegistrationPlan.fromJson(Map<String, dynamic> json) {
+    return _RegistrationPlan(
+      id: _asInt(json['id']),
+      name: (json['name'] ?? '').toString(),
+      slug: (json['slug'] ?? '').toString(),
+      priceMonthly: _asDouble(json['price_monthly']),
+      trialDays: _asInt(json['trial_days']),
+      productLimit: _asInt(json['product_limit']),
+      serviceLimit: _asInt(json['service_limit']),
+      staffLimit: _asInt(json['staff_limit']),
+      posEnabled: _asBool(json['pos_enabled']),
+      deliveryEnabled: _asBool(json['delivery_enabled']),
+      analyticsEnabled: _asBool(json['analytics_enabled']),
+      isActive: !_hasExplicitFalse(json['is_active']),
+      sortOrder: _asInt(json['sort_order']),
+      description: json['description']?.toString(),
+    );
+  }
+
+  final int id;
+  final String name;
+  final String slug;
+  final double priceMonthly;
+  final int trialDays;
+  final int productLimit;
+  final int serviceLimit;
+  final int staffLimit;
+  final bool posEnabled;
+  final bool deliveryEnabled;
+  final bool analyticsEnabled;
+  final bool isActive;
+  final int sortOrder;
+  final String? description;
+
+  String get priceLabel {
+    if (trialDays > 0) {
+      return '$trialDays-day free trial';
+    }
+    if (priceMonthly <= 0) {
+      return 'Free';
+    }
+    return 'UGX ${_compactMoney(priceMonthly)}/mo';
+  }
+
+  String limitLabel(int value) {
+    if (value < 0 || value == 0) return 'Unlimited';
+    return value.toString();
+  }
+}
+
+class _PlanTag extends StatelessWidget {
+  const _PlanTag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.84),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+int _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.round();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+double _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+bool _asBool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final text = value?.toString().trim().toLowerCase() ?? '';
+  return text == '1' || text == 'true' || text == 'yes';
+}
+
+bool _hasExplicitFalse(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value == false;
+  if (value is num) return value == 0;
+  final text = value.toString().trim().toLowerCase();
+  return text == '0' || text == 'false' || text == 'no';
+}
+
+String _compactMoney(double value) {
+  final rounded = value.round();
+  final digits = rounded.toString().split('').reversed.toList();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && i % 3 == 0) {
+      buffer.write(',');
+    }
+    buffer.write(digits[i]);
+  }
+  return buffer.toString().split('').reversed.join();
 }
 
 const Color _mintAccentColor = Color(0xFF5CC7B5);

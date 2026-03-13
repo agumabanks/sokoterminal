@@ -48,13 +48,19 @@ class CategoryGrid extends ConsumerWidget {
           child: AnimatedContainer(
             duration: DesignTokens.durationFast,
             decoration: BoxDecoration(
-              color: isSelected ? DesignTokens.brandPrimary : DesignTokens.surfaceWhite,
+              color: isSelected
+                  ? DesignTokens.brandPrimary
+                  : DesignTokens.surfaceWhite,
               borderRadius: DesignTokens.borderRadiusMd,
               border: Border.all(
-                color: isSelected ? DesignTokens.brandPrimary : DesignTokens.grayLight,
+                color: isSelected
+                    ? DesignTokens.brandPrimary
+                    : DesignTokens.grayLight,
                 width: 1,
               ),
-              boxShadow: isSelected ? DesignTokens.shadowMd : DesignTokens.shadowSm,
+              boxShadow: isSelected
+                  ? DesignTokens.shadowMd
+                  : DesignTokens.shadowSm,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -69,7 +75,9 @@ class CategoryGrid extends ConsumerWidget {
                   item.name,
                   style: DesignTokens.textSmall.copyWith(
                     color: isSelected ? Colors.white : DesignTokens.grayDark,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                   textAlign: TextAlign.center,
                 ),

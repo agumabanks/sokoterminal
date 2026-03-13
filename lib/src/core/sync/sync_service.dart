@@ -13,7 +13,9 @@ import 'package:uuid/uuid.dart';
 
 import '../app_providers.dart';
 import '../db/app_database.dart';
+import '../media/offline_media_cache.dart';
 import '../network/pos_dtos.dart';
+import '../settings/business_profile_cache.dart';
 import '../util/phone_normalizer.dart';
 import '../network/seller_api.dart';
 import '../telemetry/telemetry.dart';
@@ -55,7 +57,7 @@ class SyncService {
       (_) => _pump(),
     );
     _retryTimer ??= Timer.periodic(const Duration(minutes: 5), (_) => _pump());
-    
+
     // Check if we need initial data - if no items, do full resync from epoch
     unawaited(_ensureInitialDataLoaded());
   }
@@ -64,12 +66,16 @@ class SyncService {
     final items = await db.getAllItems();
     if (items.isEmpty) {
       if (kDebugMode) {
-        debugPrint('[SyncService] No items in DB - triggering full resync from epoch...');
+        debugPrint(
+          '[SyncService] No items in DB - triggering full resync from epoch...',
+        );
       }
       await forceFullResync();
     } else {
       if (kDebugMode) {
-        debugPrint('[SyncService] Have ${items.length} items in DB - normal sync');
+        debugPrint(
+          '[SyncService] Have ${items.length} items in DB - normal sync',
+        );
       }
       await _pump();
     }
@@ -80,7 +86,9 @@ class SyncService {
     try {
       final resetCount = await db.resetAllPendingSyncOps();
       if (kDebugMode && resetCount > 0) {
-        debugPrint('[SyncService] Reset $resetCount failed sync operations for immediate retry');
+        debugPrint(
+          '[SyncService] Reset $resetCount failed sync operations for immediate retry',
+        );
       }
     } catch (e) {
       if (kDebugMode) {
@@ -90,20 +98,19 @@ class SyncService {
     await _pump();
   }
 
-
   /// Force a complete resync by clearing all sync cursors and pulling from epoch.
   /// This is useful when the initial sync failed or products are missing.
   Future<void> forceFullResync() async {
     if (kDebugMode) {
       debugPrint('[SyncService] Starting FULL RESYNC from epoch...');
     }
-    
+
     // Clear all sync cursors
-    await db.customStatement('DELETE FROM sync_cursors');
+    await db.delete(db.syncCursors).go();
     if (kDebugMode) {
       debugPrint('[SyncService] Cleared all sync cursors');
     }
-    
+
     // Now pull will use epoch as the since timestamp
     await pullPosDelta();
   }
@@ -151,7 +158,9 @@ class SyncService {
 
       final queue = await db.pendingSyncOps();
       if (kDebugMode) {
-        debugPrint('[SyncService] Sync queue: ${queue.length} pending operations');
+        debugPrint(
+          '[SyncService] Sync queue: ${queue.length} pending operations',
+        );
         if (queue.isNotEmpty) {
           final typeCounts = <String, int>{};
           for (final op in queue) {
@@ -160,22 +169,28 @@ class SyncService {
           debugPrint('[SyncService] Queue breakdown: $typeCounts');
         }
       }
-      
+
       for (final op in queue) {
         if (!_isDue(op)) {
           if (kDebugMode) {
-            debugPrint('[SyncService] Skipping ${op.opType} (not due yet, retry: ${op.retryCount})');
+            debugPrint(
+              '[SyncService] Skipping ${op.opType} (not due yet, retry: ${op.retryCount})',
+            );
           }
           continue;
         }
-        
+
         if (kDebugMode) {
-          debugPrint('[SyncService] Processing ${op.opType} (id: ${op.id}, retry: ${op.retryCount})');
+          debugPrint(
+            '[SyncService] Processing ${op.opType} (id: ${op.id}, retry: ${op.retryCount})',
+          );
         }
-        
+
         try {
-        _syncStatusController.add('Pushing ${op.opType.replaceAll('_', ' ')}...');
-        await _dispatch(op);
+          _syncStatusController.add(
+            'Pushing ${op.opType.replaceAll('_', ' ')}...',
+          );
+          await _dispatch(op);
           await db.markSynced(op.id);
           if (kDebugMode) {
             debugPrint('[SyncService] ✅ ${op.opType} synced successfully');
@@ -184,12 +199,14 @@ class SyncService {
           final errorMsg = _formatSyncError(e);
           final nextRetryCount = op.retryCount + 1;
           final blocked = _shouldBlock(e);
-          
+
           if (kDebugMode) {
             debugPrint('[SyncService] ❌ ${op.opType} failed: $errorMsg');
-            debugPrint('[SyncService] ${blocked ? "BLOCKED" : "Will retry"} (retry: $nextRetryCount)');
+            debugPrint(
+              '[SyncService] ${blocked ? "BLOCKED" : "Will retry"} (retry: $nextRetryCount)',
+            );
           }
-          
+
           if (blocked) {
             await db.markSyncBlocked(
               op.id,
@@ -277,47 +294,61 @@ class SyncService {
   }
 
   Future<void> _pushTemplates() async {
-    final unsyncedReceipts = await (db.select(db.receiptTemplates)..where((t) => t.synced.not())).get();
-    final unsyncedQuotations = await (db.select(db.quotationTemplates)..where((t) => t.synced.not())).get();
+    final unsyncedReceipts = await (db.select(
+      db.receiptTemplates,
+    )..where((t) => t.synced.not())).get();
+    final unsyncedQuotations = await (db.select(
+      db.quotationTemplates,
+    )..where((t) => t.synced.not())).get();
 
     if (unsyncedReceipts.isEmpty && unsyncedQuotations.isEmpty) return;
 
-    final receiptPayload = unsyncedReceipts.map((t) => {
-      'id': t.id,
-      'name': t.name,
-      'style': t.style,
-      'header_message': t.headerText,
-      'header_color': t.colorHex,
-      'footer_message': t.footerText,
-      'show_logo': t.showLogo,
-      'show_qr': t.showQr,
-      'is_active': t.isActive,
-    }).toList();
+    final receiptPayload = unsyncedReceipts
+        .map(
+          (t) => {
+            'id': t.id,
+            'name': t.name,
+            'style': t.style,
+            'header_message': t.headerText,
+            'header_color': t.colorHex,
+            'footer_message': t.footerText,
+            'show_logo': t.showLogo,
+            'show_qr': t.showQr,
+            'is_active': t.isActive,
+          },
+        )
+        .toList();
 
-    final quotationPayload = unsyncedQuotations.map((t) => {
-      'id': t.id,
-      'name': t.name,
-      'style': t.style,
-      'header_message': t.headerText,
-      'header_color': t.colorHex,
-      'footer_message': t.footerText,
-      'show_logo': t.showLogo,
-      'show_qr': t.showQr,
-      'is_active': t.isActive,
-    }).toList();
+    final quotationPayload = unsyncedQuotations
+        .map(
+          (t) => {
+            'id': t.id,
+            'name': t.name,
+            'style': t.style,
+            'header_message': t.headerText,
+            'header_color': t.colorHex,
+            'footer_message': t.footerText,
+            'show_logo': t.showLogo,
+            'show_qr': t.showQr,
+            'is_active': t.isActive,
+          },
+        )
+        .toList();
 
     await sellerApi.batchUpsertTemplates(
       receiptTemplates: receiptPayload,
       quotationTemplates: quotationPayload,
     );
-    
+
     // Mark synced
     for (final t in unsyncedReceipts) {
-      await (db.update(db.receiptTemplates)..where((tbl) => tbl.id.equals(t.id)))
+      await (db.update(db.receiptTemplates)
+            ..where((tbl) => tbl.id.equals(t.id)))
           .write(const ReceiptTemplatesCompanion(synced: drift.Value(true)));
     }
     for (final t in unsyncedQuotations) {
-      await (db.update(db.quotationTemplates)..where((tbl) => tbl.id.equals(t.id)))
+      await (db.update(db.quotationTemplates)
+            ..where((tbl) => tbl.id.equals(t.id)))
           .write(const QuotationTemplatesCompanion(synced: drift.Value(true)));
     }
   }
@@ -343,7 +374,11 @@ class SyncService {
         }
       }
 
-      final message = serverMessage ?? error.message ?? error.error?.toString() ?? 'DioException';
+      final message =
+          serverMessage ??
+          error.message ??
+          error.error?.toString() ??
+          'DioException';
       final parts = <String>[
         if (status != null) 'HTTP $status',
         if (path.isNotEmpty) path,
@@ -367,7 +402,8 @@ class SyncService {
       final msg = (data is Map ? data['message']?.toString() : null) ?? '';
       final normalized = msg.toLowerCase();
       if (normalized.contains('still being processed')) return false;
-      if (normalized.contains('referenced sale') && normalized.contains('not found')) {
+      if (normalized.contains('referenced sale') &&
+          normalized.contains('not found')) {
         return false;
       }
       if (normalized.contains('sync the original sale first')) return false;
@@ -460,7 +496,10 @@ class SyncService {
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is List) {
-        return decoded.map((e) => e?.toString() ?? '').where((e) => e.trim().isNotEmpty).toList();
+        return decoded
+            .map((e) => e?.toString() ?? '')
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
       }
     } catch (_) {}
     return const [];
@@ -473,13 +512,19 @@ class SyncService {
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is List) {
-        return decoded.map((e) => int.tryParse(e?.toString() ?? '')).whereType<int>().toList();
+        return decoded
+            .map((e) => int.tryParse(e?.toString() ?? ''))
+            .whereType<int>()
+            .toList();
       }
     } catch (_) {}
     return const [];
   }
 
-  Future<void> _pushItemVariantStocks(String localId, int remoteProductId) async {
+  Future<void> _pushItemVariantStocks(
+    String localId,
+    int remoteProductId,
+  ) async {
     final item = await db.getItemById(localId);
     if (item == null) return;
 
@@ -501,30 +546,28 @@ class SyncService {
           final uploaded = await _uploadImageFile(imagePathOrUrl);
           uploadId = uploaded['id'] as int;
           final url = uploaded['url'] as String;
-          await (db.update(db.itemStocks)
-                ..where(
-                  (t) => t.itemId.equals(localId) & t.variant.equals(variant),
-                ))
+          await (db.update(db.itemStocks)..where(
+                (t) => t.itemId.equals(localId) & t.variant.equals(variant),
+              ))
               .write(
-            ItemStocksCompanion(
-              imageUploadId: drift.Value(uploadId),
-              imageUrl: drift.Value(url),
-              updatedAt: drift.Value(DateTime.now().toUtc()),
-            ),
-          );
+                ItemStocksCompanion(
+                  imageUploadId: drift.Value(uploadId),
+                  imageUrl: drift.Value(url),
+                  updatedAt: drift.Value(DateTime.now().toUtc()),
+                ),
+              );
         } else {
           // Drop missing local file to avoid a stuck sync loop.
-          await (db.update(db.itemStocks)
-                ..where(
-                  (t) => t.itemId.equals(localId) & t.variant.equals(variant),
-                ))
+          await (db.update(db.itemStocks)..where(
+                (t) => t.itemId.equals(localId) & t.variant.equals(variant),
+              ))
               .write(
-            ItemStocksCompanion(
-              imageUploadId: drift.Value(null),
-              imageUrl: drift.Value(null),
-              updatedAt: drift.Value(DateTime.now().toUtc()),
-            ),
-          );
+                ItemStocksCompanion(
+                  imageUploadId: drift.Value(null),
+                  imageUrl: drift.Value(null),
+                  updatedAt: drift.Value(DateTime.now().toUtc()),
+                ),
+              );
         }
       }
 
@@ -539,8 +582,10 @@ class SyncService {
         if (uploadId != null) 'thumbnail_upload_id': uploadId,
       };
 
-      final safeVariantKey =
-          variant.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-');
+      final safeVariantKey = variant.replaceAll(
+        RegExp(r'[^A-Za-z0-9._-]+'),
+        '-',
+      );
       await sellerApi.upsertPosCatalogProduct(
         payload,
         idempotencyKey: '$localId:$safeVariantKey',
@@ -581,8 +626,9 @@ class SyncService {
         final res = await sellerApi.fetchOrderDetails(orderId);
         final raw = res.data;
         final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
-        final first =
-            (listRaw is List && listRaw.isNotEmpty) ? listRaw.first : null;
+        final first = (listRaw is List && listRaw.isNotEmpty)
+            ? listRaw.first
+            : null;
         if (first is Map) {
           await db.upsertCachedOrder(
             orderId,
@@ -625,6 +671,14 @@ class SyncService {
       return;
     }
 
+    if (op.opType == 'expense_category_create') {
+      await sellerApi.pushExpenseCategory(
+        payload,
+        idempotencyKey: op.id.toString(),
+      );
+      return;
+    }
+
     switch (op.opType) {
       case 'item_create':
       case 'item_update':
@@ -642,46 +696,70 @@ class SyncService {
             item?.remoteId ??
             _asNullableInt(localId);
 
-        final apiDiscountType =
-            _toApiDiscountType(payload['discount_type'] ?? item?.discountType);
+        final apiDiscountType = _toApiDiscountType(
+          payload['discount_type'] ?? item?.discountType,
+        );
 
         final upsertPayload = <String, dynamic>{
           if (remoteId != null) 'product_id': remoteId,
           'name': (payload['name'] ?? item?.name ?? '').toString(),
           'unit_price': _asDouble(payload['unit_price'] ?? item?.price ?? 0),
-          'current_stock': _asInt(payload['current_stock'] ?? item?.stockQty ?? 0),
-          'published': _asBool(payload['published'] ?? item?.publishedOnline ?? false),
+          'current_stock': _asInt(
+            payload['current_stock'] ?? item?.stockQty ?? 0,
+          ),
+          'published': _asBool(
+            payload['published'] ?? item?.publishedOnline ?? false,
+          ),
           if (_asNullableInt(payload['category_id']) != null)
             'category_id': _asNullableInt(payload['category_id']),
-          if (_asNullableInt(payload['brand_id']) != null) 'brand_id': _asNullableInt(payload['brand_id']),
-          if ((payload['unit'] ?? item?.unit) != null) 'unit': (payload['unit'] ?? item?.unit).toString(),
+          if (_asNullableInt(payload['brand_id']) != null)
+            'brand_id': _asNullableInt(payload['brand_id']),
+          if ((payload['unit'] ?? item?.unit) != null)
+            'unit': (payload['unit'] ?? item?.unit).toString(),
           if (payload['weight'] != null || item?.weight != null)
             'weight': _asDouble(payload['weight'] ?? item?.weight ?? 0),
           if (payload['min_qty'] != null || item?.minPurchaseQty != null)
             'min_qty': _asInt(payload['min_qty'] ?? item?.minPurchaseQty ?? 1),
-          if (payload['low_stock_quantity'] != null || item?.lowStockWarning != null)
-            'low_stock_quantity': _asInt(payload['low_stock_quantity'] ?? item?.lowStockWarning ?? 0),
+          if (payload['low_stock_quantity'] != null ||
+              item?.lowStockWarning != null)
+            'low_stock_quantity': _asInt(
+              payload['low_stock_quantity'] ?? item?.lowStockWarning ?? 0,
+            ),
           if (payload['discount'] != null || item?.discount != null)
             'discount': _asDouble(payload['discount'] ?? item?.discount ?? 0),
           if (apiDiscountType != null) 'discount_type': apiDiscountType,
           if (payload['shipping_cost'] != null || item?.shippingFee != null)
-            'shipping_cost': _asDouble(payload['shipping_cost'] ?? item?.shippingFee ?? 0),
-          if (payload['est_shipping_days'] != null || item?.shippingDays != null)
-            'est_shipping_days': _asInt(payload['est_shipping_days'] ?? item?.shippingDays ?? 0),
+            'shipping_cost': _asDouble(
+              payload['shipping_cost'] ?? item?.shippingFee ?? 0,
+            ),
+          if (payload['est_shipping_days'] != null ||
+              item?.shippingDays != null)
+            'est_shipping_days': _asInt(
+              payload['est_shipping_days'] ?? item?.shippingDays ?? 0,
+            ),
           if (payload['refundable'] != null || item?.refundable != null)
-            'refundable': _asBool(payload['refundable'] ?? item?.refundable ?? false),
-          if (payload['cash_on_delivery'] != null || item?.cashOnDelivery != null)
-            'cash_on_delivery': _asBool(payload['cash_on_delivery'] ?? item?.cashOnDelivery ?? true),
+            'refundable': _asBool(
+              payload['refundable'] ?? item?.refundable ?? false,
+            ),
+          if (payload['cash_on_delivery'] != null ||
+              item?.cashOnDelivery != null)
+            'cash_on_delivery': _asBool(
+              payload['cash_on_delivery'] ?? item?.cashOnDelivery ?? true,
+            ),
           if (payload['tags'] != null) 'tags': payload['tags'],
-          if (payload['description'] != null) 'description': payload['description'],
-          if (payload['sku'] != null || item?.sku != null) 'sku': payload['sku'] ?? item?.sku,
+          if (payload['description'] != null)
+            'description': payload['description'],
+          if (payload['sku'] != null || item?.sku != null)
+            'sku': payload['sku'] ?? item?.sku,
           if (payload['barcode'] != null || item?.barcode != null)
             'barcode': payload['barcode'] ?? item?.barcode,
         };
 
         // Fill category/brand from local item if missing.
-        final categoryIdRaw = (payload['category_id'] ?? item?.categoryId)?.toString();
-        if (!upsertPayload.containsKey('category_id') && categoryIdRaw != null) {
+        final categoryIdRaw = (payload['category_id'] ?? item?.categoryId)
+            ?.toString();
+        if (!upsertPayload.containsKey('category_id') &&
+            categoryIdRaw != null) {
           final cat = int.tryParse(categoryIdRaw);
           if (cat != null) upsertPayload['category_id'] = cat;
         }
@@ -695,7 +773,8 @@ class SyncService {
         if (!upsertPayload.containsKey('tags') && item?.tags != null) {
           upsertPayload['tags'] = item!.tags;
         }
-        if (!upsertPayload.containsKey('description') && item?.description != null) {
+        if (!upsertPayload.containsKey('description') &&
+            item?.description != null) {
           upsertPayload['description'] = item!.description;
         }
 
@@ -705,7 +784,8 @@ class SyncService {
           var thumbUploadId = item.thumbnailUploadId;
           final thumbPathOrUrl = (item.thumbnailUrl ?? item.imageUrl)?.trim();
           if ((thumbPathOrUrl ?? '').isNotEmpty &&
-              !(thumbPathOrUrl!.startsWith('http://') || thumbPathOrUrl.startsWith('https://'))) {
+              !(thumbPathOrUrl!.startsWith('http://') ||
+                  thumbPathOrUrl.startsWith('https://'))) {
             final file = File(thumbPathOrUrl);
             if (file.existsSync()) {
               final uploaded = await _uploadImageFile(thumbPathOrUrl);
@@ -737,10 +817,16 @@ class SyncService {
           // Gallery (remote urls first, then pending local paths).
           final urlsAll = _decodeStringList(item.galleryUrls);
           final idsAll = _decodeIntList(item.galleryUploadIds);
-          final remoteCount = idsAll.length < urlsAll.length ? idsAll.length : urlsAll.length;
+          final remoteCount = idsAll.length < urlsAll.length
+              ? idsAll.length
+              : urlsAll.length;
           final remoteUrls = urlsAll.take(remoteCount).toList();
           final remoteIds = idsAll.take(remoteCount).toList();
-          final pending = urlsAll.skip(remoteCount).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          final pending = urlsAll
+              .skip(remoteCount)
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
 
           if (pending.isNotEmpty) {
             final pendingQueue = List<String>.from(pending);
@@ -764,7 +850,9 @@ class SyncService {
                 await db.updateItemFields(
                   localId,
                   ItemsCompanion(
-                    galleryUrls: drift.Value(jsonEncode([...remoteUrls, ...pendingQueue])),
+                    galleryUrls: drift.Value(
+                      jsonEncode([...remoteUrls, ...pendingQueue]),
+                    ),
                     galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
                   ),
                 );
@@ -776,17 +864,24 @@ class SyncService {
               await db.updateItemFields(
                 localId,
                 ItemsCompanion(
-                  galleryUrls: drift.Value(jsonEncode([...remoteUrls, ...pendingQueue])),
+                  galleryUrls: drift.Value(
+                    jsonEncode([...remoteUrls, ...pendingQueue]),
+                  ),
                   galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
                 ),
               );
             }
           }
 
-          final hasGalleryColumns = item.galleryUrls != null || item.galleryUploadIds != null;
+          final hasGalleryColumns =
+              item.galleryUrls != null || item.galleryUploadIds != null;
           final hasUnknownRemoteWithoutIds =
-              idsAll.isEmpty && pending.any((p) => p.startsWith('http://') || p.startsWith('https://'));
-          final canReplaceGallery = hasGalleryColumns && !hasUnknownRemoteWithoutIds;
+              idsAll.isEmpty &&
+              pending.any(
+                (p) => p.startsWith('http://') || p.startsWith('https://'),
+              );
+          final canReplaceGallery =
+              hasGalleryColumns && !hasUnknownRemoteWithoutIds;
           if (canReplaceGallery) {
             upsertPayload['photo_upload_ids'] = remoteIds;
             upsertPayload['replace_photo_upload_ids'] = true;
@@ -848,23 +943,41 @@ class SyncService {
         final isCreate = op.opType == 'service_create';
         final mappedPayload = <String, dynamic>{};
         final title = (payload['title'] ?? '').toString();
-        if (isCreate || (payload.containsKey('title') && title.trim().isNotEmpty)) {
+        if (isCreate ||
+            (payload.containsKey('title') && title.trim().isNotEmpty)) {
           mappedPayload['title'] = title;
         }
-        if (payload['summary'] != null) mappedPayload['summary'] = payload['summary'];
-        if (payload['description'] != null) mappedPayload['description'] = payload['description'];
-
-        if (isCreate || payload.containsKey('base_price') || payload.containsKey('price')) {
-          mappedPayload['base_price'] = _asDouble(payload['base_price'] ?? payload['price'] ?? 0);
+        if (payload['summary'] != null) {
+          mappedPayload['summary'] = payload['summary'];
         }
-        if (payload['currency'] != null) mappedPayload['currency'] = payload['currency'];
-        if (payload['category_id'] != null) mappedPayload['category_id'] = payload['category_id'];
+        if (payload['description'] != null) {
+          mappedPayload['description'] = payload['description'];
+        }
+
+        if (isCreate ||
+            payload.containsKey('base_price') ||
+            payload.containsKey('price')) {
+          mappedPayload['base_price'] = _asDouble(
+            payload['base_price'] ?? payload['price'] ?? 0,
+          );
+        }
+        if (payload['currency'] != null) {
+          mappedPayload['currency'] = payload['currency'];
+        }
+        if (payload['category_id'] != null) {
+          mappedPayload['category_id'] = payload['category_id'];
+        }
 
         final durationRaw = payload['duration_minutes'] ?? payload['duration'];
-        if (durationRaw != null) mappedPayload['duration_minutes'] = _asInt(durationRaw);
+        if (durationRaw != null) {
+          mappedPayload['duration_minutes'] = _asInt(durationRaw);
+        }
 
-        if (payload.containsKey('is_published') || payload.containsKey('published')) {
-          mappedPayload['is_published'] = _asBool(payload['is_published'] ?? payload['published']);
+        if (payload.containsKey('is_published') ||
+            payload.containsKey('published')) {
+          mappedPayload['is_published'] = _asBool(
+            payload['is_published'] ?? payload['published'],
+          );
         }
 
         if (op.opType == 'service_create') {
@@ -906,6 +1019,39 @@ class SyncService {
           await sellerApi.updateService(remoteId.toString(), mappedPayload);
           await db.markServiceSynced(localId);
         }
+        break;
+      case 'service_delete':
+        final localId = payload['local_id']?.toString().trim();
+        final remoteId =
+            _asNullableInt(payload['remote_id']) ??
+            _asNullableInt(payload['service_id']) ??
+            (localId == null || localId.isEmpty
+                ? null
+                : (await db.getServiceById(localId))?.remoteId);
+
+        if (remoteId == null) {
+          // Local-only service deletion: no remote action needed.
+          return;
+        }
+        try {
+          await sellerApi.deleteService(remoteId.toString());
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 404) {
+            // Idempotent delete: treat missing remote resource as success.
+            return;
+          }
+          rethrow;
+        }
+        break;
+      case 'ad_media_upload':
+        final filePath = payload['file_path']?.toString().trim() ?? '';
+        if (filePath.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing file_path for ad media upload',
+          );
+        }
+        await _uploadImageFile(filePath);
         break;
       case 'transaction_push':
         await sellerApi.pushTransaction(payload);
@@ -971,44 +1117,55 @@ class SyncService {
         if (type == 'sale') {
           final saleBody = {
             'terminal_transaction_id': body['entry_id'],
-            'receipt_number': body['receipt_number'], // Only if available in payload, otherwise backend handles null
+            'receipt_number':
+                body['receipt_number'], // Only if available in payload, otherwise backend handles null
             'sale_date': body['occurred_at'],
             'subtotal': body['subtotal'],
             'discount': body['discount'],
             'tax': body['tax'],
             'total': body['total'],
-            'payment_method': (body['payments'] as List?)?.firstOrNull?['method'] ?? 'cash',
+            'payment_method':
+                (body['payments'] as List?)?.firstOrNull?['method'] ?? 'cash',
             'status': 'paid',
-            'customer_name': body['customer_name'], // Check validity if available
+            'customer_name':
+                body['customer_name'], // Check validity if available
             'notes': body['note'],
-            'items': (body['lines'] as List).map((l) => {
-              'product_id': l['product_id'],
-              'title': l['name'],
-              'quantity': l['quantity'],
-              'price': l['price'],
-              'total': l['subtotal'],
-            }).toList(),
+            'items': (body['lines'] as List)
+                .map(
+                  (l) => <String, dynamic>{
+                    if (l['product_id'] != null)
+                      'product_id': l['product_id'].toString(),
+                    if (l['service_id'] != null)
+                      'service_id': l['service_id'].toString(),
+                    'title': l['name'],
+                    if (l['variation'] != null) 'variation': l['variation'],
+                    'quantity': l['quantity'],
+                    'price': l['price'],
+                    'total': l['subtotal'],
+                  },
+                )
+                .toList(),
           };
 
           try {
-             final res = await sellerApi.createPosTransaction(saleBody);
-             final remoteId = (res.data is Map) ? res.data['id'] : null;
-             
-             final entryId = payload['entry_id']?.toString();
-             if (entryId != null) {
-                await db.markLedgerSynced(
-                  entryId,
-                  jsonEncode({
-                    'server_entry_id': remoteId,
-                    'idempotency_key': key,
-                    'received_at': DateTime.now().toIso8601String(),
-                  }),
-                );
-             }
-             break; 
+            final res = await sellerApi.createPosTransaction(saleBody);
+            final remoteId = (res.data is Map) ? res.data['id'] : null;
+
+            final entryId = payload['entry_id']?.toString();
+            if (entryId != null) {
+              await db.markLedgerSynced(
+                entryId,
+                jsonEncode({
+                  'server_entry_id': remoteId,
+                  'idempotency_key': key,
+                  'received_at': DateTime.now().toIso8601String(),
+                }),
+              );
+            }
+            break;
           } catch (e) {
-             // If specific error, handle it. Otherwise rethrow to retry later.
-             rethrow;
+            // If specific error, handle it. Otherwise rethrow to retry later.
+            rethrow;
           }
         }
 
@@ -1064,8 +1221,12 @@ class SyncService {
           'product_id': remoteId,
           'name': (item?.name ?? payload['name'] ?? '').toString(),
           'unit_price': _asDouble(item?.price ?? payload['unit_price'] ?? 0),
-          'current_stock': _asInt(payload['current_stock'] ?? item?.stockQty ?? 0),
-          'published': _asBool(payload['published'] ?? item?.publishedOnline ?? false),
+          'current_stock': _asInt(
+            payload['current_stock'] ?? item?.stockQty ?? 0,
+          ),
+          'published': _asBool(
+            payload['published'] ?? item?.publishedOnline ?? false,
+          ),
           if (item?.sku != null) 'sku': item!.sku,
           if (item?.barcode != null) 'barcode': item!.barcode,
         };
@@ -1079,7 +1240,9 @@ class SyncService {
           idempotencyKey: localId,
         );
         if (res.data is Map<String, dynamic>) {
-          final productId = _asNullableInt((res.data as Map<String, dynamic>)['product_id']);
+          final productId = _asNullableInt(
+            (res.data as Map<String, dynamic>)['product_id'],
+          );
           if (productId != null) {
             await db.markItemSyncedWithRemoteId(localId, productId);
           }
@@ -1112,6 +1275,19 @@ class SyncService {
           throw DioException(
             requestOptions: res.requestOptions,
             error: 'Cash movement ack idempotency mismatch',
+          );
+        }
+        final localMovementId = int.tryParse(
+          payload['movement_id']?.toString() ?? '',
+        );
+        final remoteMovementId = int.tryParse(ack.serverEntryId);
+        if (localMovementId != null) {
+          await db.updateCashMovement(
+            localMovementId,
+            CashMovementsCompanion(
+              remoteId: drift.Value(remoteMovementId),
+              idempotencyKey: drift.Value(key),
+            ),
           );
         }
         break;
@@ -1160,7 +1336,8 @@ class SyncService {
           );
         }
 
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final res = await sellerApi.pushExpense(body, idempotencyKey: key);
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
@@ -1197,7 +1374,8 @@ class SyncService {
             error: 'Missing idempotency_key for goods received note',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final linesRaw = body['lines'];
         if (linesRaw is List) {
           final updated = <Map<String, dynamic>>[];
@@ -1219,7 +1397,10 @@ class SyncService {
           }
           body['lines'] = updated;
         }
-        final res = await sellerApi.pushGoodsReceivedNote(body, idempotencyKey: key);
+        final res = await sellerApi.pushGoodsReceivedNote(
+          body,
+          idempotencyKey: key,
+        );
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
             requestOptions: res.requestOptions,
@@ -1244,7 +1425,7 @@ class SyncService {
         }
 
         final body = Map<String, dynamic>.from(payload);
-        
+
         // Resolve product IDs
         final itemsRaw = body['items'];
         if (itemsRaw is List) {
@@ -1253,17 +1434,18 @@ class SyncService {
             if (raw is! Map) continue;
             final item = Map<String, dynamic>.from(raw);
             final localProductId = item['product_id'];
-            
+
             // Try to resolve to remote ID if possible
-            if (localProductId != null && localProductId.toString().isNotEmpty) {
-               final resolved = await _resolveRemoteProductId(localProductId);
-               if (resolved != null) {
-                 item['product_id'] = resolved;
-               } 
-               // If not resolved, we still send what we have (maybe null or local ID), 
-               // backend should handle or ignore.
-               // Actually, let's keep it robust: if unresolved, send null or let backend handle mismatch.
-               // My controller logic handles generic IDs.
+            if (localProductId != null &&
+                localProductId.toString().isNotEmpty) {
+              final resolved = await _resolveRemoteProductId(localProductId);
+              if (resolved != null) {
+                item['product_id'] = resolved;
+              }
+              // If not resolved, we still send what we have (maybe null or local ID),
+              // backend should handle or ignore.
+              // Actually, let's keep it robust: if unresolved, send null or let backend handle mismatch.
+              // My controller logic handles generic IDs.
             }
             updatedItems.add(item);
           }
@@ -1272,7 +1454,7 @@ class SyncService {
 
         final res = await sellerApi.createPosTransaction(body);
         if (res.statusCode == 200 || res.statusCode == 201) {
-           await db.markTransactionSynced(txId);
+          await db.markTransactionSynced(txId);
         }
         break;
 
@@ -1287,7 +1469,8 @@ class SyncService {
             error: 'Missing idempotency_key for stocktake',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final linesRaw = body['lines'];
         if (linesRaw is List) {
           final updated = <Map<String, dynamic>>[];
@@ -1335,7 +1518,8 @@ class SyncService {
             error: 'Missing idempotency_key for purchase order',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         final linesRaw = body['lines'];
         if (linesRaw is List) {
           final updated = <Map<String, dynamic>>[];
@@ -1357,14 +1541,18 @@ class SyncService {
           }
           body['lines'] = updated;
         }
-        final res = await sellerApi.createPurchaseOrder(body, idempotencyKey: key);
+        final res = await sellerApi.createPurchaseOrder(
+          body,
+          idempotencyKey: key,
+        );
         if (res.data is! Map<String, dynamic>) {
           throw DioException(
             requestOptions: res.requestOptions,
             error: 'Invalid purchase order response',
           );
         }
-        final ackKey = (res.data as Map<String, dynamic>)['idempotency_key']?.toString();
+        final ackKey = (res.data as Map<String, dynamic>)['idempotency_key']
+            ?.toString();
         if (ackKey != key) {
           throw DioException(
             requestOptions: res.requestOptions,
@@ -1404,7 +1592,9 @@ class SyncService {
         }
 
         final quotationNumber =
-            (rawBody['quotation_number'] ?? rawBody['number'] ?? rawBody['quotationNumber'])
+            (rawBody['quotation_number'] ??
+                    rawBody['number'] ??
+                    rawBody['quotationNumber'])
                 ?.toString()
                 .trim();
         if (quotationNumber == null || quotationNumber.isEmpty) {
@@ -1414,10 +1604,13 @@ class SyncService {
           );
         }
 
-        var validityDays = _asInt(rawBody['validity_days'] ?? rawBody['validityDays']);
+        var validityDays = _asInt(
+          rawBody['validity_days'] ?? rawBody['validityDays'],
+        );
         if (validityDays <= 0) {
-          final validUntil =
-              DateTime.tryParse((rawBody['valid_until'] ?? rawBody['validUntil'] ?? '').toString());
+          final validUntil = DateTime.tryParse(
+            (rawBody['valid_until'] ?? rawBody['validUntil'] ?? '').toString(),
+          );
           if (validUntil != null) {
             validityDays = validUntil.difference(DateTime.now()).inDays;
           }
@@ -1425,7 +1618,8 @@ class SyncService {
         if (validityDays <= 0) validityDays = 30;
 
         final customerId = rawBody['customer_id']?.toString();
-        final notes = rawBody['notes']?.toString() ?? rawBody['note']?.toString();
+        final notes =
+            rawBody['notes']?.toString() ?? rawBody['note']?.toString();
 
         final lines = <Map<String, dynamic>>[];
         final rawLines = rawBody['lines'];
@@ -1438,7 +1632,9 @@ class SyncService {
                     .toString()
                     .trim();
             final quantity = _asInt(line['quantity'] ?? line['qty'] ?? 1);
-            final price = _asDouble(line['price'] ?? line['unit_price'] ?? line['unitPrice'] ?? 0);
+            final price = _asDouble(
+              line['price'] ?? line['unit_price'] ?? line['unitPrice'] ?? 0,
+            );
             final total = _asDouble(line['total']) != 0
                 ? _asDouble(line['total'])
                 : price * quantity;
@@ -1495,7 +1691,8 @@ class SyncService {
           'style': payload['style'] ?? 'minimal',
           'header_color': payload['header_color'] ?? payload['color'],
           'footer_message': payload['footer'] ?? payload['footer_message'],
-          'show_logo': payload['show_logo'] == 1 || payload['show_logo'] == true,
+          'show_logo':
+              payload['show_logo'] == 1 || payload['show_logo'] == true,
           'show_qr': payload['show_qr'] == 1 || payload['show_qr'] == true,
           'is_active': payload['is_active'] ?? true,
         }, idempotencyKey: key);
@@ -1512,7 +1709,9 @@ class SyncService {
           );
         }
         final localCustomerId =
-            payload['customer_id']?.toString() ?? payload['local_id']?.toString() ?? '';
+            payload['customer_id']?.toString() ??
+            payload['local_id']?.toString() ??
+            '';
         final body = Map<String, dynamic>.from(payload)
           ..remove('idempotency_key');
         final res = await sellerApi.pushCustomer(body, idempotencyKey: key);
@@ -1521,16 +1720,18 @@ class SyncService {
         if (res.data is Map) {
           final data = Map<String, dynamic>.from(res.data as Map);
           remoteId = data['contact_id']?.toString();
-          updatedAt =
-              DateTime.tryParse(data['updated_at']?.toString() ?? '')?.toUtc();
+          updatedAt = DateTime.tryParse(
+            data['updated_at']?.toString() ?? '',
+          )?.toUtc();
         }
         if (localCustomerId.trim().isNotEmpty) {
-          await (db.update(db.customers)
-                ..where((t) => t.id.equals(localCustomerId.trim())))
-              .write(
+          await (db.update(
+            db.customers,
+          )..where((t) => t.id.equals(localCustomerId.trim()))).write(
             CustomersCompanion(
-              remoteId:
-                  remoteId == null ? const drift.Value.absent() : drift.Value(remoteId),
+              remoteId: remoteId == null
+                  ? const drift.Value.absent()
+                  : drift.Value(remoteId),
               synced: const drift.Value(true),
               updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
             ),
@@ -1540,7 +1741,8 @@ class SyncService {
       case 'service_variant_push':
       case 'service_variant_create':
       case 'service_variant_update':
-        final variantIdRaw = payload['id'] ?? payload['variant_id'] ?? payload['local_id'];
+        final variantIdRaw =
+            payload['id'] ?? payload['variant_id'] ?? payload['local_id'];
         final serviceIdRaw = payload['service_id'] ?? payload['serviceId'];
         final variantId = variantIdRaw?.toString().trim() ?? '';
         final serviceId = serviceIdRaw?.toString().trim() ?? '';
@@ -1585,6 +1787,136 @@ class SyncService {
           payload,
           idempotencyKey: 'syncop:${op.id}',
         );
+        final existingProfile = await db.getBusinessProfile();
+        if (existingProfile != null) {
+          await db.upsertBusinessProfile(
+            existingProfile
+                .copyWith(
+                  shopName:
+                      payload['name']?.toString() ?? existingProfile.shopName,
+                  shopAddress: payload.containsKey('address')
+                      ? drift.Value(payload['address']?.toString())
+                      : const drift.Value.absent(),
+                  shopPhone: payload.containsKey('phone')
+                      ? drift.Value(payload['phone']?.toString())
+                      : const drift.Value.absent(),
+                  logoUploadId: payload['logo'] is num
+                      ? drift.Value((payload['logo'] as num).toInt())
+                      : const drift.Value.absent(),
+                  metaTitle: payload.containsKey('meta_title')
+                      ? drift.Value(payload['meta_title']?.toString())
+                      : const drift.Value.absent(),
+                  metaDescription: payload.containsKey('meta_description')
+                      ? drift.Value(payload['meta_description']?.toString())
+                      : const drift.Value.absent(),
+                  thermalPrinterWidth: payload['thermal_printer_width'] is num
+                      ? drift.Value(
+                          (payload['thermal_printer_width'] as num).toInt(),
+                        )
+                      : const drift.Value.absent(),
+                  shippingCost: payload['shipping_cost'] is num
+                      ? drift.Value(
+                          (payload['shipping_cost'] as num).toDouble(),
+                        )
+                      : const drift.Value.absent(),
+                  selfDeliveryActive:
+                      payload.containsKey('self_delivery_active')
+                      ? _asBool(payload['self_delivery_active'])
+                      : existingProfile.selfDeliveryActive,
+                  deliveryRadiusKm: payload['delivery_radius_km'] is num
+                      ? drift.Value(
+                          (payload['delivery_radius_km'] as num).toDouble(),
+                        )
+                      : const drift.Value.absent(),
+                  deliveryPickupLatitude:
+                      payload['delivery_pickup_latitude'] is num
+                      ? drift.Value(
+                          (payload['delivery_pickup_latitude'] as num)
+                              .toDouble(),
+                        )
+                      : const drift.Value.absent(),
+                  deliveryPickupLongitude:
+                      payload['delivery_pickup_longitude'] is num
+                      ? drift.Value(
+                          (payload['delivery_pickup_longitude'] as num)
+                              .toDouble(),
+                        )
+                      : const drift.Value.absent(),
+                  cashOnDeliveryEnabled:
+                      payload.containsKey('cash_on_delivery_status')
+                      ? _asBool(payload['cash_on_delivery_status'])
+                      : existingProfile.cashOnDeliveryEnabled,
+                  bankPaymentEnabled: payload.containsKey('bank_payment_status')
+                      ? _asBool(payload['bank_payment_status'])
+                      : existingProfile.bankPaymentEnabled,
+                  bankName: payload.containsKey('bank_name')
+                      ? drift.Value(payload['bank_name']?.toString())
+                      : const drift.Value.absent(),
+                  bankAccName: payload.containsKey('bank_acc_name')
+                      ? drift.Value(payload['bank_acc_name']?.toString())
+                      : const drift.Value.absent(),
+                  bankAccNo: payload.containsKey('bank_acc_no')
+                      ? drift.Value(payload['bank_acc_no']?.toString())
+                      : const drift.Value.absent(),
+                  bankRoutingNo: payload.containsKey('bank_routing_no')
+                      ? drift.Value(payload['bank_routing_no']?.toString())
+                      : const drift.Value.absent(),
+                  mtnMerchantCode: payload.containsKey('mtn_merchant_code')
+                      ? drift.Value(payload['mtn_merchant_code']?.toString())
+                      : const drift.Value.absent(),
+                  airtelMerchantCode:
+                      payload.containsKey('airtel_merchant_code')
+                      ? drift.Value(payload['airtel_merchant_code']?.toString())
+                      : const drift.Value.absent(),
+                  paybillNumber: payload.containsKey('paybill_number')
+                      ? drift.Value(payload['paybill_number']?.toString())
+                      : const drift.Value.absent(),
+                  receiptPaymentMethodsJson:
+                      payload['receipt_payment_methods'] is Map
+                      ? drift.Value(
+                          jsonEncode(
+                            Map<String, dynamic>.from(
+                              payload['receipt_payment_methods'] as Map,
+                            ),
+                          ),
+                        )
+                      : const drift.Value.absent(),
+                  updatedAt: DateTime.now().toUtc(),
+                  synced: true,
+                )
+                .toCompanion(false),
+          );
+        }
+        break;
+      case 'delivery_profile_push':
+        await sellerApi.upsertDeliveryProfile(payload);
+        final existingProfile = await db.getBusinessProfile();
+        if (existingProfile != null) {
+          await db.upsertBusinessProfile(
+            existingProfile
+                .copyWith(
+                  shippingCost: payload['base_fee'] is num
+                      ? drift.Value((payload['base_fee'] as num).toDouble())
+                      : const drift.Value.absent(),
+                  selfDeliveryActive: payload.containsKey('enabled')
+                      ? _asBool(payload['enabled'])
+                      : existingProfile.selfDeliveryActive,
+                  deliveryRadiusKm: payload['radius_km'] is num
+                      ? drift.Value((payload['radius_km'] as num).toDouble())
+                      : const drift.Value.absent(),
+                  deliveryPickupLatitude: payload['origin_lat'] is num
+                      ? drift.Value((payload['origin_lat'] as num).toDouble())
+                      : const drift.Value.absent(),
+                  deliveryPickupLongitude: payload['origin_lng'] is num
+                      ? drift.Value((payload['origin_lng'] as num).toDouble())
+                      : const drift.Value.absent(),
+                  deliveryProfileJson: drift.Value(jsonEncode(payload)),
+                  updatedAt: DateTime.now().toUtc(),
+                  synced: true,
+                )
+                .toCompanion(false),
+          );
+        }
         break;
       case 'shift_push':
       case 'shift_open':
@@ -1601,7 +1933,8 @@ class SyncService {
         final body = Map<String, dynamic>.from(payload)
           ..remove('idempotency_key');
         await sellerApi.pushShift(body, idempotencyKey: key);
-        final shiftId = payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
+        final shiftId =
+            payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
         if (shiftId.isNotEmpty) {
           await (db.update(db.shifts)..where((t) => t.id.equals(shiftId)))
               .write(const ShiftsCompanion(synced: drift.Value(true)));
@@ -1621,7 +1954,8 @@ class SyncService {
         final body = Map<String, dynamic>.from(payload)
           ..remove('idempotency_key');
         await sellerApi.closeShift(body, idempotencyKey: key);
-        final shiftId = payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
+        final shiftId =
+            payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
         if (shiftId.isNotEmpty) {
           await (db.update(db.shifts)..where((t) => t.id.equals(shiftId)))
               .write(const ShiftsCompanion(synced: drift.Value(true)));
@@ -1645,6 +1979,18 @@ class SyncService {
           'value': payload['value'],
         };
         await sellerApi.pushSetting(body, idempotencyKey: key);
+        break;
+      case 'sms_send':
+        final key = payload['idempotency_key']?.toString() ?? '';
+        if (key.isEmpty) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing idempotency_key for SMS send',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
+        await sellerApi.sendSingleSms(body, idempotencyKey: key);
         break;
       case 'supplier_push':
       case 'supplier_create':
@@ -1670,7 +2016,8 @@ class SyncService {
             error: 'Missing idempotency_key for package purchase',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         await sellerApi.pushPackagePurchase(body, idempotencyKey: key);
         break;
       case 'package_redemption_push':
@@ -1681,7 +2028,8 @@ class SyncService {
             error: 'Missing idempotency_key for redemption',
           );
         }
-        final body = Map<String, dynamic>.from(payload)..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload)
+          ..remove('idempotency_key');
         await sellerApi.pushPackageRedemption(body, idempotencyKey: key);
         break;
       default:
@@ -1707,9 +2055,16 @@ class SyncService {
       final configSince = await db.getLastPulledAt('config');
 
       DateTime since = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-      final cursors = [productsSince, servicesSince, customersSince, configSince];
+      final cursors = [
+        productsSince,
+        servicesSince,
+        customersSince,
+        configSince,
+      ];
       if (cursors.every((c) => c != null)) {
-        since = cursors.cast<DateTime>().reduce((a, b) => a.isBefore(b) ? a : b);
+        since = cursors.cast<DateTime>().reduce(
+          (a, b) => a.isBefore(b) ? a : b,
+        );
       }
 
       if (kDebugMode) {
@@ -1729,33 +2084,35 @@ class SyncService {
       if (kDebugMode) {
         debugPrint('[SyncService] Wrapper keys: ${responseData.keys.toList()}');
       }
-      
+
       if (responseData.containsKey('data')) {
-         if (kDebugMode) {
-           debugPrint('[SyncService] Inner data type: ${responseData['data'].runtimeType}');
-         }
-         if (responseData['data'] is Map) {
-           final inner = responseData['data'] as Map;
-           if (kDebugMode) {
-             debugPrint('[SyncService] Inner keys: ${inner.keys.toList()}');
-           }
-           responseData = responseData['data'] as Map<String, dynamic>;
-         } else {
-           if (kDebugMode) {
-             debugPrint('[SyncService] Inner data IS NOT A MAP!');
-           }
-         }
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Inner data type: ${responseData['data'].runtimeType}',
+          );
+        }
+        if (responseData['data'] is Map) {
+          final inner = responseData['data'] as Map;
+          if (kDebugMode) {
+            debugPrint('[SyncService] Inner keys: ${inner.keys.toList()}');
+          }
+          responseData = responseData['data'] as Map<String, dynamic>;
+        } else {
+          if (kDebugMode) {
+            debugPrint('[SyncService] Inner data IS NOT A MAP!');
+          }
+        }
       }
 
       final pull = PosSyncPullResponse.fromJson(responseData);
-      
+
       // Debug: Log what we received
       if (kDebugMode) {
         debugPrint(
           '[SyncService] Pull received: ${pull.products.length} products, ${pull.services.length} services, ${pull.customers.length} customers, ${pull.ledgerEntries.length} txns',
         );
       }
-      
+
       _syncStatusController.add('Syncing products...');
       if (pull.products.isEmpty) {
         if (kDebugMode) {
@@ -1766,8 +2123,9 @@ class SyncService {
       for (final p in pull.products) {
         if (p.id.isEmpty) continue;
         final remoteId = int.tryParse(p.id);
-        final existing =
-            remoteId != null ? await db.getItemByRemoteId(remoteId) : null;
+        final existing = remoteId != null
+            ? await db.getItemByRemoteId(remoteId)
+            : null;
         final localId = existing?.id ?? p.id;
         final displayPrice = p.stocks.isEmpty
             ? p.unitPrice
@@ -1781,8 +2139,9 @@ class SyncService {
         await db.upsertItem(
           ItemsCompanion.insert(
             id: drift.Value(localId),
-            remoteId:
-                remoteId != null ? drift.Value(remoteId) : const drift.Value.absent(),
+            remoteId: remoteId != null
+                ? drift.Value(remoteId)
+                : const drift.Value.absent(),
             name: p.name.isEmpty ? 'Product' : p.name,
             price: displayPrice,
             stockQty: drift.Value(displayStock),
@@ -1806,22 +2165,38 @@ class SyncService {
             brandId: p.brandId != null
                 ? drift.Value(p.brandId.toString())
                 : const drift.Value.absent(),
-            unit: p.unit != null ? drift.Value(p.unit) : const drift.Value.absent(),
-            weight: p.weight != null ? drift.Value(p.weight) : const drift.Value.absent(),
+            unit: p.unit != null
+                ? drift.Value(p.unit)
+                : const drift.Value.absent(),
+            weight: p.weight != null
+                ? drift.Value(p.weight)
+                : const drift.Value.absent(),
             minPurchaseQty: p.minQty != null
                 ? drift.Value(p.minQty!)
                 : const drift.Value.absent(),
-            tags: p.tags != null ? drift.Value(p.tags) : const drift.Value.absent(),
+            tags: p.tags != null
+                ? drift.Value(p.tags)
+                : const drift.Value.absent(),
             description: p.description != null
                 ? drift.Value(p.description)
                 : const drift.Value.absent(),
-            discount: p.discount != null ? drift.Value(p.discount) : const drift.Value.absent(),
-            discountType: discountType != null ? drift.Value(discountType) : const drift.Value.absent(),
-            shippingDays: p.estShippingDays != null ? drift.Value(p.estShippingDays) : const drift.Value.absent(),
-            shippingFee: p.shippingCost != null ? drift.Value(p.shippingCost) : const drift.Value.absent(),
+            discount: p.discount != null
+                ? drift.Value(p.discount)
+                : const drift.Value.absent(),
+            discountType: discountType != null
+                ? drift.Value(discountType)
+                : const drift.Value.absent(),
+            shippingDays: p.estShippingDays != null
+                ? drift.Value(p.estShippingDays)
+                : const drift.Value.absent(),
+            shippingFee: p.shippingCost != null
+                ? drift.Value(p.shippingCost)
+                : const drift.Value.absent(),
             refundable: drift.Value(p.refundable ?? false),
             cashOnDelivery: drift.Value(p.cashOnDelivery ?? true),
-            lowStockWarning: p.lowStockQuantity != null ? drift.Value(p.lowStockQuantity) : const drift.Value.absent(),
+            lowStockWarning: p.lowStockQuantity != null
+                ? drift.Value(p.lowStockQuantity)
+                : const drift.Value.absent(),
             barcode: p.barcode != null
                 ? drift.Value(p.barcode)
                 : const drift.Value.absent(),
@@ -1851,7 +2226,9 @@ class SyncService {
             ItemStocksCompanion.insert(
               itemId: localId,
               variant: variant,
-              remoteStockId: s.id > 0 ? drift.Value(s.id) : const drift.Value.absent(),
+              remoteStockId: s.id > 0
+                  ? drift.Value(s.id)
+                  : const drift.Value.absent(),
               price: s.price,
               stockQty: drift.Value(s.qty),
               sku: drift.Value(s.sku),
@@ -1859,7 +2236,9 @@ class SyncService {
                   ? drift.Value(s.imageUploadId)
                   : const drift.Value.absent(),
               imageUrl: drift.Value(s.imageUrl),
-              updatedAt: drift.Value(s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc()),
+              updatedAt: drift.Value(
+                s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc(),
+              ),
             ),
           );
 
@@ -1879,17 +2258,20 @@ class SyncService {
       for (final s in pull.services) {
         if (s.id.isEmpty) continue;
         final remoteId = int.tryParse(s.id);
-        final existing =
-            remoteId != null ? await db.getServiceByRemoteId(remoteId) : null;
+        final existing = remoteId != null
+            ? await db.getServiceByRemoteId(remoteId)
+            : null;
         final localId = existing?.id ?? s.id;
         await db.upsertService(
           ServicesCompanion.insert(
             id: drift.Value(localId),
-            remoteId:
-                remoteId != null ? drift.Value(remoteId) : const drift.Value.absent(),
+            remoteId: remoteId != null
+                ? drift.Value(remoteId)
+                : const drift.Value.absent(),
             title: s.title.isEmpty ? 'Service' : s.title,
             price: s.price,
             description: drift.Value(s.description),
+            imageUrl: drift.Value(s.imageUrl),
             durationMinutes: drift.Value(s.durationMinutes),
             category: drift.Value(s.category),
             publishedOnline: drift.Value(s.published),
@@ -1919,19 +2301,21 @@ class SyncService {
       // Upsert service packages from pull
       for (final p in pull.servicePackages) {
         if (p.id.isEmpty) continue;
-        await db.into(db.servicePackages).insertOnConflictUpdate(
-          ServicePackagesCompanion(
-            id: drift.Value(p.id),
-            serviceId: drift.Value(p.serviceId),
-            name: drift.Value(p.name),
-            totalSessions: drift.Value(p.totalSessions),
-            price: drift.Value(p.price),
-            validityDays: drift.Value(p.validityDays),
-            active: drift.Value(p.active),
-            updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
-            synced: const drift.Value(true),
-          ),
-        );
+        await db
+            .into(db.servicePackages)
+            .insertOnConflictUpdate(
+              ServicePackagesCompanion(
+                id: drift.Value(p.id),
+                serviceId: drift.Value(p.serviceId),
+                name: drift.Value(p.name),
+                totalSessions: drift.Value(p.totalSessions),
+                price: drift.Value(p.price),
+                validityDays: drift.Value(p.validityDays),
+                active: drift.Value(p.active),
+                updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       _syncStatusController.add('Syncing customers...');
@@ -1975,6 +2359,38 @@ class SyncService {
       }
 
       _syncStatusController.add('Syncing expenses...');
+      // Sync expense categories if receiving full snapshot or if relevant
+      try {
+        final categoriesRes = await sellerApi.fetchExpenseCategories();
+        final categoriesData = categoriesRes.data;
+        final categoriesList =
+            (categoriesData is Map ? categoriesData['data'] : categoriesData)
+                as List?;
+
+        if (categoriesList != null) {
+          _syncStatusController.add('Syncing expense categories...');
+          for (final c in categoriesList) {
+            if (c is! Map) continue;
+            final name = c['name']?.toString() ?? '';
+            if (name.isNotEmpty) {
+              await db.deleteLocalTemporaryCategory(name);
+            }
+            await db.upsertExpenseCategory(
+              ExpenseCategoriesCompanion(
+                id: drift.Value(_asInt(c['id'])),
+                name: drift.Value(name),
+                type: drift.Value(c['type']?.toString() ?? 'expense'),
+                isActive: drift.Value(_asBool(c['is_active'])),
+                updatedAt: drift.Value(DateTime.now().toUtc()),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[SyncService] Failed to sync expense categories: $e');
+        // Don't fail the whole sync for this
+      }
+
       for (final e in pull.expenses) {
         if (e.id <= 0) continue;
 
@@ -2018,78 +2434,162 @@ class SyncService {
       _syncStatusController.add('Syncing quotations...');
       for (final q in pull.quotations) {
         if (q.id.isEmpty) continue;
-        
+
         // Upsert quotation using insertOnConflictUpdate
-        await db.into(db.quotations).insertOnConflictUpdate(QuotationsCompanion(
-          id: drift.Value(q.id),
-          number: drift.Value(q.quotationNumber),
-          customerId: drift.Value(q.customerId),
-          validUntil: drift.Value(DateTime.now().add(Duration(days: q.validityDays))),
-          totalAmount: drift.Value(q.total),
-          notes: drift.Value(q.notes),
-          synced: const drift.Value(true),
-        ));
+        await db
+            .into(db.quotations)
+            .insertOnConflictUpdate(
+              QuotationsCompanion(
+                id: drift.Value(q.id),
+                number: drift.Value(q.quotationNumber),
+                customerId: drift.Value(q.customerId),
+                validUntil: drift.Value(
+                  DateTime.now().add(Duration(days: q.validityDays)),
+                ),
+                totalAmount: drift.Value(q.total),
+                notes: drift.Value(q.notes),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       // Sync customer packages
       _syncStatusController.add('Syncing packages...');
       for (final p in pull.customerPackages) {
         if (p.id <= 0) continue;
-        await db.into(db.customerPackages).insertOnConflictUpdate(CustomerPackagesCompanion(
-            id: drift.Value(p.id.toString()),
-            packageId: drift.Value(p.packageId),
-            customerId: drift.Value(p.customerId),
-            remainingSessions: drift.Value(p.remainingSessions),
-            expiresAt: drift.Value(p.expiresAt),
-            synced: const drift.Value(true)
-        ));
+        await db
+            .into(db.customerPackages)
+            .insertOnConflictUpdate(
+              CustomerPackagesCompanion(
+                id: drift.Value(p.id.toString()),
+                packageId: drift.Value(p.packageId),
+                customerId: drift.Value(p.customerId),
+                remainingSessions: drift.Value(p.remainingSessions),
+                expiresAt: drift.Value(p.expiresAt),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       // Sync redemptions
       for (final r in pull.packageRedemptions) {
         if (r.id <= 0) continue;
-        await db.into(db.packageRedemptions).insertOnConflictUpdate(PackageRedemptionsCompanion(
-             id: drift.Value(r.id.toString()),
-             customerPackageId: drift.Value(r.customerPackageId.toString()),
-             sessionsUsed: drift.Value(r.sessionsUsed),
-             note: drift.Value(r.note),
-             synced: const drift.Value(true)
-        ));
+        await db
+            .into(db.packageRedemptions)
+            .insertOnConflictUpdate(
+              PackageRedemptionsCompanion(
+                id: drift.Value(r.id.toString()),
+                customerPackageId: drift.Value(r.customerPackageId.toString()),
+                sessionsUsed: drift.Value(r.sessionsUsed),
+                note: drift.Value(r.note),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       // Sync shifts (pulled from server)
       _syncStatusController.add('Syncing shifts...');
       for (final s in pull.shifts) {
         if (s.id.isEmpty) continue;
-        
-        await db.into(db.shifts).insertOnConflictUpdate(ShiftsCompanion(
-          id: drift.Value(s.id),
-          outletId: drift.Value(s.outletId?.toString()),
-          staffId: drift.Value(s.staffId?.toString()),
-          openedAt: drift.Value(s.openedAt),
-          closedAt: drift.Value(s.closedAt),
-          openingFloat: drift.Value(s.openingFloat),
-          closingFloat: drift.Value(s.closingFloat ?? 0),
-          synced: const drift.Value(true),
-        ));
+
+        await db
+            .into(db.shifts)
+            .insertOnConflictUpdate(
+              ShiftsCompanion(
+                id: drift.Value(s.id),
+                outletId: drift.Value(s.outletId?.toString()),
+                staffId: drift.Value(s.staffId?.toString()),
+                openedAt: drift.Value(s.openedAt),
+                closedAt: drift.Value(s.closedAt),
+                openingFloat: drift.Value(s.openingFloat),
+                closingFloat: drift.Value(s.closingFloat ?? 0),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       // Sync cash movements (pulled from server)
       _syncStatusController.add('Syncing cash movements...');
       for (final m in pull.cashMovements) {
         if (m.id <= 0) continue;
-        
-        // CashMovements has auto-increment id, so we can't use insertOnConflictUpdate easily.
-        // Just skip existing records 
-        debugPrint('[SyncService] Received cash movement ${m.id} from server');
+        final key = m.idempotencyKey.trim();
+        final existingByRemote = await db.getCashMovementByRemoteId(m.id);
+        if (existingByRemote != null) {
+          await db.updateCashMovement(
+            existingByRemote.id,
+            CashMovementsCompanion(
+              idempotencyKey: key.isEmpty
+                  ? const drift.Value.absent()
+                  : drift.Value(key),
+              type: drift.Value(
+                m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+              ),
+              amount: drift.Value(m.amount),
+              note: drift.Value(m.note),
+              createdAt: drift.Value(
+                m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+              ),
+            ),
+          );
+          continue;
+        }
+
+        if (key.isNotEmpty) {
+          final existingByKey = await db.getCashMovementByIdempotencyKey(key);
+          if (existingByKey != null) {
+            await db.updateCashMovement(
+              existingByKey.id,
+              CashMovementsCompanion(
+                remoteId: drift.Value(m.id),
+                idempotencyKey: drift.Value(key),
+                type: drift.Value(
+                  m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+                ),
+                amount: drift.Value(m.amount),
+                note: drift.Value(m.note),
+                createdAt: drift.Value(
+                  m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+                ),
+              ),
+            );
+            continue;
+          }
+        }
+
+        await db
+            .into(db.cashMovements)
+            .insert(
+              CashMovementsCompanion.insert(
+                remoteId: drift.Value(m.id),
+                idempotencyKey: key.isEmpty
+                    ? const drift.Value.absent()
+                    : drift.Value(key),
+                outletId: pull.outletId.trim().isNotEmpty
+                    ? drift.Value(pull.outletId)
+                    : const drift.Value.absent(),
+                staffId: m.staffId != null
+                    ? drift.Value(m.staffId.toString())
+                    : const drift.Value.absent(),
+                type: m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+                amount: m.amount,
+                note: drift.Value(m.note),
+                createdAt: drift.Value(
+                  m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+                ),
+              ),
+            );
       }
 
-      // Settings sync - store in shared preferences or secure storage
-      // since there's no AppSettings table
       _syncStatusController.add('Syncing settings...');
       for (final setting in pull.settings) {
         if (setting.key.isEmpty) continue;
-        debugPrint('[SyncService] Received setting ${setting.key}=${setting.value} from server');
+        await db.upsertAppSetting(
+          AppSettingsCompanion.insert(
+            key: setting.key,
+            valueJson: drift.Value(jsonEncode(setting.value)),
+            updatedAt: drift.Value(setting.updatedAt ?? DateTime.now().toUtc()),
+          ),
+        );
       }
 
       final outlet = pull.outlet;
@@ -2105,61 +2605,148 @@ class SyncService {
         );
       }
 
-      for (final t in pull.receiptTemplates) {
-         await db.into(db.receiptTemplates).insertOnConflictUpdate(ReceiptTemplatesCompanion.insert(
-            id: drift.Value(t.id),
-            name: drift.Value(t.name),
-            style: drift.Value(t.style),
-            headerText: drift.Value(t.headerMessage),
-            colorHex: drift.Value(t.headerColor),
-            footerText: drift.Value(t.footerMessage),
-            showLogo: drift.Value(t.showLogo),
-            showQr: drift.Value(t.showQr),
-            isActive: drift.Value(t.isActive),
-            updatedAt: drift.Value(t.updatedAt),
+      final businessProfile = pull.businessProfile;
+      if (businessProfile != null && businessProfile.shopName.isNotEmpty) {
+        _syncStatusController.add('Syncing business profile...');
+        await db.upsertBusinessProfile(
+          BusinessProfilesCompanion.insert(
+            id: kPrimaryBusinessProfileId,
+            sellerId: drift.Value(
+              businessProfile.sellerId.trim().isEmpty
+                  ? null
+                  : businessProfile.sellerId,
+            ),
+            sellerName: drift.Value(businessProfile.sellerName),
+            sellerEmail: drift.Value(businessProfile.sellerEmail),
+            sellerPhone: drift.Value(businessProfile.sellerPhone),
+            shopId: drift.Value(businessProfile.shopId),
+            shopName: businessProfile.shopName,
+            shopAddress: drift.Value(businessProfile.shopAddress),
+            shopPhone: drift.Value(businessProfile.shopPhone),
+            logoUploadId: businessProfile.logoUploadId != null
+                ? drift.Value(businessProfile.logoUploadId)
+                : const drift.Value.absent(),
+            logoUrl: drift.Value(businessProfile.logoUrl),
+            metaTitle: drift.Value(businessProfile.metaTitle),
+            metaDescription: drift.Value(businessProfile.metaDescription),
+            thermalPrinterWidth: businessProfile.thermalPrinterWidth != null
+                ? drift.Value(businessProfile.thermalPrinterWidth)
+                : const drift.Value.absent(),
+            shippingCost: businessProfile.shippingCost != null
+                ? drift.Value(businessProfile.shippingCost)
+                : const drift.Value.absent(),
+            selfDeliveryActive: drift.Value(businessProfile.selfDeliveryActive),
+            deliveryRadiusKm: businessProfile.deliveryRadiusKm != null
+                ? drift.Value(businessProfile.deliveryRadiusKm)
+                : const drift.Value.absent(),
+            deliveryPickupLatitude:
+                businessProfile.deliveryPickupLatitude != null
+                ? drift.Value(businessProfile.deliveryPickupLatitude)
+                : const drift.Value.absent(),
+            deliveryPickupLongitude:
+                businessProfile.deliveryPickupLongitude != null
+                ? drift.Value(businessProfile.deliveryPickupLongitude)
+                : const drift.Value.absent(),
+            cashOnDeliveryEnabled: drift.Value(
+              businessProfile.cashOnDeliveryEnabled,
+            ),
+            bankPaymentEnabled: drift.Value(businessProfile.bankPaymentEnabled),
+            mobileMoneyEnabled: drift.Value(businessProfile.mobileMoneyEnabled),
+            bankName: drift.Value(businessProfile.bankName),
+            bankAccName: drift.Value(businessProfile.bankAccName),
+            bankAccNo: drift.Value(businessProfile.bankAccNo),
+            bankRoutingNo: drift.Value(businessProfile.bankRoutingNo),
+            mtnMerchantCode: drift.Value(businessProfile.mtnMerchantCode),
+            airtelMerchantCode: drift.Value(businessProfile.airtelMerchantCode),
+            paybillNumber: drift.Value(businessProfile.paybillNumber),
+            receiptPaymentMethodsJson: drift.Value(
+              jsonEncode(businessProfile.receiptPaymentMethods),
+            ),
+            deliveryProfileJson: drift.Value(
+              jsonEncode(businessProfile.deliveryProfile),
+            ),
+            updatedAt: drift.Value(
+              businessProfile.updatedAt ?? DateTime.now().toUtc(),
+            ),
             synced: const drift.Value(true),
-         ));
+          ),
+        );
+      }
+
+      for (final t in pull.receiptTemplates) {
+        await db
+            .into(db.receiptTemplates)
+            .insertOnConflictUpdate(
+              ReceiptTemplatesCompanion.insert(
+                id: drift.Value(t.id),
+                name: drift.Value(t.name),
+                style: drift.Value(t.style),
+                headerText: drift.Value(t.headerMessage),
+                colorHex: drift.Value(t.headerColor),
+                footerText: drift.Value(t.footerMessage),
+                showLogo: drift.Value(t.showLogo),
+                showQr: drift.Value(t.showQr),
+                isActive: drift.Value(t.isActive),
+                updatedAt: drift.Value(t.updatedAt),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       for (final t in pull.quotationTemplates) {
-         await db.into(db.quotationTemplates).insertOnConflictUpdate(QuotationTemplatesCompanion.insert(
-            id: drift.Value(t.id),
-            name: drift.Value(t.name),
-            style: drift.Value(t.style),
-            headerText: drift.Value(t.headerMessage), // Matches DTO 
-            colorHex: drift.Value(t.headerColor),
-            footerText: drift.Value(t.footerMessage),
-            showLogo: drift.Value(t.showLogo),
-            showQr: drift.Value(t.showQr),
-            isActive: drift.Value(t.isActive),
-            updatedAt: drift.Value(t.updatedAt),
-            synced: const drift.Value(true),
-         ));
+        await db
+            .into(db.quotationTemplates)
+            .insertOnConflictUpdate(
+              QuotationTemplatesCompanion.insert(
+                id: drift.Value(t.id),
+                name: drift.Value(t.name),
+                style: drift.Value(t.style),
+                headerText: drift.Value(t.headerMessage), // Matches DTO
+                colorHex: drift.Value(t.headerColor),
+                footerText: drift.Value(t.footerMessage),
+                showLogo: drift.Value(t.showLogo),
+                showQr: drift.Value(t.showQr),
+                isActive: drift.Value(t.isActive),
+                updatedAt: drift.Value(t.updatedAt),
+                synced: const drift.Value(true),
+              ),
+            );
       }
 
       _syncStatusController.add('Syncing transactions...');
       for (final e in pull.ledgerEntries) {
         if (e.clientEntryId.isEmpty) continue;
-        
-        final List<LedgerLinesCompanion> lines = e.lines.map((l) => LedgerLinesCompanion.insert(
-          entryId: e.clientEntryId,
-          title: l.title,
-          quantity: l.quantity,
-          unitPrice: l.price,
-          lineTotal: l.total,
-          itemId: drift.Value(l.itemId),
-        )).toList();
 
-        final List<PaymentsCompanion> payments = e.payments.map((p) => PaymentsCompanion.insert(
-          entryId: e.clientEntryId,
-          method: p.method,
-          amount: p.amount,
-        )).toList();
+        final List<LedgerLinesCompanion> lines = e.lines
+            .map(
+              (l) => LedgerLinesCompanion.insert(
+                entryId: e.clientEntryId,
+                title: l.title,
+                quantity: l.quantity,
+                unitPrice: l.price,
+                lineTotal: l.total,
+                itemId: drift.Value(l.itemId),
+                serviceId: drift.Value(l.serviceId),
+                variant: drift.Value(l.variation),
+              ),
+            )
+            .toList();
+
+        final List<PaymentsCompanion> payments = e.payments
+            .map(
+              (p) => PaymentsCompanion.insert(
+                entryId: e.clientEntryId,
+                method: p.method,
+                amount: p.amount,
+              ),
+            )
+            .toList();
 
         await db.upsertLedgerEntryFromSync(
           entry: LedgerEntriesCompanion.insert(
             id: drift.Value(e.clientEntryId),
-            idempotencyKey: e.clientEntryId, // Use client ID as idempotency key for now
+            idempotencyKey:
+                e.clientEntryId, // Use client ID as idempotency key for now
             type: e.type,
             subtotal: drift.Value(e.subtotal),
             discount: drift.Value(e.discount),
@@ -2167,10 +2754,12 @@ class SyncService {
             total: drift.Value(e.total),
             note: drift.Value(e.note),
             synced: const drift.Value(true),
-            remoteAck: drift.Value(jsonEncode({
-              'server_entry_id': e.id,
-              'received_at': e.updatedAt?.toIso8601String(),
-            })),
+            remoteAck: drift.Value(
+              jsonEncode({
+                'server_entry_id': e.id,
+                'received_at': e.updatedAt?.toIso8601String(),
+              }),
+            ),
             customerId: drift.Value(e.customerId),
             createdAt: drift.Value(e.occurredAt ?? DateTime.now().toUtc()),
           ),
@@ -2181,28 +2770,35 @@ class SyncService {
 
       if (pull.sellerProfile != null) {
         _syncStatusController.add('Syncing profile...');
-        await secureStorage.write(key: 'seller_profile', value: jsonEncode({
-          'id': pull.sellerProfile!.id,
-          'name': pull.sellerProfile!.name,
-          'email': pull.sellerProfile!.email,
-          'phone': pull.sellerProfile!.phone,
-          'business_name': pull.sellerProfile!.businessName,
-        }));
+        await secureStorage.write(
+          key: 'seller_profile',
+          value: jsonEncode({
+            'id': pull.sellerProfile!.id,
+            'name': pull.sellerProfile!.name,
+            'email': pull.sellerProfile!.email,
+            'phone': pull.sellerProfile!.phone,
+            'business_name': pull.sellerProfile!.businessName,
+          }),
+        );
       }
 
       await Future.wait([
         db.setLastPulledAt('products', pull.receivedAt),
         db.setLastPulledAt('services', pull.receivedAt),
         db.setLastPulledAt('customers', pull.receivedAt),
+        db.setLastPulledAt('business_profile', pull.receivedAt),
         db.setLastPulledAt('config', pull.receivedAt),
       ]);
-      
+
       // Debug: Log total items in DB after sync
       final allItems = await db.getAllItems();
+      final allServices = await db.getAllServices();
       if (kDebugMode) {
-        debugPrint('[SyncService] After sync: ${allItems.length} total items in local DB');
+        debugPrint(
+          '[SyncService] After sync: ${allItems.length} total items in local DB',
+        );
       }
-
+      unawaited(_primeOfflineMediaCache(allItems, allServices));
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -2214,6 +2810,41 @@ class SyncService {
       }
       rethrow;
     }
+  }
+
+  Future<void> _primeOfflineMediaCache(
+    List<Item> items,
+    List<Service> services,
+  ) async {
+    final urls = <String>{};
+    for (final item in items) {
+      if (_isNetworkUrl(item.imageUrl)) {
+        urls.add(item.imageUrl!.trim());
+      }
+      if (_isNetworkUrl(item.thumbnailUrl)) {
+        urls.add(item.thumbnailUrl!.trim());
+      }
+      for (final galleryUrl in _decodeStringList(item.galleryUrls)) {
+        if (_isNetworkUrl(galleryUrl)) {
+          urls.add(galleryUrl.trim());
+        }
+      }
+    }
+    for (final service in services) {
+      if (_isNetworkUrl(service.imageUrl)) {
+        urls.add(service.imageUrl!.trim());
+      }
+    }
+    if (urls.isEmpty) return;
+    await OfflineMediaCache.instance.prefetchAll(urls);
+  }
+
+  bool _isNetworkUrl(String? value) {
+    if (value == null) return false;
+    final raw = value.trim();
+    if (raw.isEmpty) return false;
+    final scheme = Uri.tryParse(raw)?.scheme.toLowerCase();
+    return scheme == 'http' || scheme == 'https';
   }
 
   Future<void> pullSellerProducts() async {
@@ -2235,9 +2866,13 @@ class SyncService {
   Future<void> pullMarketplaceOrders() async {
     final res = await sellerApi.fetchOrders();
     final data = res.data;
-    final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+    final listRaw = data is Map<String, dynamic>
+        ? (data['data'] ?? const [])
+        : data;
     final list = List<Map<String, dynamic>>.from(
-      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+      (listRaw as Iterable).whereType<Map>().map(
+        (e) => Map<String, dynamic>.from(e),
+      ),
     );
     for (final order in list) {
       final id = int.tryParse(order['id']?.toString() ?? '');
@@ -2249,9 +2884,13 @@ class SyncService {
   Future<void> pullServiceBookings() async {
     final res = await sellerApi.fetchServiceBookings();
     final data = res.data;
-    final listRaw = data is Map<String, dynamic> ? (data['data'] ?? const []) : data;
+    final listRaw = data is Map<String, dynamic>
+        ? (data['data'] ?? const [])
+        : data;
     final list = List<Map<String, dynamic>>.from(
-      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+      (listRaw as Iterable).whereType<Map>().map(
+        (e) => Map<String, dynamic>.from(e),
+      ),
     );
     for (final booking in list) {
       final id = int.tryParse(booking['id']?.toString() ?? '');
@@ -2275,7 +2914,8 @@ class SyncService {
       if (lastSyncRaw != null) {
         final lastSync = DateTime.tryParse(lastSyncRaw)?.toUtc();
         if (lastSync != null &&
-            DateTime.now().toUtc().difference(lastSync) < _contactsSyncInterval) {
+            DateTime.now().toUtc().difference(lastSync) <
+                _contactsSyncInterval) {
           return;
         }
       }
@@ -2283,8 +2923,8 @@ class SyncService {
 
     final sw = Stopwatch()..start();
     try {
-      final deviceContacts = contacts ??
-          await FlutterContacts.getContacts(withProperties: true);
+      final deviceContacts =
+          contacts ?? await FlutterContacts.getContacts(withProperties: true);
       if (deviceContacts.isEmpty) {
         await secureStorage.write(
           key: _contactsSyncKey,
@@ -2298,88 +2938,91 @@ class SyncService {
       final payloads = _buildContactPayloads(deviceContacts);
       if (payloads.isEmpty) return;
 
-    const batchSize = 200;
-    for (var i = 0; i < payloads.length; i += batchSize) {
-      final chunk = payloads.sublist(
-        i,
-        i + batchSize > payloads.length ? payloads.length : i + batchSize,
-      );
-
-      final res = await sellerApi.batchUpsertCrmContacts(chunk);
-      final body = res.data;
-      if (body is! Map<String, dynamic>) {
-        throw DioException(
-          requestOptions: res.requestOptions,
-          error: 'Invalid CRM contacts response shape',
-        );
-      }
-
-      final data = body['data'];
-      if (data is! List) {
-        throw DioException(
-          requestOptions: res.requestOptions,
-          error: 'Invalid CRM contacts response data',
-        );
-      }
-
-      for (var j = 0; j < chunk.length && j < data.length; j++) {
-        final payload = chunk[j];
-        final result = data[j];
-        if (result is! Map<String, dynamic>) continue;
-        final contactId = result['id']?.toString() ?? '';
-        if (contactId.isEmpty) continue;
-
-        final updatedAtRaw = result['updated_at']?.toString();
-        final updatedAt = updatedAtRaw != null
-            ? DateTime.tryParse(updatedAtRaw)?.toUtc()
-            : null;
-        final phones = payload['phones'];
-        final emails = payload['emails'];
-
-        final deviceId = payload['external_id']?.toString() ?? '';
-        final phone = _firstString(phones);
-        final email = _firstString(emails);
-
-        String? linkedCustomerId;
-        if (deviceId.isNotEmpty) {
-          final dc = await (db.select(db.deviceContacts)
-                ..where((t) => t.deviceId.equals(deviceId)))
-              .getSingleOrNull();
-          linkedCustomerId = dc?.linkedCustomerId;
-        }
-
-        Customer? existing;
-        if (linkedCustomerId != null && linkedCustomerId.trim().isNotEmpty) {
-          existing = await db.getCustomerById(linkedCustomerId.trim());
-        }
-        existing ??=
-            (contactId.isNotEmpty ? await db.getCustomerByRemoteId(contactId) : null);
-        existing ??=
-            (phone != null && phone.isNotEmpty ? await db.getCustomerByPhoneE164(phone) : null);
-        existing ??=
-            (email != null && email.isNotEmpty ? await db.getCustomerByEmail(email) : null);
-
-        final localCustomerId = existing?.id ?? _uuid.v4();
-        await db.upsertCustomer(
-          CustomersCompanion.insert(
-            id: drift.Value(localCustomerId),
-            remoteId: drift.Value(contactId),
-            name: payload['display_name']?.toString() ?? 'Contact',
-            phone: drift.Value(phone),
-            email: drift.Value(email),
-            synced: const drift.Value(true),
-            updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
-          ),
+      const batchSize = 200;
+      for (var i = 0; i < payloads.length; i += batchSize) {
+        final chunk = payloads.sublist(
+          i,
+          i + batchSize > payloads.length ? payloads.length : i + batchSize,
         );
 
-        if (deviceId.isNotEmpty) {
-          await db.linkDeviceContactToCustomer(
-            deviceId: deviceId,
-            customerId: localCustomerId,
+        final res = await sellerApi.batchUpsertCrmContacts(chunk);
+        final body = res.data;
+        if (body is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid CRM contacts response shape',
           );
         }
+
+        final data = body['data'];
+        if (data is! List) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid CRM contacts response data',
+          );
+        }
+
+        for (var j = 0; j < chunk.length && j < data.length; j++) {
+          final payload = chunk[j];
+          final result = data[j];
+          if (result is! Map<String, dynamic>) continue;
+          final contactId = result['id']?.toString() ?? '';
+          if (contactId.isEmpty) continue;
+
+          final updatedAtRaw = result['updated_at']?.toString();
+          final updatedAt = updatedAtRaw != null
+              ? DateTime.tryParse(updatedAtRaw)?.toUtc()
+              : null;
+          final phones = payload['phones'];
+          final emails = payload['emails'];
+
+          final deviceId = payload['external_id']?.toString() ?? '';
+          final phone = _firstString(phones);
+          final email = _firstString(emails);
+
+          String? linkedCustomerId;
+          if (deviceId.isNotEmpty) {
+            final dc = await (db.select(
+              db.deviceContacts,
+            )..where((t) => t.deviceId.equals(deviceId))).getSingleOrNull();
+            linkedCustomerId = dc?.linkedCustomerId;
+          }
+
+          Customer? existing;
+          if (linkedCustomerId != null && linkedCustomerId.trim().isNotEmpty) {
+            existing = await db.getCustomerById(linkedCustomerId.trim());
+          }
+          existing ??= (contactId.isNotEmpty
+              ? await db.getCustomerByRemoteId(contactId)
+              : null);
+          existing ??= (phone != null && phone.isNotEmpty
+              ? await db.getCustomerByPhoneE164(phone)
+              : null);
+          existing ??= (email != null && email.isNotEmpty
+              ? await db.getCustomerByEmail(email)
+              : null);
+
+          final localCustomerId = existing?.id ?? _uuid.v4();
+          await db.upsertCustomer(
+            CustomersCompanion.insert(
+              id: drift.Value(localCustomerId),
+              remoteId: drift.Value(contactId),
+              name: payload['display_name']?.toString() ?? 'Contact',
+              phone: drift.Value(phone),
+              email: drift.Value(email),
+              synced: const drift.Value(true),
+              updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+
+          if (deviceId.isNotEmpty) {
+            await db.linkDeviceContactToCustomer(
+              deviceId: deviceId,
+              customerId: localCustomerId,
+            );
+          }
+        }
       }
-    }
 
       await secureStorage.write(
         key: _contactsSyncKey,
@@ -2405,7 +3048,10 @@ class SyncService {
         unawaited(
           telemetry.event(
             'contacts_sync_fail',
-            props: {'duration_ms': sw.elapsedMilliseconds, 'error': e.toString()},
+            props: {
+              'duration_ms': sw.elapsedMilliseconds,
+              'error': e.toString(),
+            },
           ),
         );
         unawaited(telemetry.recordError(e, st, hint: 'contacts_sync'));
@@ -2434,8 +3080,9 @@ class SyncService {
       if (primaryPhone != null) {
         matched = await db.getCustomerByPhoneE164(primaryPhone);
       }
-      matched ??=
-          primaryEmail != null ? await db.getCustomerByEmail(primaryEmail) : null;
+      matched ??= primaryEmail != null
+          ? await db.getCustomerByEmail(primaryEmail)
+          : null;
 
       await db.upsertDeviceContact(
         DeviceContactsCompanion.insert(
@@ -2455,6 +3102,7 @@ class SyncService {
   Future<void> dispose() async {
     await _connectivitySub?.cancel();
     _retryTimer?.cancel();
+    await _syncStatusController.close();
   }
 
   List<Map<String, dynamic>> _buildContactPayloads(List<Contact> contacts) {

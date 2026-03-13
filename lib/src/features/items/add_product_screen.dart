@@ -15,6 +15,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
+import '../../widgets/offline_cached_image.dart';
 import 'product_form_controller.dart';
 import 'product_variants_screen.dart';
 
@@ -58,13 +59,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
-    
+
     // Populate from existing item if editing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _populateFromExisting();
       unawaited(_hydrateFromServerIfNeeded());
       if (widget.startPublishOnline) {
-        unawaited(ref.read(productFormProvider.notifier).setPublishOnline(true));
+        unawaited(
+          ref.read(productFormProvider.notifier).setPublishOnline(true),
+        );
       }
     });
   }
@@ -121,7 +124,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final thumbRaw = (item.thumbnailUrl ?? item.imageUrl)?.trim();
       final galleryUrlsAll = _decodeStringList(item.galleryUrls);
       final galleryIdsAll = _decodeIntList(item.galleryUploadIds);
-      final remoteCount = galleryIdsAll.length < galleryUrlsAll.length ? galleryIdsAll.length : galleryUrlsAll.length;
+      final remoteCount = galleryIdsAll.length < galleryUrlsAll.length
+          ? galleryIdsAll.length
+          : galleryUrlsAll.length;
       final remoteGalleryUrls = galleryUrlsAll.take(remoteCount).toList();
       final pendingGalleryFiles = galleryUrlsAll
           .skip(remoteCount)
@@ -132,7 +137,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       File? pendingThumbnailFile;
       String? remoteThumbnailUrl = thumbRaw;
       int? remoteThumbnailId = item.thumbnailUploadId;
-      if (thumbRaw != null && thumbRaw.isNotEmpty && !thumbRaw.startsWith('http')) {
+      if (thumbRaw != null &&
+          thumbRaw.isNotEmpty &&
+          !thumbRaw.startsWith('http')) {
         final f = File(thumbRaw);
         if (f.existsSync()) {
           pendingThumbnailFile = f;
@@ -211,9 +218,12 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final lowStock = int.tryParse(lowStockRaw?.toString() ?? '');
       final discount = double.tryParse(discountRaw?.toString() ?? '');
       final shippingCost = double.tryParse(shippingCostRaw?.toString() ?? '');
-      final estShippingDays = int.tryParse(estShippingDaysRaw?.toString() ?? '');
+      final estShippingDays = int.tryParse(
+        estShippingDaysRaw?.toString() ?? '',
+      );
       final refundable = refundableRaw == true || refundableRaw == 1;
-      final cashOnDelivery = cashOnDeliveryRaw == true || cashOnDeliveryRaw == 1;
+      final cashOnDelivery =
+          cashOnDeliveryRaw == true || cashOnDeliveryRaw == 1;
       final published = publishedRaw == true || publishedRaw == 1;
 
       final localDiscountType = discountTypeRaw == null
@@ -226,17 +236,25 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           item.id,
           ItemsCompanion(
             remoteId: Value(productId),
-            categoryId: categoryId != null ? Value(categoryId) : const Value.absent(),
+            categoryId: categoryId != null
+                ? Value(categoryId)
+                : const Value.absent(),
             brandId: brandId != null ? Value(brandId) : const Value.absent(),
             unit: unit != null ? Value(unit) : const Value.absent(),
             weight: weight != null ? Value(weight) : const Value.absent(),
-            minPurchaseQty: minQty != null ? Value(minQty) : const Value.absent(),
-            lowStockWarning: lowStock != null ? Value(lowStock) : const Value.absent(),
+            minPurchaseQty: minQty != null
+                ? Value(minQty)
+                : const Value.absent(),
+            lowStockWarning: lowStock != null
+                ? Value(lowStock)
+                : const Value.absent(),
             discount: discount != null ? Value(discount) : const Value.absent(),
             discountType: localDiscountType != null
                 ? Value(localDiscountType)
                 : const Value.absent(),
-            shippingFee: shippingCost != null ? Value(shippingCost) : const Value.absent(),
+            shippingFee: shippingCost != null
+                ? Value(shippingCost)
+                : const Value.absent(),
             shippingDays: estShippingDays != null
                 ? Value(estShippingDays)
                 : const Value.absent(),
@@ -244,7 +262,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             cashOnDelivery: Value(cashOnDelivery),
             barcode: barcode != null ? Value(barcode) : const Value.absent(),
             tags: tags != null ? Value(tags) : const Value.absent(),
-            description: description != null ? Value(description) : const Value.absent(),
+            description: description != null
+                ? Value(description)
+                : const Value.absent(),
           ),
         ),
       );
@@ -350,7 +370,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text(widget.existingItem == null ? 'Add Product' : 'Edit Product'),
+        title: Text(
+          widget.existingItem == null ? 'Add Product' : 'Edit Product',
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(100),
           child: Column(
@@ -386,7 +408,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           _buildBasicInfoTab(state, ctrl),
           _buildPricingTab(state, ctrl),
           _buildImagesTab(state, ctrl),
-          state.publishOnline 
+          state.publishOnline
               ? _buildDetailsTab(state, ctrl)
               : _buildShippingTab(state, ctrl),
         ],
@@ -395,11 +417,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildOnlineToggle(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildOnlineToggle(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: state.publishOnline 
+      color: state.publishOnline
           ? DesignTokens.brandAccent.withValues(alpha: 0.15)
           : DesignTokens.grayLight.withValues(alpha: 0.3),
       child: Row(
@@ -409,7 +434,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             child: Icon(
               state.publishOnline ? Icons.public : Icons.store,
               key: ValueKey(state.publishOnline),
-              color: state.publishOnline ? DesignTokens.brandAccent : DesignTokens.grayMedium,
+              color: state.publishOnline
+                  ? DesignTokens.brandAccent
+                  : DesignTokens.grayMedium,
             ),
           ),
           const SizedBox(width: 12),
@@ -423,8 +450,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   style: DesignTokens.textBodyBold,
                 ),
                 Text(
-                  state.publishOnline 
-                      ? 'Visible on soko.sanaa.ug' 
+                  state.publishOnline
+                      ? 'Visible on soko24.co'
                       : 'Only at point of sale',
                   style: DesignTokens.textSmall,
                 ),
@@ -453,7 +480,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildBasicInfoTab(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildBasicInfoTab(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -461,7 +491,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         children: [
           Text('Product Information', style: DesignTokens.textTitle),
           const SizedBox(height: 16),
-          
+
           AppInput(
             controller: _nameCtrl,
             label: 'Product Name *',
@@ -471,20 +501,20 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             onChanged: ctrl.setName,
           ),
           const SizedBox(height: 16),
-          
+
           if (state.publishOnline) ...[
             // Category selector
             _buildCategorySelector(state, ctrl),
             const SizedBox(height: 16),
-            
-            // Brand selector  
+
+            // Brand selector
             _buildBrandSelector(state, ctrl),
             const SizedBox(height: 16),
           ],
-          
+
           // Unit selector
           _buildUnitSelector(state, ctrl),
-          
+
           if (state.publishOnline) ...[
             const SizedBox(height: 16),
             AppInput(
@@ -492,7 +522,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               label: 'Weight (kg)',
               hint: '0.5',
               prefixIcon: Icons.scale_outlined,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               onChanged: ctrl.setWeight,
             ),
           ],
@@ -501,7 +533,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildCategorySelector(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildCategorySelector(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -524,8 +559,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               children: [
                 Icon(
                   Icons.category_outlined,
-                  color: state.categoryId != null 
-                      ? DesignTokens.brandPrimary 
+                  color: state.categoryId != null
+                      ? DesignTokens.brandPrimary
                       : DesignTokens.grayMedium,
                 ),
                 const SizedBox(width: 12),
@@ -534,7 +569,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                     state.categoryName ?? 'Select category',
                     style: state.categoryName != null
                         ? DesignTokens.textBody
-                        : DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                        : DesignTokens.textBody.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
                   ),
                 ),
                 if (state.isLoadingCategories)
@@ -553,7 +590,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildBrandSelector(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildBrandSelector(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -571,8 +611,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               children: [
                 Icon(
                   Icons.branding_watermark_outlined,
-                  color: state.brandId != null 
-                      ? DesignTokens.brandPrimary 
+                  color: state.brandId != null
+                      ? DesignTokens.brandPrimary
                       : DesignTokens.grayMedium,
                 ),
                 const SizedBox(width: 12),
@@ -581,7 +621,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                     state.brandName ?? 'Select brand',
                     style: state.brandName != null
                         ? DesignTokens.textBody
-                        : DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                        : DesignTokens.textBody.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
                   ),
                 ),
                 if (state.brandId != null)
@@ -605,8 +647,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildUnitSelector(ProductFormState state, ProductFormController ctrl) {
-    const units = ['pc', 'kg', 'g', 'set', 'pair', 'pack', 'box', 'dozen', 'liter', 'meter'];
+  Widget _buildUnitSelector(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
+    const units = [
+      'pc',
+      'kg',
+      'g',
+      'set',
+      'pair',
+      'pack',
+      'box',
+      'dozen',
+      'liter',
+      'meter',
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -615,14 +671,20 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: units.map((unit) => ChoiceChip(
-            label: Text(unit),
-            selected: state.unit == unit,
-            onSelected: (v) {
-              if (v) ctrl.setUnit(unit);
-            },
-            selectedColor: DesignTokens.brandPrimary.withValues(alpha: 0.2),
-          )).toList(),
+          children: units
+              .map(
+                (unit) => ChoiceChip(
+                  label: Text(unit),
+                  selected: state.unit == unit,
+                  onSelected: (v) {
+                    if (v) ctrl.setUnit(unit);
+                  },
+                  selectedColor: DesignTokens.brandPrimary.withValues(
+                    alpha: 0.2,
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
@@ -637,7 +699,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         children: [
           Text('Pricing & Stock', style: DesignTokens.textTitle),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -667,7 +729,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           if (state.publishOnline) ...[
             Row(
               children: [
@@ -702,7 +764,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ),
             const SizedBox(height: 16),
           ],
-          
+
           Row(
             children: [
               Expanded(
@@ -729,7 +791,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           AppInput(
             controller: _lowStockCtrl,
             label: 'Low Stock Warning',
@@ -755,7 +817,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.layers_outlined, color: DesignTokens.grayMedium),
+                    const Icon(
+                      Icons.layers_outlined,
+                      color: DesignTokens.grayMedium,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -806,8 +871,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                     stream: db.watchItemStocksForItem(item.id),
                     builder: (context, snapshot) {
                       final stocks = snapshot.data ?? const <ItemStock>[];
-                      final variants =
-                          stocks.where((s) => s.variant.trim().isNotEmpty).length;
+                      final variants = stocks
+                          .where((s) => s.variant.trim().isNotEmpty)
+                          .length;
                       final label = variants == 0
                           ? 'No variants yet'
                           : '$variants variants configured';
@@ -834,17 +900,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           const SizedBox(height: 8),
           Text(
             'Add a thumbnail and gallery images to showcase your product',
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
           ),
           const SizedBox(height: 24),
-          
+
           // Thumbnail
           Text('Thumbnail (Main Image)', style: DesignTokens.textBodyBold),
           const SizedBox(height: 12),
           _buildThumbnailPicker(state, ctrl),
-          
+
           const SizedBox(height: 32),
-          
+
           // Gallery
           Text('Gallery Images', style: DesignTokens.textBodyBold),
           const SizedBox(height: 12),
@@ -854,7 +922,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildThumbnailPicker(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildThumbnailPicker(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final hasFile = state.thumbnailFile != null;
     final url = state.thumbnailUrl?.trim();
     final hasUrl = url != null && url.isNotEmpty;
@@ -868,27 +939,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               fit: BoxFit.cover,
             )
           : (url!.startsWith('http')
-              ? Image.network(
-                  url,
-                  width: double.infinity,
-                  height: 200,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(height: 200),
-                )
-              : Image.file(
-                  File(url),
-                  width: double.infinity,
-                  height: 200,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(height: 200),
-                ));
+                ? OfflineCachedImage(
+                    imageUrl: url,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorWidget: const SizedBox(height: 200),
+                  )
+                : Image.file(
+                    File(url),
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox(height: 200),
+                  ));
 
       return Stack(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: image,
-          ),
+          ClipRRect(borderRadius: BorderRadius.circular(12), child: image),
           Positioned(
             top: 8,
             right: 8,
@@ -906,44 +974,50 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
 
     return Container(
-            width: double.infinity,
-            height: 200,
-            decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: DesignTokens.grayLight,
-                style: BorderStyle.solid,
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: DesignTokens.grayLight.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: DesignTokens.grayLight,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.add_photo_alternate_outlined,
+            size: 48,
+            color: DesignTokens.grayMedium,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: ctrl.pickThumbnail,
+                icon: const Icon(Icons.photo_library),
+                label: const Text('Gallery'),
               ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_photo_alternate_outlined, 
-                    size: 48, color: DesignTokens.grayMedium),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: ctrl.pickThumbnail,
-                      icon: const Icon(Icons.photo_library),
-                      label: const Text('Gallery'),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: ctrl.takeThumbnailPhoto,
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Camera'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: ctrl.takeThumbnailPhoto,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Camera'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildGalleryPicker(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildGalleryPicker(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final total = state.galleryUrls.length + state.galleryFiles.length;
     return Column(
       children: [
@@ -962,19 +1036,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ),
             child: Column(
               children: [
-                Icon(Icons.add_photo_alternate, 
-                    size: 32, color: DesignTokens.brandPrimary),
+                Icon(
+                  Icons.add_photo_alternate,
+                  size: 32,
+                  color: DesignTokens.brandPrimary,
+                ),
                 const SizedBox(height: 8),
-                Text('Add Gallery Images', 
-                    style: DesignTokens.textBody.copyWith(
-                      color: DesignTokens.brandPrimary,
-                      fontWeight: FontWeight.w600,
-                    )),
+                Text(
+                  'Add Gallery Images',
+                  style: DesignTokens.textBody.copyWith(
+                    color: DesignTokens.brandPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
         ),
-        
+
         if (total > 0) ...[
           const SizedBox(height: 16),
           GridView.builder(
@@ -993,19 +1072,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: isRemote
-                        ? Image.network(
-                            state.galleryUrls[i],
+                        ? OfflineCachedImage(
+                            imageUrl: state.galleryUrls[i],
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const SizedBox(),
+                            errorWidget: const SizedBox(),
                           )
                         : Image.file(
                             state.galleryFiles[i - state.galleryUrls.length],
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   Positioned(
                     top: 4,
@@ -1013,15 +1092,20 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                     child: GestureDetector(
                       onTap: () => isRemote
                           ? ctrl.removeExistingGalleryImage(i)
-                          : ctrl.removeGalleryImage(i - state.galleryUrls.length),
+                          : ctrl.removeGalleryImage(
+                              i - state.galleryUrls.length,
+                            ),
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
                           color: Colors.black54,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close, 
-                            color: Colors.white, size: 16),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -1042,7 +1126,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         children: [
           Text('Description & Details', style: DesignTokens.textTitle),
           const SizedBox(height: 16),
-          
+
           AppInput(
             controller: _descriptionCtrl,
             label: 'Product Description',
@@ -1051,7 +1135,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             onChanged: ctrl.setDescription,
           ),
           const SizedBox(height: 16),
-          
+
           AppInput(
             controller: _tagsCtrl,
             label: 'Tags (comma-separated)',
@@ -1060,11 +1144,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             onChanged: ctrl.setTags,
           ),
           const SizedBox(height: 24),
-          
+
           // Shipping section
           Text('Shipping & Options', style: DesignTokens.textTitle),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
@@ -1093,7 +1177,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           _buildSwitchTile(
             title: 'Refundable',
             subtitle: 'Allow customers to request refunds',
@@ -1122,7 +1206,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         children: [
           Text('Additional Options', style: DesignTokens.textTitle),
           const SizedBox(height: 16),
-          
+
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1195,8 +1279,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               Expanded(
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, 
-                        color: DesignTokens.warning, size: 20),
+                    Icon(
+                      Icons.info_outline,
+                      color: DesignTokens.warning,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
@@ -1211,9 +1298,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               )
             else
               const Spacer(),
-            
+
             const SizedBox(width: 12),
-            
+
             AppButton(
               label: widget.existingItem == null ? 'Create Product' : 'Save',
               onPressed: state.canSubmit ? _saveProduct : null,
@@ -1237,7 +1324,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
     if (!state.isExtrasValid) return 'Check min qty / shipping fields';
     if (state.publishOnline && !state.isOnlineDetailsValid) {
-      if (state.description.trim().isEmpty || state.description.trim().length < 10) {
+      if (state.description.trim().isEmpty ||
+          state.description.trim().length < 10) {
         return 'Add a good description (10+ chars)';
       }
       if (state.shippingDaysValue == null) return 'Set shipping days (e.g. 3)';
@@ -1285,11 +1373,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                         itemCount: state.categories.length,
                         itemBuilder: (_, i) {
                           final cat = state.categories[i];
-                          final isSelected = cat['id']?.toString() == state.categoryId;
+                          final isSelected =
+                              cat['id']?.toString() == state.categoryId;
                           return ListTile(
                             leading: Icon(
-                              isSelected ? Icons.check_circle : Icons.category_outlined,
-                              color: isSelected ? DesignTokens.brandPrimary : null,
+                              isSelected
+                                  ? Icons.check_circle
+                                  : Icons.category_outlined,
+                              color: isSelected
+                                  ? DesignTokens.brandPrimary
+                                  : null,
                             ),
                             title: Text(cat['name']?.toString() ?? ''),
                             selected: isSelected,
@@ -1348,11 +1441,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                         itemCount: state.brands.length,
                         itemBuilder: (_, i) {
                           final brand = state.brands[i];
-                          final isSelected = brand['id']?.toString() == state.brandId;
+                          final isSelected =
+                              brand['id']?.toString() == state.brandId;
                           return ListTile(
                             leading: Icon(
-                              isSelected ? Icons.check_circle : Icons.branding_watermark_outlined,
-                              color: isSelected ? DesignTokens.brandPrimary : null,
+                              isSelected
+                                  ? Icons.check_circle
+                                  : Icons.branding_watermark_outlined,
+                              color: isSelected
+                                  ? DesignTokens.brandPrimary
+                                  : null,
                             ),
                             title: Text(brand['name']?.toString() ?? ''),
                             selected: isSelected,
@@ -1377,9 +1475,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   Future<void> _saveProduct() async {
     final state = ref.read(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
-    
+
     if (!state.canSubmit) return;
-    
+
     // Auto-generate SKU if empty
     String finalSku = state.sku.trim();
     if (finalSku.isEmpty) {
@@ -1388,7 +1486,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       finalSku = updatedState.sku;
     } else {
       // Validate SKU for duplicates
-      final skuError = await ctrl.validateSKU(editingItemId: widget.existingItem?.id);
+      final skuError = await ctrl.validateSKU(
+        editingItemId: widget.existingItem?.id,
+      );
       if (skuError != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1406,7 +1506,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         return;
       }
     }
-    
+
     ctrl.setSubmitting(true);
 
     try {
@@ -1417,17 +1517,27 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final existing = widget.existingItem;
 
       final thumbPathOrUrl = state.thumbnailFile?.path ?? state.thumbnailUrl;
-      final thumbUploadId = state.thumbnailFile != null ? null : state.thumbnailUploadId;
+      final thumbUploadId = state.thumbnailFile != null
+          ? null
+          : state.thumbnailUploadId;
 
-      final pendingGalleryPaths = state.galleryFiles.map((f) => f.path).toList();
-      final combinedGalleryUrls = [...state.galleryUrls, ...pendingGalleryPaths];
+      final pendingGalleryPaths = state.galleryFiles
+          .map((f) => f.path)
+          .toList();
+      final combinedGalleryUrls = [
+        ...state.galleryUrls,
+        ...pendingGalleryPaths,
+      ];
 
       final existingGalleryUrls = _decodeStringList(existing?.galleryUrls);
       final existingGalleryIds = _decodeIntList(existing?.galleryUploadIds);
-      final existingRemoteCount = existingGalleryIds.length < existingGalleryUrls.length
+      final existingRemoteCount =
+          existingGalleryIds.length < existingGalleryUrls.length
           ? existingGalleryIds.length
           : existingGalleryUrls.length;
-      final existingHasGallery = existingRemoteCount > 0 || existingGalleryUrls.skip(existingRemoteCount).isNotEmpty;
+      final existingHasGallery =
+          existingRemoteCount > 0 ||
+          existingGalleryUrls.skip(existingRemoteCount).isNotEmpty;
       final currentHasGallery = combinedGalleryUrls.isNotEmpty;
       final shouldClearGallery = existingHasGallery && !currentHasGallery;
 
@@ -1447,14 +1557,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         weight: Value(double.tryParse(state.weight)),
         minPurchaseQty: Value(int.tryParse(state.minQty) ?? 1),
         tags: Value(state.tags.isNotEmpty ? state.tags : null),
-        description: Value(state.description.isNotEmpty ? state.description : null),
+        description: Value(
+          state.description.isNotEmpty ? state.description : null,
+        ),
         thumbnailUrl: Value(thumbPathOrUrl),
         thumbnailUploadId: Value(thumbUploadId),
         galleryUrls: currentHasGallery || shouldClearGallery
-            ? Value(jsonEncode(currentHasGallery ? combinedGalleryUrls : const <String>[]))
+            ? Value(
+                jsonEncode(
+                  currentHasGallery ? combinedGalleryUrls : const <String>[],
+                ),
+              )
             : const Value.absent(),
         galleryUploadIds: currentHasGallery || shouldClearGallery
-            ? Value(jsonEncode(currentHasGallery ? state.galleryUploadIds : const <int>[]))
+            ? Value(
+                jsonEncode(
+                  currentHasGallery ? state.galleryUploadIds : const <int>[],
+                ),
+              )
             : const Value.absent(),
         discount: Value(double.tryParse(state.discount)),
         discountType: Value(state.discountType),
@@ -1469,11 +1589,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       await db.upsertItem(companion);
 
       // Enqueue sync
-      final opType = widget.existingItem == null ? 'item_create' : 'item_update';
+      final opType = widget.existingItem == null
+          ? 'item_create'
+          : 'item_update';
       final catId = int.tryParse(state.categoryId ?? '');
       await sync.enqueue(opType, {
         'local_id': id,
-        if (widget.existingItem?.remoteId != null) 'remote_id': widget.existingItem!.remoteId,
+        if (widget.existingItem?.remoteId != null)
+          'remote_id': widget.existingItem!.remoteId,
         'name': state.name.trim(),
         'unit_price': double.tryParse(state.price) ?? 0,
         'current_stock': int.tryParse(state.stock) ?? 0,
@@ -1484,16 +1607,23 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         'unit': state.unit.isNotEmpty ? state.unit : 'pc',
         if (state.weight.isNotEmpty) 'weight': double.tryParse(state.weight),
         'min_qty': int.tryParse(state.minQty) ?? 1,
-        if (state.tags.isNotEmpty) 
-          'tags': state.tags.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+        if (state.tags.isNotEmpty)
+          'tags': state.tags
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList(),
         if (state.description.isNotEmpty) 'description': state.description,
         'discount': double.tryParse(state.discount) ?? 0,
         'discount_type': state.discountType == 'flat' ? 'amount' : 'percent',
-        if (state.shippingDays.isNotEmpty) 'est_shipping_days': int.tryParse(state.shippingDays),
-        if (state.shippingFee.isNotEmpty) 'shipping_cost': double.tryParse(state.shippingFee),
+        if (state.shippingDays.isNotEmpty)
+          'est_shipping_days': int.tryParse(state.shippingDays),
+        if (state.shippingFee.isNotEmpty)
+          'shipping_cost': double.tryParse(state.shippingFee),
         'refundable': state.refundable ? 1 : 0,
         'cash_on_delivery': state.cashOnDelivery ? 1 : 0,
-        if (state.lowStockWarning.isNotEmpty) 'low_stock_quantity': int.tryParse(state.lowStockWarning),
+        if (state.lowStockWarning.isNotEmpty)
+          'low_stock_quantity': int.tryParse(state.lowStockWarning),
         if (state.sku.isNotEmpty) 'sku': state.sku,
       });
       unawaited(sync.syncNow());
@@ -1503,7 +1633,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.existingItem == null ? 'Product created!' : 'Product updated!'),
+            content: Text(
+              widget.existingItem == null
+                  ? 'Product created!'
+                  : 'Product updated!',
+            ),
             backgroundColor: DesignTokens.brandAccent,
           ),
         );
@@ -1512,7 +1646,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       ctrl.setSubmitting(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: DesignTokens.error),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
         );
       }
     }
@@ -1525,7 +1662,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is List) {
-        return decoded.map((e) => e?.toString() ?? '').where((e) => e.trim().isNotEmpty).toList();
+        return decoded
+            .map((e) => e?.toString() ?? '')
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
       }
     } catch (_) {}
     return const [];
@@ -1538,7 +1678,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     try {
       final decoded = jsonDecode(trimmed);
       if (decoded is List) {
-        return decoded.map((e) => int.tryParse(e?.toString() ?? '')).whereType<int>().toList();
+        return decoded
+            .map((e) => int.tryParse(e?.toString() ?? ''))
+            .whereType<int>()
+            .toList();
       }
     } catch (_) {}
     return const [];

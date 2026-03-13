@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 /// Soko Seller Terminal Design System
-/// 
+///
 /// This file defines all design tokens following strict constraints:
 /// - 8pt grid for all spacing
 /// - Only 3 font sizes
 /// - Only 3 gray shades + brand colors
-/// 
+///
 /// "Steve Jobs standard" - premium, minimal, consistent.
 
 class DesignTokens {
@@ -82,13 +82,18 @@ class DesignTokens {
   );
 
   /// Variants
-  static TextStyle get textTitleLight => textTitle.copyWith(color: surfaceWhite);
+  static TextStyle get textTitleLight =>
+      textTitle.copyWith(color: surfaceWhite);
   static TextStyle get textBodyLight => textBody.copyWith(color: surfaceWhite);
-  static TextStyle get textSmallLight => textSmall.copyWith(color: surfaceWhite.withValues(alpha: 0.8));
+  static TextStyle get textSmallLight =>
+      textSmall.copyWith(color: surfaceWhite.withValues(alpha: 0.8));
 
-  static TextStyle get textTitleMedium => textTitle.copyWith(fontWeight: FontWeight.w600);
-  static TextStyle get textBodyBold => textBody.copyWith(fontWeight: FontWeight.w600);
-  static TextStyle get textSmallBold => textSmall.copyWith(fontWeight: FontWeight.w600);
+  static TextStyle get textTitleMedium =>
+      textTitle.copyWith(fontWeight: FontWeight.w600);
+  static TextStyle get textBodyBold =>
+      textBody.copyWith(fontWeight: FontWeight.w600);
+  static TextStyle get textSmallBold =>
+      textSmall.copyWith(fontWeight: FontWeight.w600);
 
   static TextStyle get textBodyMuted => textBody.copyWith(color: grayMedium);
 
@@ -110,8 +115,12 @@ class DesignTokens {
   static const EdgeInsets paddingMd = EdgeInsets.all(spaceMd);
   static const EdgeInsets paddingLg = EdgeInsets.all(spaceLg);
 
-  static const EdgeInsets paddingHorizontalMd = EdgeInsets.symmetric(horizontal: spaceMd);
-  static const EdgeInsets paddingVerticalSm = EdgeInsets.symmetric(vertical: spaceSm);
+  static const EdgeInsets paddingHorizontalMd = EdgeInsets.symmetric(
+    horizontal: spaceMd,
+  );
+  static const EdgeInsets paddingVerticalSm = EdgeInsets.symmetric(
+    vertical: spaceSm,
+  );
 
   static const EdgeInsets paddingScreen = EdgeInsets.all(spaceMd);
 
@@ -124,10 +133,18 @@ class DesignTokens {
   static const double radiusLg = 16;
   static const double radiusXl = 24;
 
-  static const BorderRadius borderRadiusSm = BorderRadius.all(Radius.circular(radiusSm));
-  static const BorderRadius borderRadiusMd = BorderRadius.all(Radius.circular(radiusMd));
-  static const BorderRadius borderRadiusLg = BorderRadius.all(Radius.circular(radiusLg));
-  static const BorderRadius borderRadiusXl = BorderRadius.all(Radius.circular(radiusXl));
+  static const BorderRadius borderRadiusSm = BorderRadius.all(
+    Radius.circular(radiusSm),
+  );
+  static const BorderRadius borderRadiusMd = BorderRadius.all(
+    Radius.circular(radiusMd),
+  );
+  static const BorderRadius borderRadiusLg = BorderRadius.all(
+    Radius.circular(radiusLg),
+  );
+  static const BorderRadius borderRadiusXl = BorderRadius.all(
+    Radius.circular(radiusXl),
+  );
 
   /// Bottom sheet uses top-only radius
   static const BorderRadius borderRadiusBottomSheet = BorderRadius.vertical(
@@ -139,28 +156,28 @@ class DesignTokens {
   // ─────────────────────────────────────────────────────────────────────────
 
   static List<BoxShadow> get shadowSm => [
-        BoxShadow(
-          color: grayDark.withValues(alpha: 0.04),
-          blurRadius: 4,
-          offset: const Offset(0, 2),
-        ),
-      ];
+    BoxShadow(
+      color: grayDark.withValues(alpha: 0.04),
+      blurRadius: 4,
+      offset: const Offset(0, 2),
+    ),
+  ];
 
   static List<BoxShadow> get shadowMd => [
-        BoxShadow(
-          color: grayDark.withValues(alpha: 0.08),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ];
+    BoxShadow(
+      color: grayDark.withValues(alpha: 0.08),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    ),
+  ];
 
   static List<BoxShadow> get shadowLg => [
-        BoxShadow(
-          color: grayDark.withValues(alpha: 0.12),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ];
+    BoxShadow(
+      color: grayDark.withValues(alpha: 0.12),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+  ];
 
   // ─────────────────────────────────────────────────────────────────────────
   // ANIMATION DURATIONS

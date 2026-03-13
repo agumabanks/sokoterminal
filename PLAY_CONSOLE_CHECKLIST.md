@@ -6,7 +6,11 @@ This is the shortest safe path to shipping **Soko Seller Terminal** to paying se
 
 - [ ] `flutter analyze`
 - [ ] `flutter test`
+- [ ] `bash scripts/release_preflight.sh`
+- [ ] `bash scripts/play_submission_gate.sh`
+- [ ] `bash scripts/verify_play_reviewer_login.sh` (must pass)
 - [ ] Release signing configured (`android/key.properties` or CI env vars)
+- [ ] `googleMapsApiKey` configured (`android/key.properties` or `GOOGLE_MAPS_API_KEY`)
 - [ ] Build AAB: `flutter build appbundle --release`
 - [ ] Confirm API URL for this build:
   - [ ] `assets/config/.env` OR `--dart-define=API_BASE_URL=...`
@@ -19,6 +23,9 @@ This is the shortest safe path to shipping **Soko Seller Terminal** to paying se
 - [ ] Data Safety form completed (declare contacts usage if `READ_CONTACTS` is enabled)
 - [ ] Content rating completed
 - [ ] App access instructions for reviewers (seller test account + steps)
+  - [ ] `PLAY_REVIEWER_ACCESS.md` filled for this exact build/version
+  - [ ] PIN and password fallback both documented
+  - [ ] `PLAY_DATA_SAFETY_NOTES.md` matches submitted Data Safety answers
 
 ## C) Internal testing (fast sanity)
 
@@ -26,11 +33,13 @@ This is the shortest safe path to shipping **Soko Seller Terminal** to paying se
 - [ ] Install from Play
 - [ ] Verify core flows:
   - [ ] Login
+  - [ ] Login fallback works (`Use password instead` on PIN screen)
   - [ ] Sync pull works (products show)
   - [ ] POS sale → receipt number → print/share
   - [ ] Refund (manager PIN) → correct ledger/report
   - [ ] Void (manager PIN + reason code) → correct ledger/report
   - [ ] Expenses (if enabled) → reports reflect; cashouts link
+  - [ ] Expense + cash movement reach backend after `Sync now`
 
 ## D) Closed testing (pilot paying sellers)
 
@@ -45,4 +54,3 @@ This is the shortest safe path to shipping **Soko Seller Terminal** to paying se
 - [ ] 20% rollout for 24h
 - [ ] 50% rollout for 24–48h
 - [ ] 100% rollout when stable
-

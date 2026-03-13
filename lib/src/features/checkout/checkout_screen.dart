@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:drift/drift.dart' hide Column;
@@ -19,8 +18,10 @@ import '../../core/theme/design_tokens.dart';
 import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../widgets/offline_cached_image.dart';
 import 'cart_controller.dart';
 import 'parked_sales_controller.dart';
+import '../receipts/receipt_details_sheet.dart';
 import '../receipts/receipt_providers.dart';
 
 final itemsStreamProvider = StreamProvider<List<Item>>((ref) {
@@ -59,6 +60,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _query = '';
   bool _scanLocked = false;
   bool _syncingCatalog = false;
+  bool _checkingOut = false;
 
   @override
   void dispose() {
@@ -81,16 +83,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     setState(() => _syncingCatalog = true);
     try {
       final prefs = ref.read(sharedPreferencesProvider);
-      final staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
+      final staffInitialized =
+          prefs.getBool(posStaffInitializedPrefKey) ?? false;
       final connectivity = await Connectivity().checkConnectivity();
       final online = connectivity.any((r) => r != ConnectivityResult.none);
       if (online && staffInitialized) {
-        final token = await ref.read(secureStorageProvider).readPosSessionToken();
+        final token = await ref
+            .read(secureStorageProvider)
+            .readPosSessionToken();
         if (token == null || token.trim().isEmpty) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Staff login required to sync (enter cashier/manager PIN).'),
+              content: Text(
+                'Staff login required to sync (enter cashier/manager PIN).',
+              ),
             ),
           );
           context.go('/pos-login?redirect=/home');
@@ -102,22 +109,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       final items = await ref.read(appDatabaseProvider).getAllItems();
       final syncService = ref.read(syncServiceProvider);
       if (!context.mounted) return;
-      
+
       if (items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No products found - doing full sync…')),
         );
         await syncService.forceFullResync();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Syncing catalog…')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Syncing catalog…')));
         await syncService.syncNow();
       }
-      
+
       ref.invalidate(productsLastPulledAtProvider);
       if (!context.mounted) return;
-      
+
       // Check again if we now have products
       final newItems = await ref.read(appDatabaseProvider).getAllItems();
       if (!context.mounted) return;
@@ -145,19 +152,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final stocks = await db.getItemStocksForItem(item.id);
     if (!context.mounted) return null;
 
+    if (item.stockEnabled && item.stockQty <= 0) {
+      await _showOutOfStockAlert(context, item.name);
+      return null;
+    }
+
     if (stocks.isEmpty) {
       HapticFeedback.selectionClick();
       final msg = cartController.addItem(item: item);
       if (msg != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
       return item.name;
     }
 
     final hasChoices =
-        stocks.length > 1 || (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
+        stocks.length > 1 ||
+        (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
     if (!hasChoices) {
       HapticFeedback.selectionClick();
       final s = stocks.first;
@@ -166,8 +180,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         availableStock: s.stockQty,
       );
       if (msg != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
       return item.name;
@@ -189,15 +204,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           final outOfStock = item.stockEnabled && s.stockQty <= 0;
           return ListTile(
             title: Text(label, style: DesignTokens.textBodyBold),
-            subtitle: Text('Stock: ${s.stockQty}', style: DesignTokens.textSmall),
+            subtitle: Text(
+              'Stock: ${s.stockQty}',
+              style: DesignTokens.textSmall,
+            ),
             trailing: Text(s.price.toUgx(), style: DesignTokens.textBodyBold),
-            enabled: !outOfStock,
-            onTap: outOfStock
-                ? null
-                : () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).pop(s.variant);
-                  },
+            onTap: () async {
+              if (outOfStock) {
+                await _showOutOfStockAlert(
+                  context,
+                  '${item.name} • ${label == 'Default' ? 'default variant' : label}',
+                );
+                return;
+              }
+              HapticFeedback.selectionClick();
+              Navigator.of(context).pop(s.variant);
+            },
           );
         },
       ),
@@ -206,15 +228,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!context.mounted) return null;
     if (pickedVariant == null) return null;
     final normalized = pickedVariant.trim();
-    final pickedStock = stocks.firstWhere((e) => e.variant.trim() == normalized);
+    final pickedStock = stocks.firstWhere(
+      (e) => e.variant.trim() == normalized,
+    );
     if (normalized.isEmpty) {
       final msg = cartController.addItem(
         item: item,
         availableStock: pickedStock.stockQty,
       );
       if (msg != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
       return item.name;
@@ -226,13 +251,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       availableStock: pickedStock.stockQty,
     );
     if (msg != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (msg.startsWith('Out of stock')) return null;
     }
     return '${item.name} • $normalized';
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -374,17 +397,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       );
                     }
                     return SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 200,
-                        mainAxisSpacing: DesignTokens.spaceSm,
-                        crossAxisSpacing: DesignTokens.spaceSm,
-                        childAspectRatio: 0.8,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 200,
+                            mainAxisSpacing: DesignTokens.spaceSm,
+                            crossAxisSpacing: DesignTokens.spaceSm,
+                            childAspectRatio: 0.8,
+                          ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
                         final threshold = item.lowStockWarning ?? 5;
-                        final canSell =
-                            !item.stockEnabled || item.stockQty > 0;
+                        final outOfStock =
+                            item.stockEnabled && item.stockQty <= 0;
                         return _ProductTile(
                           name: item.name,
                           price: item.price,
@@ -392,11 +416,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           stockEnabled: item.stockEnabled,
                           lowStockThreshold: threshold,
                           imageUrl: item.imageUrl,
-                          onTap: canSell
-                              ? () {
-                                  unawaited(_addProduct(context, item));
-                                }
-                              : null,
+                          onTap: () {
+                            if (outOfStock) {
+                              unawaited(
+                                _showOutOfStockAlert(context, item.name),
+                              );
+                              return;
+                            }
+                            unawaited(_addProduct(context, item));
+                          },
                         );
                       }, childCount: filtered.length),
                     );
@@ -421,7 +449,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   }
                   final filtered = _query.isEmpty
                       ? services
-                      : services.where((s) => _matchesService(s, _query)).toList();
+                      : services
+                            .where((s) => _matchesService(s, _query))
+                            .toList();
                   return SliverMainAxisGroup(
                     slivers: [
                       SliverToBoxAdapter(
@@ -432,7 +462,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             DesignTokens.spaceMd,
                             DesignTokens.spaceSm,
                           ),
-                          child: Text('Services', style: DesignTokens.textBodyBold),
+                          child: Text(
+                            'Services',
+                            style: DesignTokens.textBodyBold,
+                          ),
                         ),
                       ),
                       if (filtered.isEmpty)
@@ -447,19 +480,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             horizontal: DesignTokens.spaceMd,
                           ),
                           sliver: SliverGrid(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 200,
-                              mainAxisSpacing: DesignTokens.spaceSm,
-                              crossAxisSpacing: DesignTokens.spaceSm,
-                              childAspectRatio: 0.85,
-                            ),
-                            delegate: SliverChildBuilderDelegate((context, index) {
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 200,
+                                  mainAxisSpacing: DesignTokens.spaceSm,
+                                  crossAxisSpacing: DesignTokens.spaceSm,
+                                  childAspectRatio: 0.85,
+                                ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
                               final service = filtered[index];
                               return _ServiceCard(
                                 title: service.title,
                                 price: service.price,
+                                imageUrl: service.imageUrl,
                                 description: service.description,
-                                onTap: () => _addServiceWithVariantPicker(context, service),
+                                onTap: () => _addServiceWithVariantPicker(
+                                  context,
+                                  service,
+                                ),
                               );
                             }, childCount: filtered.length),
                           ),
@@ -467,10 +508,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ],
                   );
                 },
-                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                error: (e, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                loading: () =>
+                    const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (e, _) =>
+                    const SliverToBoxAdapter(child: SizedBox.shrink()),
               ),
-
 
               // Bottom padding
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -486,12 +528,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             parkedCount: parked.length,
             onSelectCustomer: () => _selectCustomer(context),
             onUpdateQuantity: (id, quantity) async {
-              final msg =
-                  await cartController.updateQuantityWithFreshStock(id, quantity);
+              final msg = await cartController.updateQuantityWithFreshStock(
+                id,
+                quantity,
+              );
               if (msg == null) return;
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(msg)));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(msg)));
             },
             onEditPrice: (line) => _showPriceOverride(context, line),
             onPark: () => _showParkSale(context, ref),
@@ -563,19 +608,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// - 0 variants: use base service price
   /// - 1 variant: auto-use that variant
   /// - 2+ variants: show 1-tap picker
-  Future<void> _addServiceWithVariantPicker(BuildContext context, Service service) async {
+  Future<void> _addServiceWithVariantPicker(
+    BuildContext context,
+    Service service,
+  ) async {
     final db = ref.read(appDatabaseProvider);
     final cartController = ref.read(cartControllerProvider.notifier);
-    
+
     final variants = await db.getServiceVariantsForService(service.id);
-    
+
     // No variants: use base price
     if (variants.isEmpty) {
       HapticFeedback.selectionClick();
       cartController.addService(service: service);
       return;
     }
-    
+
     // Single variant: auto-use it
     if (variants.length == 1) {
       final v = variants.first;
@@ -587,7 +635,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       );
       return;
     }
-    
+
     // Multiple variants: show picker
     if (!context.mounted) return;
     final picked = await BottomSheetModal.show<ServiceVariant>(
@@ -627,7 +675,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         },
       ),
     );
-    
+
     if (picked == null || !context.mounted) return;
     cartController.addService(
       service: service,
@@ -663,8 +711,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cartController = ref.read(cartControllerProvider.notifier);
 
     // Prefer variant SKU matches (more specific than product SKU/barcode).
-    final stockMatches =
-        await (db.select(db.itemStocks)..where((t) => t.sku.equals(code))).get();
+    final stockMatches = await (db.select(
+      db.itemStocks,
+    )..where((t) => t.sku.equals(code))).get();
     if (stockMatches.isNotEmpty) {
       String? addedLabel;
       if (stockMatches.length == 1) {
@@ -678,8 +727,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             );
             if (msg != null) {
               if (!mounted) return;
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(msg)));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(msg)));
               if (msg.startsWith('Out of stock')) return;
             }
             addedLabel = item.name;
@@ -692,8 +742,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             );
             if (msg != null) {
               if (!mounted) return;
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text(msg)));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(msg)));
               if (msg.startsWith('Out of stock')) return;
             }
             addedLabel = '${item.name} • ${stock.variant.trim()}';
@@ -716,14 +767,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 future: db.getItemById(s.itemId),
                 builder: (context, snap) {
                   final name = snap.data?.name ?? s.itemId;
-                  final label = s.variant.trim().isEmpty ? 'Default' : s.variant.replaceAll('-', ' • ');
-                  final enabled = !(snap.data?.stockEnabled ?? true) || s.stockQty > 0;
+                  final label = s.variant.trim().isEmpty
+                      ? 'Default'
+                      : s.variant.replaceAll('-', ' • ');
+                  final enabled =
+                      !(snap.data?.stockEnabled ?? true) || s.stockQty > 0;
                   return ListTile(
                     title: Text(name, style: DesignTokens.textBodyBold),
-                    subtitle: Text('$label • Stock ${s.stockQty}', style: DesignTokens.textSmall),
-                    trailing: Text(s.price.toUgx(), style: DesignTokens.textSmallBold),
-                    enabled: enabled,
-                    onTap: enabled ? () => Navigator.of(context).pop(s) : null,
+                    subtitle: Text(
+                      '$label • Stock ${s.stockQty}',
+                      style: DesignTokens.textSmall,
+                    ),
+                    trailing: Text(
+                      s.price.toUgx(),
+                      style: DesignTokens.textSmallBold,
+                    ),
+                    onTap: () async {
+                      if (!enabled) {
+                        await _showOutOfStockAlert(
+                          context,
+                          '$name • ${label == 'Default' ? 'default variant' : label}',
+                        );
+                        return;
+                      }
+                      Navigator.of(context).pop(s);
+                    },
                   );
                 },
               );
@@ -740,8 +808,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               );
               if (msg != null) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text(msg)));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(msg)));
                 if (msg.startsWith('Out of stock')) return;
               }
               addedLabel = item.name;
@@ -754,8 +823,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               );
               if (msg != null) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text(msg)));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(msg)));
                 if (msg.startsWith('Out of stock')) return;
               }
               addedLabel = '${item.name} • ${picked.variant.trim()}';
@@ -806,6 +876,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       SnackBar(
         content: Text('Added "$addedLabel"'),
         backgroundColor: DesignTokens.brandAccent,
+      ),
+    );
+  }
+
+  Future<void> _showOutOfStockAlert(BuildContext context, String itemLabel) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Out of stock'),
+        content: Text('$itemLabel is currently out of stock.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }
@@ -972,7 +1058,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: DesignTokens.spaceSm),
                 Text(
                   error!,
-                  style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.error,
+                  ),
                 ),
               ],
               const SizedBox(height: DesignTokens.spaceLg),
@@ -1001,7 +1089,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           CustomersCompanion.insert(
                             id: Value(id),
                             name: name,
-                            phone: phone.isEmpty ? const Value.absent() : Value(phone),
+                            phone: phone.isEmpty
+                                ? const Value.absent()
+                                : Value(phone),
                             synced: const Value(false),
                             updatedAt: Value(now),
                           ),
@@ -1010,27 +1100,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         // Try immediate cloud sync; fallback to outbox when offline or blocked.
                         try {
                           final api = ref.read(sellerApiProvider);
-                          final res = await api.pushCustomer(
-                            {
-                              'customer_id': id,
-                              'display_name': name,
-                              if (phone.isNotEmpty) 'phone': phone,
-                              if (phone.isNotEmpty) 'phones': [phone],
-                              'emails': const [],
-                              'source': 'pos_terminal',
-                              'shared_with_business': true,
-                            },
-                            idempotencyKey: id,
-                          );
+                          final res = await api.pushCustomer({
+                            'customer_id': id,
+                            'display_name': name,
+                            if (phone.isNotEmpty) 'phone': phone,
+                            if (phone.isNotEmpty) 'phones': [phone],
+                            'emails': const [],
+                            'source': 'pos_terminal',
+                            'shared_with_business': true,
+                          }, idempotencyKey: id);
 
-                          final data =
-                              res.data is Map ? Map<String, dynamic>.from(res.data as Map) : null;
+                          final data = res.data is Map
+                              ? Map<String, dynamic>.from(res.data as Map)
+                              : null;
                           final remoteId = data?['contact_id']?.toString();
                           final updatedAt = DateTime.tryParse(
                             data?['updated_at']?.toString() ?? '',
                           )?.toUtc();
 
-                          await (db.update(db.customers)..where((t) => t.id.equals(id))).write(
+                          await (db.update(
+                            db.customers,
+                          )..where((t) => t.id.equals(id))).write(
                             CustomersCompanion(
                               remoteId: remoteId == null
                                   ? const Value.absent()
@@ -1083,9 +1173,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!context.mounted) return;
     if (!ok) return;
 
-    final priceCtrl = TextEditingController(
-      text: line.price.formatCommas(),
-    );
+    final priceCtrl = TextEditingController(text: line.price.formatCommas());
     final newPrice = await BottomSheetModal.show<double>(
       context: context,
       title: 'Price Override',
@@ -1167,12 +1255,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               _selectCustomer(rootContext);
             },
             onUpdateQuantity: (id, quantity) async {
-              final msg =
-                  await cartController.updateQuantityWithFreshStock(id, quantity);
+              final msg = await cartController.updateQuantityWithFreshStock(
+                id,
+                quantity,
+              );
               if (msg == null) return;
               if (!rootContext.mounted) return;
-              ScaffoldMessenger.of(rootContext)
-                  .showSnackBar(SnackBar(content: Text(msg)));
+              ScaffoldMessenger.of(
+                rootContext,
+              ).showSnackBar(SnackBar(content: Text(msg)));
             },
             onEditPrice: (line) {
               Navigator.of(sheetContext).pop();
@@ -1197,8 +1288,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _handleCheckout(BuildContext context, WidgetRef ref) async {
+    if (_checkingOut) return;
     final cart = ref.read(cartControllerProvider);
     if (cart.lines.isEmpty) return;
+    setState(() => _checkingOut = true);
+    try {
+      await _handleCheckoutInner(context, ref, cart);
+    } finally {
+      if (mounted) setState(() => _checkingOut = false);
+    }
+  }
+
+  Future<void> _handleCheckoutInner(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cart,
+  ) async {
 
     final total = cart.subtotal;
     final prefs = ref.read(sharedPreferencesProvider);
@@ -1211,7 +1316,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Staff login required to sync sales. Enter cashier PIN to continue.'),
+            content: Text(
+              'Staff login required to sync sales. Enter cashier PIN to continue.',
+            ),
           ),
         );
         context.go('/pos-login?redirect=/home');
@@ -1303,8 +1410,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         payments = [CheckoutPayment(method: 'cash', amount: total)];
         if ((received - total).abs() > 0.01) {
           final change = (received - total).clamp(0, double.infinity);
-          note =
-              'Cash received ${received.toUgx()} • Change ${change.toUgx()}';
+          note = 'Cash received ${received.toUgx()} • Change ${change.toUgx()}';
         }
         break;
       case 'mobile_money':
@@ -1474,6 +1580,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              BottomSheetModal.show(
+                context: context,
+                title: 'Receipt',
+                subtitle: entryId,
+                child: ReceiptDetailsSheet(entryId: entryId),
+              );
+            },
+            icon: const Icon(Icons.receipt_long),
+            label: const Text('View details'),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final sent = await _sendCustomerReceiptSms(context, ref, entryId);
+              if (sent && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: const Icon(Icons.sms_outlined),
+            label: const Text('Send SMS receipt'),
+          ),
+          const SizedBox(height: DesignTokens.spaceSm),
+          OutlinedButton.icon(
             onPressed: () async {
               await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
               if (context.mounted) Navigator.of(context).pop();
@@ -1493,6 +1624,107 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ],
       ),
     );
+  }
+
+  Future<bool> _sendCustomerReceiptSms(
+    BuildContext context,
+    WidgetRef ref,
+    String entryId,
+  ) async {
+    final db = ref.read(appDatabaseProvider);
+    final bundle = await db.fetchLedgerEntryBundle(entryId);
+    if (bundle == null) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Receipt details are not available yet')),
+      );
+      return false;
+    }
+
+    final customerId = bundle.entry.customerId;
+    if (customerId == null || customerId.trim().isEmpty) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Attach a customer with a phone number to send SMS'),
+        ),
+      );
+      return false;
+    }
+
+    final customer = await (db.select(
+      db.customers,
+    )..where((t) => t.id.equals(customerId))).getSingleOrNull();
+    final phone = (customer?.phone ?? '').trim();
+    if (phone.isEmpty) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The selected customer does not have a phone number'),
+        ),
+      );
+      return false;
+    }
+
+    final payload = <String, dynamic>{
+      'phone': phone,
+      'context': 'pos_receipt',
+      'customer_id': customerId,
+      'customer_name': customer?.name ?? 'Customer',
+      'reference': bundle.entry.receiptNumber ?? entryId,
+      'entry_id': entryId,
+      'total': bundle.entry.total,
+    };
+    final idempotencyKey = _uuid.v4();
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity.any((r) => r != ConnectivityResult.none);
+
+    if (!online) {
+      await ref.read(syncServiceProvider).enqueue('sms_send', {
+        ...payload,
+        'idempotency_key': idempotencyKey,
+      });
+      if (!context.mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'SMS receipt queued. It will send when the terminal reconnects.',
+          ),
+        ),
+      );
+      return true;
+    }
+
+    try {
+      final res = await ref
+          .read(sellerApiProvider)
+          .sendSingleSms(payload, idempotencyKey: idempotencyKey);
+      final body = res.data is Map<String, dynamic>
+          ? Map<String, dynamic>.from(res.data as Map<String, dynamic>)
+          : const <String, dynamic>{};
+      final data = body['data'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(body['data'] as Map<String, dynamic>)
+          : const <String, dynamic>{};
+      if (!context.mounted) return true;
+      final remainingCredits = data['remaining_credits']?.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            remainingCredits == null
+                ? 'SMS receipt sent'
+                : 'SMS receipt sent. Remaining credits: $remainingCredits',
+          ),
+          backgroundColor: DesignTokens.brandAccent,
+        ),
+      );
+      return true;
+    } catch (e) {
+      if (!context.mounted) return false;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send SMS receipt: $e')));
+      return false;
+    }
   }
 
   Future<double?> _cashReceivedFlow(
@@ -1747,19 +1979,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(height: DesignTokens.spaceSm),
-	                  ...drafts.asMap().entries.map((entry) {
-	                  final index = entry.key;
-	                  final draft = entry.value;
-	                  final showRef = draft.method != 'cash';
-	                  final methods = _paymentMethods(
-                        hasCustomer: hasCustomer,
-                        paymentSettings: paymentSettings,
-                      );
-	                  final methodValue = methods.any((m) => m.$1 == draft.method)
-	                      ? draft.method
-	                      : methods.first.$1;
-	                  draft.method = methodValue;
-	                  return Container(
+                ...drafts.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final draft = entry.value;
+                  final showRef = draft.method != 'cash';
+                  final methods = _paymentMethods(
+                    hasCustomer: hasCustomer,
+                    paymentSettings: paymentSettings,
+                  );
+                  final methodValue = methods.any((m) => m.$1 == draft.method)
+                      ? draft.method
+                      : methods.first.$1;
+                  draft.method = methodValue;
+                  return Container(
                     margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
                     padding: DesignTokens.paddingMd,
                     decoration: BoxDecoration(
@@ -1771,14 +2003,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       children: [
                         Row(
                           children: [
-	                            Expanded(
-	                              child: DropdownButtonFormField<String>(
-	                                initialValue: methodValue,
-	                                items: methods
-	                                    .map(
-	                                      (m) => DropdownMenuItem(
-	                                        value: m.$1,
-	                                        child: Text(m.$2),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: methodValue,
+                                items: methods
+                                    .map(
+                                      (m) => DropdownMenuItem(
+                                        value: m.$1,
+                                        child: Text(m.$2),
                                       ),
                                     )
                                     .toList(),
@@ -1848,7 +2080,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       paymentSettings: paymentSettings,
                     );
                     final method =
-                        methods.where((m) => m.$1 != 'credit').firstOrNull?.$1 ??
+                        methods
+                            .where((m) => m.$1 != 'credit')
+                            .firstOrNull
+                            ?.$1 ??
                         'card';
                     drafts.add(
                       _PaymentDraft(
@@ -1964,10 +2199,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   '${cart.lines.length} items',
                   style: DesignTokens.textBody,
                 ),
-                Text(
-                  cart.subtotal.toUgx(),
-                  style: DesignTokens.textBodyBold,
-                ),
+                Text(cart.subtotal.toUgx(), style: DesignTokens.textBodyBold),
               ],
             ),
           ),
@@ -2219,7 +2451,9 @@ class _ProductTile extends StatelessWidget {
     final effectiveStock = stockEnabled ? stock : null;
     final outOfStock = effectiveStock != null && effectiveStock <= 0;
     final lowStock =
-        effectiveStock != null && effectiveStock > 0 && effectiveStock <= lowStockThreshold;
+        effectiveStock != null &&
+        effectiveStock > 0 &&
+        effectiveStock <= lowStockThreshold;
     final isDisabled = onTap == null;
 
     return Opacity(
@@ -2227,70 +2461,70 @@ class _ProductTile extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-        decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite,
-          borderRadius: DesignTokens.borderRadiusMd,
-          boxShadow: DesignTokens.shadowSm,
-          border: outOfStock
-              ? Border.all(color: DesignTokens.error.withValues(alpha: 0.55))
-              : lowStock
-                  ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
-                  : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(DesignTokens.radiusMd),
-                ),
-                child: _buildImage(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(DesignTokens.spaceSm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: DesignTokens.textSmall.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: DesignTokens.grayDark,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+          decoration: BoxDecoration(
+            color: DesignTokens.surfaceWhite,
+            borderRadius: DesignTokens.borderRadiusMd,
+            boxShadow: DesignTokens.shadowSm,
+            border: outOfStock
+                ? Border.all(color: DesignTokens.error.withValues(alpha: 0.55))
+                : lowStock
+                ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(DesignTokens.radiusMd),
                   ),
-                  const SizedBox(height: DesignTokens.spaceXxs),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        price.toUgx(),
-                        style: DesignTokens.textSmall.copyWith(
-                          color: DesignTokens.brandAccent,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  child: _buildImage(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(DesignTokens.spaceSm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: DesignTokens.textSmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: DesignTokens.grayDark,
                       ),
-                      if (effectiveStock != null)
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: DesignTokens.spaceXxs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text(
-                          outOfStock ? 'OUT' : '$effectiveStock',
+                          price.toUgx(),
                           style: DesignTokens.textSmall.copyWith(
-                            color: outOfStock
-                                ? DesignTokens.error
-                                : lowStock
-                                    ? DesignTokens.warning
-                                    : DesignTokens.grayMedium,
+                            color: DesignTokens.brandAccent,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                    ],
-                  ),
-                ],
+                        if (effectiveStock != null)
+                          Text(
+                            outOfStock ? 'OUT' : '$effectiveStock',
+                            style: DesignTokens.textSmall.copyWith(
+                              color: outOfStock
+                                  ? DesignTokens.error
+                                  : lowStock
+                                  ? DesignTokens.warning
+                                  : DesignTokens.grayMedium,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -2300,38 +2534,28 @@ class _ProductTile extends StatelessWidget {
     final raw = imageUrl?.trim();
     if (raw == null || raw.isEmpty) return _buildPlaceholder();
 
-    final uri = Uri.tryParse(raw);
-    final scheme = uri?.scheme.toLowerCase() ?? '';
-    final isNetwork = scheme == 'http' || scheme == 'https';
-    if (isNetwork) {
-      return Image.network(
-        raw,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(),
-        loadingBuilder: (context, child, event) {
-          if (event == null) return child;
-          return const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        },
-      );
-    }
-
-    final filePath = scheme == 'file' ? uri!.toFilePath() : raw;
-    return Image.file(
-      File(filePath),
+    return OfflineCachedImage(
+      imageUrl: raw,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildPlaceholder(),
+      placeholder: const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: _buildPlaceholder(),
     );
   }
 
   Widget _buildPlaceholder() {
     final color = Colors.primaries[name.hashCode % Colors.primaries.length];
-    final initials = name.trim().split(' ').take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join();
+    final initials = name
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
+        .join();
     return Container(
       color: color.withValues(alpha: 0.1),
       alignment: Alignment.center,
@@ -2347,12 +2571,14 @@ class _ServiceCard extends StatelessWidget {
   const _ServiceCard({
     required this.title,
     required this.price,
+    this.imageUrl,
     this.description,
     this.onTap,
   });
 
   final String title;
   final double price;
+  final String? imageUrl;
   final String? description;
   final VoidCallback? onTap;
 
@@ -2376,15 +2602,38 @@ class _ServiceCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(DesignTokens.radiusMd),
                 ),
-                child: Container(
-                  color: color.withValues(alpha: 0.1),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.room_service_outlined,
-                    size: 36,
-                    color: color,
-                  ),
-                ),
+                child: (imageUrl?.trim().isNotEmpty ?? false)
+                    ? OfflineCachedImage(
+                        imageUrl: imageUrl!.trim(),
+                        fit: BoxFit.cover,
+                        placeholder: Container(
+                          color: color.withValues(alpha: 0.1),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.room_service_outlined,
+                            size: 36,
+                            color: color,
+                          ),
+                        ),
+                        errorWidget: Container(
+                          color: color.withValues(alpha: 0.1),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.room_service_outlined,
+                            size: 36,
+                            color: color,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: color.withValues(alpha: 0.1),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.room_service_outlined,
+                          size: 36,
+                          color: color,
+                        ),
+                      ),
               ),
             ),
             Padding(
@@ -2658,10 +2907,7 @@ class _CartItem extends StatelessWidget {
                   Text(title, style: DesignTokens.textBody),
                   Row(
                     children: [
-                      Text(
-                        price.toUgx(),
-                        style: DesignTokens.textSmall,
-                      ),
+                      Text(price.toUgx(), style: DesignTokens.textSmall),
                       if (availableStock != null) ...[
                         const SizedBox(width: DesignTokens.spaceXs),
                         Text(
@@ -2952,14 +3198,15 @@ class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet> {
                 HapticFeedback.mediumImpact();
                 Navigator.of(context).pop(code.trim());
               },
-              errorBuilder: (BuildContext context, MobileScannerException error) {
-                return Center(
-                  child: Text(
-                    'Camera unavailable',
-                    style: DesignTokens.textBody,
-                  ),
-                );
-              },
+              errorBuilder:
+                  (BuildContext context, MobileScannerException error) {
+                    return Center(
+                      child: Text(
+                        'Camera unavailable',
+                        style: DesignTokens.textBody,
+                      ),
+                    );
+                  },
             ),
           ),
         ),

@@ -36,9 +36,9 @@ class ShiftsScreen extends ConsumerWidget {
             tooltip: 'Sync now',
             icon: const Icon(Icons.sync),
             onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sync started…')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Sync started…')));
               await ref.read(syncServiceProvider).syncNow();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
@@ -68,7 +68,9 @@ class ShiftsScreen extends ConsumerWidget {
             data: (rows) => rows.isEmpty
                 ? _EmptyMovements()
                 : Column(
-                    children: rows.map((m) => _MovementTile(movement: m)).toList(),
+                    children: rows
+                        .map((m) => _MovementTile(movement: m))
+                        .toList(),
                   ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text('Failed to load cash movements: $e'),
@@ -102,7 +104,10 @@ class _ShiftStatusCard extends ConsumerWidget {
                 color: DesignTokens.grayLight.withValues(alpha: 0.4),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
-              child: const Icon(Icons.lock_clock, color: DesignTokens.grayMedium),
+              child: const Icon(
+                Icons.lock_clock,
+                color: DesignTokens.grayMedium,
+              ),
             ),
             const SizedBox(width: DesignTokens.spaceMd),
             Expanded(
@@ -166,16 +171,28 @@ class _ShiftStatusCard extends ConsumerWidget {
               }
               final summary = snapshot.data;
               if (summary == null) {
-                return Text('Cash summary unavailable', style: DesignTokens.textSmallLight);
+                return Text(
+                  'Cash summary unavailable',
+                  style: DesignTokens.textSmallLight,
+                );
               }
 
               return Row(
                 children: [
-                  _MetricPill(label: 'Opening', value: 'UGX ${summary.opening.toStringAsFixed(0)}'),
+                  _MetricPill(
+                    label: 'Opening',
+                    value: 'UGX ${summary.opening.toStringAsFixed(0)}',
+                  ),
                   const SizedBox(width: DesignTokens.spaceSm),
-                  _MetricPill(label: 'Cash sales', value: 'UGX ${summary.cashSales.toStringAsFixed(0)}'),
+                  _MetricPill(
+                    label: 'Cash sales',
+                    value: 'UGX ${summary.cashSales.toStringAsFixed(0)}',
+                  ),
                   const SizedBox(width: DesignTokens.spaceSm),
-                  _MetricPill(label: 'Net in/out', value: 'UGX ${summary.netMovements.toStringAsFixed(0)}'),
+                  _MetricPill(
+                    label: 'Net in/out',
+                    value: 'UGX ${summary.netMovements.toStringAsFixed(0)}',
+                  ),
                 ],
               );
             },
@@ -187,7 +204,9 @@ class _ShiftStatusCard extends ConsumerWidget {
               final expected = snapshot.data?.expected ?? shift!.openingFloat;
               return Text(
                 'Expected cash now: UGX ${expected.toStringAsFixed(0)}',
-                style: DesignTokens.textBodyLight.copyWith(fontWeight: FontWeight.w700),
+                style: DesignTokens.textBodyLight.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               );
             },
           ),
@@ -247,7 +266,9 @@ class _MetricPill extends StatelessWidget {
             const SizedBox(height: DesignTokens.spaceXxs),
             Text(
               value,
-              style: DesignTokens.textBodyLight.copyWith(fontWeight: FontWeight.w700),
+              style: DesignTokens.textBodyLight.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -282,7 +303,9 @@ class _ActionsCard extends ConsumerWidget {
               onPressed: () => _openShiftSheet(context, ref),
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('Open shift'),
-              style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+              ),
             )
           else ...[
             Row(
@@ -325,7 +348,9 @@ class _ActionsCard extends ConsumerWidget {
               onPressed: () => _closeShiftSheet(context, ref, openShift!),
               icon: const Icon(Icons.stop_circle_outlined),
               label: const Text('Close shift'),
-              style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.error,
+              ),
             ),
           ],
         ],
@@ -456,11 +481,16 @@ class _ActionsCard extends ConsumerWidget {
                   if (amount <= 0) return;
 
                   final note = noteCtrl.text.trim();
-                  final storedNote = note.isEmpty ? '[$category]' : '[$category] $note';
+                  final storedNote = note.isEmpty
+                      ? '[$category]'
+                      : '[$category] $note';
 
                   final db = ref.read(appDatabaseProvider);
                   final outletId = (await db.getPrimaryOutlet())?.id;
-                  final staffId = ref.read(posSessionProvider).staffId?.toString();
+                  final staffId = ref
+                      .read(posSessionProvider)
+                      .staffId
+                      ?.toString();
 
                   final occurredAt = DateTime.now().toUtc();
                   String? linkedExpenseId;
@@ -495,7 +525,8 @@ class _ActionsCard extends ConsumerWidget {
                         action: 'cash_movement_$type',
                         payload: {
                           'movement_id': movementId,
-                          if (linkedExpenseId != null) 'linked_expense_id': linkedExpenseId,
+                          if (linkedExpenseId != null)
+                            'linked_expense_id': linkedExpenseId,
                           'amount': amount,
                           'tag': category,
                           'note': note,
@@ -509,7 +540,9 @@ class _ActionsCard extends ConsumerWidget {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${type == 'withdrawal' ? 'Cash out' : 'Cash in'} recorded'),
+                      content: Text(
+                        '${type == 'withdrawal' ? 'Cash out' : 'Cash in'} recorded',
+                      ),
                       backgroundColor: DesignTokens.brandAccent,
                     ),
                   );
@@ -639,7 +672,9 @@ class _MovementTile extends StatelessWidget {
           children: [
             Text(
               'UGX ${movement.amount.toStringAsFixed(0)}',
-              style: DesignTokens.textBodyBold.copyWith(color: isOut ? DesignTokens.error : DesignTokens.grayDark),
+              style: DesignTokens.textBodyBold.copyWith(
+                color: isOut ? DesignTokens.error : DesignTokens.grayDark,
+              ),
             ),
             const SizedBox(height: DesignTokens.spaceXxs),
             Text(time, style: DesignTokens.textSmall),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
+import '../../core/util/phone_normalizer.dart';
 import 'auth_controller.dart';
 
 class StaffLoginScreen extends ConsumerStatefulWidget {
@@ -36,8 +38,12 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
     });
 
     try {
-      final phone = _phoneController.text.trim();
+      final phone = normalizeUgPhone(_phoneController.text.trim());
       final pin = _pinController.text.trim();
+
+      if (phone.isEmpty) {
+        throw Exception('Invalid phone number');
+      }
 
       // Get dependencies
       final sellerApi = ref.read(sellerApiProvider);
@@ -73,15 +79,22 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
       await secureStorage.writeAccessToken(token);
       await ref.read(authControllerProvider.notifier).bootstrap();
       await secureStorage.write(key: 'staff_shop_id', value: shopId);
-      await secureStorage.write(key: 'staff_id', value: staff?['id']?.toString() ?? '');
-      await secureStorage.write(key: 'staff_name', value: staff?['name']?.toString() ?? '');
+      await secureStorage.write(
+        key: 'staff_id',
+        value: staff?['id']?.toString() ?? '',
+      );
+      await secureStorage.write(
+        key: 'staff_name',
+        value: staff?['name']?.toString() ?? '',
+      );
       await secureStorage.write(key: 'staff_phone', value: phone);
       await secureStorage.write(key: 'login_type', value: 'staff');
 
       if (!mounted) return;
 
       // Navigate to home
-      Navigator.of(context).pushReplacementNamed('/home');
+      if (!mounted) return;
+      context.go('/home/checkout');
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
@@ -168,8 +181,13 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 18),
                     decoration: InputDecoration(
                       labelText: 'Phone Number',
-                      labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                      prefixIcon: const Icon(Icons.phone, color: Colors.white70),
+                      labelStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.phone,
+                        color: Colors.white70,
+                      ),
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.1),
                       border: OutlineInputBorder(
@@ -178,11 +196,16 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Colors.blue, width: 2),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 2,
+                        ),
                       ),
                     ),
                     validator: (value) {
@@ -207,8 +230,13 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
                     ],
                     decoration: InputDecoration(
                       labelText: '6-Digit PIN',
-                      labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
-                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                      labelStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.lock_outline,
+                        color: Colors.white70,
+                      ),
                       counterText: '',
                       filled: true,
                       fillColor: Colors.white.withOpacity(0.1),
@@ -218,11 +246,16 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Colors.blue, width: 2),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 2,
+                        ),
                       ),
                     ),
                     validator: (value) {
@@ -248,12 +281,19 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _errorMessage!,
-                              style: const TextStyle(color: Colors.red, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ],

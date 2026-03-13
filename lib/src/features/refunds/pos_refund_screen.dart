@@ -33,7 +33,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   bool _searching = false;
   List<LedgerEntry> _searchResults = [];
   String? _error;
-  
+
   // Refund amounts per line (key: line id)
   final Map<int, int> _refundQuantities = {};
   final _noteCtrl = TextEditingController();
@@ -54,7 +54,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
       });
       return;
     }
-    
+
     setState(() {
       _searching = true;
       _error = null;
@@ -78,7 +78,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         q.where((t) => t.idempotencyKey.like('%$trimmed%'));
       }
       final results = await q.get();
-      
+
       setState(() {
         _searchResults = results;
         _searching = false;
@@ -95,10 +95,10 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
     setState(() => _loading = true);
     try {
       final db = ref.read(appDatabaseProvider);
-      final lines = await (db.select(db.ledgerLines)
-        ..where((t) => t.entryId.equals(sale.id)))
-        .get();
-      
+      final lines = await (db.select(
+        db.ledgerLines,
+      )..where((t) => t.entryId.equals(sale.id))).get();
+
       setState(() {
         _selectedSale = sale;
         _saleLines = lines;
@@ -130,7 +130,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
 
   Future<void> _processRefund() async {
     if (_selectedSale == null || _refundTotal <= 0) return;
-    
+
     setState(() => _loading = true);
     try {
       final approved = await requireManagerPin(
@@ -146,12 +146,13 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
       final db = ref.read(appDatabaseProvider);
       final sync = ref.read(syncServiceProvider);
       final actorStaffId =
-          ref.read(posSessionProvider).staffId?.toString() ?? _selectedSale!.staffId;
-      
+          ref.read(posSessionProvider).staffId?.toString() ??
+          _selectedSale!.staffId;
+
       final refundId = const Uuid().v4();
       final idempotencyKey = 'refund_$refundId';
       final occurredAt = DateTime.now().toUtc();
-      
+
       // Build refund lines (store positive amounts; entry type indicates refund).
       final lineRows = <LedgerLinesCompanion>[];
       final apiLines = <Map<String, dynamic>>[];
@@ -184,7 +185,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           'subtotal': lineTotal,
         });
       }
-      
+
       // Get next receipt number for refund
       final receiptNumber = await db.getNextReceiptNumber();
       final outletId =
@@ -234,7 +235,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           variant: line.variant ?? '',
         );
       }
-      
+
       // Queue sync
       await sync.enqueue('ledger_push', {
         'entry_id': refundId,
@@ -266,16 +267,18 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         },
       );
       unawaited(sync.syncNow());
-      
+
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Refund of ${NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0).format(_refundTotal)} processed'),
+          content: Text(
+            'Refund of ${NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0).format(_refundTotal)} processed',
+          ),
           backgroundColor: DesignTokens.success,
         ),
       );
-      
+
       Navigator.pop(context, true);
     } catch (e) {
       setState(() {
@@ -289,12 +292,8 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: const Text('Process Refund'),
-      ),
-      body: _selectedSale == null 
-          ? _buildSearchView() 
-          : _buildRefundView(),
+      appBar: AppBar(title: const Text('Process Refund')),
+      body: _selectedSale == null ? _buildSearchView() : _buildRefundView(),
     );
   }
 
@@ -322,8 +321,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                 onRetry: () => _searchReceipts(_searchCtrl.text),
               ),
             )
-          else
-          if (_searching)
+          else if (_searching)
             const Center(child: CircularProgressIndicator())
           else if (_searchResults.isEmpty && _searchCtrl.text.isNotEmpty)
             Center(
@@ -331,7 +329,11 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
-                    Icon(Icons.search_off, size: 48, color: DesignTokens.grayMedium),
+                    Icon(
+                      Icons.search_off,
+                      size: 48,
+                      color: DesignTokens.grayMedium,
+                    ),
                     const SizedBox(height: 12),
                     Text('No sales found', style: DesignTokens.textBody),
                   ],
@@ -354,9 +356,12 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   }
 
   Widget _buildRefundView() {
-    final currencyFormat = NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      symbol: 'UGX ',
+      decimalDigits: 0,
+    );
     final dateFormat = DateFormat('MMM dd, yyyy HH:mm');
-    
+
     return Column(
       children: [
         // Original sale info
@@ -379,7 +384,9 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                     ),
                     Text(
                       dateFormat.format(_selectedSale!.createdAt.toLocal()),
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                     ),
                   ],
                 ),
@@ -392,7 +399,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           ),
         ),
         const Divider(height: 1),
-        
+
         // Lines to refund
         Expanded(
           child: _loading
@@ -411,7 +418,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
                   ),
                 ),
         ),
-        
+
         // Refund note
         Container(
           padding: DesignTokens.paddingScreen,
@@ -422,7 +429,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
             maxLines: 2,
           ),
         ),
-        
+
         // Footer
         Container(
           padding: DesignTokens.paddingScreen,
@@ -463,15 +470,18 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
 
 class _SaleCard extends StatelessWidget {
   const _SaleCard({required this.sale, this.onTap});
-  
+
   final LedgerEntry sale;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(
+      symbol: 'UGX ',
+      decimalDigits: 0,
+    );
     final dateFormat = DateFormat('MMM dd, HH:mm');
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -502,15 +512,18 @@ class _RefundLineCard extends StatelessWidget {
     required this.refundQty,
     required this.onQtyChanged,
   });
-  
+
   final LedgerLine line;
   final int refundQty;
   final ValueChanged<int> onQtyChanged;
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0);
-    
+    final currencyFormat = NumberFormat.currency(
+      symbol: 'UGX ',
+      decimalDigits: 0,
+    );
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -524,7 +537,9 @@ class _RefundLineCard extends StatelessWidget {
                   Text(line.title, style: DesignTokens.textBodyBold),
                   Text(
                     '${line.quantity} × ${currencyFormat.format(line.unitPrice)}',
-                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ],
               ),
@@ -539,10 +554,13 @@ class _RefundLineCard extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.remove, size: 18),
-                    onPressed: refundQty > 0 
+                    onPressed: refundQty > 0
                         ? () => onQtyChanged(refundQty - 1)
                         : null,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
                   ),
                   SizedBox(
                     width: 40,
@@ -554,10 +572,13 @@ class _RefundLineCard extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.add, size: 18),
-                    onPressed: refundQty < line.quantity 
+                    onPressed: refundQty < line.quantity
                         ? () => onQtyChanged(refundQty + 1)
                         : null,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
                   ),
                 ],
               ),
@@ -569,7 +590,9 @@ class _RefundLineCard extends StatelessWidget {
                 currencyFormat.format(line.unitPrice * refundQty),
                 textAlign: TextAlign.end,
                 style: DesignTokens.textBodyBold.copyWith(
-                  color: refundQty > 0 ? DesignTokens.error : DesignTokens.grayMedium,
+                  color: refundQty > 0
+                      ? DesignTokens.error
+                      : DesignTokens.grayMedium,
                 ),
               ),
             ),

@@ -28,7 +28,9 @@ class ConnectivityBanner extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 'You are offline. Changes will sync when connected.',
-                style: DesignTokens.textSmallLight.copyWith(color: Colors.white),
+                style: DesignTokens.textSmallLight.copyWith(
+                  color: Colors.white,
+                ),
               ),
             ],
           ),

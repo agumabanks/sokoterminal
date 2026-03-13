@@ -15,17 +15,26 @@ class RestorePromptDialog extends ConsumerWidget {
 
     if (backup == null) return const SizedBox.shrink();
 
-    final date = DateTime.tryParse(backup['created_at']?.toString() ?? '')?.toLocal();
-    final dateStr = date != null ? DateFormat('MMM d, yyyy HH:mm').format(date) : 'Unknown date';
+    final date = DateTime.tryParse(
+      backup['created_at']?.toString() ?? '',
+    )?.toLocal();
+    final dateStr = date != null
+        ? DateFormat('MMM d, yyyy HH:mm').format(date)
+        : 'Unknown date';
     final counts = backup['data_counts'] as Map<String, dynamic>? ?? {};
 
     return WillPopScope(
       onWillPop: () async => !state.restoring,
       child: AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: DesignTokens.borderRadiusMd),
+        shape: RoundedRectangleBorder(
+          borderRadius: DesignTokens.borderRadiusMd,
+        ),
         title: Row(
           children: [
-            const Icon(Icons.cloud_download_outlined, color: DesignTokens.brandPrimary),
+            const Icon(
+              Icons.cloud_download_outlined,
+              color: DesignTokens.brandPrimary,
+            ),
             const SizedBox(width: 8),
             const Text('Business Migration'),
           ],
@@ -49,15 +58,27 @@ class RestorePromptDialog extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Backup: ${backup['name'] ?? 'Cloud Backup'}', style: DesignTokens.textBodyBold),
+                  Text(
+                    'Backup: ${backup['name'] ?? 'Cloud Backup'}',
+                    style: DesignTokens.textBodyBold,
+                  ),
                   Text('Saved on: $dateStr', style: DesignTokens.textSmall),
                   const Divider(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _CompactStat(label: 'Products', value: '${counts['products'] ?? 0}'),
-                      _CompactStat(label: 'Customers', value: '${counts['customers'] ?? 0}'),
-                      _CompactStat(label: 'Sales', value: '${counts['transactions'] ?? 0}'),
+                      _CompactStat(
+                        label: 'Products',
+                        value: '${counts['products'] ?? 0}',
+                      ),
+                      _CompactStat(
+                        label: 'Customers',
+                        value: '${counts['customers'] ?? 0}',
+                      ),
+                      _CompactStat(
+                        label: 'Sales',
+                        value: '${counts['transactions'] ?? 0}',
+                      ),
                     ],
                   ),
                 ],
@@ -67,7 +88,9 @@ class RestorePromptDialog extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 state.error!,
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.error,
+                ),
               ),
             ],
             if (state.restoring) ...[
@@ -77,7 +100,10 @@ class RestorePromptDialog extends ConsumerWidget {
                   children: [
                     CircularProgressIndicator(),
                     SizedBox(height: 8),
-                    Text('Restoring your business...', style: DesignTokens.textSmall),
+                    Text(
+                      'Restoring your business...',
+                      style: DesignTokens.textSmall,
+                    ),
                   ],
                 ),
               ),
@@ -88,8 +114,12 @@ class RestorePromptDialog extends ConsumerWidget {
             ? []
             : [
                 TextButton(
-                  onPressed: () => ref.read(migrationProvider.notifier).dismiss(),
-                  child: Text('Start Fresh', style: TextStyle(color: DesignTokens.grayMedium)),
+                  onPressed: () =>
+                      ref.read(migrationProvider.notifier).dismiss(),
+                  child: Text(
+                    'Start Fresh',
+                    style: TextStyle(color: DesignTokens.grayMedium),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -98,7 +128,9 @@ class RestorePromptDialog extends ConsumerWidget {
                         .restoreBackup(backup['id'] as int);
                     if (success && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Business data restored successfully!')),
+                        const SnackBar(
+                          content: Text('Business data restored successfully!'),
+                        ),
                       );
                     }
                   },
@@ -124,7 +156,12 @@ class _CompactStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.brandPrimary)),
+        Text(
+          value,
+          style: DesignTokens.textBodyBold.copyWith(
+            color: DesignTokens.brandPrimary,
+          ),
+        ),
         Text(label, style: DesignTokens.textSmall.copyWith(fontSize: 10)),
       ],
     );

@@ -8,7 +8,8 @@ class PaymentConfigScreen extends ConsumerStatefulWidget {
   const PaymentConfigScreen({super.key});
 
   @override
-  ConsumerState<PaymentConfigScreen> createState() => _PaymentConfigScreenState();
+  ConsumerState<PaymentConfigScreen> createState() =>
+      _PaymentConfigScreenState();
 }
 
 class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
@@ -39,7 +40,11 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black,
+            size: 20,
+          ),
           onPressed: () => context.go('/onboarding/business-details'),
         ),
         title: const Text(
@@ -71,7 +76,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 32),
-                    
+
                     Text(
                       'Payment Methods',
                       style: TextStyle(
@@ -81,7 +86,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     _buildPaymentToggle(
                       title: 'Cash on Delivery',
                       subtitle: 'Collect payment when delivering',
@@ -90,7 +95,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       onChanged: (val) => setState(() => _cashOnDelivery = val),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     _buildPaymentToggle(
                       title: 'Bank Transfer',
                       subtitle: 'Receive payments via bank',
@@ -99,7 +104,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       onChanged: (val) => setState(() => _bankTransfer = val),
                     ),
                     const SizedBox(height: 32),
-                    
+
                     Text(
                       'Delivery',
                       style: TextStyle(
@@ -109,7 +114,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     _buildModernField(
                       controller: _shippingCostController,
                       label: 'Default Shipping Cost',
@@ -123,7 +128,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                     ),
                     const SizedBox(height: 32),
-                    
+
                     // Continue Button
                     SizedBox(
                       height: 56,
@@ -147,15 +152,12 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     TextButton(
                       onPressed: () => context.go('/onboarding/welcome'),
                       child: Text(
                         'Skip for now',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
                       ),
                     ),
                   ],
@@ -226,10 +228,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
         value: value,
         onChanged: onChanged,
         secondary: Icon(icon, color: value ? Colors.black : Colors.grey[500]),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
         activeColor: Colors.black,
       ),
@@ -254,7 +253,10 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
           prefixIcon: Icon(icon, color: Colors.grey[500], size: 22),
           labelText: label,
           hintText: hint,
@@ -266,7 +268,10 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
     );
   }
 
-  void _applyOnboardingState(OnboardingState onboarding, {bool notify = false}) {
+  void _applyOnboardingState(
+    OnboardingState onboarding, {
+    bool notify = false,
+  }) {
     final data = onboarding.shopData;
     if (data.isEmpty) return;
 
@@ -301,8 +306,10 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
     if (value is num) return value != 0;
     if (value is String) {
       final normalized = value.trim().toLowerCase();
-      if (normalized == 'true' || normalized == '1' || normalized == 'yes') return true;
-      if (normalized == 'false' || normalized == '0' || normalized == 'no') return false;
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes')
+        return true;
+      if (normalized == 'false' || normalized == '0' || normalized == 'no')
+        return false;
     }
     return null;
   }
@@ -336,7 +343,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
       'shipping_cost': shippingCost ?? 0,
     });
     controller.goToStage(5);
-    
+
     context.go('/onboarding/welcome');
   }
 }

@@ -29,11 +29,15 @@ class AppButton extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (isLoading)
-           Container(
-             width: 16, height: 16,
-             margin: const EdgeInsets.only(right: 8),
-             child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-           )
+          Container(
+            width: 16,
+            height: 16,
+            margin: const EdgeInsets.only(right: 8),
+            child: const CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
         else if (icon != null)
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -59,7 +63,9 @@ class AppButton extends StatelessWidget {
         return ElevatedButton.styleFrom(
           backgroundColor: DesignTokens.brandPrimary,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DesignTokens.radiusMd)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+          ),
           elevation: 0,
         );
       case AppButtonVariant.outline:
@@ -67,18 +73,22 @@ class AppButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           foregroundColor: DesignTokens.brandPrimary,
           side: const BorderSide(color: DesignTokens.brandPrimary),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DesignTokens.radiusMd)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+          ),
           elevation: 0,
         );
       case AppButtonVariant.danger:
-         return ElevatedButton.styleFrom(
+        return ElevatedButton.styleFrom(
           backgroundColor: DesignTokens.error,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DesignTokens.radiusMd)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+          ),
           elevation: 0,
         );
       case AppButtonVariant.text:
-       return ElevatedButton.styleFrom(
+        return ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: DesignTokens.brandPrimary,
           elevation: 0,

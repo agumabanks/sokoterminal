@@ -3,20 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_providers.dart';
-import '../../core/network/api_client.dart';
 
 /// Provider for backup list
-final backupsProvider = FutureProvider.autoDispose<List<BackupItem>>((ref) async {
+final backupsProvider = FutureProvider.autoDispose<List<BackupItem>>((
+  ref,
+) async {
   final client = ref.watch(apiClientProvider);
   final response = await client.get<Map<String, dynamic>>('/v2/seller/backups');
   final data = response.data?['data'] as List<dynamic>? ?? [];
-  return data.map((e) => BackupItem.fromJson(e as Map<String, dynamic>)).toList();
+  return data
+      .map((e) => BackupItem.fromJson(e as Map<String, dynamic>))
+      .toList();
 });
 
 /// Provider for latest backup info
-final latestBackupProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+final latestBackupProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((
+  ref,
+) async {
   final client = ref.watch(apiClientProvider);
-  final response = await client.get<Map<String, dynamic>>('/v2/seller/backups/latest');
+  final response = await client.get<Map<String, dynamic>>(
+    '/v2/seller/backups/latest',
+  );
   if (response.data?['available'] == true) {
     return response.data?['backup'] as Map<String, dynamic>?;
   }
@@ -75,7 +82,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       await client.post<Map<String, dynamic>>(
         '/v2/seller/backups',
         data: {
-          'name': 'Backup ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+          'name':
+              'Backup ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
           'type': 'manual',
         },
       );
@@ -129,8 +137,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
     try {
       final client = ref.read(apiClientProvider);
-      final response = await client.get<Map<String, dynamic>>('/v2/seller/backups/$backupId');
-      
+      final response = await client.get<Map<String, dynamic>>(
+        '/v2/seller/backups/$backupId',
+      );
+
       if (response.data?['success'] == true) {
         // Here you would typically clear local DB and import the backup data
         // For now, we just show success
@@ -258,7 +268,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                           Text(
                             'Secure your business data',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                              color: theme.colorScheme.onPrimary.withOpacity(
+                                0.8,
+                              ),
                             ),
                           ),
                         ],
@@ -278,7 +290,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.backup),
-                    label: Text(_isCreating ? 'Creating...' : 'Create Backup Now'),
+                    label: Text(
+                      _isCreating ? 'Creating...' : 'Create Backup Now',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: theme.colorScheme.primary,
@@ -365,7 +379,11 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
                     const SizedBox(height: 16),
                     Text('Failed to load backups: $e'),
                     const SizedBox(height: 16),
@@ -424,7 +442,10 @@ class _BackupCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: backup.status == 'complete'
                         ? Colors.green.withOpacity(0.1)
@@ -435,7 +456,9 @@ class _BackupCard extends StatelessWidget {
                     backup.status,
                     style: TextStyle(
                       fontSize: 12,
-                      color: backup.status == 'complete' ? Colors.green : Colors.orange,
+                      color: backup.status == 'complete'
+                          ? Colors.green
+                          : Colors.orange,
                     ),
                   ),
                 ),
@@ -446,7 +469,9 @@ class _BackupCard extends StatelessWidget {
               children: [
                 Text(
                   dateFormat.format(backup.createdAt.toLocal()),
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey,
+                  ),
                 ),
                 const Spacer(),
                 Text(

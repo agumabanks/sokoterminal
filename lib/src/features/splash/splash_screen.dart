@@ -8,6 +8,7 @@ import 'package:soko_seller_terminal/src/core/app_providers.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_session_controller.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_staff_prefs.dart';
 import 'package:soko_seller_terminal/src/core/sync/sync_service.dart';
+import 'package:soko_seller_terminal/src/core/settings/business_setup_prefs.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -16,7 +17,8 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   String _status = 'Initializing...';
@@ -57,7 +59,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     syncService.start();
 
     final loginType = await secureStorage.read(key: 'login_type');
-    
+
     // If logged in as staff, verify shop_id and skip POS PIN check
     if (loginType == 'staff') {
       final shopId = await secureStorage.read(key: 'staff_shop_id');
@@ -66,15 +68,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
         if (mounted) context.go('/staff-login');
         return;
       }
-      
+
       // Staff are already "POS authenticated" via phone+PIN
       if (mounted) {
         // Start sync (already started above)
-         // ...
+        // ...
       }
     } else {
       // Owner Logic: Check POS PIN session
-      
+
       // POS staff session check (only required when staff is initialized on backend).
       if (!mounted) return;
       setState(() => _status = 'Checking staff session…');
@@ -83,7 +85,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
       final posSession = ref.read(posSessionProvider);
 
       final prefs = ref.read(sharedPreferencesProvider);
-      bool staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
+      bool staffInitialized =
+          prefs.getBool(posStaffInitializedPrefKey) ?? false;
       final connectivity = await Connectivity().checkConnectivity();
       final online = connectivity.any((r) => r != ConnectivityResult.none);
       if (online) {
@@ -117,20 +120,32 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     });
 
     try {
-      // Force sync or normal sync depending on state
-      // We'll use syncNow which handles logic (or explicit full resync if preferred)
-      // User wanted "immediate sync from backend".
-      // We can use primeOfflineData or syncNow.
+      // Force sync or normal sync depending on state.
       await syncService.syncNow();
     } catch (e) {
-      // Proceed even if sync fails (offline mode)
+      // Proceed even if sync fails (offline mode).
       debugPrint('Splash sync failed: $e');
-    } finally {
-      await sub.cancel();
-      if (mounted) {
-        context.go('/home/checkout');
-      }
     }
+
+    await sub.cancel();
+    if (!mounted) return;
+
+    final setupCompleted = await ref
+        .read(businessSetupCompletedProvider.notifier)
+        .refreshFromLocalCache(ref.read(appDatabaseProvider));
+    if (!mounted) return;
+
+    final setupRequired =
+        ref.read(sharedPreferencesProvider).getBool(
+              businessSetupRequiredPrefKey,
+            ) ??
+        false;
+    final destination = setupRequired && !setupCompleted
+        ? '/home/more/business-setup'
+        : '/home/checkout';
+
+    if (!mounted) return;
+    context.go(destination);
   }
 
   @override
@@ -171,11 +186,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
             child: SafeArea(
               child: Column(
                 children: [
-                   SizedBox(
+                  SizedBox(
                     width: 200,
                     child: LinearProgressIndicator(
                       backgroundColor: Colors.grey[900],
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
                       minHeight: 2,
                     ),
                   ),

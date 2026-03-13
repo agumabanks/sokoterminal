@@ -9,7 +9,11 @@ import '../storage/secure_storage.dart';
 import 'api_client.dart';
 
 class SellerApi {
-  SellerApi({required this.client, required this.config, required this.storage});
+  SellerApi({
+    required this.client,
+    required this.config,
+    required this.storage,
+  });
 
   final ApiClient client;
   final AppConfig config;
@@ -41,20 +45,27 @@ class SellerApi {
     required int orderId,
     required String status,
   }) {
-    return client.post('/v2/seller/orders/update-delivery-status', data: {
-      'order_id': orderId,
-      'status': status,
-    });
+    return client.post(
+      '/v2/seller/orders/update-delivery-status',
+      data: {'order_id': orderId, 'status': status},
+    );
   }
 
   Future<Response<dynamic>> updateOrderPaymentStatus({
     required int orderId,
     required String status,
   }) {
-    return client.post('/v2/seller/orders/update-payment-status', data: {
-      'order_id': orderId,
-      'status': status,
-    });
+    return client.post(
+      '/v2/seller/orders/update-payment-status',
+      data: {'order_id': orderId, 'status': status},
+    );
+  }
+
+  Future<Response<dynamic>> requestSokoDelivery(int orderId) {
+    return client.post(
+      '/v2/seller/request-soko-delivery',
+      data: {'order_id': orderId},
+    );
   }
 
   // Refund requests (marketplace)
@@ -63,14 +74,23 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> approveRefundRequest({required int refundId}) {
-    return client.post('/v2/seller/refunds/approve', data: {'refund_id': refundId});
+    return client.post(
+      '/v2/seller/refunds/approve',
+      data: {'refund_id': refundId},
+    );
   }
 
-  Future<Response<dynamic>> rejectRefundRequest({required int refundId, String? reason}) {
-    return client.post('/v2/seller/refunds/reject', data: {
-      'refund_id': refundId,
-      if (reason != null) 'reject_reason': reason,
-    });
+  Future<Response<dynamic>> rejectRefundRequest({
+    required int refundId,
+    String? reason,
+  }) {
+    return client.post(
+      '/v2/seller/refunds/reject',
+      data: {
+        'refund_id': refundId,
+        if (reason != null) 'reject_reason': reason,
+      },
+    );
   }
 
   // Products
@@ -78,7 +98,10 @@ class SellerApi {
     return client.post('/v2/seller/products/add', data: payload);
   }
 
-  Future<Response<dynamic>> updateProduct(String productId, Map<String, dynamic> payload) {
+  Future<Response<dynamic>> updateProduct(
+    String productId,
+    Map<String, dynamic> payload,
+  ) {
     return client.post('/v2/seller/products/update/$productId', data: payload);
   }
 
@@ -145,6 +168,10 @@ class SellerApi {
     );
   }
 
+  Future<Response<dynamic>> deleteService(String id) {
+    return client.delete('/v2/service-provider/offerings/$id');
+  }
+
   Future<Response<dynamic>> fetchMyServices() {
     return client.get('/v2/service-provider/my/offerings');
   }
@@ -154,19 +181,24 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> confirmServiceBooking(int bookingId) {
-    return client.post('/v2/service-provider/provider/bookings/$bookingId/confirm');
+    return client.post(
+      '/v2/service-provider/provider/bookings/$bookingId/confirm',
+    );
   }
 
   Future<Response<dynamic>> completeServiceBooking(int bookingId) {
-    return client.post('/v2/service-provider/provider/bookings/$bookingId/complete');
+    return client.post(
+      '/v2/service-provider/provider/bookings/$bookingId/complete',
+    );
   }
 
-  Future<Response<dynamic>> cancelServiceBooking(int bookingId, {String? reason}) {
+  Future<Response<dynamic>> cancelServiceBooking(
+    int bookingId, {
+    String? reason,
+  }) {
     return client.post(
       '/v2/service-provider/provider/bookings/$bookingId/cancel',
-      data: {
-        if (reason != null) 'reason': reason,
-      },
+      data: {if (reason != null) 'reason': reason},
     );
   }
 
@@ -183,7 +215,10 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> pullPosSync({required DateTime since}) {
-    return client.get('/v2/seller/pos/sync/pull', query: {'since': since.toUtc().toIso8601String()});
+    return client.get(
+      '/v2/seller/pos/sync/pull',
+      query: {'since': since.toUtc().toIso8601String()},
+    );
   }
 
   // POS Catalog Products (offline-first upsert)
@@ -314,35 +349,168 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> updateDeviceToken(String token) {
-    return client.post('/v2/profile/update-device-token', data: {
-      'device_token': token,
-      'platform': 'flutter',
-    });
+    return client.post(
+      '/v2/profile/update-device-token',
+      data: {'device_token': token, 'platform': 'flutter'},
+    );
   }
 
-  // Notifications
-  Future<Response<dynamic>> fetchNotifications() {
-    return client.get('/v2/seller/notifications');
+  // Notifications (new unified notification system)
+  Future<Response<dynamic>> fetchNotifications({
+    int perPage = 20,
+    int page = 1,
+  }) {
+    return client.get(
+      '/v2/seller/notifications',
+      query: {'per_page': perPage, 'page': page},
+    );
   }
 
-  Future<Response<dynamic>> fetchUnreadNotifications() {
-    return client.get('/v2/seller/notifications/unread');
+  Future<Response<dynamic>> fetchUnreadNotificationCount() {
+    return client.get('/v2/seller/notifications/unread-count');
   }
 
   Future<Response<dynamic>> markNotificationRead(String notificationId) {
-    return client.post('/v2/seller/notifications/mark-read', data: {
-      'notification_id': notificationId,
-    });
+    return client.post('/v2/seller/notifications/$notificationId/read');
   }
 
   Future<Response<dynamic>> markAllNotificationsRead() {
-    return client.post('/v2/seller/notifications/mark-all-read');
+    return client.post('/v2/seller/notifications/read-all');
   }
 
   Future<Response<dynamic>> deleteNotification(String notificationId) {
-    return client.post('/v2/seller/notifications/delete', data: {
-      'notification_id': notificationId,
-    });
+    return client.delete('/v2/seller/notifications/$notificationId');
+  }
+
+  Future<Response<dynamic>> registerDeviceToken({
+    required String token,
+    String platform = 'android',
+    String? deviceId,
+    String? appVersion,
+  }) {
+    return client.post(
+      '/v2/seller/notifications/device-token',
+      data: {
+        'token': token,
+        'platform': platform,
+        if (deviceId != null) 'device_id': deviceId,
+        if (appVersion != null) 'app_version': appVersion,
+      },
+    );
+  }
+
+  Future<Response<dynamic>> removeDeviceToken(String token) {
+    return client.delete(
+      '/v2/seller/notifications/device-token',
+      data: {'token': token},
+    );
+  }
+
+  Future<Response<dynamic>> fetchNotificationPreferences() {
+    return client.get('/v2/seller/notifications/preferences');
+  }
+
+  Future<Response<dynamic>> updateNotificationPreferences({
+    required String category,
+    bool? pushEnabled,
+    bool? emailEnabled,
+    bool? smsEnabled,
+  }) {
+    return client.post(
+      '/v2/seller/notifications/preferences',
+      data: {
+        'category': category,
+        if (pushEnabled != null) 'push_enabled': pushEnabled,
+        if (emailEnabled != null) 'email_enabled': emailEnabled,
+        if (smsEnabled != null) 'sms_enabled': smsEnabled,
+      },
+    );
+  }
+
+  // Seller SMS module
+  Future<Response<dynamic>> fetchSmsDashboard() {
+    return client.get('/v2/seller/sms/dashboard');
+  }
+
+  Future<Response<dynamic>> fetchSmsCampaigns({
+    int perPage = 20,
+    int page = 1,
+  }) {
+    return client.get(
+      '/v2/seller/sms/campaigns',
+      query: {'per_page': perPage, 'page': page},
+    );
+  }
+
+  Future<Response<dynamic>> createSmsCampaign(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/sms/campaigns', data: payload);
+  }
+
+  Future<Response<dynamic>> sendSmsCampaign(int campaignId) {
+    return client.post('/v2/seller/sms/campaigns/$campaignId/send');
+  }
+
+  Future<Response<dynamic>> fetchSmsTemplates() {
+    return client.get('/v2/seller/sms/templates');
+  }
+
+  Future<Response<dynamic>> createSmsTemplate(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/sms/templates', data: payload);
+  }
+
+  Future<Response<dynamic>> sendSingleSms(
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/sms/send',
+      data: payload,
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  // Seller wallet and in-house purchases
+  Future<Response<dynamic>> fetchSellerWalletDashboard() {
+    return client.get('/v2/seller/wallet');
+  }
+
+  Future<Response<dynamic>> createSellerWalletTopup(
+    double amount, {
+    String? idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/wallet/topups',
+      data: {'amount': amount},
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> fetchSellerWalletTopupStatus(int topupId) {
+    return client.get('/v2/seller/wallet/topups/$topupId');
+  }
+
+  Future<Response<dynamic>> createSellerWalletPurchase({
+    required String type,
+    int? quantity,
+    Map<String, dynamic>? extra,
+    String? idempotencyKey,
+  }) {
+    final payload = <String, dynamic>{
+      'type': type,
+      if (quantity != null) 'quantity': quantity,
+      if (extra != null) ...extra,
+    };
+    return client.post(
+      '/v2/seller/wallet/purchases',
+      data: payload,
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
   }
 
   // Coupons
@@ -354,7 +522,10 @@ class SellerApi {
     return client.post('/v2/seller/coupon/create', data: payload);
   }
 
-  Future<Response<dynamic>> updateCoupon(int couponId, Map<String, dynamic> payload) {
+  Future<Response<dynamic>> updateCoupon(
+    int couponId,
+    Map<String, dynamic> payload,
+  ) {
     return client.post('/v2/seller/coupon/update/$couponId', data: payload);
   }
 
@@ -375,10 +546,10 @@ class SellerApi {
     required int conversationId,
     required String message,
   }) {
-    return client.post('/v2/seller/conversations/message/store', data: {
-      'conversation_id': conversationId,
-      'message': message,
-    });
+    return client.post(
+      '/v2/seller/conversations/message/store',
+      data: {'conversation_id': conversationId, 'message': message},
+    );
   }
 
   // Auctions
@@ -386,8 +557,14 @@ class SellerApi {
     return client.get('/v2/seller/auction-products', query: {'page': page});
   }
 
-  Future<Response<dynamic>> fetchAuctionProductBids(int productId, {int page = 1}) {
-    return client.get('/v2/seller/auction-product-bids/edit/$productId', query: {'page': page});
+  Future<Response<dynamic>> fetchAuctionProductBids(
+    int productId, {
+    int page = 1,
+  }) {
+    return client.get(
+      '/v2/seller/auction-product-bids/edit/$productId',
+      query: {'page': page},
+    );
   }
 
   Future<Response<dynamic>> deleteAuctionBid(int bidId) {
@@ -412,7 +589,9 @@ class SellerApi {
     return _updateShopInfoWithFallback(payload);
   }
 
-  Future<Response<dynamic>> _updateShopInfoWithFallback(Map<String, dynamic> payload) async {
+  Future<Response<dynamic>> _updateShopInfoWithFallback(
+    Map<String, dynamic> payload,
+  ) async {
     try {
       return await client.post('/v2/seller/shop-update', data: payload);
     } on DioException catch (e) {
@@ -437,7 +616,9 @@ class SellerApi {
     return client.get('/v2/seller/delivery-profile');
   }
 
-  Future<Response<dynamic>> upsertDeliveryProfile(Map<String, dynamic> payload) {
+  Future<Response<dynamic>> upsertDeliveryProfile(
+    Map<String, dynamic> payload,
+  ) {
     return client.post('/v2/seller/delivery-profile', data: payload);
   }
 
@@ -489,11 +670,14 @@ class SellerApi {
     String paymentOption = 'free',
     double? amount,
   }) {
-    return client.post('/v2/seller/seller-package/free-package', data: {
-      'package_id': packageId,
-      'payment_option': paymentOption,
-      if (amount != null) 'amount': amount,
-    });
+    return client.post(
+      '/v2/seller/seller-package/free-package',
+      data: {
+        'package_id': packageId,
+        'payment_option': paymentOption,
+        if (amount != null) 'amount': amount,
+      },
+    );
   }
 
   Future<Response<dynamic>> purchaseSellerPackageOffline({
@@ -502,12 +686,16 @@ class SellerApi {
     String? trxId,
     String? photoBase64,
   }) {
-    return client.post('/v2/seller/seller-package/offline-payment', data: {
-      'package_id': packageId,
-      'payment_option': paymentOption,
-      if (trxId != null && trxId.trim().isNotEmpty) 'trx_id': trxId.trim(),
-      if (photoBase64 != null && photoBase64.trim().isNotEmpty) 'photo': photoBase64.trim(),
-    });
+    return client.post(
+      '/v2/seller/seller-package/offline-payment',
+      data: {
+        'package_id': packageId,
+        'payment_option': paymentOption,
+        if (trxId != null && trxId.trim().isNotEmpty) 'trx_id': trxId.trim(),
+        if (photoBase64 != null && photoBase64.trim().isNotEmpty)
+          'photo': photoBase64.trim(),
+      },
+    );
   }
 
   // POS v2: Cash movements + audit logs (idempotent)
@@ -535,9 +723,10 @@ class SellerApi {
 
   // POS Expenses
   Future<Response<dynamic>> fetchExpenses({DateTime? since}) {
-    return client.get('/v2/seller/pos/expenses', query: {
-      if (since != null) 'since': since.toUtc().toIso8601String(),
-    });
+    return client.get(
+      '/v2/seller/pos/expenses',
+      query: {if (since != null) 'since': since.toUtc().toIso8601String()},
+    );
   }
 
   Future<Response<dynamic>> pushExpense(
@@ -583,12 +772,42 @@ class SellerApi {
     );
   }
 
+  // POS Expense Categories
+  Future<Response<dynamic>> fetchExpenseCategories() {
+    return client.get('/v2/seller/pos/expense-categories');
+  }
+
+  Future<Response<dynamic>> pushExpenseCategory(
+    Map<String, dynamic> payload, {
+    required String idempotencyKey,
+  }) {
+    return client.post(
+      '/v2/seller/pos/expense-categories',
+      data: payload,
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  Future<Response<dynamic>> deleteExpenseCategory(String id) {
+    return client.delete('/v2/seller/pos/expense-categories/$id');
+  }
+
   // POS Customers (seller-scoped CRM contacts)
-  Future<Response<dynamic>> fetchSellerCustomers({int page = 1, DateTime? since}) {
-    return client.get('/v2/seller/pos/customers', query: {
-      'page': page,
-      if (since != null) 'since': since.toUtc().toIso8601String(),
-    });
+  Future<Response<dynamic>> fetchSellerCustomers({
+    int page = 1,
+    DateTime? since,
+  }) {
+    return client.get(
+      '/v2/seller/pos/customers',
+      query: {
+        'page': page,
+        if (since != null) 'updated_since': since.toUtc().toIso8601String(),
+      },
+    );
+  }
+
+  Future<Response<dynamic>> fetchSellerCustomerDetails(String customerId) {
+    return client.get('/v2/seller/pos/customers/$customerId');
   }
 
   Future<Response<dynamic>> pushCustomer(
@@ -623,9 +842,10 @@ class SellerApi {
   Future<Response<dynamic>> batchUpsertCrmContacts(
     List<Map<String, dynamic>> contacts,
   ) {
-    return client.post('/v2/seller/crm/contacts/batch', data: {
-      'contacts': contacts,
-    });
+    return client.post(
+      '/v2/seller/crm/contacts/batch',
+      data: {'contacts': contacts},
+    );
   }
 
   // CRM Marketing
@@ -672,10 +892,13 @@ class SellerApi {
     required List<Map<String, dynamic>> receiptTemplates,
     required List<Map<String, dynamic>> quotationTemplates,
   }) {
-    return client.post('/v2/seller/pos/templates/batch', data: {
-      'receipt_templates': receiptTemplates,
-      'quotation_templates': quotationTemplates,
-    });
+    return client.post(
+      '/v2/seller/pos/templates/batch',
+      data: {
+        'receipt_templates': receiptTemplates,
+        'quotation_templates': quotationTemplates,
+      },
+    );
   }
 
   // Server Exports (PR14)
@@ -683,10 +906,10 @@ class SellerApi {
     required String type,
     int? outletId,
   }) {
-    return client.post('/v2/seller/pos/exports', data: {
-      'type': type,
-      if (outletId != null) 'outlet_id': outletId,
-    });
+    return client.post(
+      '/v2/seller/pos/exports',
+      data: {'type': type, if (outletId != null) 'outlet_id': outletId},
+    );
   }
 
   // Support Bundles (PR15)
@@ -694,17 +917,18 @@ class SellerApi {
     required Map<String, dynamic> metadata,
     String? fileUrl,
   }) {
-    return client.post('/v2/seller/pos/support/bundles', data: {
-      'metadata': metadata,
-      if (fileUrl != null) 'file_url': fileUrl,
-    });
+    return client.post(
+      '/v2/seller/pos/support/bundles',
+      data: {'metadata': metadata, if (fileUrl != null) 'file_url': fileUrl},
+    );
   }
 
   // POS Shifts
   Future<Response<dynamic>> fetchShifts({DateTime? since}) {
-    return client.get('/v2/seller/pos/shifts', query: {
-      if (since != null) 'since': since.toUtc().toIso8601String(),
-    });
+    return client.get(
+      '/v2/seller/pos/shifts',
+      query: {if (since != null) 'since': since.toUtc().toIso8601String()},
+    );
   }
 
   Future<Response<dynamic>> pushShift(
@@ -761,10 +985,10 @@ class SellerApi {
     required String phone,
     required String pin,
   }) {
-    return client.post('/v2/seller/pos/staff/login', data: {
-      'phone': phone,
-      'pin': pin,
-    });
+    return client.post(
+      '/v2/seller/pos/staff/login',
+      data: {'phone': phone, 'pin': pin},
+    );
   }
 
   Future<Response<dynamic>> staffMe() {
@@ -795,6 +1019,19 @@ class SellerApi {
   }
 
   /// Register a new seller with shop
+  Future<Response<dynamic>> fetchSellerRegistrationPlans() async {
+    final publicDio = Dio(
+      BaseOptions(
+        baseUrl: config.apiBaseUrl,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
+    return publicDio.get('/v2/seller/register/plans');
+  }
+
   Future<Response<dynamic>> registerSeller({
     required String name,
     String? email,
@@ -802,41 +1039,55 @@ class SellerApi {
     required String pin,
     required String shopName,
     String? address,
-    double? latitude,              // Shop business location
-    double? longitude,             // Shop business location
-    double? registrationLatitude,  // User's GPS at signup (analytics)
+    double? latitude, // Shop business location
+    double? longitude, // Shop business location
+    double? registrationLatitude, // User's GPS at signup (analytics)
     double? registrationLongitude, // User's GPS at signup (analytics)
     String? category,
     double? deliveryRadiusKm,
+    int? planId,
+    String? planSlug,
   }) {
     // Use the public Dio instance (no auth token required)
-    final publicDio = Dio(BaseOptions(
-      baseUrl: config.apiBaseUrl,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    ));
+    final publicDio = Dio(
+      BaseOptions(
+        baseUrl: config.apiBaseUrl,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      ),
+    );
     publicDio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           debugPrint('[HTTP:public] -> ${options.method} ${options.uri}');
           if (options.data != null) {
-            debugPrint('[HTTP:public]    data: ${_redactSensitive(options.data)}');
+            debugPrint(
+              '[HTTP:public]    data: ${_redactSensitive(options.data)}',
+            );
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          debugPrint('[HTTP:public] <- ${response.statusCode} ${response.requestOptions.uri}');
+          debugPrint(
+            '[HTTP:public] <- ${response.statusCode} ${response.requestOptions.uri}',
+          );
           if (response.data != null) {
-            debugPrint('[HTTP:public]    data: ${_redactSensitive(response.data)}');
+            debugPrint(
+              '[HTTP:public]    data: ${_redactSensitive(response.data)}',
+            );
           }
           return handler.next(response);
         },
         onError: (error, handler) {
-          debugPrint('[HTTP:public] !! ${error.requestOptions.uri} ${error.message}');
+          debugPrint(
+            '[HTTP:public] !! ${error.requestOptions.uri} ${error.message}',
+          );
           if (error.response?.data != null) {
-            debugPrint('[HTTP:public]    data: ${_redactSensitive(error.response?.data)}');
+            debugPrint(
+              '[HTTP:public]    data: ${_redactSensitive(error.response?.data)}',
+            );
           }
           return handler.next(error);
         },
@@ -853,10 +1104,14 @@ class SellerApi {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       // User's registration location (GPS at signup) - separate from shop location
-      if (registrationLatitude != null) 'registration_latitude': registrationLatitude,
-      if (registrationLongitude != null) 'registration_longitude': registrationLongitude,
+      if (registrationLatitude != null)
+        'registration_latitude': registrationLatitude,
+      if (registrationLongitude != null)
+        'registration_longitude': registrationLongitude,
       if (category != null) 'category': category,
       if (deliveryRadiusKm != null) 'delivery_radius_km': deliveryRadiusKm,
+      if (planId != null) 'plan_id': planId,
+      if (planSlug != null && planSlug.isNotEmpty) 'plan_slug': planSlug,
     };
 
     Future<Response<dynamic>> send(Map<String, dynamic> body) {
@@ -866,7 +1121,8 @@ class SellerApi {
     return send(payload).catchError((error) async {
       if (error is DioException) {
         final msg = _extractErrorMessage(error.response?.data);
-        if (msg.contains("Unknown column 'latitude'") || msg.contains("Unknown column 'longitude'")) {
+        if (msg.contains("Unknown column 'latitude'") ||
+            msg.contains("Unknown column 'longitude'")) {
           final retry = Map<String, dynamic>.from(payload)
             ..remove('latitude')
             ..remove('longitude')
@@ -901,6 +1157,52 @@ class SellerApi {
       return data.map(_redactSensitive).toList();
     }
     return data;
+  }
+
+  // ─── Soko Studio (AI Ad Generation) ───────────────────────────
+
+  Future<Response<dynamic>> studioStyles() {
+    return client.get('/v2/seller/studio/styles');
+  }
+
+  Future<Response<dynamic>> studioLlmStatus() {
+    return client.get('/v2/seller/studio/llm-status');
+  }
+
+  Future<Response<dynamic>> studioListAds({int? productId, int? serviceId}) {
+    final q = <String, dynamic>{};
+    if (productId != null) q['product_id'] = productId;
+    if (serviceId != null) q['service_id'] = serviceId;
+    return client.get('/v2/seller/studio/ads', query: q);
+  }
+
+  Future<Response<dynamic>> studioGenerateAds({
+    int? productId,
+    int? serviceId,
+    List<String>? styles,
+    int count = 3,
+  }) {
+    return client.post('/v2/seller/studio/ads/generate', data: {
+      if (productId != null) 'product_id': productId,
+      if (serviceId != null) 'service_id': serviceId,
+      if (styles != null) 'styles': styles,
+      'count': count,
+    });
+  }
+
+  Future<Response<dynamic>> studioAdStatus({int? productId, int? serviceId}) {
+    final q = <String, dynamic>{};
+    if (productId != null) q['product_id'] = productId;
+    if (serviceId != null) q['service_id'] = serviceId;
+    return client.get('/v2/seller/studio/ads/status', query: q);
+  }
+
+  Future<Response<dynamic>> studioGetAd(int id) {
+    return client.get('/v2/seller/studio/ads/$id');
+  }
+
+  Future<Response<dynamic>> studioDeleteAd(int id) {
+    return client.delete('/v2/seller/studio/ads/$id');
   }
 
   static String _extractErrorMessage(dynamic data) {

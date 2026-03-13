@@ -13,22 +13,42 @@ final appConfigProvider = Provider<AppConfig>((ref) {
   throw UnimplementedError('appConfigProvider must be overridden in main.dart');
 });
 
-final sharedPreferencesProvider =
-    Provider<SharedPreferences>((ref) => throw UnimplementedError());
+final sharedPreferencesProvider = Provider<SharedPreferences>(
+  (ref) => throw UnimplementedError(),
+);
 
 final secureStorageProvider = Provider<SecureStorage>((ref) {
-  throw UnimplementedError('secureStorageProvider must be overridden in main.dart');
+  throw UnimplementedError(
+    'secureStorageProvider must be overridden in main.dart',
+  );
 });
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  throw UnimplementedError('appDatabaseProvider must be overridden in main.dart');
+  throw UnimplementedError(
+    'appDatabaseProvider must be overridden in main.dart',
+  );
 });
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final config = ref.watch(appConfigProvider);
   final storage = ref.watch(secureStorageProvider);
-  return ApiClient(config: config, secureStorage: storage);
+  return ApiClient(
+    config: config,
+    secureStorage: storage,
+    onAuthExpired: () {
+      // Lazy-import to avoid circular dependency:
+      // The auth controller will handle clearing state and navigating to login.
+      try {
+        ref.read(authLogoutCallbackProvider)?.call();
+      } catch (_) {}
+    },
+  );
 });
+
+// Callback set by auth_controller to handle 401-triggered logout.
+final authLogoutCallbackProvider = StateProvider<void Function()?>(
+  (ref) => null,
+);
 
 final sellerApiProvider = Provider<SellerApi>((ref) {
   final client = ref.watch(apiClientProvider);
@@ -43,5 +63,5 @@ final dbExecutorProvider = Provider<drift.QueryExecutor>((ref) {
 });
 
 final connectivityProvider = StreamProvider<List<ConnectivityResult>>((ref) {
-   return Connectivity().onConnectivityChanged;
+  return Connectivity().onConnectivityChanged;
 });

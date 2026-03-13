@@ -64,7 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '957614256068',
     projectId: 'sanaaos',
     storageBucket: 'sanaaos.firebasestorage.app',
-    iosClientId: '957614256068-rmu43ikme1aat7r6fogdiaml4837frbd.apps.googleusercontent.com',
+    iosClientId:
+        '957614256068-rmu43ikme1aat7r6fogdiaml4837frbd.apps.googleusercontent.com',
     iosBundleId: 'com.soko24.sokoSellerTerminal',
   );
 
@@ -74,7 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '957614256068',
     projectId: 'sanaaos',
     storageBucket: 'sanaaos.firebasestorage.app',
-    iosClientId: '957614256068-rmu43ikme1aat7r6fogdiaml4837frbd.apps.googleusercontent.com',
+    iosClientId:
+        '957614256068-rmu43ikme1aat7r6fogdiaml4837frbd.apps.googleusercontent.com',
     iosBundleId: 'com.soko24.sokoSellerTerminal',
   );
 

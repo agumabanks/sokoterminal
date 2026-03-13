@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/auth/pos_session_controller.dart';
 import '../checkout/checkout_screen.dart';
 import '../notifications/notifications_entry_screen.dart';
 import '../transactions/transactions_screen.dart';
@@ -15,6 +16,7 @@ import '../../core/sync/sync_service.dart';
 import '../../widgets/pin_prompt_sheet.dart';
 import '../../widgets/connectivity_banner.dart';
 import '../../widgets/sync_status_bar.dart';
+import '../../widgets/logout_dialog.dart';
 import '../receipts/receipt_providers.dart';
 import '../../core/firebase/remote_config_service.dart';
 import '../../core/settings/business_setup_prefs.dart';
@@ -72,10 +74,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final staffState = ref.watch(staffPinProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
     final setupCompleted = ref.watch(businessSetupCompletedProvider);
-    final stockAlertCount = ref.watch(openStockAlertsCountProvider).maybeWhen(
-          data: (c) => c,
-          orElse: () => 0,
-        );
+    final stockAlertCount = ref
+        .watch(openStockAlertsCountProvider)
+        .maybeWhen(data: (c) => c, orElse: () => 0);
     final alertsBadgeCount = notifications.unreadCount + stockAlertCount;
     return Scaffold(
       body: Column(
@@ -92,16 +93,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               decoration: BoxDecoration(
                 color: DesignTokens.warning.withValues(alpha: 0.12),
                 border: Border(
-                  bottom: BorderSide(color: DesignTokens.warning.withValues(alpha: 0.35)),
+                  bottom: BorderSide(
+                    color: DesignTokens.warning.withValues(alpha: 0.35),
+                  ),
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.checklist_outlined, color: DesignTokens.warning),
+                  const Icon(
+                    Icons.checklist_outlined,
+                    color: DesignTokens.warning,
+                  ),
                   const SizedBox(width: DesignTokens.spaceSm),
                   const Expanded(
                     child: Text(
-                      'Finish setup: business, payments, receipts, printer, PIN',
+                      'Finish setup: business, payments, receipts. Printer and PIN are recommended next.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
@@ -127,6 +133,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                       ),
                     ),
                   ),
+                if (ref.watch(screenLockedProvider))
+                  _ScreenLockOverlay(onUnlock: () => _promptScreenUnlock(context, ref)),
               ],
             ),
           ),
@@ -165,6 +173,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
   }
 
+  void _promptScreenUnlock(BuildContext context, WidgetRef ref) {
+    unawaited(() async {
+      final pin = await PinPromptSheet.show(
+        context: context,
+        title: 'Unlock Screen',
+        pinLabel: 'Enter PIN',
+        actionLabel: 'Unlock',
+      );
+      if (pin == null || !context.mounted) return;
+      // Try POS session PIN or staff PIN
+      final posSession = ref.read(posSessionProvider.notifier);
+      final ok = await posSession.startWithPin(pin);
+      if (ok) {
+        ref.read(screenLockedProvider.notifier).state = false;
+        return;
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incorrect PIN')),
+      );
+    }());
+  }
+
   void _promptUnlock(BuildContext context, WidgetRef ref) {
     final controller = ref.read(staffPinProvider.notifier);
     unawaited(() async {
@@ -183,5 +214,41 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
       }
     }());
+  }
+}
+
+class _ScreenLockOverlay extends StatelessWidget {
+  const _ScreenLockOverlay({required this.onUnlock});
+  final VoidCallback onUnlock;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.85),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lock, size: 64, color: Colors.white54),
+            const SizedBox(height: 16),
+            Text(
+              'Screen Locked',
+              style: DesignTokens.textTitle.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Enter your PIN to unlock',
+              style: DesignTokens.textBody.copyWith(color: Colors.white60),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.lock_open),
+              label: const Text('Unlock'),
+              onPressed: onUnlock,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

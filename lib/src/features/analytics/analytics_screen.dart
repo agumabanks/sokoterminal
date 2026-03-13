@@ -43,9 +43,10 @@ class AnalyticsScreen extends ConsumerWidget {
   }
 
   Widget _buildSummaryCards(AnalyticsState state) {
-    final total7d = state.dailySales.fold<double>(0, (sum, item) => sum + item.amount);
-    final topProduct = state.topProducts.isNotEmpty ? state.topProducts.first.name : 'N/A';
-
+    final total7d = state.dailySales.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
     return Row(
       children: [
         Expanded(
@@ -60,7 +61,8 @@ class AnalyticsScreen extends ConsumerWidget {
         Expanded(
           child: _StatCard(
             label: 'Stock Value',
-            value: 'UGX ${NumberFormat.compact().format(state.totalInventoryValue)}',
+            value:
+                'UGX ${NumberFormat.compact().format(state.totalInventoryValue)}',
             icon: Icons.inventory_2_outlined,
             color: DesignTokens.brandAccent,
           ),
@@ -72,9 +74,10 @@ class AnalyticsScreen extends ConsumerWidget {
   Widget _buildSalesChart(AnalyticsState state) {
     if (state.dailySales.isEmpty) return const SizedBox.shrink();
 
-    final maxVal = state.dailySales.fold<double>(0, (max, e) => e.amount > max ? e.amount : max);
-    final yInterval = maxVal > 0 ? (maxVal / 5).ceilToDouble() : 1000.0;
-
+    final maxVal = state.dailySales.fold<double>(
+      0,
+      (max, e) => e.amount > max ? e.amount : max,
+    );
     return Container(
       padding: DesignTokens.paddingMd,
       decoration: BoxDecoration(
@@ -101,13 +104,16 @@ class AnalyticsScreen extends ConsumerWidget {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index < 0 || index >= state.dailySales.length) return const Text('');
+                        if (index < 0 || index >= state.dailySales.length)
+                          return const Text('');
                         final date = state.dailySales[index].date;
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
                             DateFormat('E').format(date),
-                            style: DesignTokens.textSmall.copyWith(fontSize: 10),
+                            style: DesignTokens.textSmall.copyWith(
+                              fontSize: 10,
+                            ),
                           ),
                         );
                       },
@@ -126,8 +132,12 @@ class AnalyticsScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
@@ -139,7 +149,9 @@ class AnalyticsScreen extends ConsumerWidget {
                         toY: entry.value.amount,
                         color: DesignTokens.brandPrimary,
                         width: 16,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
+                        ),
                       ),
                     ],
                   );
@@ -167,28 +179,39 @@ class AnalyticsScreen extends ConsumerWidget {
           const SizedBox(height: DesignTokens.spaceMd),
           if (state.topProducts.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceLg),
+              padding: const EdgeInsets.symmetric(
+                vertical: DesignTokens.spaceLg,
+              ),
               child: Center(
                 child: Text('No sales data yet', style: DesignTokens.textSmall),
               ),
             )
           else
-            ...state.topProducts.map((p) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.1),
-                    child: Text(
-                      p.name[0].toUpperCase(),
-                      style: const TextStyle(color: DesignTokens.brandPrimary),
-                    ),
+            ...state.topProducts.map(
+              (p) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: DesignTokens.brandPrimary.withValues(
+                    alpha: 0.1,
                   ),
-                  title: Text(p.name, style: DesignTokens.textBody),
-                  subtitle: Text('${p.quantity} sold', style: DesignTokens.textSmall),
-                  trailing: Text(
-                    'UGX ${NumberFormat.compact().format(p.revenue)}',
-                    style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.brandAccent),
+                  child: Text(
+                    p.name[0].toUpperCase(),
+                    style: const TextStyle(color: DesignTokens.brandPrimary),
                   ),
-                )),
+                ),
+                title: Text(p.name, style: DesignTokens.textBody),
+                subtitle: Text(
+                  '${p.quantity} sold',
+                  style: DesignTokens.textSmall,
+                ),
+                trailing: Text(
+                  'UGX ${NumberFormat.compact().format(p.revenue)}',
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: DesignTokens.brandAccent,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -222,7 +245,12 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: DesignTokens.spaceSm),
-          Text(label, style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+          Text(
+            label,
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
+          ),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,

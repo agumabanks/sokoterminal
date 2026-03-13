@@ -2409,6 +2409,17 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _priceMeta = const VerificationMeta('price');
   @override
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
@@ -2486,6 +2497,7 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     remoteId,
     title,
     description,
+    imageUrl,
     price,
     durationMinutes,
     publishedOnline,
@@ -2529,6 +2541,12 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
           data['description']!,
           _descriptionMeta,
         ),
+      );
+    }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
       );
     }
     if (data.containsKey('price')) {
@@ -2600,6 +2618,10 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      ),
       price: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}price'],
@@ -2638,6 +2660,7 @@ class Service extends DataClass implements Insertable<Service> {
   final int? remoteId;
   final String title;
   final String? description;
+  final String? imageUrl;
   final double price;
   final int? durationMinutes;
   final bool publishedOnline;
@@ -2649,6 +2672,7 @@ class Service extends DataClass implements Insertable<Service> {
     this.remoteId,
     required this.title,
     this.description,
+    this.imageUrl,
     required this.price,
     this.durationMinutes,
     required this.publishedOnline,
@@ -2666,6 +2690,9 @@ class Service extends DataClass implements Insertable<Service> {
     map['title'] = Variable<String>(title);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || imageUrl != null) {
+      map['image_url'] = Variable<String>(imageUrl);
     }
     map['price'] = Variable<double>(price);
     if (!nullToAbsent || durationMinutes != null) {
@@ -2690,6 +2717,9 @@ class Service extends DataClass implements Insertable<Service> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      imageUrl: imageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imageUrl),
       price: Value(price),
       durationMinutes: durationMinutes == null && nullToAbsent
           ? const Value.absent()
@@ -2713,6 +2743,7 @@ class Service extends DataClass implements Insertable<Service> {
       remoteId: serializer.fromJson<int?>(json['remoteId']),
       title: serializer.fromJson<String>(json['title']),
       description: serializer.fromJson<String?>(json['description']),
+      imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       price: serializer.fromJson<double>(json['price']),
       durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
       publishedOnline: serializer.fromJson<bool>(json['publishedOnline']),
@@ -2729,6 +2760,7 @@ class Service extends DataClass implements Insertable<Service> {
       'remoteId': serializer.toJson<int?>(remoteId),
       'title': serializer.toJson<String>(title),
       'description': serializer.toJson<String?>(description),
+      'imageUrl': serializer.toJson<String?>(imageUrl),
       'price': serializer.toJson<double>(price),
       'durationMinutes': serializer.toJson<int?>(durationMinutes),
       'publishedOnline': serializer.toJson<bool>(publishedOnline),
@@ -2743,6 +2775,7 @@ class Service extends DataClass implements Insertable<Service> {
     Value<int?> remoteId = const Value.absent(),
     String? title,
     Value<String?> description = const Value.absent(),
+    Value<String?> imageUrl = const Value.absent(),
     double? price,
     Value<int?> durationMinutes = const Value.absent(),
     bool? publishedOnline,
@@ -2754,6 +2787,7 @@ class Service extends DataClass implements Insertable<Service> {
     remoteId: remoteId.present ? remoteId.value : this.remoteId,
     title: title ?? this.title,
     description: description.present ? description.value : this.description,
+    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     price: price ?? this.price,
     durationMinutes: durationMinutes.present
         ? durationMinutes.value
@@ -2771,6 +2805,7 @@ class Service extends DataClass implements Insertable<Service> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       price: data.price.present ? data.price.value : this.price,
       durationMinutes: data.durationMinutes.present
           ? data.durationMinutes.value
@@ -2791,6 +2826,7 @@ class Service extends DataClass implements Insertable<Service> {
           ..write('remoteId: $remoteId, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('price: $price, ')
           ..write('durationMinutes: $durationMinutes, ')
           ..write('publishedOnline: $publishedOnline, ')
@@ -2807,6 +2843,7 @@ class Service extends DataClass implements Insertable<Service> {
     remoteId,
     title,
     description,
+    imageUrl,
     price,
     durationMinutes,
     publishedOnline,
@@ -2822,6 +2859,7 @@ class Service extends DataClass implements Insertable<Service> {
           other.remoteId == this.remoteId &&
           other.title == this.title &&
           other.description == this.description &&
+          other.imageUrl == this.imageUrl &&
           other.price == this.price &&
           other.durationMinutes == this.durationMinutes &&
           other.publishedOnline == this.publishedOnline &&
@@ -2835,6 +2873,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
   final Value<int?> remoteId;
   final Value<String> title;
   final Value<String?> description;
+  final Value<String?> imageUrl;
   final Value<double> price;
   final Value<int?> durationMinutes;
   final Value<bool> publishedOnline;
@@ -2847,6 +2886,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.remoteId = const Value.absent(),
     this.title = const Value.absent(),
     this.description = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     this.price = const Value.absent(),
     this.durationMinutes = const Value.absent(),
     this.publishedOnline = const Value.absent(),
@@ -2860,6 +2900,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.remoteId = const Value.absent(),
     required String title,
     this.description = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     required double price,
     this.durationMinutes = const Value.absent(),
     this.publishedOnline = const Value.absent(),
@@ -2874,6 +2915,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Expression<int>? remoteId,
     Expression<String>? title,
     Expression<String>? description,
+    Expression<String>? imageUrl,
     Expression<double>? price,
     Expression<int>? durationMinutes,
     Expression<bool>? publishedOnline,
@@ -2887,6 +2929,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       if (remoteId != null) 'remote_id': remoteId,
       if (title != null) 'title': title,
       if (description != null) 'description': description,
+      if (imageUrl != null) 'image_url': imageUrl,
       if (price != null) 'price': price,
       if (durationMinutes != null) 'duration_minutes': durationMinutes,
       if (publishedOnline != null) 'published_online': publishedOnline,
@@ -2902,6 +2945,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Value<int?>? remoteId,
     Value<String>? title,
     Value<String?>? description,
+    Value<String?>? imageUrl,
     Value<double>? price,
     Value<int?>? durationMinutes,
     Value<bool>? publishedOnline,
@@ -2915,6 +2959,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       remoteId: remoteId ?? this.remoteId,
       title: title ?? this.title,
       description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
       price: price ?? this.price,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       publishedOnline: publishedOnline ?? this.publishedOnline,
@@ -2939,6 +2984,9 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
+    }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
     }
     if (price.present) {
       map['price'] = Variable<double>(price.value);
@@ -2971,6 +3019,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
           ..write('remoteId: $remoteId, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('price: $price, ')
           ..write('durationMinutes: $durationMinutes, ')
           ..write('publishedOnline: $publishedOnline, ')
@@ -10085,6 +10134,2184 @@ class OutletsCompanion extends UpdateCompanion<Outlet> {
   }
 }
 
+class $BusinessProfilesTable extends BusinessProfiles
+    with TableInfo<$BusinessProfilesTable, BusinessProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BusinessProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sellerIdMeta = const VerificationMeta(
+    'sellerId',
+  );
+  @override
+  late final GeneratedColumn<String> sellerId = GeneratedColumn<String>(
+    'seller_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sellerNameMeta = const VerificationMeta(
+    'sellerName',
+  );
+  @override
+  late final GeneratedColumn<String> sellerName = GeneratedColumn<String>(
+    'seller_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sellerEmailMeta = const VerificationMeta(
+    'sellerEmail',
+  );
+  @override
+  late final GeneratedColumn<String> sellerEmail = GeneratedColumn<String>(
+    'seller_email',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sellerPhoneMeta = const VerificationMeta(
+    'sellerPhone',
+  );
+  @override
+  late final GeneratedColumn<String> sellerPhone = GeneratedColumn<String>(
+    'seller_phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _shopIdMeta = const VerificationMeta('shopId');
+  @override
+  late final GeneratedColumn<String> shopId = GeneratedColumn<String>(
+    'shop_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _shopNameMeta = const VerificationMeta(
+    'shopName',
+  );
+  @override
+  late final GeneratedColumn<String> shopName = GeneratedColumn<String>(
+    'shop_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _shopAddressMeta = const VerificationMeta(
+    'shopAddress',
+  );
+  @override
+  late final GeneratedColumn<String> shopAddress = GeneratedColumn<String>(
+    'shop_address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _shopPhoneMeta = const VerificationMeta(
+    'shopPhone',
+  );
+  @override
+  late final GeneratedColumn<String> shopPhone = GeneratedColumn<String>(
+    'shop_phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _logoUploadIdMeta = const VerificationMeta(
+    'logoUploadId',
+  );
+  @override
+  late final GeneratedColumn<int> logoUploadId = GeneratedColumn<int>(
+    'logo_upload_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _logoUrlMeta = const VerificationMeta(
+    'logoUrl',
+  );
+  @override
+  late final GeneratedColumn<String> logoUrl = GeneratedColumn<String>(
+    'logo_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metaTitleMeta = const VerificationMeta(
+    'metaTitle',
+  );
+  @override
+  late final GeneratedColumn<String> metaTitle = GeneratedColumn<String>(
+    'meta_title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metaDescriptionMeta = const VerificationMeta(
+    'metaDescription',
+  );
+  @override
+  late final GeneratedColumn<String> metaDescription = GeneratedColumn<String>(
+    'meta_description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _thermalPrinterWidthMeta =
+      const VerificationMeta('thermalPrinterWidth');
+  @override
+  late final GeneratedColumn<int> thermalPrinterWidth = GeneratedColumn<int>(
+    'thermal_printer_width',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _shippingCostMeta = const VerificationMeta(
+    'shippingCost',
+  );
+  @override
+  late final GeneratedColumn<double> shippingCost = GeneratedColumn<double>(
+    'shipping_cost',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _selfDeliveryActiveMeta =
+      const VerificationMeta('selfDeliveryActive');
+  @override
+  late final GeneratedColumn<bool> selfDeliveryActive = GeneratedColumn<bool>(
+    'self_delivery_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("self_delivery_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _deliveryRadiusKmMeta = const VerificationMeta(
+    'deliveryRadiusKm',
+  );
+  @override
+  late final GeneratedColumn<double> deliveryRadiusKm = GeneratedColumn<double>(
+    'delivery_radius_km',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deliveryPickupLatitudeMeta =
+      const VerificationMeta('deliveryPickupLatitude');
+  @override
+  late final GeneratedColumn<double> deliveryPickupLatitude =
+      GeneratedColumn<double>(
+        'delivery_pickup_latitude',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _deliveryPickupLongitudeMeta =
+      const VerificationMeta('deliveryPickupLongitude');
+  @override
+  late final GeneratedColumn<double> deliveryPickupLongitude =
+      GeneratedColumn<double>(
+        'delivery_pickup_longitude',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _cashOnDeliveryEnabledMeta =
+      const VerificationMeta('cashOnDeliveryEnabled');
+  @override
+  late final GeneratedColumn<bool> cashOnDeliveryEnabled =
+      GeneratedColumn<bool>(
+        'cash_on_delivery_enabled',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("cash_on_delivery_enabled" IN (0, 1))',
+        ),
+        defaultValue: const Constant(true),
+      );
+  static const VerificationMeta _bankPaymentEnabledMeta =
+      const VerificationMeta('bankPaymentEnabled');
+  @override
+  late final GeneratedColumn<bool> bankPaymentEnabled = GeneratedColumn<bool>(
+    'bank_payment_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("bank_payment_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _mobileMoneyEnabledMeta =
+      const VerificationMeta('mobileMoneyEnabled');
+  @override
+  late final GeneratedColumn<bool> mobileMoneyEnabled = GeneratedColumn<bool>(
+    'mobile_money_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("mobile_money_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _bankNameMeta = const VerificationMeta(
+    'bankName',
+  );
+  @override
+  late final GeneratedColumn<String> bankName = GeneratedColumn<String>(
+    'bank_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bankAccNameMeta = const VerificationMeta(
+    'bankAccName',
+  );
+  @override
+  late final GeneratedColumn<String> bankAccName = GeneratedColumn<String>(
+    'bank_acc_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bankAccNoMeta = const VerificationMeta(
+    'bankAccNo',
+  );
+  @override
+  late final GeneratedColumn<String> bankAccNo = GeneratedColumn<String>(
+    'bank_acc_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bankRoutingNoMeta = const VerificationMeta(
+    'bankRoutingNo',
+  );
+  @override
+  late final GeneratedColumn<String> bankRoutingNo = GeneratedColumn<String>(
+    'bank_routing_no',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _mtnMerchantCodeMeta = const VerificationMeta(
+    'mtnMerchantCode',
+  );
+  @override
+  late final GeneratedColumn<String> mtnMerchantCode = GeneratedColumn<String>(
+    'mtn_merchant_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _airtelMerchantCodeMeta =
+      const VerificationMeta('airtelMerchantCode');
+  @override
+  late final GeneratedColumn<String> airtelMerchantCode =
+      GeneratedColumn<String>(
+        'airtel_merchant_code',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _paybillNumberMeta = const VerificationMeta(
+    'paybillNumber',
+  );
+  @override
+  late final GeneratedColumn<String> paybillNumber = GeneratedColumn<String>(
+    'paybill_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _receiptPaymentMethodsJsonMeta =
+      const VerificationMeta('receiptPaymentMethodsJson');
+  @override
+  late final GeneratedColumn<String> receiptPaymentMethodsJson =
+      GeneratedColumn<String>(
+        'receipt_payment_methods_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _deliveryProfileJsonMeta =
+      const VerificationMeta('deliveryProfileJson');
+  @override
+  late final GeneratedColumn<String> deliveryProfileJson =
+      GeneratedColumn<String>(
+        'delivery_profile_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  static const VerificationMeta _syncedMeta = const VerificationMeta('synced');
+  @override
+  late final GeneratedColumn<bool> synced = GeneratedColumn<bool>(
+    'synced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("synced" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sellerId,
+    sellerName,
+    sellerEmail,
+    sellerPhone,
+    shopId,
+    shopName,
+    shopAddress,
+    shopPhone,
+    logoUploadId,
+    logoUrl,
+    metaTitle,
+    metaDescription,
+    thermalPrinterWidth,
+    shippingCost,
+    selfDeliveryActive,
+    deliveryRadiusKm,
+    deliveryPickupLatitude,
+    deliveryPickupLongitude,
+    cashOnDeliveryEnabled,
+    bankPaymentEnabled,
+    mobileMoneyEnabled,
+    bankName,
+    bankAccName,
+    bankAccNo,
+    bankRoutingNo,
+    mtnMerchantCode,
+    airtelMerchantCode,
+    paybillNumber,
+    receiptPaymentMethodsJson,
+    deliveryProfileJson,
+    updatedAt,
+    synced,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'business_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BusinessProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('seller_id')) {
+      context.handle(
+        _sellerIdMeta,
+        sellerId.isAcceptableOrUnknown(data['seller_id']!, _sellerIdMeta),
+      );
+    }
+    if (data.containsKey('seller_name')) {
+      context.handle(
+        _sellerNameMeta,
+        sellerName.isAcceptableOrUnknown(data['seller_name']!, _sellerNameMeta),
+      );
+    }
+    if (data.containsKey('seller_email')) {
+      context.handle(
+        _sellerEmailMeta,
+        sellerEmail.isAcceptableOrUnknown(
+          data['seller_email']!,
+          _sellerEmailMeta,
+        ),
+      );
+    }
+    if (data.containsKey('seller_phone')) {
+      context.handle(
+        _sellerPhoneMeta,
+        sellerPhone.isAcceptableOrUnknown(
+          data['seller_phone']!,
+          _sellerPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shop_id')) {
+      context.handle(
+        _shopIdMeta,
+        shopId.isAcceptableOrUnknown(data['shop_id']!, _shopIdMeta),
+      );
+    }
+    if (data.containsKey('shop_name')) {
+      context.handle(
+        _shopNameMeta,
+        shopName.isAcceptableOrUnknown(data['shop_name']!, _shopNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shopNameMeta);
+    }
+    if (data.containsKey('shop_address')) {
+      context.handle(
+        _shopAddressMeta,
+        shopAddress.isAcceptableOrUnknown(
+          data['shop_address']!,
+          _shopAddressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shop_phone')) {
+      context.handle(
+        _shopPhoneMeta,
+        shopPhone.isAcceptableOrUnknown(data['shop_phone']!, _shopPhoneMeta),
+      );
+    }
+    if (data.containsKey('logo_upload_id')) {
+      context.handle(
+        _logoUploadIdMeta,
+        logoUploadId.isAcceptableOrUnknown(
+          data['logo_upload_id']!,
+          _logoUploadIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('logo_url')) {
+      context.handle(
+        _logoUrlMeta,
+        logoUrl.isAcceptableOrUnknown(data['logo_url']!, _logoUrlMeta),
+      );
+    }
+    if (data.containsKey('meta_title')) {
+      context.handle(
+        _metaTitleMeta,
+        metaTitle.isAcceptableOrUnknown(data['meta_title']!, _metaTitleMeta),
+      );
+    }
+    if (data.containsKey('meta_description')) {
+      context.handle(
+        _metaDescriptionMeta,
+        metaDescription.isAcceptableOrUnknown(
+          data['meta_description']!,
+          _metaDescriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('thermal_printer_width')) {
+      context.handle(
+        _thermalPrinterWidthMeta,
+        thermalPrinterWidth.isAcceptableOrUnknown(
+          data['thermal_printer_width']!,
+          _thermalPrinterWidthMeta,
+        ),
+      );
+    }
+    if (data.containsKey('shipping_cost')) {
+      context.handle(
+        _shippingCostMeta,
+        shippingCost.isAcceptableOrUnknown(
+          data['shipping_cost']!,
+          _shippingCostMeta,
+        ),
+      );
+    }
+    if (data.containsKey('self_delivery_active')) {
+      context.handle(
+        _selfDeliveryActiveMeta,
+        selfDeliveryActive.isAcceptableOrUnknown(
+          data['self_delivery_active']!,
+          _selfDeliveryActiveMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_radius_km')) {
+      context.handle(
+        _deliveryRadiusKmMeta,
+        deliveryRadiusKm.isAcceptableOrUnknown(
+          data['delivery_radius_km']!,
+          _deliveryRadiusKmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_pickup_latitude')) {
+      context.handle(
+        _deliveryPickupLatitudeMeta,
+        deliveryPickupLatitude.isAcceptableOrUnknown(
+          data['delivery_pickup_latitude']!,
+          _deliveryPickupLatitudeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_pickup_longitude')) {
+      context.handle(
+        _deliveryPickupLongitudeMeta,
+        deliveryPickupLongitude.isAcceptableOrUnknown(
+          data['delivery_pickup_longitude']!,
+          _deliveryPickupLongitudeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cash_on_delivery_enabled')) {
+      context.handle(
+        _cashOnDeliveryEnabledMeta,
+        cashOnDeliveryEnabled.isAcceptableOrUnknown(
+          data['cash_on_delivery_enabled']!,
+          _cashOnDeliveryEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_payment_enabled')) {
+      context.handle(
+        _bankPaymentEnabledMeta,
+        bankPaymentEnabled.isAcceptableOrUnknown(
+          data['bank_payment_enabled']!,
+          _bankPaymentEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mobile_money_enabled')) {
+      context.handle(
+        _mobileMoneyEnabledMeta,
+        mobileMoneyEnabled.isAcceptableOrUnknown(
+          data['mobile_money_enabled']!,
+          _mobileMoneyEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_name')) {
+      context.handle(
+        _bankNameMeta,
+        bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta),
+      );
+    }
+    if (data.containsKey('bank_acc_name')) {
+      context.handle(
+        _bankAccNameMeta,
+        bankAccName.isAcceptableOrUnknown(
+          data['bank_acc_name']!,
+          _bankAccNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_acc_no')) {
+      context.handle(
+        _bankAccNoMeta,
+        bankAccNo.isAcceptableOrUnknown(data['bank_acc_no']!, _bankAccNoMeta),
+      );
+    }
+    if (data.containsKey('bank_routing_no')) {
+      context.handle(
+        _bankRoutingNoMeta,
+        bankRoutingNo.isAcceptableOrUnknown(
+          data['bank_routing_no']!,
+          _bankRoutingNoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mtn_merchant_code')) {
+      context.handle(
+        _mtnMerchantCodeMeta,
+        mtnMerchantCode.isAcceptableOrUnknown(
+          data['mtn_merchant_code']!,
+          _mtnMerchantCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('airtel_merchant_code')) {
+      context.handle(
+        _airtelMerchantCodeMeta,
+        airtelMerchantCode.isAcceptableOrUnknown(
+          data['airtel_merchant_code']!,
+          _airtelMerchantCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('paybill_number')) {
+      context.handle(
+        _paybillNumberMeta,
+        paybillNumber.isAcceptableOrUnknown(
+          data['paybill_number']!,
+          _paybillNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('receipt_payment_methods_json')) {
+      context.handle(
+        _receiptPaymentMethodsJsonMeta,
+        receiptPaymentMethodsJson.isAcceptableOrUnknown(
+          data['receipt_payment_methods_json']!,
+          _receiptPaymentMethodsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_profile_json')) {
+      context.handle(
+        _deliveryProfileJsonMeta,
+        deliveryProfileJson.isAcceptableOrUnknown(
+          data['delivery_profile_json']!,
+          _deliveryProfileJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('synced')) {
+      context.handle(
+        _syncedMeta,
+        synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BusinessProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BusinessProfile(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sellerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seller_id'],
+      ),
+      sellerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seller_name'],
+      ),
+      sellerEmail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seller_email'],
+      ),
+      sellerPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seller_phone'],
+      ),
+      shopId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shop_id'],
+      ),
+      shopName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shop_name'],
+      )!,
+      shopAddress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shop_address'],
+      ),
+      shopPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shop_phone'],
+      ),
+      logoUploadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}logo_upload_id'],
+      ),
+      logoUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}logo_url'],
+      ),
+      metaTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}meta_title'],
+      ),
+      metaDescription: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}meta_description'],
+      ),
+      thermalPrinterWidth: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}thermal_printer_width'],
+      ),
+      shippingCost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}shipping_cost'],
+      ),
+      selfDeliveryActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}self_delivery_active'],
+      )!,
+      deliveryRadiusKm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}delivery_radius_km'],
+      ),
+      deliveryPickupLatitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}delivery_pickup_latitude'],
+      ),
+      deliveryPickupLongitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}delivery_pickup_longitude'],
+      ),
+      cashOnDeliveryEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}cash_on_delivery_enabled'],
+      )!,
+      bankPaymentEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}bank_payment_enabled'],
+      )!,
+      mobileMoneyEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}mobile_money_enabled'],
+      )!,
+      bankName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_name'],
+      ),
+      bankAccName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_acc_name'],
+      ),
+      bankAccNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_acc_no'],
+      ),
+      bankRoutingNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_routing_no'],
+      ),
+      mtnMerchantCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mtn_merchant_code'],
+      ),
+      airtelMerchantCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}airtel_merchant_code'],
+      ),
+      paybillNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paybill_number'],
+      ),
+      receiptPaymentMethodsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_payment_methods_json'],
+      ),
+      deliveryProfileJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}delivery_profile_json'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      synced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}synced'],
+      )!,
+    );
+  }
+
+  @override
+  $BusinessProfilesTable createAlias(String alias) {
+    return $BusinessProfilesTable(attachedDatabase, alias);
+  }
+}
+
+class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
+  final String id;
+  final String? sellerId;
+  final String? sellerName;
+  final String? sellerEmail;
+  final String? sellerPhone;
+  final String? shopId;
+  final String shopName;
+  final String? shopAddress;
+  final String? shopPhone;
+  final int? logoUploadId;
+  final String? logoUrl;
+  final String? metaTitle;
+  final String? metaDescription;
+  final int? thermalPrinterWidth;
+  final double? shippingCost;
+  final bool selfDeliveryActive;
+  final double? deliveryRadiusKm;
+  final double? deliveryPickupLatitude;
+  final double? deliveryPickupLongitude;
+  final bool cashOnDeliveryEnabled;
+  final bool bankPaymentEnabled;
+  final bool mobileMoneyEnabled;
+  final String? bankName;
+  final String? bankAccName;
+  final String? bankAccNo;
+  final String? bankRoutingNo;
+  final String? mtnMerchantCode;
+  final String? airtelMerchantCode;
+  final String? paybillNumber;
+  final String? receiptPaymentMethodsJson;
+  final String? deliveryProfileJson;
+  final DateTime updatedAt;
+  final bool synced;
+  const BusinessProfile({
+    required this.id,
+    this.sellerId,
+    this.sellerName,
+    this.sellerEmail,
+    this.sellerPhone,
+    this.shopId,
+    required this.shopName,
+    this.shopAddress,
+    this.shopPhone,
+    this.logoUploadId,
+    this.logoUrl,
+    this.metaTitle,
+    this.metaDescription,
+    this.thermalPrinterWidth,
+    this.shippingCost,
+    required this.selfDeliveryActive,
+    this.deliveryRadiusKm,
+    this.deliveryPickupLatitude,
+    this.deliveryPickupLongitude,
+    required this.cashOnDeliveryEnabled,
+    required this.bankPaymentEnabled,
+    required this.mobileMoneyEnabled,
+    this.bankName,
+    this.bankAccName,
+    this.bankAccNo,
+    this.bankRoutingNo,
+    this.mtnMerchantCode,
+    this.airtelMerchantCode,
+    this.paybillNumber,
+    this.receiptPaymentMethodsJson,
+    this.deliveryProfileJson,
+    required this.updatedAt,
+    required this.synced,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || sellerId != null) {
+      map['seller_id'] = Variable<String>(sellerId);
+    }
+    if (!nullToAbsent || sellerName != null) {
+      map['seller_name'] = Variable<String>(sellerName);
+    }
+    if (!nullToAbsent || sellerEmail != null) {
+      map['seller_email'] = Variable<String>(sellerEmail);
+    }
+    if (!nullToAbsent || sellerPhone != null) {
+      map['seller_phone'] = Variable<String>(sellerPhone);
+    }
+    if (!nullToAbsent || shopId != null) {
+      map['shop_id'] = Variable<String>(shopId);
+    }
+    map['shop_name'] = Variable<String>(shopName);
+    if (!nullToAbsent || shopAddress != null) {
+      map['shop_address'] = Variable<String>(shopAddress);
+    }
+    if (!nullToAbsent || shopPhone != null) {
+      map['shop_phone'] = Variable<String>(shopPhone);
+    }
+    if (!nullToAbsent || logoUploadId != null) {
+      map['logo_upload_id'] = Variable<int>(logoUploadId);
+    }
+    if (!nullToAbsent || logoUrl != null) {
+      map['logo_url'] = Variable<String>(logoUrl);
+    }
+    if (!nullToAbsent || metaTitle != null) {
+      map['meta_title'] = Variable<String>(metaTitle);
+    }
+    if (!nullToAbsent || metaDescription != null) {
+      map['meta_description'] = Variable<String>(metaDescription);
+    }
+    if (!nullToAbsent || thermalPrinterWidth != null) {
+      map['thermal_printer_width'] = Variable<int>(thermalPrinterWidth);
+    }
+    if (!nullToAbsent || shippingCost != null) {
+      map['shipping_cost'] = Variable<double>(shippingCost);
+    }
+    map['self_delivery_active'] = Variable<bool>(selfDeliveryActive);
+    if (!nullToAbsent || deliveryRadiusKm != null) {
+      map['delivery_radius_km'] = Variable<double>(deliveryRadiusKm);
+    }
+    if (!nullToAbsent || deliveryPickupLatitude != null) {
+      map['delivery_pickup_latitude'] = Variable<double>(
+        deliveryPickupLatitude,
+      );
+    }
+    if (!nullToAbsent || deliveryPickupLongitude != null) {
+      map['delivery_pickup_longitude'] = Variable<double>(
+        deliveryPickupLongitude,
+      );
+    }
+    map['cash_on_delivery_enabled'] = Variable<bool>(cashOnDeliveryEnabled);
+    map['bank_payment_enabled'] = Variable<bool>(bankPaymentEnabled);
+    map['mobile_money_enabled'] = Variable<bool>(mobileMoneyEnabled);
+    if (!nullToAbsent || bankName != null) {
+      map['bank_name'] = Variable<String>(bankName);
+    }
+    if (!nullToAbsent || bankAccName != null) {
+      map['bank_acc_name'] = Variable<String>(bankAccName);
+    }
+    if (!nullToAbsent || bankAccNo != null) {
+      map['bank_acc_no'] = Variable<String>(bankAccNo);
+    }
+    if (!nullToAbsent || bankRoutingNo != null) {
+      map['bank_routing_no'] = Variable<String>(bankRoutingNo);
+    }
+    if (!nullToAbsent || mtnMerchantCode != null) {
+      map['mtn_merchant_code'] = Variable<String>(mtnMerchantCode);
+    }
+    if (!nullToAbsent || airtelMerchantCode != null) {
+      map['airtel_merchant_code'] = Variable<String>(airtelMerchantCode);
+    }
+    if (!nullToAbsent || paybillNumber != null) {
+      map['paybill_number'] = Variable<String>(paybillNumber);
+    }
+    if (!nullToAbsent || receiptPaymentMethodsJson != null) {
+      map['receipt_payment_methods_json'] = Variable<String>(
+        receiptPaymentMethodsJson,
+      );
+    }
+    if (!nullToAbsent || deliveryProfileJson != null) {
+      map['delivery_profile_json'] = Variable<String>(deliveryProfileJson);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['synced'] = Variable<bool>(synced);
+    return map;
+  }
+
+  BusinessProfilesCompanion toCompanion(bool nullToAbsent) {
+    return BusinessProfilesCompanion(
+      id: Value(id),
+      sellerId: sellerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellerId),
+      sellerName: sellerName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellerName),
+      sellerEmail: sellerEmail == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellerEmail),
+      sellerPhone: sellerPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellerPhone),
+      shopId: shopId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shopId),
+      shopName: Value(shopName),
+      shopAddress: shopAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shopAddress),
+      shopPhone: shopPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shopPhone),
+      logoUploadId: logoUploadId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoUploadId),
+      logoUrl: logoUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoUrl),
+      metaTitle: metaTitle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metaTitle),
+      metaDescription: metaDescription == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metaDescription),
+      thermalPrinterWidth: thermalPrinterWidth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thermalPrinterWidth),
+      shippingCost: shippingCost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shippingCost),
+      selfDeliveryActive: Value(selfDeliveryActive),
+      deliveryRadiusKm: deliveryRadiusKm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryRadiusKm),
+      deliveryPickupLatitude: deliveryPickupLatitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryPickupLatitude),
+      deliveryPickupLongitude: deliveryPickupLongitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryPickupLongitude),
+      cashOnDeliveryEnabled: Value(cashOnDeliveryEnabled),
+      bankPaymentEnabled: Value(bankPaymentEnabled),
+      mobileMoneyEnabled: Value(mobileMoneyEnabled),
+      bankName: bankName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankName),
+      bankAccName: bankAccName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankAccName),
+      bankAccNo: bankAccNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankAccNo),
+      bankRoutingNo: bankRoutingNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankRoutingNo),
+      mtnMerchantCode: mtnMerchantCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mtnMerchantCode),
+      airtelMerchantCode: airtelMerchantCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(airtelMerchantCode),
+      paybillNumber: paybillNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paybillNumber),
+      receiptPaymentMethodsJson:
+          receiptPaymentMethodsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptPaymentMethodsJson),
+      deliveryProfileJson: deliveryProfileJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryProfileJson),
+      updatedAt: Value(updatedAt),
+      synced: Value(synced),
+    );
+  }
+
+  factory BusinessProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BusinessProfile(
+      id: serializer.fromJson<String>(json['id']),
+      sellerId: serializer.fromJson<String?>(json['sellerId']),
+      sellerName: serializer.fromJson<String?>(json['sellerName']),
+      sellerEmail: serializer.fromJson<String?>(json['sellerEmail']),
+      sellerPhone: serializer.fromJson<String?>(json['sellerPhone']),
+      shopId: serializer.fromJson<String?>(json['shopId']),
+      shopName: serializer.fromJson<String>(json['shopName']),
+      shopAddress: serializer.fromJson<String?>(json['shopAddress']),
+      shopPhone: serializer.fromJson<String?>(json['shopPhone']),
+      logoUploadId: serializer.fromJson<int?>(json['logoUploadId']),
+      logoUrl: serializer.fromJson<String?>(json['logoUrl']),
+      metaTitle: serializer.fromJson<String?>(json['metaTitle']),
+      metaDescription: serializer.fromJson<String?>(json['metaDescription']),
+      thermalPrinterWidth: serializer.fromJson<int?>(
+        json['thermalPrinterWidth'],
+      ),
+      shippingCost: serializer.fromJson<double?>(json['shippingCost']),
+      selfDeliveryActive: serializer.fromJson<bool>(json['selfDeliveryActive']),
+      deliveryRadiusKm: serializer.fromJson<double?>(json['deliveryRadiusKm']),
+      deliveryPickupLatitude: serializer.fromJson<double?>(
+        json['deliveryPickupLatitude'],
+      ),
+      deliveryPickupLongitude: serializer.fromJson<double?>(
+        json['deliveryPickupLongitude'],
+      ),
+      cashOnDeliveryEnabled: serializer.fromJson<bool>(
+        json['cashOnDeliveryEnabled'],
+      ),
+      bankPaymentEnabled: serializer.fromJson<bool>(json['bankPaymentEnabled']),
+      mobileMoneyEnabled: serializer.fromJson<bool>(json['mobileMoneyEnabled']),
+      bankName: serializer.fromJson<String?>(json['bankName']),
+      bankAccName: serializer.fromJson<String?>(json['bankAccName']),
+      bankAccNo: serializer.fromJson<String?>(json['bankAccNo']),
+      bankRoutingNo: serializer.fromJson<String?>(json['bankRoutingNo']),
+      mtnMerchantCode: serializer.fromJson<String?>(json['mtnMerchantCode']),
+      airtelMerchantCode: serializer.fromJson<String?>(
+        json['airtelMerchantCode'],
+      ),
+      paybillNumber: serializer.fromJson<String?>(json['paybillNumber']),
+      receiptPaymentMethodsJson: serializer.fromJson<String?>(
+        json['receiptPaymentMethodsJson'],
+      ),
+      deliveryProfileJson: serializer.fromJson<String?>(
+        json['deliveryProfileJson'],
+      ),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      synced: serializer.fromJson<bool>(json['synced']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sellerId': serializer.toJson<String?>(sellerId),
+      'sellerName': serializer.toJson<String?>(sellerName),
+      'sellerEmail': serializer.toJson<String?>(sellerEmail),
+      'sellerPhone': serializer.toJson<String?>(sellerPhone),
+      'shopId': serializer.toJson<String?>(shopId),
+      'shopName': serializer.toJson<String>(shopName),
+      'shopAddress': serializer.toJson<String?>(shopAddress),
+      'shopPhone': serializer.toJson<String?>(shopPhone),
+      'logoUploadId': serializer.toJson<int?>(logoUploadId),
+      'logoUrl': serializer.toJson<String?>(logoUrl),
+      'metaTitle': serializer.toJson<String?>(metaTitle),
+      'metaDescription': serializer.toJson<String?>(metaDescription),
+      'thermalPrinterWidth': serializer.toJson<int?>(thermalPrinterWidth),
+      'shippingCost': serializer.toJson<double?>(shippingCost),
+      'selfDeliveryActive': serializer.toJson<bool>(selfDeliveryActive),
+      'deliveryRadiusKm': serializer.toJson<double?>(deliveryRadiusKm),
+      'deliveryPickupLatitude': serializer.toJson<double?>(
+        deliveryPickupLatitude,
+      ),
+      'deliveryPickupLongitude': serializer.toJson<double?>(
+        deliveryPickupLongitude,
+      ),
+      'cashOnDeliveryEnabled': serializer.toJson<bool>(cashOnDeliveryEnabled),
+      'bankPaymentEnabled': serializer.toJson<bool>(bankPaymentEnabled),
+      'mobileMoneyEnabled': serializer.toJson<bool>(mobileMoneyEnabled),
+      'bankName': serializer.toJson<String?>(bankName),
+      'bankAccName': serializer.toJson<String?>(bankAccName),
+      'bankAccNo': serializer.toJson<String?>(bankAccNo),
+      'bankRoutingNo': serializer.toJson<String?>(bankRoutingNo),
+      'mtnMerchantCode': serializer.toJson<String?>(mtnMerchantCode),
+      'airtelMerchantCode': serializer.toJson<String?>(airtelMerchantCode),
+      'paybillNumber': serializer.toJson<String?>(paybillNumber),
+      'receiptPaymentMethodsJson': serializer.toJson<String?>(
+        receiptPaymentMethodsJson,
+      ),
+      'deliveryProfileJson': serializer.toJson<String?>(deliveryProfileJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'synced': serializer.toJson<bool>(synced),
+    };
+  }
+
+  BusinessProfile copyWith({
+    String? id,
+    Value<String?> sellerId = const Value.absent(),
+    Value<String?> sellerName = const Value.absent(),
+    Value<String?> sellerEmail = const Value.absent(),
+    Value<String?> sellerPhone = const Value.absent(),
+    Value<String?> shopId = const Value.absent(),
+    String? shopName,
+    Value<String?> shopAddress = const Value.absent(),
+    Value<String?> shopPhone = const Value.absent(),
+    Value<int?> logoUploadId = const Value.absent(),
+    Value<String?> logoUrl = const Value.absent(),
+    Value<String?> metaTitle = const Value.absent(),
+    Value<String?> metaDescription = const Value.absent(),
+    Value<int?> thermalPrinterWidth = const Value.absent(),
+    Value<double?> shippingCost = const Value.absent(),
+    bool? selfDeliveryActive,
+    Value<double?> deliveryRadiusKm = const Value.absent(),
+    Value<double?> deliveryPickupLatitude = const Value.absent(),
+    Value<double?> deliveryPickupLongitude = const Value.absent(),
+    bool? cashOnDeliveryEnabled,
+    bool? bankPaymentEnabled,
+    bool? mobileMoneyEnabled,
+    Value<String?> bankName = const Value.absent(),
+    Value<String?> bankAccName = const Value.absent(),
+    Value<String?> bankAccNo = const Value.absent(),
+    Value<String?> bankRoutingNo = const Value.absent(),
+    Value<String?> mtnMerchantCode = const Value.absent(),
+    Value<String?> airtelMerchantCode = const Value.absent(),
+    Value<String?> paybillNumber = const Value.absent(),
+    Value<String?> receiptPaymentMethodsJson = const Value.absent(),
+    Value<String?> deliveryProfileJson = const Value.absent(),
+    DateTime? updatedAt,
+    bool? synced,
+  }) => BusinessProfile(
+    id: id ?? this.id,
+    sellerId: sellerId.present ? sellerId.value : this.sellerId,
+    sellerName: sellerName.present ? sellerName.value : this.sellerName,
+    sellerEmail: sellerEmail.present ? sellerEmail.value : this.sellerEmail,
+    sellerPhone: sellerPhone.present ? sellerPhone.value : this.sellerPhone,
+    shopId: shopId.present ? shopId.value : this.shopId,
+    shopName: shopName ?? this.shopName,
+    shopAddress: shopAddress.present ? shopAddress.value : this.shopAddress,
+    shopPhone: shopPhone.present ? shopPhone.value : this.shopPhone,
+    logoUploadId: logoUploadId.present ? logoUploadId.value : this.logoUploadId,
+    logoUrl: logoUrl.present ? logoUrl.value : this.logoUrl,
+    metaTitle: metaTitle.present ? metaTitle.value : this.metaTitle,
+    metaDescription: metaDescription.present
+        ? metaDescription.value
+        : this.metaDescription,
+    thermalPrinterWidth: thermalPrinterWidth.present
+        ? thermalPrinterWidth.value
+        : this.thermalPrinterWidth,
+    shippingCost: shippingCost.present ? shippingCost.value : this.shippingCost,
+    selfDeliveryActive: selfDeliveryActive ?? this.selfDeliveryActive,
+    deliveryRadiusKm: deliveryRadiusKm.present
+        ? deliveryRadiusKm.value
+        : this.deliveryRadiusKm,
+    deliveryPickupLatitude: deliveryPickupLatitude.present
+        ? deliveryPickupLatitude.value
+        : this.deliveryPickupLatitude,
+    deliveryPickupLongitude: deliveryPickupLongitude.present
+        ? deliveryPickupLongitude.value
+        : this.deliveryPickupLongitude,
+    cashOnDeliveryEnabled: cashOnDeliveryEnabled ?? this.cashOnDeliveryEnabled,
+    bankPaymentEnabled: bankPaymentEnabled ?? this.bankPaymentEnabled,
+    mobileMoneyEnabled: mobileMoneyEnabled ?? this.mobileMoneyEnabled,
+    bankName: bankName.present ? bankName.value : this.bankName,
+    bankAccName: bankAccName.present ? bankAccName.value : this.bankAccName,
+    bankAccNo: bankAccNo.present ? bankAccNo.value : this.bankAccNo,
+    bankRoutingNo: bankRoutingNo.present
+        ? bankRoutingNo.value
+        : this.bankRoutingNo,
+    mtnMerchantCode: mtnMerchantCode.present
+        ? mtnMerchantCode.value
+        : this.mtnMerchantCode,
+    airtelMerchantCode: airtelMerchantCode.present
+        ? airtelMerchantCode.value
+        : this.airtelMerchantCode,
+    paybillNumber: paybillNumber.present
+        ? paybillNumber.value
+        : this.paybillNumber,
+    receiptPaymentMethodsJson: receiptPaymentMethodsJson.present
+        ? receiptPaymentMethodsJson.value
+        : this.receiptPaymentMethodsJson,
+    deliveryProfileJson: deliveryProfileJson.present
+        ? deliveryProfileJson.value
+        : this.deliveryProfileJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+    synced: synced ?? this.synced,
+  );
+  BusinessProfile copyWithCompanion(BusinessProfilesCompanion data) {
+    return BusinessProfile(
+      id: data.id.present ? data.id.value : this.id,
+      sellerId: data.sellerId.present ? data.sellerId.value : this.sellerId,
+      sellerName: data.sellerName.present
+          ? data.sellerName.value
+          : this.sellerName,
+      sellerEmail: data.sellerEmail.present
+          ? data.sellerEmail.value
+          : this.sellerEmail,
+      sellerPhone: data.sellerPhone.present
+          ? data.sellerPhone.value
+          : this.sellerPhone,
+      shopId: data.shopId.present ? data.shopId.value : this.shopId,
+      shopName: data.shopName.present ? data.shopName.value : this.shopName,
+      shopAddress: data.shopAddress.present
+          ? data.shopAddress.value
+          : this.shopAddress,
+      shopPhone: data.shopPhone.present ? data.shopPhone.value : this.shopPhone,
+      logoUploadId: data.logoUploadId.present
+          ? data.logoUploadId.value
+          : this.logoUploadId,
+      logoUrl: data.logoUrl.present ? data.logoUrl.value : this.logoUrl,
+      metaTitle: data.metaTitle.present ? data.metaTitle.value : this.metaTitle,
+      metaDescription: data.metaDescription.present
+          ? data.metaDescription.value
+          : this.metaDescription,
+      thermalPrinterWidth: data.thermalPrinterWidth.present
+          ? data.thermalPrinterWidth.value
+          : this.thermalPrinterWidth,
+      shippingCost: data.shippingCost.present
+          ? data.shippingCost.value
+          : this.shippingCost,
+      selfDeliveryActive: data.selfDeliveryActive.present
+          ? data.selfDeliveryActive.value
+          : this.selfDeliveryActive,
+      deliveryRadiusKm: data.deliveryRadiusKm.present
+          ? data.deliveryRadiusKm.value
+          : this.deliveryRadiusKm,
+      deliveryPickupLatitude: data.deliveryPickupLatitude.present
+          ? data.deliveryPickupLatitude.value
+          : this.deliveryPickupLatitude,
+      deliveryPickupLongitude: data.deliveryPickupLongitude.present
+          ? data.deliveryPickupLongitude.value
+          : this.deliveryPickupLongitude,
+      cashOnDeliveryEnabled: data.cashOnDeliveryEnabled.present
+          ? data.cashOnDeliveryEnabled.value
+          : this.cashOnDeliveryEnabled,
+      bankPaymentEnabled: data.bankPaymentEnabled.present
+          ? data.bankPaymentEnabled.value
+          : this.bankPaymentEnabled,
+      mobileMoneyEnabled: data.mobileMoneyEnabled.present
+          ? data.mobileMoneyEnabled.value
+          : this.mobileMoneyEnabled,
+      bankName: data.bankName.present ? data.bankName.value : this.bankName,
+      bankAccName: data.bankAccName.present
+          ? data.bankAccName.value
+          : this.bankAccName,
+      bankAccNo: data.bankAccNo.present ? data.bankAccNo.value : this.bankAccNo,
+      bankRoutingNo: data.bankRoutingNo.present
+          ? data.bankRoutingNo.value
+          : this.bankRoutingNo,
+      mtnMerchantCode: data.mtnMerchantCode.present
+          ? data.mtnMerchantCode.value
+          : this.mtnMerchantCode,
+      airtelMerchantCode: data.airtelMerchantCode.present
+          ? data.airtelMerchantCode.value
+          : this.airtelMerchantCode,
+      paybillNumber: data.paybillNumber.present
+          ? data.paybillNumber.value
+          : this.paybillNumber,
+      receiptPaymentMethodsJson: data.receiptPaymentMethodsJson.present
+          ? data.receiptPaymentMethodsJson.value
+          : this.receiptPaymentMethodsJson,
+      deliveryProfileJson: data.deliveryProfileJson.present
+          ? data.deliveryProfileJson.value
+          : this.deliveryProfileJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      synced: data.synced.present ? data.synced.value : this.synced,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BusinessProfile(')
+          ..write('id: $id, ')
+          ..write('sellerId: $sellerId, ')
+          ..write('sellerName: $sellerName, ')
+          ..write('sellerEmail: $sellerEmail, ')
+          ..write('sellerPhone: $sellerPhone, ')
+          ..write('shopId: $shopId, ')
+          ..write('shopName: $shopName, ')
+          ..write('shopAddress: $shopAddress, ')
+          ..write('shopPhone: $shopPhone, ')
+          ..write('logoUploadId: $logoUploadId, ')
+          ..write('logoUrl: $logoUrl, ')
+          ..write('metaTitle: $metaTitle, ')
+          ..write('metaDescription: $metaDescription, ')
+          ..write('thermalPrinterWidth: $thermalPrinterWidth, ')
+          ..write('shippingCost: $shippingCost, ')
+          ..write('selfDeliveryActive: $selfDeliveryActive, ')
+          ..write('deliveryRadiusKm: $deliveryRadiusKm, ')
+          ..write('deliveryPickupLatitude: $deliveryPickupLatitude, ')
+          ..write('deliveryPickupLongitude: $deliveryPickupLongitude, ')
+          ..write('cashOnDeliveryEnabled: $cashOnDeliveryEnabled, ')
+          ..write('bankPaymentEnabled: $bankPaymentEnabled, ')
+          ..write('mobileMoneyEnabled: $mobileMoneyEnabled, ')
+          ..write('bankName: $bankName, ')
+          ..write('bankAccName: $bankAccName, ')
+          ..write('bankAccNo: $bankAccNo, ')
+          ..write('bankRoutingNo: $bankRoutingNo, ')
+          ..write('mtnMerchantCode: $mtnMerchantCode, ')
+          ..write('airtelMerchantCode: $airtelMerchantCode, ')
+          ..write('paybillNumber: $paybillNumber, ')
+          ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
+          ..write('deliveryProfileJson: $deliveryProfileJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('synced: $synced')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    sellerId,
+    sellerName,
+    sellerEmail,
+    sellerPhone,
+    shopId,
+    shopName,
+    shopAddress,
+    shopPhone,
+    logoUploadId,
+    logoUrl,
+    metaTitle,
+    metaDescription,
+    thermalPrinterWidth,
+    shippingCost,
+    selfDeliveryActive,
+    deliveryRadiusKm,
+    deliveryPickupLatitude,
+    deliveryPickupLongitude,
+    cashOnDeliveryEnabled,
+    bankPaymentEnabled,
+    mobileMoneyEnabled,
+    bankName,
+    bankAccName,
+    bankAccNo,
+    bankRoutingNo,
+    mtnMerchantCode,
+    airtelMerchantCode,
+    paybillNumber,
+    receiptPaymentMethodsJson,
+    deliveryProfileJson,
+    updatedAt,
+    synced,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BusinessProfile &&
+          other.id == this.id &&
+          other.sellerId == this.sellerId &&
+          other.sellerName == this.sellerName &&
+          other.sellerEmail == this.sellerEmail &&
+          other.sellerPhone == this.sellerPhone &&
+          other.shopId == this.shopId &&
+          other.shopName == this.shopName &&
+          other.shopAddress == this.shopAddress &&
+          other.shopPhone == this.shopPhone &&
+          other.logoUploadId == this.logoUploadId &&
+          other.logoUrl == this.logoUrl &&
+          other.metaTitle == this.metaTitle &&
+          other.metaDescription == this.metaDescription &&
+          other.thermalPrinterWidth == this.thermalPrinterWidth &&
+          other.shippingCost == this.shippingCost &&
+          other.selfDeliveryActive == this.selfDeliveryActive &&
+          other.deliveryRadiusKm == this.deliveryRadiusKm &&
+          other.deliveryPickupLatitude == this.deliveryPickupLatitude &&
+          other.deliveryPickupLongitude == this.deliveryPickupLongitude &&
+          other.cashOnDeliveryEnabled == this.cashOnDeliveryEnabled &&
+          other.bankPaymentEnabled == this.bankPaymentEnabled &&
+          other.mobileMoneyEnabled == this.mobileMoneyEnabled &&
+          other.bankName == this.bankName &&
+          other.bankAccName == this.bankAccName &&
+          other.bankAccNo == this.bankAccNo &&
+          other.bankRoutingNo == this.bankRoutingNo &&
+          other.mtnMerchantCode == this.mtnMerchantCode &&
+          other.airtelMerchantCode == this.airtelMerchantCode &&
+          other.paybillNumber == this.paybillNumber &&
+          other.receiptPaymentMethodsJson == this.receiptPaymentMethodsJson &&
+          other.deliveryProfileJson == this.deliveryProfileJson &&
+          other.updatedAt == this.updatedAt &&
+          other.synced == this.synced);
+}
+
+class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
+  final Value<String> id;
+  final Value<String?> sellerId;
+  final Value<String?> sellerName;
+  final Value<String?> sellerEmail;
+  final Value<String?> sellerPhone;
+  final Value<String?> shopId;
+  final Value<String> shopName;
+  final Value<String?> shopAddress;
+  final Value<String?> shopPhone;
+  final Value<int?> logoUploadId;
+  final Value<String?> logoUrl;
+  final Value<String?> metaTitle;
+  final Value<String?> metaDescription;
+  final Value<int?> thermalPrinterWidth;
+  final Value<double?> shippingCost;
+  final Value<bool> selfDeliveryActive;
+  final Value<double?> deliveryRadiusKm;
+  final Value<double?> deliveryPickupLatitude;
+  final Value<double?> deliveryPickupLongitude;
+  final Value<bool> cashOnDeliveryEnabled;
+  final Value<bool> bankPaymentEnabled;
+  final Value<bool> mobileMoneyEnabled;
+  final Value<String?> bankName;
+  final Value<String?> bankAccName;
+  final Value<String?> bankAccNo;
+  final Value<String?> bankRoutingNo;
+  final Value<String?> mtnMerchantCode;
+  final Value<String?> airtelMerchantCode;
+  final Value<String?> paybillNumber;
+  final Value<String?> receiptPaymentMethodsJson;
+  final Value<String?> deliveryProfileJson;
+  final Value<DateTime> updatedAt;
+  final Value<bool> synced;
+  final Value<int> rowid;
+  const BusinessProfilesCompanion({
+    this.id = const Value.absent(),
+    this.sellerId = const Value.absent(),
+    this.sellerName = const Value.absent(),
+    this.sellerEmail = const Value.absent(),
+    this.sellerPhone = const Value.absent(),
+    this.shopId = const Value.absent(),
+    this.shopName = const Value.absent(),
+    this.shopAddress = const Value.absent(),
+    this.shopPhone = const Value.absent(),
+    this.logoUploadId = const Value.absent(),
+    this.logoUrl = const Value.absent(),
+    this.metaTitle = const Value.absent(),
+    this.metaDescription = const Value.absent(),
+    this.thermalPrinterWidth = const Value.absent(),
+    this.shippingCost = const Value.absent(),
+    this.selfDeliveryActive = const Value.absent(),
+    this.deliveryRadiusKm = const Value.absent(),
+    this.deliveryPickupLatitude = const Value.absent(),
+    this.deliveryPickupLongitude = const Value.absent(),
+    this.cashOnDeliveryEnabled = const Value.absent(),
+    this.bankPaymentEnabled = const Value.absent(),
+    this.mobileMoneyEnabled = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.bankAccName = const Value.absent(),
+    this.bankAccNo = const Value.absent(),
+    this.bankRoutingNo = const Value.absent(),
+    this.mtnMerchantCode = const Value.absent(),
+    this.airtelMerchantCode = const Value.absent(),
+    this.paybillNumber = const Value.absent(),
+    this.receiptPaymentMethodsJson = const Value.absent(),
+    this.deliveryProfileJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.synced = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BusinessProfilesCompanion.insert({
+    required String id,
+    this.sellerId = const Value.absent(),
+    this.sellerName = const Value.absent(),
+    this.sellerEmail = const Value.absent(),
+    this.sellerPhone = const Value.absent(),
+    this.shopId = const Value.absent(),
+    required String shopName,
+    this.shopAddress = const Value.absent(),
+    this.shopPhone = const Value.absent(),
+    this.logoUploadId = const Value.absent(),
+    this.logoUrl = const Value.absent(),
+    this.metaTitle = const Value.absent(),
+    this.metaDescription = const Value.absent(),
+    this.thermalPrinterWidth = const Value.absent(),
+    this.shippingCost = const Value.absent(),
+    this.selfDeliveryActive = const Value.absent(),
+    this.deliveryRadiusKm = const Value.absent(),
+    this.deliveryPickupLatitude = const Value.absent(),
+    this.deliveryPickupLongitude = const Value.absent(),
+    this.cashOnDeliveryEnabled = const Value.absent(),
+    this.bankPaymentEnabled = const Value.absent(),
+    this.mobileMoneyEnabled = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.bankAccName = const Value.absent(),
+    this.bankAccNo = const Value.absent(),
+    this.bankRoutingNo = const Value.absent(),
+    this.mtnMerchantCode = const Value.absent(),
+    this.airtelMerchantCode = const Value.absent(),
+    this.paybillNumber = const Value.absent(),
+    this.receiptPaymentMethodsJson = const Value.absent(),
+    this.deliveryProfileJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.synced = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       shopName = Value(shopName);
+  static Insertable<BusinessProfile> custom({
+    Expression<String>? id,
+    Expression<String>? sellerId,
+    Expression<String>? sellerName,
+    Expression<String>? sellerEmail,
+    Expression<String>? sellerPhone,
+    Expression<String>? shopId,
+    Expression<String>? shopName,
+    Expression<String>? shopAddress,
+    Expression<String>? shopPhone,
+    Expression<int>? logoUploadId,
+    Expression<String>? logoUrl,
+    Expression<String>? metaTitle,
+    Expression<String>? metaDescription,
+    Expression<int>? thermalPrinterWidth,
+    Expression<double>? shippingCost,
+    Expression<bool>? selfDeliveryActive,
+    Expression<double>? deliveryRadiusKm,
+    Expression<double>? deliveryPickupLatitude,
+    Expression<double>? deliveryPickupLongitude,
+    Expression<bool>? cashOnDeliveryEnabled,
+    Expression<bool>? bankPaymentEnabled,
+    Expression<bool>? mobileMoneyEnabled,
+    Expression<String>? bankName,
+    Expression<String>? bankAccName,
+    Expression<String>? bankAccNo,
+    Expression<String>? bankRoutingNo,
+    Expression<String>? mtnMerchantCode,
+    Expression<String>? airtelMerchantCode,
+    Expression<String>? paybillNumber,
+    Expression<String>? receiptPaymentMethodsJson,
+    Expression<String>? deliveryProfileJson,
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? synced,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sellerId != null) 'seller_id': sellerId,
+      if (sellerName != null) 'seller_name': sellerName,
+      if (sellerEmail != null) 'seller_email': sellerEmail,
+      if (sellerPhone != null) 'seller_phone': sellerPhone,
+      if (shopId != null) 'shop_id': shopId,
+      if (shopName != null) 'shop_name': shopName,
+      if (shopAddress != null) 'shop_address': shopAddress,
+      if (shopPhone != null) 'shop_phone': shopPhone,
+      if (logoUploadId != null) 'logo_upload_id': logoUploadId,
+      if (logoUrl != null) 'logo_url': logoUrl,
+      if (metaTitle != null) 'meta_title': metaTitle,
+      if (metaDescription != null) 'meta_description': metaDescription,
+      if (thermalPrinterWidth != null)
+        'thermal_printer_width': thermalPrinterWidth,
+      if (shippingCost != null) 'shipping_cost': shippingCost,
+      if (selfDeliveryActive != null)
+        'self_delivery_active': selfDeliveryActive,
+      if (deliveryRadiusKm != null) 'delivery_radius_km': deliveryRadiusKm,
+      if (deliveryPickupLatitude != null)
+        'delivery_pickup_latitude': deliveryPickupLatitude,
+      if (deliveryPickupLongitude != null)
+        'delivery_pickup_longitude': deliveryPickupLongitude,
+      if (cashOnDeliveryEnabled != null)
+        'cash_on_delivery_enabled': cashOnDeliveryEnabled,
+      if (bankPaymentEnabled != null)
+        'bank_payment_enabled': bankPaymentEnabled,
+      if (mobileMoneyEnabled != null)
+        'mobile_money_enabled': mobileMoneyEnabled,
+      if (bankName != null) 'bank_name': bankName,
+      if (bankAccName != null) 'bank_acc_name': bankAccName,
+      if (bankAccNo != null) 'bank_acc_no': bankAccNo,
+      if (bankRoutingNo != null) 'bank_routing_no': bankRoutingNo,
+      if (mtnMerchantCode != null) 'mtn_merchant_code': mtnMerchantCode,
+      if (airtelMerchantCode != null)
+        'airtel_merchant_code': airtelMerchantCode,
+      if (paybillNumber != null) 'paybill_number': paybillNumber,
+      if (receiptPaymentMethodsJson != null)
+        'receipt_payment_methods_json': receiptPaymentMethodsJson,
+      if (deliveryProfileJson != null)
+        'delivery_profile_json': deliveryProfileJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (synced != null) 'synced': synced,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BusinessProfilesCompanion copyWith({
+    Value<String>? id,
+    Value<String?>? sellerId,
+    Value<String?>? sellerName,
+    Value<String?>? sellerEmail,
+    Value<String?>? sellerPhone,
+    Value<String?>? shopId,
+    Value<String>? shopName,
+    Value<String?>? shopAddress,
+    Value<String?>? shopPhone,
+    Value<int?>? logoUploadId,
+    Value<String?>? logoUrl,
+    Value<String?>? metaTitle,
+    Value<String?>? metaDescription,
+    Value<int?>? thermalPrinterWidth,
+    Value<double?>? shippingCost,
+    Value<bool>? selfDeliveryActive,
+    Value<double?>? deliveryRadiusKm,
+    Value<double?>? deliveryPickupLatitude,
+    Value<double?>? deliveryPickupLongitude,
+    Value<bool>? cashOnDeliveryEnabled,
+    Value<bool>? bankPaymentEnabled,
+    Value<bool>? mobileMoneyEnabled,
+    Value<String?>? bankName,
+    Value<String?>? bankAccName,
+    Value<String?>? bankAccNo,
+    Value<String?>? bankRoutingNo,
+    Value<String?>? mtnMerchantCode,
+    Value<String?>? airtelMerchantCode,
+    Value<String?>? paybillNumber,
+    Value<String?>? receiptPaymentMethodsJson,
+    Value<String?>? deliveryProfileJson,
+    Value<DateTime>? updatedAt,
+    Value<bool>? synced,
+    Value<int>? rowid,
+  }) {
+    return BusinessProfilesCompanion(
+      id: id ?? this.id,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
+      sellerEmail: sellerEmail ?? this.sellerEmail,
+      sellerPhone: sellerPhone ?? this.sellerPhone,
+      shopId: shopId ?? this.shopId,
+      shopName: shopName ?? this.shopName,
+      shopAddress: shopAddress ?? this.shopAddress,
+      shopPhone: shopPhone ?? this.shopPhone,
+      logoUploadId: logoUploadId ?? this.logoUploadId,
+      logoUrl: logoUrl ?? this.logoUrl,
+      metaTitle: metaTitle ?? this.metaTitle,
+      metaDescription: metaDescription ?? this.metaDescription,
+      thermalPrinterWidth: thermalPrinterWidth ?? this.thermalPrinterWidth,
+      shippingCost: shippingCost ?? this.shippingCost,
+      selfDeliveryActive: selfDeliveryActive ?? this.selfDeliveryActive,
+      deliveryRadiusKm: deliveryRadiusKm ?? this.deliveryRadiusKm,
+      deliveryPickupLatitude:
+          deliveryPickupLatitude ?? this.deliveryPickupLatitude,
+      deliveryPickupLongitude:
+          deliveryPickupLongitude ?? this.deliveryPickupLongitude,
+      cashOnDeliveryEnabled:
+          cashOnDeliveryEnabled ?? this.cashOnDeliveryEnabled,
+      bankPaymentEnabled: bankPaymentEnabled ?? this.bankPaymentEnabled,
+      mobileMoneyEnabled: mobileMoneyEnabled ?? this.mobileMoneyEnabled,
+      bankName: bankName ?? this.bankName,
+      bankAccName: bankAccName ?? this.bankAccName,
+      bankAccNo: bankAccNo ?? this.bankAccNo,
+      bankRoutingNo: bankRoutingNo ?? this.bankRoutingNo,
+      mtnMerchantCode: mtnMerchantCode ?? this.mtnMerchantCode,
+      airtelMerchantCode: airtelMerchantCode ?? this.airtelMerchantCode,
+      paybillNumber: paybillNumber ?? this.paybillNumber,
+      receiptPaymentMethodsJson:
+          receiptPaymentMethodsJson ?? this.receiptPaymentMethodsJson,
+      deliveryProfileJson: deliveryProfileJson ?? this.deliveryProfileJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      synced: synced ?? this.synced,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sellerId.present) {
+      map['seller_id'] = Variable<String>(sellerId.value);
+    }
+    if (sellerName.present) {
+      map['seller_name'] = Variable<String>(sellerName.value);
+    }
+    if (sellerEmail.present) {
+      map['seller_email'] = Variable<String>(sellerEmail.value);
+    }
+    if (sellerPhone.present) {
+      map['seller_phone'] = Variable<String>(sellerPhone.value);
+    }
+    if (shopId.present) {
+      map['shop_id'] = Variable<String>(shopId.value);
+    }
+    if (shopName.present) {
+      map['shop_name'] = Variable<String>(shopName.value);
+    }
+    if (shopAddress.present) {
+      map['shop_address'] = Variable<String>(shopAddress.value);
+    }
+    if (shopPhone.present) {
+      map['shop_phone'] = Variable<String>(shopPhone.value);
+    }
+    if (logoUploadId.present) {
+      map['logo_upload_id'] = Variable<int>(logoUploadId.value);
+    }
+    if (logoUrl.present) {
+      map['logo_url'] = Variable<String>(logoUrl.value);
+    }
+    if (metaTitle.present) {
+      map['meta_title'] = Variable<String>(metaTitle.value);
+    }
+    if (metaDescription.present) {
+      map['meta_description'] = Variable<String>(metaDescription.value);
+    }
+    if (thermalPrinterWidth.present) {
+      map['thermal_printer_width'] = Variable<int>(thermalPrinterWidth.value);
+    }
+    if (shippingCost.present) {
+      map['shipping_cost'] = Variable<double>(shippingCost.value);
+    }
+    if (selfDeliveryActive.present) {
+      map['self_delivery_active'] = Variable<bool>(selfDeliveryActive.value);
+    }
+    if (deliveryRadiusKm.present) {
+      map['delivery_radius_km'] = Variable<double>(deliveryRadiusKm.value);
+    }
+    if (deliveryPickupLatitude.present) {
+      map['delivery_pickup_latitude'] = Variable<double>(
+        deliveryPickupLatitude.value,
+      );
+    }
+    if (deliveryPickupLongitude.present) {
+      map['delivery_pickup_longitude'] = Variable<double>(
+        deliveryPickupLongitude.value,
+      );
+    }
+    if (cashOnDeliveryEnabled.present) {
+      map['cash_on_delivery_enabled'] = Variable<bool>(
+        cashOnDeliveryEnabled.value,
+      );
+    }
+    if (bankPaymentEnabled.present) {
+      map['bank_payment_enabled'] = Variable<bool>(bankPaymentEnabled.value);
+    }
+    if (mobileMoneyEnabled.present) {
+      map['mobile_money_enabled'] = Variable<bool>(mobileMoneyEnabled.value);
+    }
+    if (bankName.present) {
+      map['bank_name'] = Variable<String>(bankName.value);
+    }
+    if (bankAccName.present) {
+      map['bank_acc_name'] = Variable<String>(bankAccName.value);
+    }
+    if (bankAccNo.present) {
+      map['bank_acc_no'] = Variable<String>(bankAccNo.value);
+    }
+    if (bankRoutingNo.present) {
+      map['bank_routing_no'] = Variable<String>(bankRoutingNo.value);
+    }
+    if (mtnMerchantCode.present) {
+      map['mtn_merchant_code'] = Variable<String>(mtnMerchantCode.value);
+    }
+    if (airtelMerchantCode.present) {
+      map['airtel_merchant_code'] = Variable<String>(airtelMerchantCode.value);
+    }
+    if (paybillNumber.present) {
+      map['paybill_number'] = Variable<String>(paybillNumber.value);
+    }
+    if (receiptPaymentMethodsJson.present) {
+      map['receipt_payment_methods_json'] = Variable<String>(
+        receiptPaymentMethodsJson.value,
+      );
+    }
+    if (deliveryProfileJson.present) {
+      map['delivery_profile_json'] = Variable<String>(
+        deliveryProfileJson.value,
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (synced.present) {
+      map['synced'] = Variable<bool>(synced.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BusinessProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('sellerId: $sellerId, ')
+          ..write('sellerName: $sellerName, ')
+          ..write('sellerEmail: $sellerEmail, ')
+          ..write('sellerPhone: $sellerPhone, ')
+          ..write('shopId: $shopId, ')
+          ..write('shopName: $shopName, ')
+          ..write('shopAddress: $shopAddress, ')
+          ..write('shopPhone: $shopPhone, ')
+          ..write('logoUploadId: $logoUploadId, ')
+          ..write('logoUrl: $logoUrl, ')
+          ..write('metaTitle: $metaTitle, ')
+          ..write('metaDescription: $metaDescription, ')
+          ..write('thermalPrinterWidth: $thermalPrinterWidth, ')
+          ..write('shippingCost: $shippingCost, ')
+          ..write('selfDeliveryActive: $selfDeliveryActive, ')
+          ..write('deliveryRadiusKm: $deliveryRadiusKm, ')
+          ..write('deliveryPickupLatitude: $deliveryPickupLatitude, ')
+          ..write('deliveryPickupLongitude: $deliveryPickupLongitude, ')
+          ..write('cashOnDeliveryEnabled: $cashOnDeliveryEnabled, ')
+          ..write('bankPaymentEnabled: $bankPaymentEnabled, ')
+          ..write('mobileMoneyEnabled: $mobileMoneyEnabled, ')
+          ..write('bankName: $bankName, ')
+          ..write('bankAccName: $bankAccName, ')
+          ..write('bankAccNo: $bankAccNo, ')
+          ..write('bankRoutingNo: $bankRoutingNo, ')
+          ..write('mtnMerchantCode: $mtnMerchantCode, ')
+          ..write('airtelMerchantCode: $airtelMerchantCode, ')
+          ..write('paybillNumber: $paybillNumber, ')
+          ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
+          ..write('deliveryProfileJson: $deliveryProfileJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('synced: $synced, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AppSettingsTable extends AppSettings
+    with TableInfo<$AppSettingsTable, AppSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueJsonMeta = const VerificationMeta(
+    'valueJson',
+  );
+  @override
+  late final GeneratedColumn<String> valueJson = GeneratedColumn<String>(
+    'value_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, valueJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value_json')) {
+      context.handle(
+        _valueJsonMeta,
+        valueJson.isAcceptableOrUnknown(data['value_json']!, _valueJsonMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  AppSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppSetting(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      valueJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value_json'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AppSettingsTable createAlias(String alias) {
+    return $AppSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class AppSetting extends DataClass implements Insertable<AppSetting> {
+  final String key;
+  final String? valueJson;
+  final DateTime updatedAt;
+  const AppSetting({
+    required this.key,
+    this.valueJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    if (!nullToAbsent || valueJson != null) {
+      map['value_json'] = Variable<String>(valueJson);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AppSettingsCompanion toCompanion(bool nullToAbsent) {
+    return AppSettingsCompanion(
+      key: Value(key),
+      valueJson: valueJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(valueJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AppSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppSetting(
+      key: serializer.fromJson<String>(json['key']),
+      valueJson: serializer.fromJson<String?>(json['valueJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'valueJson': serializer.toJson<String?>(valueJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AppSetting copyWith({
+    String? key,
+    Value<String?> valueJson = const Value.absent(),
+    DateTime? updatedAt,
+  }) => AppSetting(
+    key: key ?? this.key,
+    valueJson: valueJson.present ? valueJson.value : this.valueJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AppSetting copyWithCompanion(AppSettingsCompanion data) {
+    return AppSetting(
+      key: data.key.present ? data.key.value : this.key,
+      valueJson: data.valueJson.present ? data.valueJson.value : this.valueJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSetting(')
+          ..write('key: $key, ')
+          ..write('valueJson: $valueJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, valueJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppSetting &&
+          other.key == this.key &&
+          other.valueJson == this.valueJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
+  final Value<String> key;
+  final Value<String?> valueJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AppSettingsCompanion({
+    this.key = const Value.absent(),
+    this.valueJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppSettingsCompanion.insert({
+    required String key,
+    this.valueJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : key = Value(key);
+  static Insertable<AppSetting> custom({
+    Expression<String>? key,
+    Expression<String>? valueJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (valueJson != null) 'value_json': valueJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppSettingsCompanion copyWith({
+    Value<String>? key,
+    Value<String?>? valueJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AppSettingsCompanion(
+      key: key ?? this.key,
+      valueJson: valueJson ?? this.valueJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (valueJson.present) {
+      map['value_json'] = Variable<String>(valueJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSettingsCompanion(')
+          ..write('key: $key, ')
+          ..write('valueJson: $valueJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $LedgerEntriesTable extends LedgerEntries
     with TableInfo<$LedgerEntriesTable, LedgerEntry> {
   @override
@@ -12018,6 +14245,28 @@ class $CashMovementsTable extends CashMovements
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<int> remoteId = GeneratedColumn<int>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idempotencyKeyMeta = const VerificationMeta(
+    'idempotencyKey',
+  );
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+    'idempotency_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _outletIdMeta = const VerificationMeta(
     'outletId',
   );
@@ -12099,6 +14348,8 @@ class $CashMovementsTable extends CashMovements
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    remoteId,
+    idempotencyKey,
     outletId,
     staffId,
     type,
@@ -12121,6 +14372,21 @@ class $CashMovementsTable extends CashMovements
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+        _idempotencyKeyMeta,
+        idempotencyKey.isAcceptableOrUnknown(
+          data['idempotency_key']!,
+          _idempotencyKeyMeta,
+        ),
+      );
     }
     if (data.containsKey('outlet_id')) {
       context.handle(
@@ -12184,6 +14450,14 @@ class $CashMovementsTable extends CashMovements
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}remote_id'],
+      ),
+      idempotencyKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}idempotency_key'],
+      ),
       outletId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}outlet_id'],
@@ -12223,6 +14497,8 @@ class $CashMovementsTable extends CashMovements
 
 class CashMovement extends DataClass implements Insertable<CashMovement> {
   final int id;
+  final int? remoteId;
+  final String? idempotencyKey;
   final String? outletId;
   final String? staffId;
   final String type;
@@ -12232,6 +14508,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   final DateTime createdAt;
   const CashMovement({
     required this.id,
+    this.remoteId,
+    this.idempotencyKey,
     this.outletId,
     this.staffId,
     required this.type,
@@ -12244,6 +14522,12 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<int>(remoteId);
+    }
+    if (!nullToAbsent || idempotencyKey != null) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey);
+    }
     if (!nullToAbsent || outletId != null) {
       map['outlet_id'] = Variable<String>(outletId);
     }
@@ -12265,6 +14549,12 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   CashMovementsCompanion toCompanion(bool nullToAbsent) {
     return CashMovementsCompanion(
       id: Value(id),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      idempotencyKey: idempotencyKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(idempotencyKey),
       outletId: outletId == null && nullToAbsent
           ? const Value.absent()
           : Value(outletId),
@@ -12288,6 +14578,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CashMovement(
       id: serializer.fromJson<int>(json['id']),
+      remoteId: serializer.fromJson<int?>(json['remoteId']),
+      idempotencyKey: serializer.fromJson<String?>(json['idempotencyKey']),
       outletId: serializer.fromJson<String?>(json['outletId']),
       staffId: serializer.fromJson<String?>(json['staffId']),
       type: serializer.fromJson<String>(json['type']),
@@ -12302,6 +14594,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'remoteId': serializer.toJson<int?>(remoteId),
+      'idempotencyKey': serializer.toJson<String?>(idempotencyKey),
       'outletId': serializer.toJson<String?>(outletId),
       'staffId': serializer.toJson<String?>(staffId),
       'type': serializer.toJson<String>(type),
@@ -12314,6 +14608,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
 
   CashMovement copyWith({
     int? id,
+    Value<int?> remoteId = const Value.absent(),
+    Value<String?> idempotencyKey = const Value.absent(),
     Value<String?> outletId = const Value.absent(),
     Value<String?> staffId = const Value.absent(),
     String? type,
@@ -12323,6 +14619,10 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
     DateTime? createdAt,
   }) => CashMovement(
     id: id ?? this.id,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    idempotencyKey: idempotencyKey.present
+        ? idempotencyKey.value
+        : this.idempotencyKey,
     outletId: outletId.present ? outletId.value : this.outletId,
     staffId: staffId.present ? staffId.value : this.staffId,
     type: type ?? this.type,
@@ -12336,6 +14636,10 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   CashMovement copyWithCompanion(CashMovementsCompanion data) {
     return CashMovement(
       id: data.id.present ? data.id.value : this.id,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
       outletId: data.outletId.present ? data.outletId.value : this.outletId,
       staffId: data.staffId.present ? data.staffId.value : this.staffId,
       type: data.type.present ? data.type.value : this.type,
@@ -12352,6 +14656,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   String toString() {
     return (StringBuffer('CashMovement(')
           ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
           ..write('outletId: $outletId, ')
           ..write('staffId: $staffId, ')
           ..write('type: $type, ')
@@ -12366,6 +14672,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
   @override
   int get hashCode => Object.hash(
     id,
+    remoteId,
+    idempotencyKey,
     outletId,
     staffId,
     type,
@@ -12379,6 +14687,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
       identical(this, other) ||
       (other is CashMovement &&
           other.id == this.id &&
+          other.remoteId == this.remoteId &&
+          other.idempotencyKey == this.idempotencyKey &&
           other.outletId == this.outletId &&
           other.staffId == this.staffId &&
           other.type == this.type &&
@@ -12390,6 +14700,8 @@ class CashMovement extends DataClass implements Insertable<CashMovement> {
 
 class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   final Value<int> id;
+  final Value<int?> remoteId;
+  final Value<String?> idempotencyKey;
   final Value<String?> outletId;
   final Value<String?> staffId;
   final Value<String> type;
@@ -12399,6 +14711,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   final Value<DateTime> createdAt;
   const CashMovementsCompanion({
     this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.idempotencyKey = const Value.absent(),
     this.outletId = const Value.absent(),
     this.staffId = const Value.absent(),
     this.type = const Value.absent(),
@@ -12409,6 +14723,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   });
   CashMovementsCompanion.insert({
     this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.idempotencyKey = const Value.absent(),
     this.outletId = const Value.absent(),
     this.staffId = const Value.absent(),
     required String type,
@@ -12420,6 +14736,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
        amount = Value(amount);
   static Insertable<CashMovement> custom({
     Expression<int>? id,
+    Expression<int>? remoteId,
+    Expression<String>? idempotencyKey,
     Expression<String>? outletId,
     Expression<String>? staffId,
     Expression<String>? type,
@@ -12430,6 +14748,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
       if (outletId != null) 'outlet_id': outletId,
       if (staffId != null) 'staff_id': staffId,
       if (type != null) 'type': type,
@@ -12442,6 +14762,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
 
   CashMovementsCompanion copyWith({
     Value<int>? id,
+    Value<int?>? remoteId,
+    Value<String?>? idempotencyKey,
     Value<String?>? outletId,
     Value<String?>? staffId,
     Value<String>? type,
@@ -12452,6 +14774,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   }) {
     return CashMovementsCompanion(
       id: id ?? this.id,
+      remoteId: remoteId ?? this.remoteId,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       outletId: outletId ?? this.outletId,
       staffId: staffId ?? this.staffId,
       type: type ?? this.type,
@@ -12467,6 +14791,12 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<int>(remoteId.value);
+    }
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
     }
     if (outletId.present) {
       map['outlet_id'] = Variable<String>(outletId.value);
@@ -12496,6 +14826,8 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovement> {
   String toString() {
     return (StringBuffer('CashMovementsCompanion(')
           ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
           ..write('outletId: $outletId, ')
           ..write('staffId: $staffId, ')
           ..write('type: $type, ')
@@ -19693,6 +22025,345 @@ class CustomerMembershipsCompanion extends UpdateCompanion<CustomerMembership> {
   }
 }
 
+class $ExpenseCategoriesTable extends ExpenseCategories
+    with TableInfo<$ExpenseCategoriesTable, ExpenseCategory> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExpenseCategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('expense'),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, type, isActive, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'expense_categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExpenseCategory> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExpenseCategory map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExpenseCategory(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ExpenseCategoriesTable createAlias(String alias) {
+    return $ExpenseCategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class ExpenseCategory extends DataClass implements Insertable<ExpenseCategory> {
+  final int id;
+  final String name;
+  final String type;
+  final bool isActive;
+  final DateTime updatedAt;
+  const ExpenseCategory({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.isActive,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['type'] = Variable<String>(type);
+    map['is_active'] = Variable<bool>(isActive);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ExpenseCategoriesCompanion toCompanion(bool nullToAbsent) {
+    return ExpenseCategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      type: Value(type),
+      isActive: Value(isActive),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ExpenseCategory.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExpenseCategory(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      type: serializer.fromJson<String>(json['type']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'type': serializer.toJson<String>(type),
+      'isActive': serializer.toJson<bool>(isActive),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ExpenseCategory copyWith({
+    int? id,
+    String? name,
+    String? type,
+    bool? isActive,
+    DateTime? updatedAt,
+  }) => ExpenseCategory(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    type: type ?? this.type,
+    isActive: isActive ?? this.isActive,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ExpenseCategory copyWithCompanion(ExpenseCategoriesCompanion data) {
+    return ExpenseCategory(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      type: data.type.present ? data.type.value : this.type,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseCategory(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('type: $type, ')
+          ..write('isActive: $isActive, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, type, isActive, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExpenseCategory &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.type == this.type &&
+          other.isActive == this.isActive &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ExpenseCategoriesCompanion extends UpdateCompanion<ExpenseCategory> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> type;
+  final Value<bool> isActive;
+  final Value<DateTime> updatedAt;
+  const ExpenseCategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.type = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  ExpenseCategoriesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.type = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<ExpenseCategory> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? type,
+    Expression<bool>? isActive,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (type != null) 'type': type,
+      if (isActive != null) 'is_active': isActive,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  ExpenseCategoriesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String>? type,
+    Value<bool>? isActive,
+    Value<DateTime>? updatedAt,
+  }) {
+    return ExpenseCategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      isActive: isActive ?? this.isActive,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseCategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('type: $type, ')
+          ..write('isActive: $isActive, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -19718,6 +22389,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $RolesTable roles = $RolesTable(this);
   late final $StaffTable staff = $StaffTable(this);
   late final $OutletsTable outlets = $OutletsTable(this);
+  late final $BusinessProfilesTable businessProfiles = $BusinessProfilesTable(
+    this,
+  );
+  late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $LedgerEntriesTable ledgerEntries = $LedgerEntriesTable(this);
   late final $LedgerLinesTable ledgerLines = $LedgerLinesTable(this);
   late final $PaymentsTable payments = $PaymentsTable(this);
@@ -19746,6 +22421,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PackageRedemptionsTable(this);
   late final $CustomerMembershipsTable customerMemberships =
       $CustomerMembershipsTable(this);
+  late final $ExpenseCategoriesTable expenseCategories =
+      $ExpenseCategoriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -19770,6 +22447,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     roles,
     staff,
     outlets,
+    businessProfiles,
+    appSettings,
     ledgerEntries,
     ledgerLines,
     payments,
@@ -19787,6 +22466,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     customerPackages,
     packageRedemptions,
     customerMemberships,
+    expenseCategories,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -21496,6 +24176,7 @@ typedef $$ServicesTableCreateCompanionBuilder =
       Value<int?> remoteId,
       required String title,
       Value<String?> description,
+      Value<String?> imageUrl,
       required double price,
       Value<int?> durationMinutes,
       Value<bool> publishedOnline,
@@ -21510,6 +24191,7 @@ typedef $$ServicesTableUpdateCompanionBuilder =
       Value<int?> remoteId,
       Value<String> title,
       Value<String?> description,
+      Value<String?> imageUrl,
       Value<double> price,
       Value<int?> durationMinutes,
       Value<bool> publishedOnline,
@@ -21655,6 +24337,11 @@ class $$ServicesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21843,6 +24530,11 @@ class $$ServicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get price => $composableBuilder(
     column: $table.price,
     builder: (column) => ColumnOrderings(column),
@@ -21896,6 +24588,9 @@ class $$ServicesTableAnnotationComposer
     column: $table.description,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
   GeneratedColumn<double> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
@@ -22083,6 +24778,7 @@ class $$ServicesTableTableManager
                 Value<int?> remoteId = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 Value<double> price = const Value.absent(),
                 Value<int?> durationMinutes = const Value.absent(),
                 Value<bool> publishedOnline = const Value.absent(),
@@ -22095,6 +24791,7 @@ class $$ServicesTableTableManager
                 remoteId: remoteId,
                 title: title,
                 description: description,
+                imageUrl: imageUrl,
                 price: price,
                 durationMinutes: durationMinutes,
                 publishedOnline: publishedOnline,
@@ -22109,6 +24806,7 @@ class $$ServicesTableTableManager
                 Value<int?> remoteId = const Value.absent(),
                 required String title,
                 Value<String?> description = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 required double price,
                 Value<int?> durationMinutes = const Value.absent(),
                 Value<bool> publishedOnline = const Value.absent(),
@@ -22121,6 +24819,7 @@ class $$ServicesTableTableManager
                 remoteId: remoteId,
                 title: title,
                 description: description,
+                imageUrl: imageUrl,
                 price: price,
                 durationMinutes: durationMinutes,
                 publishedOnline: publishedOnline,
@@ -28892,6 +31591,950 @@ typedef $$OutletsTableProcessedTableManager =
         bool shiftsRefs,
       })
     >;
+typedef $$BusinessProfilesTableCreateCompanionBuilder =
+    BusinessProfilesCompanion Function({
+      required String id,
+      Value<String?> sellerId,
+      Value<String?> sellerName,
+      Value<String?> sellerEmail,
+      Value<String?> sellerPhone,
+      Value<String?> shopId,
+      required String shopName,
+      Value<String?> shopAddress,
+      Value<String?> shopPhone,
+      Value<int?> logoUploadId,
+      Value<String?> logoUrl,
+      Value<String?> metaTitle,
+      Value<String?> metaDescription,
+      Value<int?> thermalPrinterWidth,
+      Value<double?> shippingCost,
+      Value<bool> selfDeliveryActive,
+      Value<double?> deliveryRadiusKm,
+      Value<double?> deliveryPickupLatitude,
+      Value<double?> deliveryPickupLongitude,
+      Value<bool> cashOnDeliveryEnabled,
+      Value<bool> bankPaymentEnabled,
+      Value<bool> mobileMoneyEnabled,
+      Value<String?> bankName,
+      Value<String?> bankAccName,
+      Value<String?> bankAccNo,
+      Value<String?> bankRoutingNo,
+      Value<String?> mtnMerchantCode,
+      Value<String?> airtelMerchantCode,
+      Value<String?> paybillNumber,
+      Value<String?> receiptPaymentMethodsJson,
+      Value<String?> deliveryProfileJson,
+      Value<DateTime> updatedAt,
+      Value<bool> synced,
+      Value<int> rowid,
+    });
+typedef $$BusinessProfilesTableUpdateCompanionBuilder =
+    BusinessProfilesCompanion Function({
+      Value<String> id,
+      Value<String?> sellerId,
+      Value<String?> sellerName,
+      Value<String?> sellerEmail,
+      Value<String?> sellerPhone,
+      Value<String?> shopId,
+      Value<String> shopName,
+      Value<String?> shopAddress,
+      Value<String?> shopPhone,
+      Value<int?> logoUploadId,
+      Value<String?> logoUrl,
+      Value<String?> metaTitle,
+      Value<String?> metaDescription,
+      Value<int?> thermalPrinterWidth,
+      Value<double?> shippingCost,
+      Value<bool> selfDeliveryActive,
+      Value<double?> deliveryRadiusKm,
+      Value<double?> deliveryPickupLatitude,
+      Value<double?> deliveryPickupLongitude,
+      Value<bool> cashOnDeliveryEnabled,
+      Value<bool> bankPaymentEnabled,
+      Value<bool> mobileMoneyEnabled,
+      Value<String?> bankName,
+      Value<String?> bankAccName,
+      Value<String?> bankAccNo,
+      Value<String?> bankRoutingNo,
+      Value<String?> mtnMerchantCode,
+      Value<String?> airtelMerchantCode,
+      Value<String?> paybillNumber,
+      Value<String?> receiptPaymentMethodsJson,
+      Value<String?> deliveryProfileJson,
+      Value<DateTime> updatedAt,
+      Value<bool> synced,
+      Value<int> rowid,
+    });
+
+class $$BusinessProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $BusinessProfilesTable> {
+  $$BusinessProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sellerId => $composableBuilder(
+    column: $table.sellerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sellerName => $composableBuilder(
+    column: $table.sellerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sellerEmail => $composableBuilder(
+    column: $table.sellerEmail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sellerPhone => $composableBuilder(
+    column: $table.sellerPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shopId => $composableBuilder(
+    column: $table.shopId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shopName => $composableBuilder(
+    column: $table.shopName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shopAddress => $composableBuilder(
+    column: $table.shopAddress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shopPhone => $composableBuilder(
+    column: $table.shopPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get logoUploadId => $composableBuilder(
+    column: $table.logoUploadId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metaTitle => $composableBuilder(
+    column: $table.metaTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metaDescription => $composableBuilder(
+    column: $table.metaDescription,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get thermalPrinterWidth => $composableBuilder(
+    column: $table.thermalPrinterWidth,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get shippingCost => $composableBuilder(
+    column: $table.shippingCost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get selfDeliveryActive => $composableBuilder(
+    column: $table.selfDeliveryActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get deliveryRadiusKm => $composableBuilder(
+    column: $table.deliveryRadiusKm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get deliveryPickupLatitude => $composableBuilder(
+    column: $table.deliveryPickupLatitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get deliveryPickupLongitude => $composableBuilder(
+    column: $table.deliveryPickupLongitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get cashOnDeliveryEnabled => $composableBuilder(
+    column: $table.cashOnDeliveryEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get bankPaymentEnabled => $composableBuilder(
+    column: $table.bankPaymentEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get mobileMoneyEnabled => $composableBuilder(
+    column: $table.mobileMoneyEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankName => $composableBuilder(
+    column: $table.bankName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankAccName => $composableBuilder(
+    column: $table.bankAccName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankAccNo => $composableBuilder(
+    column: $table.bankAccNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankRoutingNo => $composableBuilder(
+    column: $table.bankRoutingNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mtnMerchantCode => $composableBuilder(
+    column: $table.mtnMerchantCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get airtelMerchantCode => $composableBuilder(
+    column: $table.airtelMerchantCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paybillNumber => $composableBuilder(
+    column: $table.paybillNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get receiptPaymentMethodsJson => $composableBuilder(
+    column: $table.receiptPaymentMethodsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deliveryProfileJson => $composableBuilder(
+    column: $table.deliveryProfileJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BusinessProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $BusinessProfilesTable> {
+  $$BusinessProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sellerId => $composableBuilder(
+    column: $table.sellerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sellerName => $composableBuilder(
+    column: $table.sellerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sellerEmail => $composableBuilder(
+    column: $table.sellerEmail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sellerPhone => $composableBuilder(
+    column: $table.sellerPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shopId => $composableBuilder(
+    column: $table.shopId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shopName => $composableBuilder(
+    column: $table.shopName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shopAddress => $composableBuilder(
+    column: $table.shopAddress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shopPhone => $composableBuilder(
+    column: $table.shopPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get logoUploadId => $composableBuilder(
+    column: $table.logoUploadId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metaTitle => $composableBuilder(
+    column: $table.metaTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metaDescription => $composableBuilder(
+    column: $table.metaDescription,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get thermalPrinterWidth => $composableBuilder(
+    column: $table.thermalPrinterWidth,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get shippingCost => $composableBuilder(
+    column: $table.shippingCost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get selfDeliveryActive => $composableBuilder(
+    column: $table.selfDeliveryActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get deliveryRadiusKm => $composableBuilder(
+    column: $table.deliveryRadiusKm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get deliveryPickupLatitude => $composableBuilder(
+    column: $table.deliveryPickupLatitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get deliveryPickupLongitude => $composableBuilder(
+    column: $table.deliveryPickupLongitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get cashOnDeliveryEnabled => $composableBuilder(
+    column: $table.cashOnDeliveryEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get bankPaymentEnabled => $composableBuilder(
+    column: $table.bankPaymentEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get mobileMoneyEnabled => $composableBuilder(
+    column: $table.mobileMoneyEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankName => $composableBuilder(
+    column: $table.bankName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankAccName => $composableBuilder(
+    column: $table.bankAccName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankAccNo => $composableBuilder(
+    column: $table.bankAccNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankRoutingNo => $composableBuilder(
+    column: $table.bankRoutingNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mtnMerchantCode => $composableBuilder(
+    column: $table.mtnMerchantCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get airtelMerchantCode => $composableBuilder(
+    column: $table.airtelMerchantCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paybillNumber => $composableBuilder(
+    column: $table.paybillNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get receiptPaymentMethodsJson => $composableBuilder(
+    column: $table.receiptPaymentMethodsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deliveryProfileJson => $composableBuilder(
+    column: $table.deliveryProfileJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BusinessProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BusinessProfilesTable> {
+  $$BusinessProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sellerId =>
+      $composableBuilder(column: $table.sellerId, builder: (column) => column);
+
+  GeneratedColumn<String> get sellerName => $composableBuilder(
+    column: $table.sellerName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sellerEmail => $composableBuilder(
+    column: $table.sellerEmail,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sellerPhone => $composableBuilder(
+    column: $table.sellerPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get shopId =>
+      $composableBuilder(column: $table.shopId, builder: (column) => column);
+
+  GeneratedColumn<String> get shopName =>
+      $composableBuilder(column: $table.shopName, builder: (column) => column);
+
+  GeneratedColumn<String> get shopAddress => $composableBuilder(
+    column: $table.shopAddress,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get shopPhone =>
+      $composableBuilder(column: $table.shopPhone, builder: (column) => column);
+
+  GeneratedColumn<int> get logoUploadId => $composableBuilder(
+    column: $table.logoUploadId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get logoUrl =>
+      $composableBuilder(column: $table.logoUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get metaTitle =>
+      $composableBuilder(column: $table.metaTitle, builder: (column) => column);
+
+  GeneratedColumn<String> get metaDescription => $composableBuilder(
+    column: $table.metaDescription,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get thermalPrinterWidth => $composableBuilder(
+    column: $table.thermalPrinterWidth,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get shippingCost => $composableBuilder(
+    column: $table.shippingCost,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get selfDeliveryActive => $composableBuilder(
+    column: $table.selfDeliveryActive,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get deliveryRadiusKm => $composableBuilder(
+    column: $table.deliveryRadiusKm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get deliveryPickupLatitude => $composableBuilder(
+    column: $table.deliveryPickupLatitude,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get deliveryPickupLongitude => $composableBuilder(
+    column: $table.deliveryPickupLongitude,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get cashOnDeliveryEnabled => $composableBuilder(
+    column: $table.cashOnDeliveryEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get bankPaymentEnabled => $composableBuilder(
+    column: $table.bankPaymentEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get mobileMoneyEnabled => $composableBuilder(
+    column: $table.mobileMoneyEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankName =>
+      $composableBuilder(column: $table.bankName, builder: (column) => column);
+
+  GeneratedColumn<String> get bankAccName => $composableBuilder(
+    column: $table.bankAccName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankAccNo =>
+      $composableBuilder(column: $table.bankAccNo, builder: (column) => column);
+
+  GeneratedColumn<String> get bankRoutingNo => $composableBuilder(
+    column: $table.bankRoutingNo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mtnMerchantCode => $composableBuilder(
+    column: $table.mtnMerchantCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get airtelMerchantCode => $composableBuilder(
+    column: $table.airtelMerchantCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paybillNumber => $composableBuilder(
+    column: $table.paybillNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get receiptPaymentMethodsJson => $composableBuilder(
+    column: $table.receiptPaymentMethodsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get deliveryProfileJson => $composableBuilder(
+    column: $table.deliveryProfileJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get synced =>
+      $composableBuilder(column: $table.synced, builder: (column) => column);
+}
+
+class $$BusinessProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BusinessProfilesTable,
+          BusinessProfile,
+          $$BusinessProfilesTableFilterComposer,
+          $$BusinessProfilesTableOrderingComposer,
+          $$BusinessProfilesTableAnnotationComposer,
+          $$BusinessProfilesTableCreateCompanionBuilder,
+          $$BusinessProfilesTableUpdateCompanionBuilder,
+          (
+            BusinessProfile,
+            BaseReferences<
+              _$AppDatabase,
+              $BusinessProfilesTable,
+              BusinessProfile
+            >,
+          ),
+          BusinessProfile,
+          PrefetchHooks Function()
+        > {
+  $$BusinessProfilesTableTableManager(
+    _$AppDatabase db,
+    $BusinessProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BusinessProfilesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BusinessProfilesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BusinessProfilesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String?> sellerId = const Value.absent(),
+                Value<String?> sellerName = const Value.absent(),
+                Value<String?> sellerEmail = const Value.absent(),
+                Value<String?> sellerPhone = const Value.absent(),
+                Value<String?> shopId = const Value.absent(),
+                Value<String> shopName = const Value.absent(),
+                Value<String?> shopAddress = const Value.absent(),
+                Value<String?> shopPhone = const Value.absent(),
+                Value<int?> logoUploadId = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
+                Value<String?> metaTitle = const Value.absent(),
+                Value<String?> metaDescription = const Value.absent(),
+                Value<int?> thermalPrinterWidth = const Value.absent(),
+                Value<double?> shippingCost = const Value.absent(),
+                Value<bool> selfDeliveryActive = const Value.absent(),
+                Value<double?> deliveryRadiusKm = const Value.absent(),
+                Value<double?> deliveryPickupLatitude = const Value.absent(),
+                Value<double?> deliveryPickupLongitude = const Value.absent(),
+                Value<bool> cashOnDeliveryEnabled = const Value.absent(),
+                Value<bool> bankPaymentEnabled = const Value.absent(),
+                Value<bool> mobileMoneyEnabled = const Value.absent(),
+                Value<String?> bankName = const Value.absent(),
+                Value<String?> bankAccName = const Value.absent(),
+                Value<String?> bankAccNo = const Value.absent(),
+                Value<String?> bankRoutingNo = const Value.absent(),
+                Value<String?> mtnMerchantCode = const Value.absent(),
+                Value<String?> airtelMerchantCode = const Value.absent(),
+                Value<String?> paybillNumber = const Value.absent(),
+                Value<String?> receiptPaymentMethodsJson = const Value.absent(),
+                Value<String?> deliveryProfileJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BusinessProfilesCompanion(
+                id: id,
+                sellerId: sellerId,
+                sellerName: sellerName,
+                sellerEmail: sellerEmail,
+                sellerPhone: sellerPhone,
+                shopId: shopId,
+                shopName: shopName,
+                shopAddress: shopAddress,
+                shopPhone: shopPhone,
+                logoUploadId: logoUploadId,
+                logoUrl: logoUrl,
+                metaTitle: metaTitle,
+                metaDescription: metaDescription,
+                thermalPrinterWidth: thermalPrinterWidth,
+                shippingCost: shippingCost,
+                selfDeliveryActive: selfDeliveryActive,
+                deliveryRadiusKm: deliveryRadiusKm,
+                deliveryPickupLatitude: deliveryPickupLatitude,
+                deliveryPickupLongitude: deliveryPickupLongitude,
+                cashOnDeliveryEnabled: cashOnDeliveryEnabled,
+                bankPaymentEnabled: bankPaymentEnabled,
+                mobileMoneyEnabled: mobileMoneyEnabled,
+                bankName: bankName,
+                bankAccName: bankAccName,
+                bankAccNo: bankAccNo,
+                bankRoutingNo: bankRoutingNo,
+                mtnMerchantCode: mtnMerchantCode,
+                airtelMerchantCode: airtelMerchantCode,
+                paybillNumber: paybillNumber,
+                receiptPaymentMethodsJson: receiptPaymentMethodsJson,
+                deliveryProfileJson: deliveryProfileJson,
+                updatedAt: updatedAt,
+                synced: synced,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String?> sellerId = const Value.absent(),
+                Value<String?> sellerName = const Value.absent(),
+                Value<String?> sellerEmail = const Value.absent(),
+                Value<String?> sellerPhone = const Value.absent(),
+                Value<String?> shopId = const Value.absent(),
+                required String shopName,
+                Value<String?> shopAddress = const Value.absent(),
+                Value<String?> shopPhone = const Value.absent(),
+                Value<int?> logoUploadId = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
+                Value<String?> metaTitle = const Value.absent(),
+                Value<String?> metaDescription = const Value.absent(),
+                Value<int?> thermalPrinterWidth = const Value.absent(),
+                Value<double?> shippingCost = const Value.absent(),
+                Value<bool> selfDeliveryActive = const Value.absent(),
+                Value<double?> deliveryRadiusKm = const Value.absent(),
+                Value<double?> deliveryPickupLatitude = const Value.absent(),
+                Value<double?> deliveryPickupLongitude = const Value.absent(),
+                Value<bool> cashOnDeliveryEnabled = const Value.absent(),
+                Value<bool> bankPaymentEnabled = const Value.absent(),
+                Value<bool> mobileMoneyEnabled = const Value.absent(),
+                Value<String?> bankName = const Value.absent(),
+                Value<String?> bankAccName = const Value.absent(),
+                Value<String?> bankAccNo = const Value.absent(),
+                Value<String?> bankRoutingNo = const Value.absent(),
+                Value<String?> mtnMerchantCode = const Value.absent(),
+                Value<String?> airtelMerchantCode = const Value.absent(),
+                Value<String?> paybillNumber = const Value.absent(),
+                Value<String?> receiptPaymentMethodsJson = const Value.absent(),
+                Value<String?> deliveryProfileJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BusinessProfilesCompanion.insert(
+                id: id,
+                sellerId: sellerId,
+                sellerName: sellerName,
+                sellerEmail: sellerEmail,
+                sellerPhone: sellerPhone,
+                shopId: shopId,
+                shopName: shopName,
+                shopAddress: shopAddress,
+                shopPhone: shopPhone,
+                logoUploadId: logoUploadId,
+                logoUrl: logoUrl,
+                metaTitle: metaTitle,
+                metaDescription: metaDescription,
+                thermalPrinterWidth: thermalPrinterWidth,
+                shippingCost: shippingCost,
+                selfDeliveryActive: selfDeliveryActive,
+                deliveryRadiusKm: deliveryRadiusKm,
+                deliveryPickupLatitude: deliveryPickupLatitude,
+                deliveryPickupLongitude: deliveryPickupLongitude,
+                cashOnDeliveryEnabled: cashOnDeliveryEnabled,
+                bankPaymentEnabled: bankPaymentEnabled,
+                mobileMoneyEnabled: mobileMoneyEnabled,
+                bankName: bankName,
+                bankAccName: bankAccName,
+                bankAccNo: bankAccNo,
+                bankRoutingNo: bankRoutingNo,
+                mtnMerchantCode: mtnMerchantCode,
+                airtelMerchantCode: airtelMerchantCode,
+                paybillNumber: paybillNumber,
+                receiptPaymentMethodsJson: receiptPaymentMethodsJson,
+                deliveryProfileJson: deliveryProfileJson,
+                updatedAt: updatedAt,
+                synced: synced,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BusinessProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BusinessProfilesTable,
+      BusinessProfile,
+      $$BusinessProfilesTableFilterComposer,
+      $$BusinessProfilesTableOrderingComposer,
+      $$BusinessProfilesTableAnnotationComposer,
+      $$BusinessProfilesTableCreateCompanionBuilder,
+      $$BusinessProfilesTableUpdateCompanionBuilder,
+      (
+        BusinessProfile,
+        BaseReferences<_$AppDatabase, $BusinessProfilesTable, BusinessProfile>,
+      ),
+      BusinessProfile,
+      PrefetchHooks Function()
+    >;
+typedef $$AppSettingsTableCreateCompanionBuilder =
+    AppSettingsCompanion Function({
+      required String key,
+      Value<String?> valueJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AppSettingsTableUpdateCompanionBuilder =
+    AppSettingsCompanion Function({
+      Value<String> key,
+      Value<String?> valueJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AppSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get valueJson => $composableBuilder(
+    column: $table.valueJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get valueJson => $composableBuilder(
+    column: $table.valueJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get valueJson =>
+      $composableBuilder(column: $table.valueJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AppSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppSettingsTable,
+          AppSetting,
+          $$AppSettingsTableFilterComposer,
+          $$AppSettingsTableOrderingComposer,
+          $$AppSettingsTableAnnotationComposer,
+          $$AppSettingsTableCreateCompanionBuilder,
+          $$AppSettingsTableUpdateCompanionBuilder,
+          (
+            AppSetting,
+            BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>,
+          ),
+          AppSetting,
+          PrefetchHooks Function()
+        > {
+  $$AppSettingsTableTableManager(_$AppDatabase db, $AppSettingsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String?> valueJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppSettingsCompanion(
+                key: key,
+                valueJson: valueJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                Value<String?> valueJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppSettingsCompanion.insert(
+                key: key,
+                valueJson: valueJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppSettingsTable,
+      AppSetting,
+      $$AppSettingsTableFilterComposer,
+      $$AppSettingsTableOrderingComposer,
+      $$AppSettingsTableAnnotationComposer,
+      $$AppSettingsTableCreateCompanionBuilder,
+      $$AppSettingsTableUpdateCompanionBuilder,
+      (
+        AppSetting,
+        BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>,
+      ),
+      AppSetting,
+      PrefetchHooks Function()
+    >;
 typedef $$LedgerEntriesTableCreateCompanionBuilder =
     LedgerEntriesCompanion Function({
       Value<String> id,
@@ -30743,6 +34386,8 @@ typedef $$PaymentsTableProcessedTableManager =
 typedef $$CashMovementsTableCreateCompanionBuilder =
     CashMovementsCompanion Function({
       Value<int> id,
+      Value<int?> remoteId,
+      Value<String?> idempotencyKey,
       Value<String?> outletId,
       Value<String?> staffId,
       required String type,
@@ -30754,6 +34399,8 @@ typedef $$CashMovementsTableCreateCompanionBuilder =
 typedef $$CashMovementsTableUpdateCompanionBuilder =
     CashMovementsCompanion Function({
       Value<int> id,
+      Value<int?> remoteId,
+      Value<String?> idempotencyKey,
       Value<String?> outletId,
       Value<String?> staffId,
       Value<String> type,
@@ -30820,6 +34467,16 @@ class $$CashMovementsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -30909,6 +34566,16 @@ class $$CashMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -30992,6 +34659,14 @@ class $$CashMovementsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -31086,6 +34761,8 @@ class $$CashMovementsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                Value<String?> idempotencyKey = const Value.absent(),
                 Value<String?> outletId = const Value.absent(),
                 Value<String?> staffId = const Value.absent(),
                 Value<String> type = const Value.absent(),
@@ -31095,6 +34772,8 @@ class $$CashMovementsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
               }) => CashMovementsCompanion(
                 id: id,
+                remoteId: remoteId,
+                idempotencyKey: idempotencyKey,
                 outletId: outletId,
                 staffId: staffId,
                 type: type,
@@ -31106,6 +34785,8 @@ class $$CashMovementsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                Value<String?> idempotencyKey = const Value.absent(),
                 Value<String?> outletId = const Value.absent(),
                 Value<String?> staffId = const Value.absent(),
                 required String type,
@@ -31115,6 +34796,8 @@ class $$CashMovementsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
               }) => CashMovementsCompanion.insert(
                 id: id,
+                remoteId: remoteId,
+                idempotencyKey: idempotencyKey,
                 outletId: outletId,
                 staffId: staffId,
                 type: type,
@@ -36840,6 +40523,209 @@ typedef $$CustomerMembershipsTableProcessedTableManager =
       CustomerMembership,
       PrefetchHooks Function({bool customerId})
     >;
+typedef $$ExpenseCategoriesTableCreateCompanionBuilder =
+    ExpenseCategoriesCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String> type,
+      Value<bool> isActive,
+      Value<DateTime> updatedAt,
+    });
+typedef $$ExpenseCategoriesTableUpdateCompanionBuilder =
+    ExpenseCategoriesCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String> type,
+      Value<bool> isActive,
+      Value<DateTime> updatedAt,
+    });
+
+class $$ExpenseCategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $ExpenseCategoriesTable> {
+  $$ExpenseCategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ExpenseCategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExpenseCategoriesTable> {
+  $$ExpenseCategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExpenseCategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExpenseCategoriesTable> {
+  $$ExpenseCategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ExpenseCategoriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExpenseCategoriesTable,
+          ExpenseCategory,
+          $$ExpenseCategoriesTableFilterComposer,
+          $$ExpenseCategoriesTableOrderingComposer,
+          $$ExpenseCategoriesTableAnnotationComposer,
+          $$ExpenseCategoriesTableCreateCompanionBuilder,
+          $$ExpenseCategoriesTableUpdateCompanionBuilder,
+          (
+            ExpenseCategory,
+            BaseReferences<
+              _$AppDatabase,
+              $ExpenseCategoriesTable,
+              ExpenseCategory
+            >,
+          ),
+          ExpenseCategory,
+          PrefetchHooks Function()
+        > {
+  $$ExpenseCategoriesTableTableManager(
+    _$AppDatabase db,
+    $ExpenseCategoriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExpenseCategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExpenseCategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExpenseCategoriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => ExpenseCategoriesCompanion(
+                id: id,
+                name: name,
+                type: type,
+                isActive: isActive,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String> type = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => ExpenseCategoriesCompanion.insert(
+                id: id,
+                name: name,
+                type: type,
+                isActive: isActive,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExpenseCategoriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExpenseCategoriesTable,
+      ExpenseCategory,
+      $$ExpenseCategoriesTableFilterComposer,
+      $$ExpenseCategoriesTableOrderingComposer,
+      $$ExpenseCategoriesTableAnnotationComposer,
+      $$ExpenseCategoriesTableCreateCompanionBuilder,
+      $$ExpenseCategoriesTableUpdateCompanionBuilder,
+      (
+        ExpenseCategory,
+        BaseReferences<_$AppDatabase, $ExpenseCategoriesTable, ExpenseCategory>,
+      ),
+      ExpenseCategory,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -36882,6 +40768,10 @@ class $AppDatabaseManager {
       $$StaffTableTableManager(_db, _db.staff);
   $$OutletsTableTableManager get outlets =>
       $$OutletsTableTableManager(_db, _db.outlets);
+  $$BusinessProfilesTableTableManager get businessProfiles =>
+      $$BusinessProfilesTableTableManager(_db, _db.businessProfiles);
+  $$AppSettingsTableTableManager get appSettings =>
+      $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$LedgerEntriesTableTableManager get ledgerEntries =>
       $$LedgerEntriesTableTableManager(_db, _db.ledgerEntries);
   $$LedgerLinesTableTableManager get ledgerLines =>
@@ -36916,4 +40806,6 @@ class $AppDatabaseManager {
       $$PackageRedemptionsTableTableManager(_db, _db.packageRedemptions);
   $$CustomerMembershipsTableTableManager get customerMemberships =>
       $$CustomerMembershipsTableTableManager(_db, _db.customerMemberships);
+  $$ExpenseCategoriesTableTableManager get expenseCategories =>
+      $$ExpenseCategoriesTableTableManager(_db, _db.expenseCategories);
 }

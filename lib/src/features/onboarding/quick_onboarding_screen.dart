@@ -12,19 +12,20 @@ class QuickOnboardingScreen extends ConsumerStatefulWidget {
   const QuickOnboardingScreen({super.key});
 
   @override
-  ConsumerState<QuickOnboardingScreen> createState() => _QuickOnboardingScreenState();
+  ConsumerState<QuickOnboardingScreen> createState() =>
+      _QuickOnboardingScreenState();
 }
 
 class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _shopNameController = TextEditingController();
-  
+
   String? _selectedCategory;
   LatLng? _selectedLocation;
   double _deliveryRadiusKm = 5.0;
   bool _isLoadingLocation = false;
   bool _isSaving = false;
-  
+
   final List<String> _categories = [
     'Fashion & Apparel',
     'Electronics',
@@ -67,7 +68,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-                
+
                 // Header
                 const Text(
                   'Set Up Your Shop',
@@ -83,7 +84,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 40),
-                
+
                 // Shop Name
                 _buildModernField(
                   controller: _shopNameController,
@@ -101,11 +102,11 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Category
                 _buildCategoryDropdown(),
                 const SizedBox(height: 24),
-                
+
                 // Location Card
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -125,7 +126,11 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                               color: Colors.blue,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.location_on, color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -134,14 +139,20 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                               children: [
                                 const Text(
                                   'Shop Location',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   _selectedLocation != null
                                       ? 'Location set ✓'
                                       : 'For Soko24 delivery',
-                                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                  ),
                                 ),
                               ],
                             ),
@@ -153,26 +164,37 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton.icon(
-                          onPressed: _isLoadingLocation ? null : _handleQuickLocation,
+                          onPressed: _isLoadingLocation
+                              ? null
+                              : _handleQuickLocation,
                           icon: _isLoadingLocation
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Icon(Icons.my_location),
-                          label: Text(_isLoadingLocation ? 'Getting location...' : 'Use My Current Location'),
+                          label: Text(
+                            _isLoadingLocation
+                                ? 'Getting location...'
+                                : 'Use My Current Location',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
                       if (_selectedLocation != null) ...[
                         const SizedBox(height: 16),
-                        
+
                         // Delivery Radius
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,10 +204,16 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                               children: [
                                 const Text(
                                   'Delivery Radius',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.blue,
                                     borderRadius: BorderRadius.circular(16),
@@ -207,11 +235,15 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                               max: 20,
                               divisions: 19,
                               activeColor: Colors.blue,
-                              onChanged: (value) => setState(() => _deliveryRadiusKm = value),
+                              onChanged: (value) =>
+                                  setState(() => _deliveryRadiusKm = value),
                             ),
                             Text(
                               'Soko24 will handle deliveries within this radius',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
                           ],
                         ),
@@ -220,7 +252,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                
+
                 // Start Selling Button
                 SizedBox(
                   height: 56,
@@ -229,23 +261,31 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                     onPressed: _isSaving ? null : _handleStartSelling,
                     child: _isSaving
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                           )
                         : const Text(
                             'Start Selling',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 Center(
                   child: Text(
                     'You can add more details later in settings',
@@ -270,8 +310,15 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
         value: _selectedCategory,
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          prefixIcon: Icon(Icons.category_outlined, color: Colors.grey[500], size: 22),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+          prefixIcon: Icon(
+            Icons.category_outlined,
+            color: Colors.grey[500],
+            size: 22,
+          ),
           labelText: 'Business Category',
           floatingLabelStyle: TextStyle(color: Colors.grey[800]),
           labelStyle: TextStyle(color: Colors.grey[500]),
@@ -302,7 +349,10 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
           prefixIcon: Icon(icon, color: Colors.grey[500], size: 22),
           labelText: label,
           hintText: hint,
@@ -315,7 +365,10 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
     );
   }
 
-  void _applyOnboardingState(OnboardingState onboarding, {bool notify = false}) {
+  void _applyOnboardingState(
+    OnboardingState onboarding, {
+    bool notify = false,
+  }) {
     final data = onboarding.shopData;
     if (data.isEmpty) return;
 
@@ -371,7 +424,8 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         throw Exception('Location permission denied');
       }
 
@@ -394,9 +448,9 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not get location: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not get location: $e')));
     } finally {
       if (mounted) {
         setState(() => _isLoadingLocation = false);
@@ -449,7 +503,9 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
           action: SnackBarAction(
             label: 'Continue Anyway',
             onPressed: () {
-              ref.read(onboardingControllerProvider.notifier).completeOnboarding();
+              ref
+                  .read(onboardingControllerProvider.notifier)
+                  .completeOnboarding();
               ref.read(syncServiceProvider).start();
               context.go('/home/checkout');
             },

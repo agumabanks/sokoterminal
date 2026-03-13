@@ -69,7 +69,8 @@ class SyncStatusNotifier extends StateNotifier<SyncStatus> {
     // Listen to sync messages from service
     final syncService = ref.read(syncServiceProvider);
     syncService.syncStatusStream.listen((msg) {
-      if (msg.toLowerCase().contains('failed') || msg.toLowerCase().contains('error')) {
+      if (msg.toLowerCase().contains('failed') ||
+          msg.toLowerCase().contains('error')) {
         state = state.copyWith(state: SyncState.error, message: msg);
       } else if (msg.toLowerCase().contains('syncing')) {
         state = state.copyWith(state: SyncState.syncing, message: msg);
@@ -99,6 +100,7 @@ final pendingSyncCountProvider = StreamProvider<int>((ref) {
   return ref.watch(appDatabaseProvider).watchPendingSyncOpsCount();
 });
 
-final syncStatusProvider = StateNotifierProvider<SyncStatusNotifier, SyncStatus>((ref) {
-  return SyncStatusNotifier(ref);
-});
+final syncStatusProvider =
+    StateNotifierProvider<SyncStatusNotifier, SyncStatus>((ref) {
+      return SyncStatusNotifier(ref);
+    });

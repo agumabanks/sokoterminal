@@ -25,6 +25,19 @@ void main() {
           'updated_at': '2025-01-01T00:00:00Z',
         },
       ],
+      'cash_movements': [
+        {
+          'id': 7,
+          'idempotency_key': 'cash_movement_7',
+          'type': 'withdrawal',
+          'amount': 1500,
+          'note': 'supplier payment',
+          'staff_id': 14,
+          'shift_id': 3,
+          'created_at': '2025-01-01T00:00:00Z',
+          'updated_at': '2025-01-01T00:00:00Z',
+        },
+      ],
       'receipt_templates': const [],
       'quotation_templates': const [],
       'ledger_entries': const [],
@@ -40,6 +53,10 @@ void main() {
     expect(parsed.expenses.first.method, 'cash');
     expect(parsed.expenses.first.category, 'utilities');
     expect(parsed.expenses.first.note, 'Water');
+    expect(parsed.cashMovements, hasLength(1));
+    expect(parsed.cashMovements.first.id, 7);
+    expect(parsed.cashMovements.first.idempotencyKey, 'cash_movement_7');
+    expect(parsed.cashMovements.first.type, 'withdrawal');
+    expect(parsed.cashMovements.first.amount, 1500.0);
   });
 }
-

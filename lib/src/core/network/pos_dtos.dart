@@ -48,6 +48,7 @@ class PosSyncPullResponse {
     required this.quotationTemplates,
     required this.ledgerEntries,
     required this.sellerProfile,
+    required this.businessProfile,
     required this.outlet,
   });
 
@@ -72,6 +73,7 @@ class PosSyncPullResponse {
   final PosSyncOutlet? outlet;
   final List<PosSyncLedgerEntry> ledgerEntries;
   final PosSyncSellerProfile? sellerProfile;
+  final PosSyncBusinessProfile? businessProfile;
 
   factory PosSyncPullResponse.fromJson(Map<String, dynamic> json) {
     final receivedAtRaw = json['received_at'];
@@ -100,6 +102,7 @@ class PosSyncPullResponse {
     final quotationTemplatesRaw = json['quotation_templates'];
     final ledgerEntriesRaw = json['ledger_entries'];
     final sellerProfileRaw = json['seller_profile'];
+    final businessProfileRaw = json['business_profile'];
 
     final config = json['config'];
     final outletRaw = config is Map<String, dynamic> ? config['outlet'] : null;
@@ -110,10 +113,22 @@ class PosSyncPullResponse {
       outletId: outletId,
       products: _parseList(productsRaw, PosSyncProduct.fromJson),
       services: _parseList(servicesRaw, PosSyncService.fromJson),
-      serviceVariants: _parseList(serviceVariantsRaw, PosSyncServiceVariant.fromJson),
-      servicePackages: _parseList(servicePackagesRaw, PosSyncServicePackage.fromJson),
-      customerPackages: _parseList(customerPackagesRaw, PosSyncCustomerPackage.fromJson),
-      packageRedemptions: _parseList(packageRedemptionsRaw, PosSyncPackageRedemption.fromJson),
+      serviceVariants: _parseList(
+        serviceVariantsRaw,
+        PosSyncServiceVariant.fromJson,
+      ),
+      servicePackages: _parseList(
+        servicePackagesRaw,
+        PosSyncServicePackage.fromJson,
+      ),
+      customerPackages: _parseList(
+        customerPackagesRaw,
+        PosSyncCustomerPackage.fromJson,
+      ),
+      packageRedemptions: _parseList(
+        packageRedemptionsRaw,
+        PosSyncPackageRedemption.fromJson,
+      ),
       customers: _parseList(customersRaw, PosSyncCustomer.fromJson),
       suppliers: _parseList(suppliersRaw, PosSyncSupplier.fromJson),
       expenses: _parseList(expensesRaw, PosSyncExpense.fromJson),
@@ -121,13 +136,24 @@ class PosSyncPullResponse {
       shifts: _parseList(shiftsRaw, PosSyncShift.fromJson),
       cashMovements: _parseList(cashMovementsRaw, PosSyncCashMovement.fromJson),
       settings: _parseList(settingsRaw, PosSyncSetting.fromJson),
-      receiptTemplates: _parseList(receiptTemplatesRaw, PosSyncReceiptTemplate.fromJson),
-      quotationTemplates: _parseList(quotationTemplatesRaw, PosSyncQuotationTemplate.fromJson),
+      receiptTemplates: _parseList(
+        receiptTemplatesRaw,
+        PosSyncReceiptTemplate.fromJson,
+      ),
+      quotationTemplates: _parseList(
+        quotationTemplatesRaw,
+        PosSyncQuotationTemplate.fromJson,
+      ),
       ledgerEntries: _parseList(ledgerEntriesRaw, PosSyncLedgerEntry.fromJson),
       sellerProfile: sellerProfileRaw is Map<String, dynamic>
           ? PosSyncSellerProfile.fromJson(sellerProfileRaw)
           : null,
-      outlet: outletRaw is Map<String, dynamic> ? PosSyncOutlet.fromJson(outletRaw) : null,
+      businessProfile: businessProfileRaw is Map<String, dynamic>
+          ? PosSyncBusinessProfile.fromJson(businessProfileRaw)
+          : null,
+      outlet: outletRaw is Map<String, dynamic>
+          ? PosSyncOutlet.fromJson(outletRaw)
+          : null,
     );
   }
 }
@@ -167,7 +193,9 @@ class PosSyncExpense {
       amount: _asDouble(json['amount']),
       method: (json['method'] ?? '').toString(),
       category: (json['category'] ?? '').toString(),
-      supplierId: json['supplier_id'] is num ? (json['supplier_id'] as num).toInt() : int.tryParse('${json['supplier_id']}'),
+      supplierId: json['supplier_id'] is num
+          ? (json['supplier_id'] as num).toInt()
+          : int.tryParse('${json['supplier_id']}'),
       note: json['note']?.toString(),
       occurredAt: _asDateTime(json['occurred_at']),
       updatedAt: _asDateTime(json['updated_at']),
@@ -262,21 +290,25 @@ class PosSyncProduct {
       thumbnailUrl: json['thumbnail_url']?.toString(),
       photoUploadIds: (json['photo_upload_ids'] is List)
           ? (json['photo_upload_ids'] as List)
-              .map((e) => _asNullableInt(e))
-              .whereType<int>()
-              .toList()
+                .map((e) => _asNullableInt(e))
+                .whereType<int>()
+                .toList()
           : const [],
       galleryUrls: (json['gallery_urls'] is List)
           ? (json['gallery_urls'] as List)
-              .map((e) => e?.toString() ?? '')
-              .where((e) => e.trim().isNotEmpty)
-              .toList()
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.trim().isNotEmpty)
+                .toList()
           : const [],
       stocks: (json['stocks'] is List)
           ? (json['stocks'] as List)
-              .whereType<Map>()
-              .map((e) => PosSyncProductStock.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => PosSyncProductStock.fromJson(
+                    Map<String, dynamic>.from(e),
+                  ),
+                )
+                .toList()
           : const [],
     );
   }
@@ -327,6 +359,7 @@ class PosSyncService {
     required this.category,
     required this.published,
     required this.updatedAt,
+    this.imageUrl,
   });
 
   final String id;
@@ -337,6 +370,7 @@ class PosSyncService {
   final String? category;
   final bool published;
   final DateTime? updatedAt;
+  final String? imageUrl;
 
   factory PosSyncService.fromJson(Map<String, dynamic> json) {
     return PosSyncService(
@@ -348,6 +382,7 @@ class PosSyncService {
       category: json['category']?.toString(),
       published: _asBool(json['published']),
       updatedAt: _asDateTime(json['updated_at']),
+      imageUrl: json['image_url']?.toString(),
     );
   }
 }
@@ -537,7 +572,9 @@ class PosSyncLedgerLine {
   PosSyncLedgerLine({
     required this.id,
     required this.itemId,
+    required this.serviceId,
     required this.title,
+    required this.variation,
     required this.price,
     required this.quantity,
     required this.total,
@@ -545,7 +582,9 @@ class PosSyncLedgerLine {
 
   final String id;
   final String? itemId;
+  final String? serviceId;
   final String title;
+  final String? variation;
   final double price;
   final int quantity;
   final double total;
@@ -554,7 +593,9 @@ class PosSyncLedgerLine {
     return PosSyncLedgerLine(
       id: (json['id'] ?? '').toString(),
       itemId: json['item_id']?.toString(),
+      serviceId: json['service_id']?.toString(),
       title: (json['title'] ?? '').toString(),
+      variation: json['variation']?.toString(),
       price: _asDouble(json['price']),
       quantity: _asInt(json['quantity']),
       total: _asDouble(json['total']),
@@ -604,6 +645,138 @@ class PosSyncSellerProfile {
       email: json['email']?.toString(),
       phone: json['phone']?.toString(),
       businessName: json['business_name']?.toString(),
+    );
+  }
+}
+
+class PosSyncBusinessProfile {
+  PosSyncBusinessProfile({
+    required this.sellerId,
+    required this.sellerName,
+    this.sellerEmail,
+    this.sellerPhone,
+    this.shopId,
+    required this.shopName,
+    this.shopAddress,
+    this.shopPhone,
+    this.logoUploadId,
+    this.logoUrl,
+    this.metaTitle,
+    this.metaDescription,
+    this.thermalPrinterWidth,
+    this.shippingCost,
+    required this.selfDeliveryActive,
+    this.deliveryRadiusKm,
+    this.deliveryPickupLatitude,
+    this.deliveryPickupLongitude,
+    required this.cashOnDeliveryEnabled,
+    required this.bankPaymentEnabled,
+    required this.mobileMoneyEnabled,
+    this.bankName,
+    this.bankAccName,
+    this.bankAccNo,
+    this.bankRoutingNo,
+    this.mtnMerchantCode,
+    this.airtelMerchantCode,
+    this.paybillNumber,
+    this.receiptPaymentMethods = const {},
+    this.deliveryProfile = const {},
+    this.updatedAt,
+  });
+
+  final String sellerId;
+  final String sellerName;
+  final String? sellerEmail;
+  final String? sellerPhone;
+  final String? shopId;
+  final String shopName;
+  final String? shopAddress;
+  final String? shopPhone;
+  final int? logoUploadId;
+  final String? logoUrl;
+  final String? metaTitle;
+  final String? metaDescription;
+  final int? thermalPrinterWidth;
+  final double? shippingCost;
+  final bool selfDeliveryActive;
+  final double? deliveryRadiusKm;
+  final double? deliveryPickupLatitude;
+  final double? deliveryPickupLongitude;
+  final bool cashOnDeliveryEnabled;
+  final bool bankPaymentEnabled;
+  final bool mobileMoneyEnabled;
+  final String? bankName;
+  final String? bankAccName;
+  final String? bankAccNo;
+  final String? bankRoutingNo;
+  final String? mtnMerchantCode;
+  final String? airtelMerchantCode;
+  final String? paybillNumber;
+  final Map<String, dynamic> receiptPaymentMethods;
+  final Map<String, dynamic> deliveryProfile;
+  final DateTime? updatedAt;
+
+  factory PosSyncBusinessProfile.fromJson(Map<String, dynamic> json) {
+    final seller = json['seller'] is Map
+        ? Map<String, dynamic>.from(json['seller'] as Map)
+        : const <String, dynamic>{};
+    final shop = json['shop'] is Map
+        ? Map<String, dynamic>.from(json['shop'] as Map)
+        : const <String, dynamic>{};
+    final pos = json['pos'] is Map
+        ? Map<String, dynamic>.from(json['pos'] as Map)
+        : const <String, dynamic>{};
+    final payment = json['payment_settings'] is Map
+        ? Map<String, dynamic>.from(json['payment_settings'] as Map)
+        : const <String, dynamic>{};
+    final delivery = json['delivery_settings'] is Map
+        ? Map<String, dynamic>.from(json['delivery_settings'] as Map)
+        : const <String, dynamic>{};
+    final receiptPaymentMethods = payment['receipt_payment_methods'] is Map
+        ? Map<String, dynamic>.from(payment['receipt_payment_methods'] as Map)
+        : const <String, dynamic>{};
+    final deliveryProfile = delivery['profile'] is Map
+        ? Map<String, dynamic>.from(delivery['profile'] as Map)
+        : const <String, dynamic>{};
+
+    return PosSyncBusinessProfile(
+      sellerId: (seller['id'] ?? '').toString(),
+      sellerName: (seller['name'] ?? '').toString(),
+      sellerEmail: seller['email']?.toString(),
+      sellerPhone: seller['phone']?.toString(),
+      shopId: shop['id']?.toString(),
+      shopName: (shop['name'] ?? '').toString(),
+      shopAddress: shop['address']?.toString(),
+      shopPhone: shop['phone']?.toString(),
+      logoUploadId: _asNullableInt(shop['logo_upload_id']),
+      logoUrl: shop['logo_url']?.toString(),
+      metaTitle: shop['meta_title']?.toString(),
+      metaDescription: shop['meta_description']?.toString(),
+      thermalPrinterWidth: _asNullableInt(pos['thermal_printer_width']),
+      shippingCost: _asNullableDouble(delivery['shipping_cost']),
+      selfDeliveryActive: _asBool(delivery['self_delivery_active']),
+      deliveryRadiusKm: _asNullableDouble(delivery['delivery_radius_km']),
+      deliveryPickupLatitude: _asNullableDouble(
+        delivery['delivery_pickup_latitude'],
+      ),
+      deliveryPickupLongitude: _asNullableDouble(
+        delivery['delivery_pickup_longitude'],
+      ),
+      cashOnDeliveryEnabled: _asBool(payment['cash_on_delivery_status']),
+      bankPaymentEnabled: _asBool(payment['bank_payment_status']),
+      mobileMoneyEnabled: receiptPaymentMethods.isEmpty
+          ? true
+          : _asNullableBool(receiptPaymentMethods['mobile_money']) ?? true,
+      bankName: payment['bank_name']?.toString(),
+      bankAccName: payment['bank_acc_name']?.toString(),
+      bankAccNo: payment['bank_acc_no']?.toString(),
+      bankRoutingNo: payment['bank_routing_no']?.toString(),
+      mtnMerchantCode: payment['mtn_merchant_code']?.toString(),
+      airtelMerchantCode: payment['airtel_merchant_code']?.toString(),
+      paybillNumber: payment['paybill_number']?.toString(),
+      receiptPaymentMethods: receiptPaymentMethods,
+      deliveryProfile: deliveryProfile,
+      updatedAt: _asDateTime(shop['updated_at']),
     );
   }
 }
@@ -732,7 +905,9 @@ class PosSyncReceiptTemplate {
       showLogo: _asBool(json['show_logo']),
       showQr: _asBool(json['show_qr']),
       isActive: _asBool(json['is_active']),
-      updatedAt: _asDateTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      updatedAt:
+          _asDateTime(json['updated_at']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 }
@@ -773,7 +948,9 @@ class PosSyncQuotationTemplate {
       showLogo: _asBool(json['show_logo']),
       showQr: _asBool(json['show_qr']),
       isActive: _asBool(json['is_active']),
-      updatedAt: _asDateTime(json['updated_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      updatedAt:
+          _asDateTime(json['updated_at']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 }
@@ -935,11 +1112,7 @@ class PosSyncCashMovement {
 
 /// Setting DTO for sync pull
 class PosSyncSetting {
-  PosSyncSetting({
-    required this.key,
-    required this.value,
-    this.updatedAt,
-  });
+  PosSyncSetting({required this.key, required this.value, this.updatedAt});
 
   final String key;
   final String? value;

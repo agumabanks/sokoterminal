@@ -1,23 +1,19 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
-import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/phone_normalizer.dart';
 import '../backup/migration_controller.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated, loading, error }
 
 class AuthState {
-  const AuthState({
-    required this.status,
-    this.message,
-    this.token,
-  });
+  const AuthState({required this.status, this.message, this.token});
 
   final AuthStatus status;
   final String? token;
@@ -35,18 +31,23 @@ class AuthState {
   static const unauthenticated = AuthState(status: AuthStatus.unauthenticated);
 }
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) {
-  final client = ref.watch(apiClientProvider);
-  final storage = ref.watch(secureStorageProvider);
-  return AuthController(ref: ref, apiClient: client, storage: storage)..bootstrap();
-});
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
+  (ref) {
+    final client = ref.watch(apiClientProvider);
+    final storage = ref.watch(secureStorageProvider);
+    return AuthController(ref: ref, apiClient: client, storage: storage)
+      ..bootstrap();
+  },
+);
 
 class AuthController extends StateNotifier<AuthState> {
-  AuthController({required this.ref, required ApiClient apiClient, required SecureStorage storage})
-      : _apiClient = apiClient,
-        _storage = storage,
-        super(AuthState.unknown);
+  AuthController({
+    required this.ref,
+    required ApiClient apiClient,
+    required SecureStorage storage,
+  }) : _apiClient = apiClient,
+       _storage = storage,
+       super(AuthState.unknown);
 
   final Ref ref;
   final ApiClient _apiClient;
@@ -60,6 +61,14 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> bootstrap() async {
+    // Register the 401 logout callback so the API client can trigger logout.
+    // Deferred to avoid modifying another provider during initialization.
+    Future.microtask(() {
+      ref.read(authLogoutCallbackProvider.notifier).state = () {
+        logout();
+      };
+    });
+
     final token = await _storage.readAccessToken();
     if (token != null && token.isNotEmpty) {
       state = AuthState(status: AuthStatus.authenticated, token: token);
@@ -71,7 +80,10 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> login({required String emailOrPhone, required String password}) async {
+  Future<void> login({
+    required String emailOrPhone,
+    required String password,
+  }) async {
     state = state.copyWith(status: AuthStatus.loading, message: null);
     try {
       final isEmail = emailOrPhone.contains('@');
@@ -89,23 +101,23 @@ class AuthController extends StateNotifier<AuthState> {
       );
       final data = response.data ?? {};
       final token = data['access_token'] ?? data['token'] ?? '';
-    if (token.isEmpty) {
-      throw Exception('Missing token from API');
-    }
+      if (token.isEmpty) {
+        throw Exception('Missing token from API');
+      }
 
-    // Ensure local database is cleared before starting a new session
-    // This prevents data bleeding between different users on the same device
-    final db = ref.read(appDatabaseProvider);
-    await db.clearAllData();
+      // Ensure local database is cleared before starting a new session
+      // This prevents data bleeding between different users on the same device
+      final db = ref.read(appDatabaseProvider);
+      await db.clearAllData();
 
-    await _storage.writeAccessToken(token);
-    
-    // Store seller UUID for identity persistence
-    final user = data['user'] as Map<String, dynamic>?;
-    final sellerUUID = user?['seller_uuid'] as String?;
-    if (sellerUUID != null && sellerUUID.isNotEmpty) {
-      await _storage.writeSellerUUID(sellerUUID);
-    }
+      await _storage.writeAccessToken(token);
+
+      // Store seller UUID for identity persistence
+      final user = data['user'] as Map<String, dynamic>?;
+      final sellerUUID = user?['seller_uuid'] as String?;
+      if (sellerUUID != null && sellerUUID.isNotEmpty) {
+        await _storage.writeSellerUUID(sellerUUID);
+      }
 
       if (normalizedPhone != null && normalizedPhone.isNotEmpty) {
         await _storage.writeLastLoginPhone(normalizedPhone);
@@ -133,8 +145,13 @@ class AuthController extends StateNotifier<AuthState> {
         data: {'phone': normalized},
       );
       return response.data ?? {'exists': false};
-    } catch (e) {
-      return {'exists': false, 'error': e.toString()};
+    } on DioException catch (e) {
+      final msg =
+          e.response?.data?['message']?.toString() ??
+          'Unable to verify account right now.';
+      throw Exception(msg);
+    } catch (_) {
+      throw Exception('Unable to verify account right now.');
     }
   }
 
@@ -153,6 +170,7 @@ class AuthController extends StateNotifier<AuthState> {
           'register_by': 'phone',
           'password': pin,
           'password_confirmation': pin,
+          'pin': pin,
           'user_type': 'seller',
           'registered_via': 'terminal',
           'shop_name': name.trim(),
@@ -168,7 +186,9 @@ class AuthController extends StateNotifier<AuthState> {
           // Account created, may need OTP verification
           state = AuthState(
             status: AuthStatus.unauthenticated,
-            message: message?.toString() ?? 'Account created! Please verify your phone.',
+            message:
+                message?.toString() ??
+                'Account created! Please verify your phone.',
           );
           return;
         }
@@ -203,24 +223,24 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(status: AuthStatus.loading, message: null);
     final normalized = normalizeUgPhone(phone);
-    
+
     try {
       // Try backend verification first
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/v2/seller/pos/pin/verify',
         data: {'phone': normalized, 'pin': pin},
       );
-      
+
       final data = response.data ?? {};
-    if (data['result'] == true && data['access_token'] != null) {
-      final token = data['access_token'];
+      if (data['result'] == true && data['access_token'] != null) {
+        final token = data['access_token'];
 
-      // Ensure local database is cleared before starting a new session
-      // This prevents data bleeding between different users on the same device
-      final db = ref.read(appDatabaseProvider);
-      await db.clearAllData();
+        // Ensure local database is cleared before starting a new session
+        // This prevents data bleeding between different users on the same device
+        final db = ref.read(appDatabaseProvider);
+        await db.clearAllData();
 
-      await _storage.writeAccessToken(token);
+        await _storage.writeAccessToken(token);
         await _storage.writeLastLoginPhone(normalized);
         state = AuthState(status: AuthStatus.authenticated, token: token);
         _scheduleTokenRefresh();
@@ -232,11 +252,11 @@ class AuthController extends StateNotifier<AuthState> {
     } catch (e) {
       // Fallback to local check if backend fails (e.g. offline) or returns specific error?
       // For now, let's stick to strict backend verification as requested "saved to backend too"
-      
+
       // However, if we want to support offline PIN login later, we'd check _storage here.
       // Given the requirement "pin saved to backend... user to do more with less clicks",
       // backend verification is key for security and cross-device.
-      
+
       String msg = 'PIN login failed';
       if (e is DioException) {
         msg = e.response?.data?['message']?.toString() ?? msg;
@@ -265,10 +285,8 @@ class AuthController extends StateNotifier<AuthState> {
         data: {'pin': p, 'password': password},
       );
 
-      // Also cache locally for offline/fallback scenarios (optional, but good for UX)
       await Future.wait([
         _storage.writeSellerQuickPhone(normalized),
-        _storage.writeSellerQuickPassword(password.trim()),
         _storage.writeSellerQuickPin(p),
         _storage.writeLastLoginPhone(normalized),
       ]);
@@ -284,19 +302,19 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     _refreshTimer?.cancel();
-    
+
     // Clear all business data from the local database
     // This ensures complete data isolation between different sellers on the same device
     final db = ref.read(appDatabaseProvider);
     await db.clearAllData();
-    
+
     // Clear all secure storage (tokens, credentials, POS sessions, quick login data)
     await _storage.clearAll();
-    
+
     // Clear SharedPreferences (POS staff initialization flag and other prefs)
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.clear();
-    
+
     state = AuthState.unauthenticated;
   }
 
@@ -304,15 +322,23 @@ class AuthController extends StateNotifier<AuthState> {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(const Duration(minutes: 55), (timer) async {
       try {
-        final response = await _apiClient.post<Map<String, dynamic>>('/v2/auth/refresh');
+        final response = await _apiClient.post<Map<String, dynamic>>(
+          '/v2/auth/refresh',
+        );
         final newToken = response.data?['access_token'];
         if (newToken != null && newToken is String && newToken.isNotEmpty) {
           await _storage.writeAccessToken(newToken);
           state = state.copyWith(token: newToken);
         }
-      } catch (_) {
-        // If refresh fails, we keep the old token and try again next loop
-        // or user will eventually be logged out by 401 interceptor
+      } on DioException catch (e) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 401 || statusCode == 403) {
+          timer.cancel();
+          await logout();
+        }
+        debugPrint('[Auth] Token refresh failed: $statusCode');
+      } catch (e) {
+        debugPrint('[Auth] Token refresh error: $e');
       }
     });
   }

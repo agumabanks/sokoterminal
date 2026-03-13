@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with TickerProviderStateMixin {
   final _pageController = PageController();
   final _phoneController = TextEditingController();
   final _pinController = TextEditingController(); // Used for PIN or Password
@@ -31,6 +33,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   String? _errorMessage;
   String? _userName;
   bool _hasPin = false; // Determined by backend check
+  bool _hasPassword = true; // Seller must keep password configured.
+  bool _usePassword = false; // Optional fallback when an account has PIN.
   bool _obscureText = true;
 
   // Animations
@@ -41,25 +45,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   static const Color _bg = Color(0xFF000000);
   static const Color _accent = Color(0xFF6C63FF);
   static const Color _surface = Color(0xFF0B0B10);
-  static const Color _glass = Color(0xFF101018);
   static const Color _stroke = Color(0x22FFFFFF);
-  static const Color _strokeStrong = Color(0x33FFFFFF);
 
   @override
   void initState() {
     super.initState();
 
     // UI chrome: dark, clean
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.black,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
 
-    _fadeController = AnimationController(duration: const Duration(milliseconds: 650), vsync: this);
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOutQuart);
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 650),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOutQuart,
+    );
     _fadeController.forward();
+
+    _phoneController.addListener(_clearErrorOnInput);
+    _pinController.addListener(_clearErrorOnInput);
 
     // Rebuild on focus change to show highlight
     _phoneFocus.addListener(() => mounted ? setState(() {}) : null);
@@ -77,10 +90,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
     super.dispose();
   }
 
+  void _clearErrorOnInput() {
+    if (_errorMessage == null || !mounted) return;
+    setState(() => _errorMessage = null);
+  }
+
   String get _normalizedPhone {
-    String digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.startsWith('0')) digits = digits.substring(1);
-    return '${_selectedCountry.code}$digits';
+    final raw = _phoneController.text.trim();
+    if (raw.isEmpty) return '';
+
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+
+    // If a full international number was entered, keep it unchanged.
+    for (final country in eastAfricanCountryCodes) {
+      if (digits.startsWith(country.digitCode) &&
+          digits.length > country.digitCode.length + 5) {
+        return digits;
+      }
+    }
+
+    return normalizePhoneWithCountry(raw, _selectedCountry);
+  }
+
+  String _humanizeError(Object error) {
+    if (error is DioException) {
+      final responseData = error.response?.data;
+      if (responseData is Map) {
+        final map = Map<String, dynamic>.from(responseData);
+        final message = map['message']?.toString().trim();
+        final fieldErrors = map['errors'];
+        if (fieldErrors is Map) {
+          final lines = <String>[];
+          for (final value in fieldErrors.values) {
+            if (value is List) {
+              lines.addAll(
+                value.map((entry) => entry.toString().trim()).where(
+                  (entry) => entry.isNotEmpty,
+                ),
+              );
+            } else if (value != null) {
+              final text = value.toString().trim();
+              if (text.isNotEmpty) lines.add(text);
+            }
+          }
+          final combined = lines.join('\n').trim();
+          if (combined.isNotEmpty) return combined;
+        }
+        if (message != null && message.isNotEmpty) {
+          return message;
+        }
+      }
+      return error.message?.trim().isNotEmpty == true
+          ? error.message!.trim()
+          : 'Request failed. Please try again.';
+    }
+
+    final raw = error.toString().trim();
+    if (raw.startsWith('Exception:')) {
+      return raw.substring('Exception:'.length).trim();
+    }
+    return raw;
   }
 
   Future<void> _handlePhoneSubmit() async {
@@ -103,9 +173,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
 
       if (result['exists'] == true) {
         // User exists -> Determine auth method
+        final hasPin = result['has_pin'] == true;
+        final hasPassword = result['has_password'] != false;
+        if (!hasPassword) {
+          setState(() => _isLoading = false);
+          _showError(
+            hasPin
+                ? 'Account password is missing. Set/reset password on web first.'
+                : 'Account is missing both password and PIN. Set password on web first.',
+          );
+          return;
+        }
+
         setState(() {
           _userName = result['name'];
-          _hasPin = result['has_pin'] == true;
+          _hasPin = hasPin;
+          _hasPassword = hasPassword;
+          _usePassword = false;
           _isLoading = false;
           _pinController.clear();
         });
@@ -117,52 +201,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       } else {
         // User new -> Go to Register
         setState(() => _isLoading = false);
-        context.go('/register', extra: {'phone': _phoneController.text.trim()});
+        context.go('/register', extra: {'phone': _normalizedPhone});
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      _showError('Connection error. Try again.');
+      _showError(_humanizeError(e));
     }
   }
 
   Future<void> _handleAuthSubmit() async {
     final input = _pinController.text;
     if (input.isEmpty) return;
+    final usePinAuth = _hasPin && !_usePassword;
 
-    if (_hasPin && input.length < 5) {
+    if (usePinAuth && !RegExp(r'^\d{6}$').hasMatch(input)) {
       _showError('Invalid PIN');
       return;
     }
 
-    if (!_hasPin && input.length < 3) {
+    if (!usePinAuth && input.length < 3) {
       _showError('Invalid Password');
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (usePinAuth && !_hasPassword) {
+      _showError('Account password is missing. Reset password on web first.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     HapticFeedback.mediumImpact();
 
     try {
       final auth = ref.read(authControllerProvider.notifier);
 
-      if (_hasPin) {
+      if (usePinAuth) {
         // Login with PIN
-        await auth.loginWithQuickPin(
-          phone: _normalizedPhone,
-          pin: input,
-        );
+        await auth.loginWithQuickPin(phone: _normalizedPhone, pin: input);
       } else {
         // Login with Password
-        await auth.login(
-          emailOrPhone: _normalizedPhone,
-          password: input,
-        );
+        await auth.login(emailOrPhone: _normalizedPhone, password: input);
       }
 
       if (!mounted) return;
 
       final state = ref.read(authControllerProvider);
       if (state.status == AuthStatus.authenticated) {
+        if (!usePinAuth && !_hasPin) {
+          final configured = await _promptPinSetupAfterPasswordLogin(input);
+          if (!mounted) return;
+          if (!configured) {
+            setState(() => _isLoading = false);
+            _showError('PIN setup is required before continuing.');
+            return;
+          }
+          setState(() {
+            _hasPin = true;
+            _usePassword = false;
+          });
+        }
+        if (!mounted) return;
         HapticFeedback.mediumImpact();
         context.go('/home/checkout');
       } else {
@@ -172,7 +273,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      _showError('Login failed');
+      _showError(_humanizeError(e));
     }
   }
 
@@ -197,11 +298,136 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   }
 
   void _showError(String message) {
-    setState(() => _errorMessage = message);
+    final cleaned = message.trim();
+    if (cleaned.isEmpty) return;
+    setState(() => _errorMessage = cleaned);
     HapticFeedback.heavyImpact();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _errorMessage = null);
-    });
+  }
+
+  Future<bool> _promptPinSetupAfterPasswordLogin(String password) async {
+    final pinCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    String? localError;
+    bool saving = false;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              final pin = pinCtrl.text.trim();
+              final confirm = confirmCtrl.text.trim();
+              if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+                setDialogState(
+                  () => localError = 'PIN must be exactly 6 digits.',
+                );
+                return;
+              }
+              if (pin != confirm) {
+                setDialogState(
+                  () => localError = 'PIN confirmation does not match.',
+                );
+                return;
+              }
+
+              setDialogState(() {
+                localError = null;
+                saving = true;
+              });
+
+              try {
+                await ref
+                    .read(authControllerProvider.notifier)
+                    .enableQuickPin(
+                      phone: _normalizedPhone,
+                      password: password,
+                      pin: pin,
+                    );
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(true);
+              } catch (e) {
+                setDialogState(() {
+                  saving = false;
+                  localError = _humanizeError(e);
+                });
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF15151D),
+              title: const Text(
+                'Set Your POS PIN',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'For account security, set a 6-digit PIN now. You can login with phone using password or PIN.',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pinCtrl,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      counterText: '',
+                      labelText: 'New PIN',
+                    ),
+                  ),
+                  TextField(
+                    controller: confirmCtrl,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      counterText: '',
+                      labelText: 'Confirm PIN',
+                    ),
+                  ),
+                  if (localError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      localError!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          await ref
+                              .read(authControllerProvider.notifier)
+                              .logout();
+                          if (!dialogContext.mounted) return;
+                          Navigator.of(dialogContext).pop(false);
+                        },
+                  child: const Text('Sign out'),
+                ),
+                ElevatedButton(
+                  onPressed: saving ? null : submit,
+                  child: Text(saving ? 'Saving...' : 'Save PIN'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    pinCtrl.dispose();
+    confirmCtrl.dispose();
+    return result == true;
   }
 
   @override
@@ -218,11 +444,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    _bg,
-                    Color(0xFF05050A),
-                    _bg,
-                  ],
+                  colors: [_bg, Color(0xFF05050A), _bg],
                 ),
               ),
             ),
@@ -236,7 +458,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             Positioned(
               bottom: -160,
               left: -130,
-              child: _GlowBlob(color: Colors.white.withOpacity(0.06), size: 520),
+              child: _GlowBlob(
+                color: Colors.white.withOpacity(0.06),
+                size: 520,
+              ),
             ),
 
             SafeArea(
@@ -251,10 +476,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                         child: PageView(
                           controller: _pageController,
                           physics: const NeverScrollableScrollPhysics(),
-                          children: [
-                            _buildPhoneStep(),
-                            _buildAuthStep(),
-                          ],
+                          children: [_buildPhoneStep(), _buildAuthStep()],
                         ),
                       ),
                     ),
@@ -302,7 +524,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: _stroke),
                   ),
-                  child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
+                  child: const Icon(
+                    Icons.storefront_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
@@ -366,7 +592,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             const SizedBox(height: 10),
             Text(
               'We’ll check if you already have an account.',
-              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -391,7 +620,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back, color: Colors.white.withOpacity(0.55), size: 16),
+                    Icon(
+                      Icons.arrow_back,
+                      color: Colors.white.withOpacity(0.55),
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       _phoneController.text,
@@ -407,7 +640,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             ),
             const SizedBox(height: 18),
             Text(
-              _userName != null ? 'Hello, $_userName' : (_hasPin ? 'Enter PIN' : 'Password'),
+              _userName != null
+                  ? 'Hello, $_userName'
+                  : ((_hasPin && !_usePassword) ? 'Enter PIN' : 'Password'),
               style: TextStyle(
                 color: Colors.white.withOpacity(0.95),
                 fontSize: 34,
@@ -418,7 +653,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             ),
             const SizedBox(height: 10),
             Text(
-              _hasPin ? 'Enter your 6-digit access PIN.' : 'Enter your password to login.',
+              (_hasPin && !_usePassword)
+                  ? 'Enter your 6-digit access PIN.'
+                  : 'Enter your password to login.',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.62),
                 fontSize: 16,
@@ -429,10 +666,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             _buildAuthField(),
             const SizedBox(height: 28),
             _MainButton(
-              text: _hasPin ? 'Unlock' : 'Login',
+              text: (_hasPin && !_usePassword) ? 'Unlock' : 'Login',
               isLoading: _isLoading,
               onTap: _handleAuthSubmit,
             ),
+            if (_hasPin) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => setState(() {
+                        _usePassword = !_usePassword;
+                        _pinController.clear();
+                      }),
+                child: Text(
+                  _usePassword ? 'Use PIN instead' : 'Use password instead',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -448,19 +700,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
         children: [
           InkWell(
             onTap: () => _showCountryPicker(),
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(22),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
               child: Row(
                 children: [
-                  Text(_selectedCountry.flag, style: const TextStyle(fontSize: 20)),
+                  Text(
+                    _selectedCountry.flag,
+                    style: const TextStyle(fontSize: 20),
+                  ),
                   const SizedBox(width: 8),
-                  Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white.withOpacity(0.55)),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 16,
+                    color: Colors.white.withOpacity(0.55),
+                  ),
                 ],
               ),
             ),
           ),
-          Container(width: 1, height: 26, color: Colors.white.withOpacity(0.10)),
+          Container(
+            width: 1,
+            height: 26,
+            color: Colors.white.withOpacity(0.10),
+          ),
           Expanded(
             child: TextFormField(
               focusNode: _phoneFocus,
@@ -477,12 +742,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
               autofillHints: const [AutofillHints.telephoneNumber],
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(10),
+                LengthLimitingTextInputFormatter(15),
               ],
               onFieldSubmitted: (_) => _handlePhoneSubmit(),
               decoration: InputDecoration(
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 18,
+                ),
                 filled: false,
                 fillColor: Colors.transparent,
                 hintText: 'Phone number',
@@ -521,26 +789,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
       child: TextFormField(
         focusNode: _authFocus,
         controller: _pinController,
-        style: _hasPin ? pinStyle : passwordStyle,
-        keyboardType: _hasPin ? TextInputType.number : TextInputType.visiblePassword,
+        style: (_hasPin && !_usePassword) ? pinStyle : passwordStyle,
+        keyboardType: (_hasPin && !_usePassword)
+            ? TextInputType.number
+            : TextInputType.visiblePassword,
         cursorColor: Colors.white,
         obscureText: _obscureText,
-        textAlign: _hasPin ? TextAlign.center : TextAlign.start,
+        textAlign: (_hasPin && !_usePassword)
+            ? TextAlign.center
+            : TextAlign.start,
         textInputAction: TextInputAction.done,
-        autofillHints: _hasPin ? const [] : const [AutofillHints.password],
-        inputFormatters: _hasPin
-            ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)]
+        autofillHints: (_hasPin && !_usePassword)
+            ? const []
+            : const [AutofillHints.password],
+        inputFormatters: (_hasPin && !_usePassword)
+            ? [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ]
             : null,
         onFieldSubmitted: (_) => _handleAuthSubmit(),
         decoration: InputDecoration(
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 18,
+          ),
           filled: false,
           fillColor: Colors.transparent,
-          hintText: _hasPin ? '••••••' : 'Password',
+          hintText: (_hasPin && !_usePassword) ? '••••••' : 'Password',
           hintStyle: TextStyle(
             color: Colors.white.withOpacity(0.18),
-            letterSpacing: _hasPin ? 10 : -0.2,
+            letterSpacing: (_hasPin && !_usePassword) ? 10 : -0.2,
             fontWeight: FontWeight.w600,
           ),
           suffixIcon: IconButton(
@@ -571,13 +851,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
             border: Border.all(color: Colors.white.withOpacity(0.18)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, color: Colors.white, size: 18),
+              const Padding(
+                padding: EdgeInsets.only(top: 1),
+                child: Icon(Icons.error_outline, color: Colors.white, size: 18),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  softWrap: true,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _errorMessage = null),
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 1),
+                  child: Icon(Icons.close, color: Colors.white, size: 18),
                 ),
               ),
             ],
@@ -588,7 +885,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with TickerProviderSt
   }
 
   Future<void> _showCountryPicker() async {
-    final selected = await showCountryPickerBottomSheet(context, _selectedCountry);
+    final selected = await showCountryPickerBottomSheet(
+      context,
+      _selectedCountry,
+    );
     if (selected != null) {
       setState(() => _selectedCountry = selected);
     }
@@ -647,7 +947,11 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: [
-          BoxShadow(color: color.withOpacity(0.55), blurRadius: 120, spreadRadius: 30),
+          BoxShadow(
+            color: color.withOpacity(0.55),
+            blurRadius: 120,
+            spreadRadius: 30,
+          ),
         ],
       ),
     );
@@ -655,7 +959,11 @@ class _GlowBlob extends StatelessWidget {
 }
 
 class _MainButton extends StatefulWidget {
-  const _MainButton({required this.text, this.isLoading = false, required this.onTap});
+  const _MainButton({
+    required this.text,
+    this.isLoading = false,
+    required this.onTap,
+  });
 
   final String text;
   final bool isLoading;
@@ -710,7 +1018,10 @@ class _MainButtonState extends State<_MainButton> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
                   )
                 : Text(
                     widget.text,

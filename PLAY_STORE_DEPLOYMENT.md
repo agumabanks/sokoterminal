@@ -24,6 +24,7 @@ storeFile=release-keystore.jks
 storePassword=<YOUR_STORE_PASSWORD>
 keyAlias=soko-seller-release
 keyPassword=<YOUR_KEY_PASSWORD>
+googleMapsApiKey=<YOUR_ANDROID_MAPS_KEY>
 ```
 
 ## 3. Build Release Bundle (AAB)
@@ -31,8 +32,11 @@ We have a helper script that runs preflight checks (tests, analysis) and builds 
 
 ```bash
 cd /var/www/soko/app/soko_seller_terminal
+bash scripts/play_submission_gate.sh
 bash scripts/build_release_aab.sh
 ```
+
+`play_submission_gate.sh` also validates reviewer credentials by calling your live API.
 
 If successful, you will see:
 `✅ Build complete: build/app/outputs/bundle/release/app-release.aab`
@@ -48,4 +52,5 @@ If successful, you will see:
 ## 5. Troubleshooting
 - **Keystore not found**: Ensure `storeFile` in `key.properties` matches the filename in `android/`.
 - **Wrong password**: Double-check passwords in `key.properties`.
+- **Reviewer login rejected by Play**: run `bash scripts/verify_play_reviewer_login.sh` and fix any failing step before upload.
 - **Version code conflict**: If Play Console says "Version code 1 already exists", edit `pubspec.yaml` and increment the version (e.g., `1.0.1+2` -> `+2` is the version code).

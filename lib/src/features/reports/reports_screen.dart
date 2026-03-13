@@ -82,7 +82,8 @@ class ReportsScreen extends ConsumerWidget {
                                   value: report.legacyCashouts,
                                   isNegative: true,
                                 ),
-                              if (report.legacyCashouts > 0) const Divider(height: DesignTokens.spaceLg),
+                              if (report.legacyCashouts > 0)
+                                const Divider(height: DesignTokens.spaceLg),
                               if (report.legacyCashouts > 0)
                                 _ReportRow(
                                   label: 'Total Expenses',
@@ -160,32 +161,32 @@ class ReportsScreen extends ConsumerWidget {
     final filteredEntries = range == null
         ? entries
         : entries
-            .where(
-              (e) =>
-                  !e.createdAt.isBefore(range.start) &&
-                  e.createdAt.isBefore(range.end),
-            )
-            .toList();
+              .where(
+                (e) =>
+                    !e.createdAt.isBefore(range.start) &&
+                    e.createdAt.isBefore(range.end),
+              )
+              .toList();
 
     final filteredMovements = range == null
         ? movements
         : movements
-            .where(
-              (m) =>
-                  !m.createdAt.isBefore(range.start) &&
-                  m.createdAt.isBefore(range.end),
-            )
-            .toList();
+              .where(
+                (m) =>
+                    !m.createdAt.isBefore(range.start) &&
+                    m.createdAt.isBefore(range.end),
+              )
+              .toList();
 
     final filteredExpenses = range == null
         ? expenses
         : expenses
-            .where(
-              (e) =>
-                  !e.occurredAt.isBefore(range.start) &&
-                  e.occurredAt.isBefore(range.end),
-            )
-            .toList();
+              .where(
+                (e) =>
+                    !e.occurredAt.isBefore(range.start) &&
+                    e.occurredAt.isBefore(range.end),
+              )
+              .toList();
 
     double grossSales = 0;
     double refunds = 0;
@@ -252,11 +253,15 @@ class ReportsScreen extends ConsumerWidget {
     // Get product sales breakdown
     final filteredEntries = dateRange == null
         ? entries.where((e) => e.type == 'sale').toList()
-        : entries.where((e) =>
-            e.type == 'sale' &&
-            !e.createdAt.isBefore(dateRange.start) &&
-            e.createdAt.isBefore(dateRange.end)).toList();
-    
+        : entries
+              .where(
+                (e) =>
+                    e.type == 'sale' &&
+                    !e.createdAt.isBefore(dateRange.start) &&
+                    e.createdAt.isBefore(dateRange.end),
+              )
+              .toList();
+
     // Fetch ledger lines for product and service breakdown
     final productSales = <String, _ProductSale>{};
     final serviceSales = <String, _ProductSale>{};
@@ -264,7 +269,8 @@ class ReportsScreen extends ConsumerWidget {
       final bundle = await db.fetchLedgerEntryBundle(entry.id);
       if (bundle == null) continue;
       for (final line in bundle.lines) {
-        final key = '${line.title}${line.variant != null ? " (${line.variant})" : ""}';
+        final key =
+            '${line.title}${line.variant != null ? " (${line.variant})" : ""}';
         final isService = (line.serviceId ?? '').trim().isNotEmpty;
         final target = isService ? serviceSales : productSales;
         if (!target.containsKey(key)) {
@@ -297,27 +303,41 @@ class ReportsScreen extends ConsumerWidget {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(shopName, style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.white,
-                )),
+                pw.Text(
+                  shopName,
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                  ),
+                ),
                 if (shopAddress.isNotEmpty) pw.SizedBox(height: 4),
-                if (shopAddress.isNotEmpty) pw.Text(shopAddress, style: const pw.TextStyle(
-                  fontSize: 10,
-                  color: PdfColors.white,
-                )),
-                if (shopPhone.isNotEmpty) pw.Text('Tel: $shopPhone', style: const pw.TextStyle(
-                  fontSize: 10,
-                  color: PdfColors.white,
-                )),
+                if (shopAddress.isNotEmpty)
+                  pw.Text(
+                    shopAddress,
+                    style: const pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                if (shopPhone.isNotEmpty)
+                  pw.Text(
+                    'Tel: $shopPhone',
+                    style: const pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColors.white,
+                    ),
+                  ),
               ],
             ),
           ),
           pw.SizedBox(height: 20),
 
           // Report Title & Date Range
-          pw.Text('Profit & Loss Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Profit & Loss Report',
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 4),
           pw.Text(
             dateRange == null
@@ -335,7 +355,8 @@ class ReportsScreen extends ConsumerWidget {
           _pdfRow('Net Sales', report.netSales, isBold: true),
           pw.SizedBox(height: 12),
           _pdfRow('Recorded Expenses', -report.recordedExpenses),
-          if (report.legacyCashouts > 0) _pdfRow('Legacy Cashouts (unlinked)', -report.legacyCashouts),
+          if (report.legacyCashouts > 0)
+            _pdfRow('Legacy Cashouts (unlinked)', -report.legacyCashouts),
           pw.Divider(),
           _pdfRow('Operating Expenses', -report.expenses, isBold: true),
           pw.SizedBox(height: 12),
@@ -344,7 +365,10 @@ class ReportsScreen extends ConsumerWidget {
           pw.SizedBox(height: 40),
 
           // Operational Stats
-          pw.Text('Operational Stats', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Operational Stats',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
           _pdfRow('Sales Transactions', report.salesCount.toDouble()),
           _pdfRow('Refund Transactions', report.refundCount.toDouble()),
           _pdfRow('Void Transactions', report.voidCount.toDouble()),
@@ -352,10 +376,16 @@ class ReportsScreen extends ConsumerWidget {
 
           // Top Products Sold
           if (topProducts.isNotEmpty) ...[
-            pw.Text('Top Products Sold', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Top Products Sold',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+              ),
               cellStyle: const pw.TextStyle(fontSize: 10),
               cellAlignment: pw.Alignment.centerLeft,
               headerAlignment: pw.Alignment.centerLeft,
@@ -365,21 +395,32 @@ class ReportsScreen extends ConsumerWidget {
                 2: const pw.FlexColumnWidth(2),
               },
               headers: ['Product', 'Qty', 'Revenue (UGX)'],
-              data: topProducts.take(15).map((p) => [
-                p.name,
-                p.quantity.toString(),
-                p.revenue.toStringAsFixed(0),
-              ]).toList(),
+              data: topProducts
+                  .take(15)
+                  .map(
+                    (p) => [
+                      p.name,
+                      p.quantity.toString(),
+                      p.revenue.toStringAsFixed(0),
+                    ],
+                  )
+                  .toList(),
             ),
           ],
           pw.SizedBox(height: 24),
 
           // Top Services Sold
           if (topServices.isNotEmpty) ...[
-            pw.Text('Top Services Sold', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              'Top Services Sold',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 8),
             pw.TableHelper.fromTextArray(
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+              ),
               cellStyle: const pw.TextStyle(fontSize: 10),
               cellAlignment: pw.Alignment.centerLeft,
               headerAlignment: pw.Alignment.centerLeft,
@@ -389,11 +430,16 @@ class ReportsScreen extends ConsumerWidget {
                 2: const pw.FlexColumnWidth(2),
               },
               headers: ['Service (Variant)', 'Qty', 'Revenue (UGX)'],
-              data: topServices.take(15).map((s) => [
-                s.name,
-                s.quantity.toString(),
-                s.revenue.toStringAsFixed(0),
-              ]).toList(),
+              data: topServices
+                  .take(15)
+                  .map(
+                    (s) => [
+                      s.name,
+                      s.quantity.toString(),
+                      s.revenue.toStringAsFixed(0),
+                    ],
+                  )
+                  .toList(),
             ),
           ],
           pw.SizedBox(height: 40),
@@ -411,18 +457,37 @@ class ReportsScreen extends ConsumerWidget {
       ),
     );
 
-    await Printing.sharePdf(bytes: await doc.save(), filename: 'soko-pl-report.pdf');
+    await Printing.sharePdf(
+      bytes: await doc.save(),
+      filename: 'soko-pl-report.pdf',
+    );
   }
 
-  pw.Widget _pdfRow(String label, double value, {bool isBold = false, double fontSize = 12}) {
+  pw.Widget _pdfRow(
+    String label,
+    double value, {
+    bool isBold = false,
+    double fontSize = 12,
+  }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: fontSize, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-          pw.Text('UGX ${value.toStringAsFixed(0)}',
-              style: pw.TextStyle(fontSize: fontSize, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+          pw.Text(
+            'UGX ${value.toStringAsFixed(0)}',
+            style: pw.TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
@@ -465,7 +530,11 @@ class _FinancialReport {
 }
 
 class _ProductSale {
-  _ProductSale({required this.name, required this.quantity, required this.revenue});
+  _ProductSale({
+    required this.name,
+    required this.quantity,
+    required this.revenue,
+  });
   final String name;
   final int quantity;
   final double revenue;
@@ -476,7 +545,10 @@ class _DateFilterBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final range = ref.watch(_dateRangeProvider);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd, vertical: DesignTokens.spaceSm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceMd,
+        vertical: DesignTokens.spaceSm,
+      ),
       decoration: BoxDecoration(
         color: DesignTokens.surfaceWhite,
         borderRadius: DesignTokens.borderRadiusMd,
@@ -484,7 +556,11 @@ class _DateFilterBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.calendar_today_outlined, size: 18, color: DesignTokens.grayMedium),
+          const Icon(
+            Icons.calendar_today_outlined,
+            size: 18,
+            color: DesignTokens.grayMedium,
+          ),
           const SizedBox(width: DesignTokens.spaceSm),
           Expanded(
             child: Text(
@@ -520,7 +596,8 @@ class _DateFilterBar extends ConsumerWidget {
           if (range != null)
             IconButton(
               icon: const Icon(Icons.close, size: 18),
-              onPressed: () => ref.read(_dateRangeProvider.notifier).state = null,
+              onPressed: () =>
+                  ref.read(_dateRangeProvider.notifier).state = null,
             ),
         ],
       ),
@@ -546,7 +623,10 @@ class _NetProfitCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('NET PROFIT', style: DesignTokens.textSmallLight.copyWith(letterSpacing: 1.2)),
+          Text(
+            'NET PROFIT',
+            style: DesignTokens.textSmallLight.copyWith(letterSpacing: 1.2),
+          ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
             'UGX ${report.netProfit.toStringAsFixed(0)}',
@@ -578,18 +658,34 @@ class _StatGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _StatItem(label: 'Transactions', value: report.salesCount.toString(), icon: Icons.receipt_long_outlined),
+        _StatItem(
+          label: 'Transactions',
+          value: report.salesCount.toString(),
+          icon: Icons.receipt_long_outlined,
+        ),
         const SizedBox(width: DesignTokens.spaceMd),
-        _StatItem(label: 'Refunds', value: report.refundCount.toString(), icon: Icons.assignment_return_outlined),
+        _StatItem(
+          label: 'Refunds',
+          value: report.refundCount.toString(),
+          icon: Icons.assignment_return_outlined,
+        ),
         const SizedBox(width: DesignTokens.spaceMd),
-        _StatItem(label: 'Voids', value: report.voidCount.toString(), icon: Icons.block_outlined),
+        _StatItem(
+          label: 'Voids',
+          value: report.voidCount.toString(),
+          icon: Icons.block_outlined,
+        ),
       ],
     );
   }
 }
 
 class _StatItem extends StatelessWidget {
-  const _StatItem({required this.label, required this.value, required this.icon});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -630,7 +726,10 @@ class _ReportSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(title.toUpperCase(), style: DesignTokens.textSmallBold.copyWith(letterSpacing: 1.1)),
+          child: Text(
+            title.toUpperCase(),
+            style: DesignTokens.textSmallBold.copyWith(letterSpacing: 1.1),
+          ),
         ),
         Container(
           padding: DesignTokens.paddingMd,
@@ -672,10 +771,14 @@ class _ReportRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: isBold ? DesignTokens.textBodyBold : DesignTokens.textBody),
+          Text(
+            label,
+            style: isBold ? DesignTokens.textBodyBold : DesignTokens.textBody,
+          ),
           Text(
             'UGX ${value.toStringAsFixed(0)}',
-            style: (isBold ? DesignTokens.textBodyBold : DesignTokens.textBody).copyWith(color: valColor),
+            style: (isBold ? DesignTokens.textBodyBold : DesignTokens.textBody)
+                .copyWith(color: valColor),
           ),
         ],
       ),
@@ -686,7 +789,8 @@ class _ReportRow extends StatelessWidget {
 class _ReportLoading extends StatelessWidget {
   const _ReportLoading();
   @override
-  Widget build(BuildContext context) => const Center(child: CircularProgressIndicator());
+  Widget build(BuildContext context) =>
+      const Center(child: CircularProgressIndicator());
 }
 
 class _ReportError extends StatelessWidget {

@@ -11,7 +11,8 @@ class VoidReasonCodesScreen extends ConsumerStatefulWidget {
   const VoidReasonCodesScreen({super.key});
 
   @override
-  ConsumerState<VoidReasonCodesScreen> createState() => _VoidReasonCodesScreenState();
+  ConsumerState<VoidReasonCodesScreen> createState() =>
+      _VoidReasonCodesScreenState();
 }
 
 class _VoidReasonCodesScreenState extends ConsumerState<VoidReasonCodesScreen> {
@@ -71,7 +72,9 @@ class _VoidReasonCodesScreenState extends ConsumerState<VoidReasonCodesScreen> {
             const SizedBox(height: DesignTokens.spaceXs),
             Text(
               'Cashiers will be prompted to select one of these reason codes.',
-              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
             const SizedBox(height: DesignTokens.spaceMd),
             Expanded(
@@ -99,7 +102,9 @@ class _VoidReasonCodesScreenState extends ConsumerState<VoidReasonCodesScreen> {
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         'No reason codes configured.',
-                        style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                        style: DesignTokens.textBody.copyWith(
+                          color: DesignTokens.grayMedium,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),

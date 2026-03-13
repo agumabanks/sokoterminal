@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/design_tokens.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/auth/pos_session_controller.dart';
 import '../../widgets/action_tile.dart';
-import '../auth/auth_controller.dart';
+import '../../widgets/logout_dialog.dart';
 import '../../core/firebase/remote_config_service.dart';
 
 /// More Screen — Navigation hub for all seller terminal features.
-/// 
+///
 /// Redesigned with grouped sections for better visual hierarchy
 /// following "Steve Jobs standard" — maximum 5-7 sections, clear grouping.
 class MoreScreen extends ConsumerWidget {
@@ -18,6 +19,8 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remoteConfig = ref.watch(remoteConfigProvider);
+    final posSession = ref.watch(posSessionProvider);
+    final isManager = posSession.isManager;
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
@@ -26,14 +29,14 @@ class MoreScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sync started…')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Sync started…')));
               await ref.read(syncServiceProvider).syncNow();
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sync finished')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Sync finished')));
             },
             tooltip: 'Sync data',
           ),
@@ -56,13 +59,22 @@ class MoreScreen extends ConsumerWidget {
                 iconColor: DesignTokens.brandAccent,
                 onTap: () => context.go('/home/more/dashboard'),
               ),
-              ActionTile(
-                title: 'Reports',
-                subtitle: 'Sales & analytics',
-                icon: Icons.bar_chart_outlined,
-                iconColor: DesignTokens.info,
-                onTap: () => context.go('/home/more/reports'),
-              ),
+              if (isManager)
+                ActionTile(
+                  title: 'Reports',
+                  subtitle: 'Sales & analytics',
+                  icon: Icons.bar_chart_outlined,
+                  iconColor: DesignTokens.info,
+                  onTap: () => context.go('/home/more/reports'),
+                ),
+              if (isManager)
+                ActionTile(
+                  title: 'Insights & Analytics',
+                  subtitle: 'Sales trends & visualizations',
+                  icon: Icons.insights,
+                  iconColor: DesignTokens.brandAccent,
+                  onTap: () => context.go('/home/more/analytics'),
+                ),
               if (remoteConfig.ffExpensesV1)
                 ActionTile(
                   title: 'Expenses',
@@ -72,20 +84,12 @@ class MoreScreen extends ConsumerWidget {
                   onTap: () => context.go('/home/more/expenses'),
                 ),
               ActionTile(
-                title: 'Insights & Analytics',
-                subtitle: 'Sales trends & visualizations',
-                icon: Icons.insights,
-                iconColor: DesignTokens.brandAccent,
-                onTap: () => context.go('/home/more/analytics'),
+                title: 'Sanaa Wallet',
+                subtitle: 'Top up and buy add-ons',
+                icon: Icons.account_balance_wallet_outlined,
+                iconColor: DesignTokens.success,
+                onTap: () => context.go('/home/more/wallet'),
               ),
-              if (remoteConfig.ffExpensesV1)
-                ActionTile(
-                  title: 'Expenses',
-                  subtitle: 'Cashouts & operating costs',
-                  icon: Icons.payments_outlined,
-                  iconColor: DesignTokens.error,
-                  onTap: () => context.go('/home/more/expenses'),
-                ),
               ActionTile(
                 title: 'Customers',
                 subtitle: 'CRM, Phone & WhatsApp',
@@ -158,6 +162,13 @@ class MoreScreen extends ConsumerWidget {
                 icon: Icons.request_quote_outlined,
                 iconColor: DesignTokens.brandPrimary,
                 onTap: () => context.go('/home/more/quotations'),
+              ),
+              ActionTile(
+                title: 'Digital Catalog',
+                subtitle: 'Generate & share product catalog',
+                icon: Icons.menu_book_outlined,
+                iconColor: DesignTokens.success,
+                onTap: () => context.go('/home/more/catalog'),
               ),
               ActionTile(
                 title: 'Wholesale & Digital',
@@ -289,19 +300,28 @@ class MoreScreen extends ConsumerWidget {
                 onTap: () => context.go('/home/more/payment-settings'),
               ),
               ActionTile(
-                title: 'Staff & Roles',
-                subtitle: 'Team access & PINs',
-                icon: Icons.badge_outlined,
-                iconColor: DesignTokens.warning,
-                onTap: () => context.go('/home/more/staff'),
+                title: 'Delivery Options',
+                subtitle: 'Seller delivery, Soko delivery',
+                icon: Icons.local_shipping_outlined,
+                iconColor: DesignTokens.info,
+                onTap: () => context.go('/home/more/delivery-settings'),
               ),
-              ActionTile(
-                title: 'App Settings',
-                subtitle: 'Printers, sync, cache',
-                icon: Icons.settings_applications_outlined,
-                iconColor: DesignTokens.grayMedium,
-                onTap: () => context.go('/home/more/settings'),
-              ),
+              if (isManager)
+                ActionTile(
+                  title: 'Staff & Roles',
+                  subtitle: 'Team access & PINs',
+                  icon: Icons.badge_outlined,
+                  iconColor: DesignTokens.warning,
+                  onTap: () => context.go('/home/more/staff'),
+                ),
+              if (isManager)
+                ActionTile(
+                  title: 'App Settings',
+                  subtitle: 'Printers, sync, cache',
+                  icon: Icons.settings_applications_outlined,
+                  iconColor: DesignTokens.grayMedium,
+                  onTap: () => context.go('/home/more/settings'),
+                ),
               ActionTile(
                 title: 'Receipt Templates',
                 subtitle: 'Customize print layout',
@@ -325,15 +345,12 @@ class MoreScreen extends ConsumerWidget {
             ),
             child: ActionTile(
               title: 'Sign Out',
-              subtitle: 'Log out of this device',
+              subtitle: 'Lock, switch staff, or sign out',
               icon: Icons.logout,
               iconColor: DesignTokens.error,
               iconBackgroundColor: DesignTokens.error.withValues(alpha: 0.1),
               showChevron: false,
-              onTap: () {
-                ref.read(authControllerProvider.notifier).logout();
-                context.go('/login');
-              },
+              onTap: () => LogoutDialog.show(context),
             ),
           ),
 

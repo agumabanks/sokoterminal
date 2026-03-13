@@ -18,7 +18,8 @@ class ReceiptTemplateEditor extends ConsumerStatefulWidget {
   final String? templateId;
 
   @override
-  ConsumerState<ReceiptTemplateEditor> createState() => _ReceiptTemplateEditorState();
+  ConsumerState<ReceiptTemplateEditor> createState() =>
+      _ReceiptTemplateEditorState();
 }
 
 class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
@@ -43,11 +44,13 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
     // Load existing template if editing, or set defaults for new template
     Future.microtask(() async {
       final db = ref.read(appDatabaseProvider);
-      
+
       if (widget.templateId != null) {
         // Edit mode: load specific template
         final templates = await db.select(db.receiptTemplates).get();
-        final existing = templates.where((t) => t.id == widget.templateId).firstOrNull;
+        final existing = templates
+            .where((t) => t.id == widget.templateId)
+            .firstOrNull;
         if (existing != null) {
           setState(() {
             _existingId = existing.id;
@@ -94,7 +97,7 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
                         onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: DesignTokens.spaceLg),
-                      
+
                       // Style Selection
                       Text('Style', style: DesignTokens.textBodyBold),
                       const SizedBox(height: DesignTokens.spaceSm),
@@ -103,15 +106,19 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
                         children: ['minimal', 'modern', 'classic'].map((style) {
                           final isSelected = _style == style;
                           return ChoiceChip(
-                            label: Text(style[0].toUpperCase() + style.substring(1)),
+                            label: Text(
+                              style[0].toUpperCase() + style.substring(1),
+                            ),
                             selected: isSelected,
-                            selectedColor: DesignTokens.brandAccent.withValues(alpha: 0.2),
+                            selectedColor: DesignTokens.brandAccent.withValues(
+                              alpha: 0.2,
+                            ),
                             onSelected: (v) => setState(() => _style = style),
                           );
                         }).toList(),
                       ),
                       const SizedBox(height: DesignTokens.spaceLg),
-                      
+
                       // Content Section
                       Text('Content', style: DesignTokens.textBodyBold),
                       const SizedBox(height: DesignTokens.spaceSm),
@@ -160,40 +167,66 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           if (_showLogo)
-                             Container(
-                               height: 60, width: 60, 
-                               color: Colors.grey[300],
-                               child: const Icon(Icons.store, size: 40),
-                             ), // Placeholder
+                            Container(
+                              height: 60,
+                              width: 60,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.store, size: 40),
+                            ), // Placeholder
                           const SizedBox(height: 12),
-                          Text('MY SHOP NAME', style: DesignTokens.textBodyBold),
-                          Text('Kampala, Uganda', style: DesignTokens.textSmall),
-                          const SizedBox(height: 16),
-                          Text(_headerCtrl.text, textAlign: TextAlign.center, style: DesignTokens.textSmall.copyWith(fontStyle: FontStyle.italic)),
-                          const Divider(),
-                          ..._sampleItems.map((i) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('${i['qty']}x ${i['name']}'),
-                                Text('${(i['qty'] as int) * (i['price'] as int)}'),
-                              ],
-                            ),
-                          )),
-                          const Divider(),
-                          Row(
-                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                             children: [
-                               Text('Total', style: DesignTokens.textBodyBold),
-                               Text('35,000', style: DesignTokens.textBodyBold),
-                             ],
+                          Text(
+                            'MY SHOP NAME',
+                            style: DesignTokens.textBodyBold,
+                          ),
+                          Text(
+                            'Kampala, Uganda',
+                            style: DesignTokens.textSmall,
                           ),
                           const SizedBox(height: 16),
-                          Text(_footerCtrl.text, textAlign: TextAlign.center, style: DesignTokens.textSmall),
+                          Text(
+                            _headerCtrl.text,
+                            textAlign: TextAlign.center,
+                            style: DesignTokens.textSmall.copyWith(
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          const Divider(),
+                          ..._sampleItems.map(
+                            (i) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${i['qty']}x ${i['name']}'),
+                                  Text(
+                                    '${(i['qty'] as int) * (i['price'] as int)}',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Divider(),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Total', style: DesignTokens.textBodyBold),
+                              Text('35,000', style: DesignTokens.textBodyBold),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _footerCtrl.text,
+                            textAlign: TextAlign.center,
+                            style: DesignTokens.textSmall,
+                          ),
                           const SizedBox(height: 12),
                           if (_showQr)
-                            Container(height: 60, width: 60, color: Colors.black),
+                            Container(
+                              height: 60,
+                              width: 60,
+                              color: Colors.black,
+                            ),
                         ],
                       ),
                     ),
@@ -202,7 +235,7 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
               ],
             ),
           ),
-           Container(
+          Container(
             padding: DesignTokens.paddingScreen,
             decoration: BoxDecoration(
               color: DesignTokens.surfaceWhite,
@@ -221,43 +254,49 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
   }
 
   Future<void> _saveTemplate() async {
-     final db = ref.read(appDatabaseProvider);
-     final sync = ref.read(syncServiceProvider);
-     
-     // Use existing ID if editing, otherwise create new
-     final id = _existingId ?? const Uuid().v4();
+    final db = ref.read(appDatabaseProvider);
+    final sync = ref.read(syncServiceProvider);
 
-     // Upsert template with all fields
-     await db.upsertReceiptTemplate(
-       ReceiptTemplatesCompanion(
-         id: Value(id),
-         name: Value(_nameCtrl.text.trim().isEmpty ? 'Custom Template' : _nameCtrl.text.trim()),
-         style: Value(_style),
-         headerText: Value(_headerCtrl.text),
-         footerText: Value(_footerCtrl.text),
-         showLogo: Value(_showLogo),
-         showQr: Value(_showQr),
-         colorHex: Value(_color),
-         updatedAt: Value(DateTime.now().toUtc()),
-         synced: const Value(true),
-       ),
-     );
-     
-     // Sync
-     await sync.enqueue('receipt_template_update', {
-       'local_id': id,
-       'name': _nameCtrl.text,
-       'style': _style,
-       'header': _headerCtrl.text,
-       'footer': _footerCtrl.text,
-       'show_logo': _showLogo ? 1 : 0,
-       'show_qr': _showQr ? 1 : 0,
-       'color': _color,
-     });
-     unawaited(sync.syncNow());
+    // Use existing ID if editing, otherwise create new
+    final id = _existingId ?? const Uuid().v4();
 
-     if(!mounted) return;
-     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Template saved')));
-     Navigator.pop(context, true); // Return true to signal refresh needed
+    // Upsert template with all fields
+    await db.upsertReceiptTemplate(
+      ReceiptTemplatesCompanion(
+        id: Value(id),
+        name: Value(
+          _nameCtrl.text.trim().isEmpty
+              ? 'Custom Template'
+              : _nameCtrl.text.trim(),
+        ),
+        style: Value(_style),
+        headerText: Value(_headerCtrl.text),
+        footerText: Value(_footerCtrl.text),
+        showLogo: Value(_showLogo),
+        showQr: Value(_showQr),
+        colorHex: Value(_color),
+        updatedAt: Value(DateTime.now().toUtc()),
+        synced: const Value(true),
+      ),
+    );
+
+    // Sync
+    await sync.enqueue('receipt_template_update', {
+      'local_id': id,
+      'name': _nameCtrl.text,
+      'style': _style,
+      'header': _headerCtrl.text,
+      'footer': _footerCtrl.text,
+      'show_logo': _showLogo ? 1 : 0,
+      'show_qr': _showQr ? 1 : 0,
+      'color': _color,
+    });
+    unawaited(sync.syncNow());
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Template saved')));
+    Navigator.pop(context, true); // Return true to signal refresh needed
   }
 }

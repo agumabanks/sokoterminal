@@ -21,11 +21,14 @@ storeFile="$(read_kv "$KEY_PROPS" "storeFile")"
 storePassword="$(read_kv "$KEY_PROPS" "storePassword")"
 keyAlias="$(read_kv "$KEY_PROPS" "keyAlias")"
 keyPassword="$(read_kv "$KEY_PROPS" "keyPassword")"
+googleMapsApiKey="$(read_kv "$KEY_PROPS" "googleMapsApiKey")"
 
 storeFile="${storeFile:-${STORE_FILE:-}}"
 storePassword="${storePassword:-${STORE_PASSWORD:-}}"
 keyAlias="${keyAlias:-${KEY_ALIAS:-}}"
 keyPassword="${keyPassword:-${KEY_PASSWORD:-}}"
+googleMapsApiKey="${googleMapsApiKey:-${GOOGLE_MAPS_API_KEY:-}}"
+appVersion="$(grep -E '^version:' pubspec.yaml | head -n 1 | awk '{print $2}' | tr -d '\r' || true)"
 
 if [[ -z "${storeFile:-}" || -z "${storePassword:-}" || -z "${keyAlias:-}" || -z "${keyPassword:-}" ]]; then
   echo "[build] ERROR: release signing is not configured." >&2
@@ -40,6 +43,12 @@ if [[ ! -f "android/$storeFile" && ! -f "$storeFile" ]]; then
   exit 1
 fi
 
+if [[ -z "${googleMapsApiKey:-}" ]]; then
+  echo "[build] ERROR: Google Maps key is not configured." >&2
+  echo "[build] Add googleMapsApiKey to $KEY_PROPS or set GOOGLE_MAPS_API_KEY." >&2
+  exit 1
+fi
+
 apiBaseUrl="${API_BASE_URL:-}"
 if [[ -z "${apiBaseUrl}" && -f "assets/config/.env" ]]; then
   apiBaseUrl="$(grep -E '^API_BASE_URL=' "assets/config/.env" | head -n 1 | cut -d= -f2- | tr -d '\r' || true)"
@@ -51,6 +60,14 @@ if [[ -n "${apiBaseUrl}" ]]; then
   buildArgs+=(--dart-define=API_BASE_URL="${apiBaseUrl}")
 else
   echo "[build] WARNING: API_BASE_URL not provided; build will use assets/config/.env (or fallback .env.example)" >&2
+fi
+
+echo "[build] Using GOOGLE_MAPS_API_KEY via dart-define"
+buildArgs+=(--dart-define=GOOGLE_MAPS_API_KEY="${googleMapsApiKey}")
+
+if [[ -n "${appVersion}" ]]; then
+  echo "[build] Using APP_VERSION via dart-define: ${appVersion}"
+  buildArgs+=(--dart-define=APP_VERSION="${appVersion}")
 fi
 
 echo "[build] Building Android App Bundle (AAB)…"

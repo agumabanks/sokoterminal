@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/db/app_database.dart';
+import '../../core/settings/business_profile_cache.dart';
 import '../../core/settings/shop_payment_settings.dart';
 
 class InvoiceService {
@@ -29,10 +30,22 @@ class InvoiceService {
   Future<void> shareOrderInvoicePdf(Map<String, dynamic> order) async {
     final pdf = await buildOrderInvoicePdf(order);
     final fileId =
-        (order['code'] ?? order['order_code'] ?? order['id'] ?? 'order').toString().trim().isEmpty
-            ? 'order'
-            : (order['code'] ?? order['order_code'] ?? order['id']).toString();
+        (order['code'] ?? order['order_code'] ?? order['id'] ?? 'order')
+            .toString()
+            .trim()
+            .isEmpty
+        ? 'order'
+        : (order['code'] ?? order['order_code'] ?? order['id']).toString();
     await Printing.sharePdf(bytes: pdf, filename: 'invoice-$fileId.pdf');
+  }
+
+  Future<void> shareQuotationPdf(QuotationWithCustomer row) async {
+    final lines = await db.getQuotationLinesByQuotationId(row.quotation.id);
+    final pdf = await buildQuotationPdf(row, lines);
+    final fileId = row.quotation.number.trim().isEmpty
+        ? row.quotation.id
+        : row.quotation.number.trim();
+    await Printing.sharePdf(bytes: pdf, filename: 'quotation-$fileId.pdf');
   }
 
   Future<Uint8List> buildPosInvoicePdf(LedgerEntryBundle bundle) async {
@@ -50,7 +63,9 @@ class InvoiceService {
     final isRefund = entry.type == 'refund';
     final isVoid = entry.type == 'void';
     final isReversal = isRefund || isVoid;
-    final voidForSale = entry.type == 'sale' ? await db.findVoidForSale(entry.id) : null;
+    final voidForSale = entry.type == 'sale'
+        ? await db.findVoidForSale(entry.id)
+        : null;
     final isVoided = isVoid || voidForSale != null;
     final title = isRefund
         ? 'CREDIT NOTE'
@@ -63,7 +78,7 @@ class InvoiceService {
     final dateStr = _dateFormat.format(entry.createdAt.toLocal());
     final timeStr = _timeFormat.format(entry.createdAt.toLocal());
 
-    final paymentSettings = ShopPaymentSettingsCache.read(prefs);
+    final paymentSettings = await _resolvePaymentSettings();
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
         !isReversal &&
@@ -104,11 +119,15 @@ class InvoiceService {
                       ),
                       textAlign: pw.TextAlign.center,
                     ),
-                    if (isVoid && entry.originalEntryId?.trim().isNotEmpty == true) ...[
+                    if (isVoid &&
+                        entry.originalEntryId?.trim().isNotEmpty == true) ...[
                       pw.SizedBox(height: 6),
                       pw.Text(
                         'Original: ${entry.originalEntryId}',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                         textAlign: pw.TextAlign.center,
                       ),
                     ],
@@ -116,7 +135,10 @@ class InvoiceService {
                       pw.SizedBox(height: 6),
                       pw.Text(
                         'Void entry: ${voidForSale.id}',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                         textAlign: pw.TextAlign.center,
                       ),
                     ],
@@ -150,7 +172,8 @@ class InvoiceService {
                       if (entry.originalEntryId != null &&
                           entry.originalEntryId!.trim().isNotEmpty)
                         _infoRow('Original', entry.originalEntryId!.trim()),
-                      if (voidForSale != null) _infoRow('Void entry', voidForSale.id),
+                      if (voidForSale != null)
+                        _infoRow('Void entry', voidForSale.id),
                     ],
                   ),
                 ),
@@ -197,8 +220,12 @@ class InvoiceService {
                 rows: [
                   _totalRow('Subtotal', '$sign${_formatMoney(entry.subtotal)}'),
                   if (entry.discount.abs() > 0.01)
-                    _totalRow('Discount', '$sign${_formatMoney(entry.discount)}'),
-                  if (entry.tax.abs() > 0.01) _totalRow('Tax', '$sign${_formatMoney(entry.tax)}'),
+                    _totalRow(
+                      'Discount',
+                      '$sign${_formatMoney(entry.discount)}',
+                    ),
+                  if (entry.tax.abs() > 0.01)
+                    _totalRow('Tax', '$sign${_formatMoney(entry.tax)}'),
                   _totalRow(
                     'TOTAL',
                     'UGX $sign${_formatMoney(entry.total)}',
@@ -291,10 +318,15 @@ class InvoiceService {
     final headerText = _cleanText(template?.headerText);
     final footerText = _cleanText(template?.footerText);
 
-    final code = (order['code'] ?? order['order_code'] ?? order['id'] ?? '').toString();
+    final code = (order['code'] ?? order['order_code'] ?? order['id'] ?? '')
+        .toString();
     final createdAt = DateTime.tryParse((order['created_at'] ?? '').toString());
-    final dateStr = createdAt != null ? _dateFormat.format(createdAt.toLocal()) : '-';
-    final timeStr = createdAt != null ? _timeFormat.format(createdAt.toLocal()) : '-';
+    final dateStr = createdAt != null
+        ? _dateFormat.format(createdAt.toLocal())
+        : '-';
+    final timeStr = createdAt != null
+        ? _timeFormat.format(createdAt.toLocal())
+        : '-';
 
     final shipping = order['shipping_address'] is Map<String, dynamic>
         ? (order['shipping_address'] as Map<String, dynamic>)
@@ -302,48 +334,62 @@ class InvoiceService {
 
     final customerName =
         (order['customer_name'] ?? shipping['name'] ?? 'Customer').toString();
-    final customerPhone =
-        (order['customer_phone'] ?? shipping['phone'] ?? '').toString();
-    final customerAddress =
-        (shipping['address'] ?? shipping['city'] ?? '').toString();
+    final customerPhone = (order['customer_phone'] ?? shipping['phone'] ?? '')
+        .toString();
+    final customerAddress = (shipping['address'] ?? shipping['city'] ?? '')
+        .toString();
 
     final paymentStatus = (order['payment_status'] ?? 'unpaid').toString();
     final deliveryStatus = (order['delivery_status'] ?? 'pending').toString();
-    final paymentMethod = (order['payment_type'] ?? order['payment_method'] ?? '').toString();
+    final paymentMethod =
+        (order['payment_type'] ?? order['payment_method'] ?? '').toString();
 
-    final paymentSettings = ShopPaymentSettingsCache.read(prefs);
+    final paymentSettings = await _resolvePaymentSettings();
     final paymentInstructions = paymentSettings.paymentInstructionsText();
     final showPaymentInstructions =
-        paymentInstructions != null &&
-        paymentStatus.toLowerCase() != 'paid';
+        paymentInstructions != null && paymentStatus.toLowerCase() != 'paid';
 
-    final itemsRaw =
-        (order['order_items'] is List)
-            ? (order['order_items'] as List)
-            : (order['items'] is List ? (order['items'] as List) : const []);
+    final itemsRaw = (order['order_items'] is List)
+        ? (order['order_items'] as List)
+        : (order['items'] is List ? (order['items'] as List) : const []);
     final items = itemsRaw
         .whereType<Map>()
         .map((raw) => Map<String, dynamic>.from(raw))
         .map((i) {
           final name = (i['product_name'] ?? i['name'] ?? 'Item').toString();
           final variation = (i['variation'] ?? '').toString().trim();
-          final qty = int.tryParse((i['quantity'] ?? i['qty'] ?? '1').toString()) ?? 1;
-          final unitPrice = _toDouble(i['unit_price']) ?? _toDouble(i['price']) ?? 0;
+          final qty =
+              int.tryParse((i['quantity'] ?? i['qty'] ?? '1').toString()) ?? 1;
+          final unitPrice =
+              _toDouble(i['unit_price']) ?? _toDouble(i['price']) ?? 0;
           final total = _toDouble(i['total']) ?? (unitPrice * qty);
-          final title =
-              variation.isEmpty ? name : '$name • $variation';
-          return _InvoiceLine(title: title, quantity: qty, unitPrice: unitPrice, lineTotal: total);
+          final title = variation.isEmpty ? name : '$name • $variation';
+          return _InvoiceLine(
+            title: title,
+            quantity: qty,
+            unitPrice: unitPrice,
+            lineTotal: total,
+          );
         })
         .toList();
 
     final subtotal =
-        _toDouble(order['subtotal_raw']) ?? _toDouble(order['sub_total']) ?? _toDouble(order['subtotal']);
+        _toDouble(order['subtotal_raw']) ??
+        _toDouble(order['sub_total']) ??
+        _toDouble(order['subtotal']);
     final shippingCost =
-        _toDouble(order['shipping_cost_raw']) ?? _toDouble(order['shipping_cost']) ?? _toDouble(order['shipping']);
+        _toDouble(order['shipping_cost_raw']) ??
+        _toDouble(order['shipping_cost']) ??
+        _toDouble(order['shipping']);
     final discount =
-        _toDouble(order['coupon_discount_raw']) ?? _toDouble(order['coupon_discount']);
-    final tax = _toDouble(order['tax_raw']) ?? _toDouble(order['tax']) ?? _toDouble(order['vat']);
-    final grandTotal = _toDouble(order['grand_total']) ?? _toDouble(order['total']) ?? 0;
+        _toDouble(order['coupon_discount_raw']) ??
+        _toDouble(order['coupon_discount']);
+    final tax =
+        _toDouble(order['tax_raw']) ??
+        _toDouble(order['tax']) ??
+        _toDouble(order['vat']);
+    final grandTotal =
+        _toDouble(order['grand_total']) ?? _toDouble(order['total']) ?? 0;
 
     doc.addPage(
       pw.MultiPage(
@@ -402,13 +448,18 @@ class InvoiceService {
               alignment: pw.Alignment.centerRight,
               child: _totalsBox(
                 rows: [
-                  if (subtotal != null) _totalRow('Subtotal', _formatMoney(subtotal)),
+                  if (subtotal != null)
+                    _totalRow('Subtotal', _formatMoney(subtotal)),
                   if (shippingCost != null)
                     _totalRow('Shipping', _formatMoney(shippingCost)),
                   if (discount != null && discount.abs() > 0.01)
                     _totalRow('Discount', '-${_formatMoney(discount)}'),
                   if (tax != null) _totalRow('Tax', _formatMoney(tax)),
-                  _totalRow('TOTAL', 'UGX ${_formatMoney(grandTotal)}', isStrong: true),
+                  _totalRow(
+                    'TOTAL',
+                    'UGX ${_formatMoney(grandTotal)}',
+                    isStrong: true,
+                  ),
                 ],
               ),
             ),
@@ -431,6 +482,152 @@ class InvoiceService {
                 ),
                 child: pw.Text(
                   paymentInstructions,
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
+              ),
+            ],
+            if (footerText != null) ...[
+              pw.SizedBox(height: 18),
+              pw.Divider(color: PdfColors.grey300),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                footerText,
+                style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+              ),
+            ],
+            pw.SizedBox(height: 18),
+            pw.Text(
+              'Powered by Soko 24',
+              style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+              textAlign: pw.TextAlign.center,
+            ),
+          ];
+        },
+      ),
+    );
+
+    return doc.save();
+  }
+
+  Future<Uint8List> buildQuotationPdf(
+    QuotationWithCustomer row,
+    List<QuotationLine> lines,
+  ) async {
+    final doc = pw.Document();
+    final outlet = await db.getPrimaryOutlet();
+    final template = await db.getLatestReceiptTemplate();
+    final headerText = _cleanText(template?.headerText);
+    final footerText = _cleanText(template?.footerText);
+
+    final quotation = row.quotation;
+    final customer = row.customer;
+    final createdAt = quotation.date.toLocal();
+    final validUntil = quotation.validUntil?.toLocal();
+    final items = lines
+        .map(
+          (line) => _InvoiceLine(
+            title: line.description,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            lineTotal: line.total,
+          ),
+        )
+        .toList();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(32, 36, 32, 36),
+        build: (context) {
+          return [
+            _buildHeader(outlet, title: 'QUOTATION'),
+            if (headerText != null) ...[
+              pw.SizedBox(height: 10),
+              pw.Text(
+                headerText,
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontStyle: pw.FontStyle.italic,
+                  color: PdfColors.grey700,
+                ),
+              ),
+            ],
+            pw.SizedBox(height: 18),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: _infoBox(
+                    title: 'Quotation',
+                    rows: [
+                      _infoRow('Number', quotation.number),
+                      _infoRow(
+                        'Created',
+                        '${_dateFormat.format(createdAt)} • ${_timeFormat.format(createdAt)}',
+                      ),
+                      if (validUntil != null)
+                        _infoRow('Valid until', _dateFormat.format(validUntil)),
+                      _infoRow(
+                        'Status',
+                        validUntil != null && DateTime.now().isAfter(validUntil)
+                            ? 'EXPIRED'
+                            : 'OPEN',
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 12),
+                pw.Expanded(
+                  child: _infoBox(
+                    title: 'Customer',
+                    rows: [
+                      _infoRow('Name', customer?.name.trim().isNotEmpty == true
+                          ? customer!.name.trim()
+                          : 'Customer'),
+                      if (customer?.phone?.trim().isNotEmpty == true)
+                        _infoRow('Phone', customer!.phone!.trim()),
+                      if (customer?.email?.trim().isNotEmpty == true)
+                        _infoRow('Email', customer!.email!.trim()),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 18),
+            _buildItemsTable(items),
+            pw.SizedBox(height: 14),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: _totalsBox(
+                rows: [
+                  _totalRow(
+                    'TOTAL',
+                    'UGX ${_formatMoney(quotation.totalAmount)}',
+                    isStrong: true,
+                  ),
+                ],
+              ),
+            ),
+            if (quotation.notes?.trim().isNotEmpty == true) ...[
+              pw.SizedBox(height: 18),
+              pw.Text(
+                'Notes',
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.grey800,
+                ),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  borderRadius: pw.BorderRadius.circular(6),
+                ),
+                child: pw.Text(
+                  quotation.notes!.trim(),
                   style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
                 ),
               ),
@@ -482,9 +679,15 @@ class InvoiceService {
                 ),
               ),
               if (address != null && address.isNotEmpty)
-                pw.Text(address, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                pw.Text(
+                  address,
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
               if (phone != null && phone.isNotEmpty)
-                pw.Text('Tel: $phone', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                pw.Text(
+                  'Tel: $phone',
+                  style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                ),
             ],
           ),
         ),
@@ -529,11 +732,17 @@ class InvoiceService {
         ),
         ...lines.map(
           (l) => pw.TableRow(
-              children: [
-                _cell(l.title),
-                _cell('${l.quantity}', align: pw.TextAlign.center),
-              _cell('$sign${_formatMoney(l.unitPrice)}', align: pw.TextAlign.right),
-              _cell('$sign${_formatMoney(l.lineTotal)}', align: pw.TextAlign.right),
+            children: [
+              _cell(l.title),
+              _cell('${l.quantity}', align: pw.TextAlign.center),
+              _cell(
+                '$sign${_formatMoney(l.unitPrice)}',
+                align: pw.TextAlign.right,
+              ),
+              _cell(
+                '$sign${_formatMoney(l.lineTotal)}',
+                align: pw.TextAlign.right,
+              ),
             ],
           ),
         ),
@@ -541,10 +750,7 @@ class InvoiceService {
     );
   }
 
-  pw.Widget _infoBox({
-    required String title,
-    required List<pw.Widget> rows,
-  }) {
+  pw.Widget _infoBox({required String title, required List<pw.Widget> rows}) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(10),
       decoration: pw.BoxDecoration(
@@ -638,11 +844,30 @@ class InvoiceService {
   }
 
   Future<Outlet?> _resolveOutlet(String? outletId) async {
+    final profile = await db.getBusinessProfile();
+    if (profile != null && profile.shopName.trim().isNotEmpty) {
+      return Outlet(
+        id: profile.shopId ?? outletId ?? kPrimaryBusinessProfileId,
+        name: profile.shopName,
+        address: profile.shopAddress,
+        phone: profile.shopPhone,
+        active: true,
+        updatedAt: profile.updatedAt,
+      );
+    }
     if (outletId != null && outletId.trim().isNotEmpty) {
       final outlet = await db.getOutletById(outletId);
       if (outlet != null) return outlet;
     }
     return db.getPrimaryOutlet();
+  }
+
+  Future<ShopPaymentSettings> _resolvePaymentSettings() async {
+    final profile = await db.getBusinessProfile();
+    if (profile != null) {
+      return businessProfileToPaymentSettings(profile);
+    }
+    return ShopPaymentSettingsCache.read(prefs);
   }
 
   String _formatReceiptNumber(int? number) {

@@ -5,11 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class FirebaseAnalyticsService {
   FirebaseAnalyticsService._();
   static final instance = FirebaseAnalyticsService._();
-  
+
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
-  
-  FirebaseAnalyticsObserver get observer => FirebaseAnalyticsObserver(analytics: _analytics);
-  
+
+  FirebaseAnalyticsObserver get observer =>
+      FirebaseAnalyticsObserver(analytics: _analytics);
+
   /// Track sale completed
   Future<void> logSaleCompleted({
     required double amount,
@@ -25,7 +26,7 @@ class FirebaseAnalyticsService {
       },
     );
   }
-  
+
   /// Track refund issued
   Future<void> logRefundIssued({required double amount}) async {
     await _analytics.logEvent(
@@ -33,7 +34,7 @@ class FirebaseAnalyticsService {
       parameters: {'amount': amount},
     );
   }
-  
+
   /// Track contact synced
   Future<void> logContactSynced({required int count}) async {
     await _analytics.logEvent(
@@ -41,7 +42,7 @@ class FirebaseAnalyticsService {
       parameters: {'count': count},
     );
   }
-  
+
   /// Track template changed
   Future<void> logTemplateChanged({required String templateId}) async {
     await _analytics.logEvent(
@@ -49,21 +50,21 @@ class FirebaseAnalyticsService {
       parameters: {'template_id': templateId},
     );
   }
-  
+
   /// Track screen view
   Future<void> logScreenView(String screenName) async {
     await _analytics.logScreenView(screenName: screenName);
   }
-  
+
   /// Set user properties
   Future<void> setUserId(String userId) async {
     await _analytics.setUserId(id: userId);
   }
-  
+
   Future<void> setUserProperty(String name, String value) async {
     await _analytics.setUserProperty(name: name, value: value);
   }
-  
+
   /// Track custom event
   Future<void> logCustomEvent({
     required String name,

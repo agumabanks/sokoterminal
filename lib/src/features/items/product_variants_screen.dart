@@ -13,10 +13,11 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 
-final itemStocksStreamProvider =
-    StreamProvider.family<List<ItemStock>, String>((ref, itemId) {
-  return ref.watch(appDatabaseProvider).watchItemStocksForItem(itemId);
-});
+final itemStocksStreamProvider = StreamProvider.family<List<ItemStock>, String>(
+  (ref, itemId) {
+    return ref.watch(appDatabaseProvider).watchItemStocksForItem(itemId);
+  },
+);
 
 class ProductVariantsScreen extends ConsumerWidget {
   const ProductVariantsScreen({super.key, required this.itemId});
@@ -30,25 +31,21 @@ class ProductVariantsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text('Variants', style: DesignTokens.textTitle),
-      ),
+      appBar: AppBar(title: Text('Variants', style: DesignTokens.textTitle)),
       body: FutureBuilder<Item?>(
         future: db.getItemById(itemId),
         builder: (context, snap) {
           final item = snap.data;
           return stocksAsync.when(
             data: (stocks) {
-              final variantsCount =
-                  stocks.where((s) => s.variant.trim().isNotEmpty).length;
+              final variantsCount = stocks
+                  .where((s) => s.variant.trim().isNotEmpty)
+                  .length;
               return ListView(
                 padding: DesignTokens.paddingScreen,
                 children: [
                   if (item != null)
-                    _HeaderCard(
-                      item: item,
-                      variantsCount: variantsCount,
-                    ),
+                    _HeaderCard(item: item, variantsCount: variantsCount),
                   const SizedBox(height: DesignTokens.spaceMd),
                   if (stocks.isEmpty)
                     _EmptyState(
@@ -58,21 +55,11 @@ class ProductVariantsScreen extends ConsumerWidget {
                     ...stocks.map(
                       (s) => _VariantTile(
                         stock: s,
-                        onEdit: () => _editVariant(
-                          context,
-                          ref,
-                          item,
-                          stocks,
-                          s,
-                        ),
+                        onEdit: () =>
+                            _editVariant(context, ref, item, stocks, s),
                         onArchive: s.variant.trim().isEmpty
                             ? null
-                            : () => _archiveVariant(
-                                  context,
-                                  ref,
-                                  item,
-                                  s,
-                                ),
+                            : () => _archiveVariant(context, ref, item, s),
                       ),
                     ),
                   const SizedBox(height: DesignTokens.spaceXl),
@@ -150,7 +137,9 @@ class ProductVariantsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: DesignTokens.spaceLg),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.error,
+            ),
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.archive_outlined),
             label: const Text('Archive'),
@@ -166,15 +155,15 @@ class ProductVariantsScreen extends ConsumerWidget {
     if (confirmed != true) return;
 
     final db = ref.read(appDatabaseProvider);
-    await (db.update(db.itemStocks)
-          ..where((t) =>
-              t.itemId.equals(itemId) & t.variant.equals(stock.variant)))
+    await (db.update(db.itemStocks)..where(
+          (t) => t.itemId.equals(itemId) & t.variant.equals(stock.variant),
+        ))
         .write(
-      ItemStocksCompanion(
-        stockQty: const drift.Value(0),
-        updatedAt: drift.Value(DateTime.now().toUtc()),
-      ),
-    );
+          ItemStocksCompanion(
+            stockQty: const drift.Value(0),
+            updatedAt: drift.Value(DateTime.now().toUtc()),
+          ),
+        );
 
     await _recomputeItemSummary(ref, item);
     await _enqueueVariantSync(ref, item);
@@ -199,7 +188,9 @@ class ProductVariantsScreen extends ConsumerWidget {
   }) async {
     if (item == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Save the product first, then add variants.')),
+        const SnackBar(
+          content: Text('Save the product first, then add variants.'),
+        ),
       );
       return;
     }
@@ -317,9 +308,9 @@ class ProductVariantsScreen extends ConsumerWidget {
       final sku = skuCtrl.text.trim();
       if (sku.isNotEmpty) {
         final db = ref.read(appDatabaseProvider);
-        final stockMatches = await (db.select(db.itemStocks)
-              ..where((t) => t.sku.equals(sku)))
-            .get();
+        final stockMatches = await (db.select(
+          db.itemStocks,
+        )..where((t) => t.sku.equals(sku))).get();
         if (!context.mounted) return;
         final conflictStock = stockMatches.any(
           (s) => !(s.itemId == itemId && s.variant == variant),
@@ -329,8 +320,9 @@ class ProductVariantsScreen extends ConsumerWidget {
           return;
         }
 
-        final itemMatches =
-            await (db.select(db.items)..where((t) => t.sku.equals(sku))).get();
+        final itemMatches = await (db.select(
+          db.items,
+        )..where((t) => t.sku.equals(sku))).get();
         if (!context.mounted) return;
         final conflictItem = itemMatches.any((i) => i.id != itemId);
         if (conflictItem) {
@@ -343,12 +335,13 @@ class ProductVariantsScreen extends ConsumerWidget {
 
       // If this is the first non-empty variant, prevent selling the legacy base row.
       final hasBaseRow = existingStocks.any((s) => s.variant.trim().isEmpty);
-      final hasNonEmpty = existingStocks.any((s) => s.variant.trim().isNotEmpty);
+      final hasNonEmpty = existingStocks.any(
+        (s) => s.variant.trim().isNotEmpty,
+      );
       if (editing == null && hasBaseRow && !hasNonEmpty) {
-        await (db.update(db.itemStocks)
-              ..where((t) =>
-                  t.itemId.equals(itemId) & t.variant.equals('')))
-            .write(
+        await (db.update(
+          db.itemStocks,
+        )..where((t) => t.itemId.equals(itemId) & t.variant.equals(''))).write(
           ItemStocksCompanion(
             stockQty: const drift.Value(0),
             updatedAt: drift.Value(DateTime.now().toUtc()),
@@ -456,7 +449,9 @@ class _HeaderCard extends StatelessWidget {
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
             'Tip: Use clear labels (e.g. “Red-L”, “5KG”). If you add variants, selling requires choosing a variant at checkout.',
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayDark),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayDark,
+            ),
           ),
         ],
       ),
@@ -477,7 +472,9 @@ class _VariantTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = stock.variant.trim().isEmpty ? 'Default' : stock.variant.trim();
+    final label = stock.variant.trim().isEmpty
+        ? 'Default'
+        : stock.variant.trim();
     final sku = (stock.sku ?? '').trim();
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -530,7 +527,11 @@ class _EmptyState extends StatelessWidget {
         padding: DesignTokens.paddingLg,
         child: Column(
           children: [
-            Icon(Icons.inventory_2_outlined, size: 48, color: DesignTokens.grayMedium),
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: DesignTokens.grayMedium,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             Text('No variants yet', style: DesignTokens.textBodyBold),
             const SizedBox(height: DesignTokens.spaceXs),
@@ -544,7 +545,9 @@ class _EmptyState extends StatelessWidget {
               onPressed: onAdd,
               icon: const Icon(Icons.add),
               label: const Text('Add variant'),
-              style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.brandAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+              ),
             ),
           ],
         ),

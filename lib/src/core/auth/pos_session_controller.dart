@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,19 +59,19 @@ class PosSessionState {
 
 final posSessionProvider =
     StateNotifierProvider<PosSessionController, PosSessionState>((ref) {
-  final storage = ref.watch(secureStorageProvider);
-  final api = ref.watch(sellerApiProvider);
-  final db = ref.watch(appDatabaseProvider);
-  final sync = ref.watch(syncServiceProvider);
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return PosSessionController(
-    storage: storage,
-    api: api,
-    db: db,
-    syncService: sync,
-    prefs: prefs,
-  )..load();
-});
+      final storage = ref.watch(secureStorageProvider);
+      final api = ref.watch(sellerApiProvider);
+      final db = ref.watch(appDatabaseProvider);
+      final sync = ref.watch(syncServiceProvider);
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return PosSessionController(
+        storage: storage,
+        api: api,
+        db: db,
+        syncService: sync,
+        prefs: prefs,
+      )..load();
+    });
 
 class PosSessionController extends StateNotifier<PosSessionState> {
   PosSessionController({
@@ -79,12 +80,12 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     required AppDatabase db,
     required SyncService syncService,
     required SharedPreferences prefs,
-  })  : _storage = storage,
-        _api = api,
-        _db = db,
-        _sync = syncService,
-        _prefs = prefs,
-        super(PosSessionState.empty);
+  }) : _storage = storage,
+       _api = api,
+       _db = db,
+       _sync = syncService,
+       _prefs = prefs,
+       super(PosSessionState.empty);
 
   final SecureStorage _storage;
   final SellerApi _api;
@@ -159,10 +160,7 @@ class PosSessionController extends StateNotifier<PosSessionState> {
           staffRole: staffRole,
           expiresAt: expiresAt,
         );
-        await _upsertLocalStaff(
-          staffId: staffId,
-          staffName: staffName,
-        );
+        await _upsertLocalStaff(staffId: staffId, staffName: staffName);
       }
     } catch (_) {
       // Best-effort: keep the token (offline) but avoid blocking the UI.
@@ -191,8 +189,10 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       final res = await _api.startPosSession(pin: trimmed);
       final data = res.data;
       if (data is! Map) {
-        state =
-            prevState.copyWith(loading: false, error: 'Invalid session response');
+        state = prevState.copyWith(
+          loading: false,
+          error: 'Invalid session response',
+        );
         return false;
       }
 
@@ -246,7 +246,10 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       unawaited(_sync.syncNow());
       return true;
     } catch (e) {
-      state = prevState.copyWith(loading: false, error: e.toString());
+      state = prevState.copyWith(
+        loading: false,
+        error: _extractErrorMessage(e),
+      );
       return false;
     }
   }
@@ -315,5 +318,37 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     return int.tryParse(raw.toString());
+  }
+
+  String _extractErrorMessage(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map) {
+        final map = Map<String, dynamic>.from(data);
+        final message = map['message']?.toString().trim();
+        if (message != null && message.isNotEmpty) {
+          return message;
+        }
+        final errors = map['errors'];
+        if (errors is Map) {
+          for (final value in errors.values) {
+            if (value is List && value.isNotEmpty) {
+              final text = value.first.toString().trim();
+              if (text.isNotEmpty) return text;
+            }
+          }
+        }
+      }
+      final fallback = error.message?.trim();
+      if (fallback != null && fallback.isNotEmpty) {
+        return fallback;
+      }
+    }
+
+    final raw = error.toString().trim();
+    if (raw.startsWith('Exception:')) {
+      return raw.substring('Exception:'.length).trim();
+    }
+    return raw.isEmpty ? 'Sign in failed.' : raw;
   }
 }

@@ -20,7 +20,11 @@ class StaffScreen extends ConsumerWidget {
         children: [
           SwitchListTile(
             title: const Text('Require PIN for staff login'),
-            subtitle: Text(state.enabled ? (state.locked ? 'Locked' : 'Unlocked') : 'Disabled'),
+            subtitle: Text(
+              state.enabled
+                  ? (state.locked ? 'Locked' : 'Unlocked')
+                  : 'Disabled',
+            ),
             value: state.enabled,
             onChanged: (v) {
               if (v) {

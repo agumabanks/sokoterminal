@@ -75,7 +75,20 @@ class _KeypadScreenState extends ConsumerState<KeypadScreen> {
         runSpacing: 24,
         alignment: WrapAlignment.center,
         children: [
-          ...['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map(_buildKey),
+          ...[
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            '8',
+            '9',
+            '*',
+            '0',
+            '#',
+          ].map(_buildKey),
         ],
       ),
     );

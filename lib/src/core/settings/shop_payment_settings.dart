@@ -48,7 +48,10 @@ class ShopPaymentSettings {
     return ShopPaymentSettings(
       cashEnabled: _asBool(json['cash_enabled'], defaultValue: true),
       bankEnabled: _asBool(json['bank_enabled'], defaultValue: false),
-      mobileMoneyEnabled: _asBool(json['mobile_money_enabled'], defaultValue: false),
+      mobileMoneyEnabled: _asBool(
+        json['mobile_money_enabled'],
+        defaultValue: false,
+      ),
       bankName: _asString(json['bank_name']),
       bankAccountName: _asString(json['bank_account_name']),
       bankAccountNumber: _asString(json['bank_account_number']),
@@ -56,8 +59,11 @@ class ShopPaymentSettings {
       mtnMerchantCode: _asString(json['mtn_merchant_code']),
       airtelMerchantCode: _asString(json['airtel_merchant_code']),
       paybillNumber: _asString(json['paybill_number']),
-      receiptPaymentMethods: json['receipt_payment_methods'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(json['receipt_payment_methods'] as Map<String, dynamic>)
+      receiptPaymentMethods:
+          json['receipt_payment_methods'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(
+              json['receipt_payment_methods'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -84,8 +90,11 @@ class ShopPaymentSettings {
       mtnMerchantCode: _asString(data['mtn_merchant_code']),
       airtelMerchantCode: _asString(data['airtel_merchant_code']),
       paybillNumber: _asString(data['paybill_number']),
-      receiptPaymentMethods: data['receipt_payment_methods'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data['receipt_payment_methods'] as Map<String, dynamic>)
+      receiptPaymentMethods:
+          data['receipt_payment_methods'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(
+              data['receipt_payment_methods'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -151,7 +160,8 @@ class ShopPaymentSettings {
       'mtn_merchant_code': mtnMerchantCode,
       'airtel_merchant_code': airtelMerchantCode,
       'paybill_number': paybillNumber,
-      if (receiptPaymentMethods != null) 'receipt_payment_methods': receiptPaymentMethods,
+      if (receiptPaymentMethods != null)
+        'receipt_payment_methods': receiptPaymentMethods,
     };
   }
 
@@ -198,7 +208,8 @@ class ShopPaymentSettings {
       mtnMerchantCode: mtnMerchantCode ?? this.mtnMerchantCode,
       airtelMerchantCode: airtelMerchantCode ?? this.airtelMerchantCode,
       paybillNumber: paybillNumber ?? this.paybillNumber,
-      receiptPaymentMethods: receiptPaymentMethods ?? this.receiptPaymentMethods,
+      receiptPaymentMethods:
+          receiptPaymentMethods ?? this.receiptPaymentMethods,
     );
   }
 }
@@ -225,7 +236,10 @@ class ShopPaymentSettingsCache {
     return tryRead(prefs) ?? ShopPaymentSettings.defaults();
   }
 
-  static Future<void> write(SharedPreferences prefs, ShopPaymentSettings settings) async {
+  static Future<void> write(
+    SharedPreferences prefs,
+    ShopPaymentSettings settings,
+  ) async {
     await prefs.setString(_prefsKey, jsonEncode(settings.toJson()));
   }
 }

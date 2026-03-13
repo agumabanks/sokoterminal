@@ -13,12 +13,16 @@ final dashboardMetricsProvider = FutureProvider<DashboardMetrics>((ref) async {
   final refunds = entries.where((e) => e.type == 'refund').toList();
   final gross = sales.fold<double>(0, (p, e) => p + e.total);
   final net = gross - refunds.fold<double>(0, (p, e) => p + e.total);
-  
+
   // Calculate trend (mock for now - compare to previous period)
   final todayCount = sales
-      .where((t) => t.createdAt.isAfter(DateTime.now().subtract(const Duration(days: 1))))
+      .where(
+        (t) => t.createdAt.isAfter(
+          DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      )
       .length;
-  
+
   return DashboardMetrics(
     grossSales: gross,
     netSales: net,
@@ -61,7 +65,9 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'My Business',
-                            style: DesignTokens.textTitleLight.copyWith(fontSize: 24),
+                            style: DesignTokens.textTitleLight.copyWith(
+                              fontSize: 24,
+                            ),
                           ),
                           const SizedBox(height: DesignTokens.spaceXs),
                           Text(
@@ -101,19 +107,21 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: DesignTokens.spaceSm),
-                    
+
                     // Primary stat - Gross Sales
                     StatCard(
                       label: 'Total Sales',
                       value: 'UGX ${_formatNumber(m.grossSales)}',
                       icon: Icons.account_balance_wallet_outlined,
                       trend: m.grossSales > 0 ? StatTrend.up : StatTrend.flat,
-                      trendLabel: m.grossSales > 0 ? '+${m.todayTransactions} today' : null,
+                      trendLabel: m.grossSales > 0
+                          ? '+${m.todayTransactions} today'
+                          : null,
                       variant: StatCardVariant.gradient,
                     ),
-                    
+
                     const SizedBox(height: DesignTokens.spaceSm),
-                    
+
                     // Secondary stats row
                     Row(
                       children: [
@@ -136,15 +144,15 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: DesignTokens.spaceLg),
-                    
+
                     // ─────────────────────────────────────────────────────────
                     // QUICK ACTIONS
                     // ─────────────────────────────────────────────────────────
                     Text('Quick Actions', style: DesignTokens.textTitle),
                     const SizedBox(height: DesignTokens.spaceMd),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -175,15 +183,15 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: DesignTokens.spaceLg),
-                    
+
                     // ─────────────────────────────────────────────────────────
                     // INSIGHTS
                     // ─────────────────────────────────────────────────────────
                     Text('Insights', style: DesignTokens.textTitle),
                     const SizedBox(height: DesignTokens.spaceMd),
-                    
+
                     _InsightCard(
                       icon: Icons.trending_up,
                       iconColor: DesignTokens.brandAccent,
@@ -211,7 +219,9 @@ class DashboardScreen extends ConsumerWidget {
                           vertical: DesignTokens.spaceXs,
                         ),
                         decoration: BoxDecoration(
-                          color: DesignTokens.brandAccent.withValues(alpha: 0.1),
+                          color: DesignTokens.brandAccent.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: DesignTokens.borderRadiusSm,
                         ),
                         child: Text(
@@ -223,7 +233,7 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: DesignTokens.spaceXl),
                   ],
                 ),
@@ -367,10 +377,7 @@ class _InsightCard extends StatelessWidget {
             if (trailing != null)
               trailing!
             else
-              Icon(
-                Icons.chevron_right,
-                color: DesignTokens.grayMedium,
-              ),
+              Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
           ],
         ),
       ),

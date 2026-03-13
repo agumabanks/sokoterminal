@@ -5,7 +5,11 @@ import '../invoices/invoice_providers.dart';
 import 'orders_controller.dart';
 
 class OrderDetailsScreen extends ConsumerStatefulWidget {
-  const OrderDetailsScreen({super.key, required this.orderId, this.initialData});
+  const OrderDetailsScreen({
+    super.key,
+    required this.orderId,
+    this.initialData,
+  });
 
   final int orderId;
   final Map<String, dynamic>? initialData;
@@ -17,6 +21,7 @@ class OrderDetailsScreen extends ConsumerStatefulWidget {
 class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   Map<String, dynamic>? _order;
   bool _loading = true;
+  bool _requestingSokoDelivery = false;
 
   @override
   void initState() {
@@ -27,7 +32,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   Future<void> _fetchDetails() async {
     setState(() => _loading = true);
-    final data = await ref.read(ordersControllerProvider.notifier).loadOrderDetails(widget.orderId);
+    final data = await ref
+        .read(ordersControllerProvider.notifier)
+        .loadOrderDetails(widget.orderId);
     if (mounted) {
       setState(() {
         _order = data;
@@ -39,9 +46,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _order == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_order == null) {
@@ -51,10 +56,16 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       );
     }
 
-    final code = _order!['order_code']?.toString() ?? _order!['code']?.toString() ?? _order!['id']?.toString() ?? 'N/A';
+    final code =
+        _order!['order_code']?.toString() ??
+        _order!['code']?.toString() ??
+        _order!['id']?.toString() ??
+        'N/A';
     final dateStr = _order!['created_at']?.toString();
     final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-    final formattedDate = date != null ? DateFormat('MMM d, y HH:mm').format(date) : '-';
+    final formattedDate = date != null
+        ? DateFormat('MMM d, y HH:mm').format(date)
+        : '-';
 
     return Scaffold(
       appBar: AppBar(
@@ -80,10 +91,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                     }
                   },
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchDetails,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchDetails),
         ],
       ),
       body: SingleChildScrollView(
@@ -101,23 +109,66 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
             _buildSectionTitle('Payment & Shipping'),
             const SizedBox(height: 8),
             _buildInfoCard([
-              _InfoRow('Payment Status', _order!['payment_status']?.toString().toUpperCase() ?? 'PENDING',
-                  isBadge: true,
-                  color: _getStatusColor(_order!['payment_status']?.toString() ?? '')),
+              _InfoRow(
+                'Payment Status',
+                _order!['payment_status']?.toString().toUpperCase() ??
+                    'PENDING',
+                isBadge: true,
+                color: _getStatusColor(
+                  _order!['payment_status']?.toString() ?? '',
+                ),
+              ),
               _InfoRow(
                 'Delivery Status',
-                (_order!['delivery_status']?.toString() ?? 'pending').toUpperCase().replaceAll('_', ' '),
+                (_order!['delivery_status']?.toString() ?? 'pending')
+                    .toUpperCase()
+                    .replaceAll('_', ' '),
+                isBadge: true,
+                color: _getStatusColor(
+                  _order!['delivery_status']?.toString() ?? '',
+                ),
+              ),
+              _InfoRow(
+                'Payment Method',
+                _order!['payment_type']?.toString() ?? '-',
+              ),
+              _InfoRow(
+                'Shipping Cost',
+                (_order!['shipping_cost'] ?? 'UGX 0').toString(),
+              ),
+              if ((_order!['soko_delivery_request'] as Map?) != null)
+                _InfoRow(
+                  'Soko24 Delivery',
+                  ((_order!['soko_delivery_request'] as Map)['status'] ?? 'pending')
+                      .toString()
+                      .toUpperCase(),
                   isBadge: true,
-                  color: _getStatusColor(_order!['delivery_status']?.toString() ?? '')),
-              _InfoRow('Payment Method', _order!['payment_type']?.toString() ?? '-'),
+                  color: _getStatusColor(
+                    ((_order!['soko_delivery_request'] as Map)['status'] ?? '')
+                        .toString(),
+                  ),
+                ),
             ]),
             const SizedBox(height: 24),
             _buildSectionTitle('Customer'),
             const SizedBox(height: 8),
             _buildInfoCard([
-              _InfoRow('Name', _order!['customer_name']?.toString() ?? _order!['shipping_address']?['name'] ?? '-'),
-              _InfoRow('Phone', _order!['customer_phone']?.toString() ?? _order!['shipping_address']?['phone'] ?? '-'),
-              _InfoRow('Address', _order!['shipping_address']?['address'] ?? '-'),
+              _InfoRow(
+                'Name',
+                _order!['customer_name']?.toString() ??
+                    _order!['shipping_address']?['name'] ??
+                    '-',
+              ),
+              _InfoRow(
+                'Phone',
+                _order!['customer_phone']?.toString() ??
+                    _order!['shipping_address']?['phone'] ??
+                    '-',
+              ),
+              _InfoRow(
+                'Address',
+                _order!['shipping_address']?['address'] ?? '-',
+              ),
               _InfoRow('City', _order!['shipping_address']?['city'] ?? '-'),
             ]),
             const SizedBox(height: 32),
@@ -128,7 +179,8 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   }
 
   Widget _buildHeader(String code, String date) {
-    final total = double.tryParse(_order!['grand_total']?.toString() ?? '0') ?? 0;
+    final total =
+        double.tryParse(_order!['grand_total']?.toString() ?? '0') ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,7 +188,11 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         const SizedBox(height: 8),
         Text(
           'UGX ${NumberFormat('#,###').format(total)}',
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
         ),
       ],
     );
@@ -158,7 +214,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Manage Order', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Manage Order',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -169,12 +228,74 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                     onPressed: () => _showStatusModal(context),
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _canRequestSokoDelivery() && !_requestingSokoDelivery
+                        ? _requestSokoDelivery
+                        : null,
+                    icon: _requestingSokoDelivery
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delivery_dining_outlined),
+                    label: Text(
+                      _hasSokoDeliveryRequest()
+                          ? 'Soko24 Requested'
+                          : 'Request Soko24',
+                    ),
+                  ),
+                ),
               ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Use seller delivery for nearby buyers, or request Soko24 delivery for marketplace orders that need platform fulfillment.',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ],
         ),
       ),
     );
+  }
+
+  bool _hasSokoDeliveryRequest() {
+    final request = _order?['soko_delivery_request'];
+    return request is Map && request.isNotEmpty;
+  }
+
+  bool _canRequestSokoDelivery() {
+    if (_hasSokoDeliveryRequest()) return false;
+    final deliveryStatus = (_order?['delivery_status'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    return deliveryStatus != 'delivered' && deliveryStatus != 'cancelled';
+  }
+
+  Future<void> _requestSokoDelivery() async {
+    setState(() => _requestingSokoDelivery = true);
+    try {
+      final message = await ref
+          .read(ordersControllerProvider.notifier)
+          .requestSokoDelivery(widget.orderId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      await _fetchDetails();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Soko24 delivery request failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _requestingSokoDelivery = false);
+      }
+    }
   }
 
   Widget _buildItemsList() {
@@ -196,7 +317,10 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final item = items[index];
-          final name = item['product_name']?.toString() ?? item['name']?.toString() ?? 'Item';
+          final name =
+              item['product_name']?.toString() ??
+              item['name']?.toString() ??
+              'Item';
           final qty = int.tryParse(item['quantity']?.toString() ?? '0') ?? 0;
           final unitPrice = item['unit_price'] is num
               ? (item['unit_price'] as num).toDouble()
@@ -207,15 +331,20 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
           final variant = item['variation']?.toString() ?? '';
 
           return ListTile(
-            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w500)),
+            title: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
             subtitle: variant.isNotEmpty ? Text(variant) : null,
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('x$qty', style: TextStyle(color: Colors.grey[600])),
-                Text('UGX ${NumberFormat('#,###').format(lineTotal)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'UGX ${NumberFormat('#,###').format(lineTotal)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           );
@@ -240,27 +369,42 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 children: [
                   SizedBox(
                     width: 120,
-                    child: Text(row.label, style: TextStyle(color: Colors.grey[600])),
+                    child: Text(
+                      row.label,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
                   ),
                   Expanded(
                     child: row.isBadge
                         ? Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: row.color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: row.color.withValues(alpha: 0.5)),
+                                  border: Border.all(
+                                    color: row.color.withValues(alpha: 0.5),
+                                  ),
                                 ),
                                 child: Text(
                                   row.value,
-                                  style: TextStyle(color: row.color, fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: row.color,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
                           )
-                        : Text(row.value, style: const TextStyle(fontWeight: FontWeight.w500)),
+                        : Text(
+                            row.value,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
                   ),
                 ],
               ),
@@ -272,14 +416,24 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   }
 
   void _showStatusModal(BuildContext context) {
-    final statuses = ['pending', 'confirmed', 'picked_up', 'on_the_way', 'delivered', 'cancelled'];
+    final statuses = [
+      'pending',
+      'confirmed',
+      'picked_up',
+      'on_the_way',
+      'delivered',
+      'cancelled',
+    ];
     final paymentStatuses = ['paid', 'unpaid'];
-    
-    String delivery = (_order!['delivery_status_raw'] ?? _order!['delivery_status'] ?? 'pending')
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replaceAll(' ', '_');
+
+    String delivery =
+        (_order!['delivery_status_raw'] ??
+                _order!['delivery_status'] ??
+                'pending')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll(' ', '_');
     String payment = _order!['payment_status']?.toString() ?? 'unpaid';
 
     showModalBottomSheet(
@@ -296,19 +450,46 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Update Order Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Update Order Status',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 24),
             DropdownButtonFormField<String>(
-              initialValue: statuses.contains(delivery) ? delivery : statuses.first,
-              decoration: const InputDecoration(labelText: 'Delivery Status', border: OutlineInputBorder()),
-              items: statuses.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase().replaceAll('_', ' ')))).toList(),
+              initialValue: statuses.contains(delivery)
+                  ? delivery
+                  : statuses.first,
+              decoration: const InputDecoration(
+                labelText: 'Delivery Status',
+                border: OutlineInputBorder(),
+              ),
+              items: statuses
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.toUpperCase().replaceAll('_', ' ')),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => delivery = v!,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: paymentStatuses.contains(payment) ? payment : paymentStatuses.last,
-              decoration: const InputDecoration(labelText: 'Payment Status', border: OutlineInputBorder()),
-              items: paymentStatuses.map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase()))).toList(),
+              initialValue: paymentStatuses.contains(payment)
+                  ? payment
+                  : paymentStatuses.last,
+              decoration: const InputDecoration(
+                labelText: 'Payment Status',
+                border: OutlineInputBorder(),
+              ),
+              items: paymentStatuses
+                  .map(
+                    (s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.toUpperCase()),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => payment = v!,
             ),
             const SizedBox(height: 24),
@@ -320,7 +501,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               ),
               onPressed: () async {
                 Navigator.pop(context);
-                await ref.read(ordersControllerProvider.notifier).updateStatus(
+                await ref
+                    .read(ordersControllerProvider.notifier)
+                    .updateStatus(
                       orderId: widget.orderId,
                       delivery: delivery,
                       payment: payment,
@@ -358,5 +541,10 @@ class _InfoRow {
   final bool isBadge;
   final Color color;
 
-  _InfoRow(this.label, this.value, {this.isBadge = false, this.color = Colors.black});
+  _InfoRow(
+    this.label,
+    this.value, {
+    this.isBadge = false,
+    this.color = Colors.black,
+  });
 }

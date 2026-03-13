@@ -14,7 +14,9 @@ import 'notifications_controller.dart';
 enum NotificationCategory { all, orders, payments, stock, system }
 
 /// Provider for selected category filter
-final selectedCategoryProvider = StateProvider<NotificationCategory>((ref) => NotificationCategory.all);
+final selectedCategoryProvider = StateProvider<NotificationCategory>(
+  (ref) => NotificationCategory.all,
+);
 
 final lowStockAlertsProvider = StreamProvider<List<Item>>((ref) {
   return ref.watch(appDatabaseProvider).watchItems();
@@ -36,13 +38,13 @@ class NotificationsScreen extends ConsumerWidget {
       }).length,
       orElse: () => 0,
     );
-    
+
     // Filter notifications by category
     final filteredItems = _filterByCategory(state.items, selectedCategory);
     final unreadCounts = _getUnreadCounts(state.items);
     unreadCounts[NotificationCategory.stock] =
         (unreadCounts[NotificationCategory.stock] ?? 0) + lowStockCount;
-    
+
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
@@ -55,13 +57,16 @@ class NotificationsScreen extends ConsumerWidget {
               onPressed: () => controller.markAllRead(),
             ),
           IconButton(
-            icon: state.loading 
-              ? const SizedBox(
-                  width: 20, 
-                  height: 20, 
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.refresh),
+            icon: state.loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
             onPressed: state.loading ? null : () => controller.load(),
           ),
         ],
@@ -70,29 +75,32 @@ class NotificationsScreen extends ConsumerWidget {
         children: [
           // Summary / Stats bar
           _StatsSummary(state: state, stockAlertsCount: lowStockCount),
-          
+
           // Category filter chips
           _CategoryFilter(
             selected: selectedCategory,
             unreadCounts: unreadCounts,
-            onSelect: (cat) => ref.read(selectedCategoryProvider.notifier).state = cat,
+            onSelect: (cat) =>
+                ref.read(selectedCategoryProvider.notifier).state = cat,
           ),
-          
+
           // Notifications list
           Expanded(
             child: selectedCategory == NotificationCategory.stock
                 ? lowStockItemsAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (e, _) => _EmptyState(
                       category: selectedCategory,
                       error: e.toString(),
                     ),
                     data: (items) {
-                      final low = items.where((i) {
-                        final threshold = i.lowStockWarning ?? 5;
-                        return i.stockEnabled && i.stockQty <= threshold;
-                      }).toList()
-                        ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
+                      final low =
+                          items.where((i) {
+                              final threshold = i.lowStockWarning ?? 5;
+                              return i.stockEnabled && i.stockQty <= threshold;
+                            }).toList()
+                            ..sort((a, b) => a.stockQty.compareTo(b.stockQty));
 
                       return RefreshIndicator(
                         onRefresh: () async {
@@ -100,12 +108,16 @@ class NotificationsScreen extends ConsumerWidget {
                           await controller.load();
                         },
                         child: low.isEmpty
-                            ? _EmptyState(category: selectedCategory, error: state.error)
+                            ? _EmptyState(
+                                category: selectedCategory,
+                                error: state.error,
+                              )
                             : ListView.separated(
                                 padding: DesignTokens.paddingScreen,
                                 itemCount: low.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: DesignTokens.spaceSm),
+                                separatorBuilder: (_, __) => const SizedBox(
+                                  height: DesignTokens.spaceSm,
+                                ),
                                 itemBuilder: (context, index) {
                                   final item = low[index];
                                   final threshold = item.lowStockWarning ?? 5;
@@ -117,8 +129,12 @@ class NotificationsScreen extends ConsumerWidget {
                                       boxShadow: DesignTokens.shadowSm,
                                       border: Border.all(
                                         color: outOfStock
-                                            ? DesignTokens.error.withValues(alpha: 0.35)
-                                            : DesignTokens.warning.withValues(alpha: 0.35),
+                                            ? DesignTokens.error.withValues(
+                                                alpha: 0.35,
+                                              )
+                                            : DesignTokens.warning.withValues(
+                                                alpha: 0.35,
+                                              ),
                                       ),
                                     ),
                                     child: ListTile(
@@ -133,7 +149,10 @@ class NotificationsScreen extends ConsumerWidget {
                                           color: Colors.white,
                                         ),
                                       ),
-                                      title: Text(item.name, style: DesignTokens.textBodyBold),
+                                      title: Text(
+                                        item.name,
+                                        style: DesignTokens.textBodyBold,
+                                      ),
                                       subtitle: Text(
                                         outOfStock
                                             ? 'Out of stock • Reorder at $threshold'
@@ -141,7 +160,8 @@ class NotificationsScreen extends ConsumerWidget {
                                         style: DesignTokens.textSmall,
                                       ),
                                       trailing: const Icon(Icons.chevron_right),
-                                      onTap: () => context.go('/home/more/low-stock'),
+                                      onTap: () =>
+                                          context.go('/home/more/low-stock'),
                                     ),
                                   );
                                 },
@@ -150,36 +170,39 @@ class NotificationsScreen extends ConsumerWidget {
                     },
                   )
                 : state.loading && state.items.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: () => controller.load(),
-                        child: filteredItems.isEmpty
-                            ? _EmptyState(
-                                category: selectedCategory,
-                                error: state.error,
-                              )
-                            : ListView.builder(
-                                padding: DesignTokens.paddingScreen,
-                                itemCount: filteredItems.length,
-                                itemBuilder: (context, index) {
-                                  final item = filteredItems[index];
-                                  return _NotificationCard(
-                                    notification: item,
-                                    onTap: () =>
-                                        _handleTap(context, controller, item),
-                                    onDismiss: () =>
-                                        _handleDelete(context, controller, item),
-                                  );
-                                },
-                              ),
-                      ),
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: () => controller.load(),
+                    child: filteredItems.isEmpty
+                        ? _EmptyState(
+                            category: selectedCategory,
+                            error: state.error,
+                          )
+                        : ListView.builder(
+                            padding: DesignTokens.paddingScreen,
+                            itemCount: filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = filteredItems[index];
+                              return _NotificationCard(
+                                notification: item,
+                                onTap: () =>
+                                    _handleTap(context, controller, item),
+                                onDismiss: () =>
+                                    _handleDelete(context, controller, item),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  List<NotificationDto> _filterByCategory(List<NotificationDto> items, NotificationCategory category) {
+  List<NotificationDto> _filterByCategory(
+    List<NotificationDto> items,
+    NotificationCategory category,
+  ) {
     if (category == NotificationCategory.all) return items;
     return items.where((item) => _getCategory(item) == category).toList();
   }
@@ -197,18 +220,25 @@ class NotificationsScreen extends ConsumerWidget {
     final title = notification.title.toLowerCase();
     final body = notification.body.toLowerCase();
     final type = notification.data['type']?.toString().toLowerCase() ?? '';
-    
-    if (title.contains('order') || body.contains('order') || type.contains('order')) {
+
+    if (title.contains('order') ||
+        body.contains('order') ||
+        type.contains('order')) {
       return NotificationCategory.orders;
     }
-    if (title.contains('payment') || body.contains('payment') || 
-        title.contains('paid') || body.contains('paid') ||
+    if (title.contains('payment') ||
+        body.contains('payment') ||
+        title.contains('paid') ||
+        body.contains('paid') ||
         type.contains('payment')) {
       return NotificationCategory.payments;
     }
-    if (title.contains('stock') || body.contains('stock') || 
-        title.contains('inventory') || body.contains('inventory') ||
-        type.contains('stock') || type.contains('inventory')) {
+    if (title.contains('stock') ||
+        body.contains('stock') ||
+        title.contains('inventory') ||
+        body.contains('inventory') ||
+        type.contains('stock') ||
+        type.contains('inventory')) {
       return NotificationCategory.stock;
     }
     return NotificationCategory.system;
@@ -262,9 +292,7 @@ class _StatsSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: DesignTokens.paddingMd,
-      decoration: BoxDecoration(
-        gradient: DesignTokens.brandGradient,
-      ),
+      decoration: BoxDecoration(gradient: DesignTokens.brandGradient),
       child: Row(
         children: [
           Expanded(
@@ -297,7 +325,11 @@ class _StatsSummary extends StatelessWidget {
 }
 
 class _StatItem extends StatelessWidget {
-  const _StatItem({required this.icon, required this.value, required this.label});
+  const _StatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
   final IconData icon;
   final String value;
   final String label;
@@ -313,8 +345,14 @@ class _StatItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(value, style: DesignTokens.textBodyBold.copyWith(color: Colors.white)),
-            Text(label, style: DesignTokens.textSmall.copyWith(color: Colors.white70)),
+            Text(
+              value,
+              style: DesignTokens.textBodyBold.copyWith(color: Colors.white),
+            ),
+            Text(
+              label,
+              style: DesignTokens.textSmall.copyWith(color: Colors.white70),
+            ),
           ],
         ),
       ],
@@ -329,7 +367,7 @@ class _CategoryFilter extends StatelessWidget {
     required this.unreadCounts,
     required this.onSelect,
   });
-  
+
   final NotificationCategory selected;
   final Map<NotificationCategory, int> unreadCounts;
   final ValueChanged<NotificationCategory> onSelect;
@@ -344,25 +382,36 @@ class _CategoryFilter extends StatelessWidget {
       ),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceMd,
+          vertical: 8,
+        ),
         children: NotificationCategory.values.map((cat) {
           final isSelected = cat == selected;
           final unread = unreadCounts[cat] ?? 0;
           final totalUnread = unreadCounts.values.fold<int>(0, (a, b) => a + b);
-          
+
           return Padding(
             padding: const EdgeInsets.only(right: DesignTokens.spaceSm),
             child: FilterChip(
               label: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(_getCategoryIcon(cat), size: 16, color: isSelected ? Colors.white : DesignTokens.grayMedium),
+                  Icon(
+                    _getCategoryIcon(cat),
+                    size: 16,
+                    color: isSelected ? Colors.white : DesignTokens.grayMedium,
+                  ),
                   const SizedBox(width: 4),
                   Text(_getCategoryLabel(cat)),
-                  if ((cat == NotificationCategory.all ? totalUnread : unread) > 0) ...[
+                  if ((cat == NotificationCategory.all ? totalUnread : unread) >
+                      0) ...[
                     const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.white24 : DesignTokens.error,
                         borderRadius: BorderRadius.circular(10),
@@ -382,7 +431,9 @@ class _CategoryFilter extends StatelessWidget {
               selected: isSelected,
               onSelected: (_) => onSelect(cat),
               selectedColor: DesignTokens.brandPrimary,
-              labelStyle: TextStyle(color: isSelected ? Colors.white : DesignTokens.grayDark),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : DesignTokens.grayDark,
+              ),
               checkmarkColor: Colors.white,
               showCheckmark: false,
             ),
@@ -394,21 +445,31 @@ class _CategoryFilter extends StatelessWidget {
 
   String _getCategoryLabel(NotificationCategory cat) {
     switch (cat) {
-      case NotificationCategory.all: return 'All';
-      case NotificationCategory.orders: return 'Orders';
-      case NotificationCategory.payments: return 'Payments';
-      case NotificationCategory.stock: return 'Stock';
-      case NotificationCategory.system: return 'System';
+      case NotificationCategory.all:
+        return 'All';
+      case NotificationCategory.orders:
+        return 'Orders';
+      case NotificationCategory.payments:
+        return 'Payments';
+      case NotificationCategory.stock:
+        return 'Stock';
+      case NotificationCategory.system:
+        return 'System';
     }
   }
 
   IconData _getCategoryIcon(NotificationCategory cat) {
     switch (cat) {
-      case NotificationCategory.all: return Icons.inbox;
-      case NotificationCategory.orders: return Icons.shopping_bag_outlined;
-      case NotificationCategory.payments: return Icons.payment;
-      case NotificationCategory.stock: return Icons.inventory_2_outlined;
-      case NotificationCategory.system: return Icons.settings;
+      case NotificationCategory.all:
+        return Icons.inbox;
+      case NotificationCategory.orders:
+        return Icons.shopping_bag_outlined;
+      case NotificationCategory.payments:
+        return Icons.payment;
+      case NotificationCategory.stock:
+        return Icons.inventory_2_outlined;
+      case NotificationCategory.system:
+        return Icons.settings;
     }
   }
 }
@@ -420,7 +481,7 @@ class _NotificationCard extends StatelessWidget {
     required this.onTap,
     required this.onDismiss,
   });
-  
+
   final NotificationDto notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
@@ -430,7 +491,7 @@ class _NotificationCard extends StatelessWidget {
     final category = NotificationsScreen._getCategory(notification);
     final categoryColor = _getCategoryColor(category);
     final isUnread = !notification.isRead;
-    
+
     return Dismissible(
       key: Key('notification_${notification.id}'),
       direction: DismissDirection.endToStart,
@@ -447,14 +508,14 @@ class _NotificationCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
         decoration: BoxDecoration(
-          color: isUnread 
-              ? DesignTokens.surfaceWhite 
+          color: isUnread
+              ? DesignTokens.surfaceWhite
               : DesignTokens.surfaceWhite.withValues(alpha: 0.7),
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: isUnread ? DesignTokens.shadowSm : [],
           border: Border.all(
-            color: isUnread 
-                ? categoryColor.withValues(alpha: 0.4) 
+            color: isUnread
+                ? categoryColor.withValues(alpha: 0.4)
                 : DesignTokens.grayLight,
             width: isUnread ? 1.5 : 1,
           ),
@@ -491,9 +552,13 @@ class _NotificationCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              notification.title.isEmpty ? 'Notification' : notification.title,
+                              notification.title.isEmpty
+                                  ? 'Notification'
+                                  : notification.title,
                               style: DesignTokens.textBodyBold.copyWith(
-                                color: isUnread ? DesignTokens.grayDark : DesignTokens.grayMedium,
+                                color: isUnread
+                                    ? DesignTokens.grayDark
+                                    : DesignTokens.grayMedium,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -515,7 +580,9 @@ class _NotificationCard extends StatelessWidget {
                       Text(
                         notification.body,
                         style: DesignTokens.textSmall.copyWith(
-                          color: isUnread ? DesignTokens.grayDark : DesignTokens.grayMedium,
+                          color: isUnread
+                              ? DesignTokens.grayDark
+                              : DesignTokens.grayMedium,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -532,7 +599,9 @@ class _NotificationCard extends StatelessWidget {
                               backgroundColor: DesignTokens.warning,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              textStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.bold),
+                              textStyle: DesignTokens.textSmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -540,10 +609,17 @@ class _NotificationCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.access_time, size: 12, color: DesignTokens.grayMedium),
+                          Icon(
+                            Icons.access_time,
+                            size: 12,
+                            color: DesignTokens.grayMedium,
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            DateTime.tryParse(notification.dateLabel)?.toRelativeLabel() ?? notification.dateLabel,
+                            DateTime.tryParse(
+                                  notification.dateLabel,
+                                )?.toRelativeLabel() ??
+                                notification.dateLabel,
                             style: DesignTokens.textSmall.copyWith(
                               color: DesignTokens.grayMedium,
                               fontSize: 11,
@@ -551,7 +627,10 @@ class _NotificationCard extends StatelessWidget {
                           ),
                           const Spacer(),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: categoryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
@@ -586,31 +665,46 @@ class _NotificationCard extends StatelessWidget {
 
   Color _getCategoryColor(NotificationCategory cat) {
     switch (cat) {
-      case NotificationCategory.all: return DesignTokens.brandPrimary;
-      case NotificationCategory.orders: return DesignTokens.info;
-      case NotificationCategory.payments: return DesignTokens.success;
-      case NotificationCategory.stock: return DesignTokens.warning;
-      case NotificationCategory.system: return DesignTokens.grayMedium;
+      case NotificationCategory.all:
+        return DesignTokens.brandPrimary;
+      case NotificationCategory.orders:
+        return DesignTokens.info;
+      case NotificationCategory.payments:
+        return DesignTokens.success;
+      case NotificationCategory.stock:
+        return DesignTokens.warning;
+      case NotificationCategory.system:
+        return DesignTokens.grayMedium;
     }
   }
 
   IconData _getCategoryIcon(NotificationCategory cat) {
     switch (cat) {
-      case NotificationCategory.all: return Icons.notifications;
-      case NotificationCategory.orders: return Icons.shopping_bag;
-      case NotificationCategory.payments: return Icons.payment;
-      case NotificationCategory.stock: return Icons.inventory_2;
-      case NotificationCategory.system: return Icons.info_outline;
+      case NotificationCategory.all:
+        return Icons.notifications;
+      case NotificationCategory.orders:
+        return Icons.shopping_bag;
+      case NotificationCategory.payments:
+        return Icons.payment;
+      case NotificationCategory.stock:
+        return Icons.inventory_2;
+      case NotificationCategory.system:
+        return Icons.info_outline;
     }
   }
 
   String _getCategoryLabel(NotificationCategory cat) {
     switch (cat) {
-      case NotificationCategory.all: return 'All';
-      case NotificationCategory.orders: return 'Order';
-      case NotificationCategory.payments: return 'Payment';
-      case NotificationCategory.stock: return 'Stock';
-      case NotificationCategory.system: return 'System';
+      case NotificationCategory.all:
+        return 'All';
+      case NotificationCategory.orders:
+        return 'Order';
+      case NotificationCategory.payments:
+        return 'Payment';
+      case NotificationCategory.stock:
+        return 'Stock';
+      case NotificationCategory.system:
+        return 'System';
     }
   }
 }
@@ -644,10 +738,7 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
-          Text(
-            _getEmptyTitle(),
-            style: DesignTokens.textBodyBold,
-          ),
+          Text(_getEmptyTitle(), style: DesignTokens.textBodyBold),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
             _getEmptySubtitle(),
@@ -664,7 +755,9 @@ class _EmptyState extends StatelessWidget {
               ),
               child: Text(
                 error!,
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.error,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -676,31 +769,46 @@ class _EmptyState extends StatelessWidget {
 
   IconData _getEmptyIcon() {
     switch (category) {
-      case NotificationCategory.all: return Icons.notifications_none;
-      case NotificationCategory.orders: return Icons.shopping_bag_outlined;
-      case NotificationCategory.payments: return Icons.payment;
-      case NotificationCategory.stock: return Icons.inventory_2_outlined;
-      case NotificationCategory.system: return Icons.settings_outlined;
+      case NotificationCategory.all:
+        return Icons.notifications_none;
+      case NotificationCategory.orders:
+        return Icons.shopping_bag_outlined;
+      case NotificationCategory.payments:
+        return Icons.payment;
+      case NotificationCategory.stock:
+        return Icons.inventory_2_outlined;
+      case NotificationCategory.system:
+        return Icons.settings_outlined;
     }
   }
 
   String _getEmptyTitle() {
     switch (category) {
-      case NotificationCategory.all: return 'No notifications yet';
-      case NotificationCategory.orders: return 'No order alerts';
-      case NotificationCategory.payments: return 'No payment alerts';
-      case NotificationCategory.stock: return 'No stock alerts';
-      case NotificationCategory.system: return 'No system alerts';
+      case NotificationCategory.all:
+        return 'No notifications yet';
+      case NotificationCategory.orders:
+        return 'No order alerts';
+      case NotificationCategory.payments:
+        return 'No payment alerts';
+      case NotificationCategory.stock:
+        return 'No stock alerts';
+      case NotificationCategory.system:
+        return 'No system alerts';
     }
   }
 
   String _getEmptySubtitle() {
     switch (category) {
-      case NotificationCategory.all: return 'When you receive notifications, they will appear here';
-      case NotificationCategory.orders: return 'Order updates and new orders will appear here';
-      case NotificationCategory.payments: return 'Payment confirmations will appear here';
-      case NotificationCategory.stock: return 'Low stock and inventory alerts will appear here';
-      case NotificationCategory.system: return 'System updates and announcements will appear here';
+      case NotificationCategory.all:
+        return 'When you receive notifications, they will appear here';
+      case NotificationCategory.orders:
+        return 'Order updates and new orders will appear here';
+      case NotificationCategory.payments:
+        return 'Payment confirmations will appear here';
+      case NotificationCategory.stock:
+        return 'Low stock and inventory alerts will appear here';
+      case NotificationCategory.system:
+        return 'System updates and announcements will appear here';
     }
   }
 }

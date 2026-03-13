@@ -59,7 +59,11 @@ class SuppliersScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.local_shipping_outlined, size: 56, color: DesignTokens.grayMedium),
+                    Icon(
+                      Icons.local_shipping_outlined,
+                      size: 56,
+                      color: DesignTokens.grayMedium,
+                    ),
                     const SizedBox(height: DesignTokens.spaceMd),
                     Text('No suppliers yet', style: DesignTokens.textBodyBold),
                     const SizedBox(height: DesignTokens.spaceXs),
@@ -85,7 +89,8 @@ class SuppliersScreen extends ConsumerWidget {
             child: ListView.separated(
               padding: DesignTokens.paddingScreen,
               itemCount: rows.length,
-              separatorBuilder: (_, __) => const SizedBox(height: DesignTokens.spaceSm),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: DesignTokens.spaceSm),
               itemBuilder: (context, index) {
                 final s = rows[index];
                 return _SupplierCard(
@@ -143,18 +148,20 @@ class SuppliersScreen extends ConsumerWidget {
           );
         }
 
-        await api.createSupplier(
-          {
-            'name': form.name,
-            if (form.contactName?.trim().isNotEmpty == true) 'contact_name': form.contactName!.trim(),
-            if (form.phone?.trim().isNotEmpty == true) 'phone': form.phone!.trim(),
-            if (form.email?.trim().isNotEmpty == true) 'email': form.email!.trim(),
-            if (form.address?.trim().isNotEmpty == true) 'address': form.address!.trim(),
-            if (form.notes?.trim().isNotEmpty == true) 'notes': form.notes!.trim(),
-            'active': form.active,
-          },
-          idempotencyKey: idempotencyKey,
-        );
+        await api.createSupplier({
+          'name': form.name,
+          if (form.contactName?.trim().isNotEmpty == true)
+            'contact_name': form.contactName!.trim(),
+          if (form.phone?.trim().isNotEmpty == true)
+            'phone': form.phone!.trim(),
+          if (form.email?.trim().isNotEmpty == true)
+            'email': form.email!.trim(),
+          if (form.address?.trim().isNotEmpty == true)
+            'address': form.address!.trim(),
+          if (form.notes?.trim().isNotEmpty == true)
+            'notes': form.notes!.trim(),
+          'active': form.active,
+        }, idempotencyKey: idempotencyKey);
 
         await ref.read(syncServiceProvider).syncNow();
         if (!context.mounted) return;
@@ -178,7 +185,11 @@ class SuppliersScreen extends ConsumerWidget {
     }());
   }
 
-  void _showEditSupplier(BuildContext context, WidgetRef ref, Supplier supplier) {
+  void _showEditSupplier(
+    BuildContext context,
+    WidgetRef ref,
+    Supplier supplier,
+  ) {
     unawaited(() async {
       final approved = await requireManagerPin(
         context,
@@ -219,24 +230,17 @@ class SuppliersScreen extends ConsumerWidget {
 
       try {
         if (form.delete == true) {
-          await api.deleteSupplier(
-            supplier.id,
-            idempotencyKey: idempotencyKey,
-          );
+          await api.deleteSupplier(supplier.id, idempotencyKey: idempotencyKey);
         } else {
-          await api.updateSupplier(
-            supplier.id,
-            {
-              'name': form.name,
-              'contact_name': form.contactName,
-              'phone': form.phone,
-              'email': form.email,
-              'address': form.address,
-              'notes': form.notes,
-              'active': form.active,
-            },
-            idempotencyKey: idempotencyKey,
-          );
+          await api.updateSupplier(supplier.id, {
+            'name': form.name,
+            'contact_name': form.contactName,
+            'phone': form.phone,
+            'email': form.email,
+            'address': form.address,
+            'notes': form.notes,
+            'active': form.active,
+          }, idempotencyKey: idempotencyKey);
         }
 
         await ref.read(syncServiceProvider).syncNow();
@@ -244,7 +248,9 @@ class SuppliersScreen extends ConsumerWidget {
         Navigator.of(context).pop(); // Dismiss loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(form.delete == true ? 'Supplier removed' : 'Supplier updated'),
+            content: Text(
+              form.delete == true ? 'Supplier removed' : 'Supplier updated',
+            ),
             backgroundColor: DesignTokens.success,
           ),
         );
@@ -271,14 +277,18 @@ class _SupplierCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitleParts = <String>[];
-    if ((supplier.phone ?? '').trim().isNotEmpty) subtitleParts.add(supplier.phone!.trim());
-    if ((supplier.contactName ?? '').trim().isNotEmpty) subtitleParts.add(supplier.contactName!.trim());
+    if ((supplier.phone ?? '').trim().isNotEmpty)
+      subtitleParts.add(supplier.phone!.trim());
+    if ((supplier.contactName ?? '').trim().isNotEmpty)
+      subtitleParts.add(supplier.contactName!.trim());
     final subtitle = subtitleParts.join(' • ');
 
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: supplier.active ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+          backgroundColor: supplier.active
+              ? DesignTokens.brandPrimary
+              : DesignTokens.grayMedium,
           child: const Icon(Icons.local_shipping_outlined, color: Colors.white),
         ),
         title: Text(supplier.name),
@@ -335,7 +345,9 @@ class _SupplierFormState extends State<_SupplierForm> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initial?.name ?? '');
-    _contactCtrl = TextEditingController(text: widget.initial?.contactName ?? '');
+    _contactCtrl = TextEditingController(
+      text: widget.initial?.contactName ?? '',
+    );
     _phoneCtrl = TextEditingController(text: widget.initial?.phone ?? '');
     _emailCtrl = TextEditingController(text: widget.initial?.email ?? '');
     _addressCtrl = TextEditingController(text: widget.initial?.address ?? '');
@@ -369,7 +381,9 @@ class _SupplierFormState extends State<_SupplierForm> {
           const SizedBox(height: DesignTokens.spaceSm),
           TextField(
             controller: _contactCtrl,
-            decoration: const InputDecoration(labelText: 'Contact person (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Contact person (optional)',
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           TextField(
@@ -407,12 +421,18 @@ class _SupplierFormState extends State<_SupplierForm> {
               if (widget.allowDelete)
                 Expanded(
                   child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(foregroundColor: DesignTokens.error),
-                    onPressed: () => Navigator.pop(context, _SupplierFormResult(name: '', delete: true)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: DesignTokens.error,
+                    ),
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _SupplierFormResult(name: '', delete: true),
+                    ),
                     child: const Text('Remove'),
                   ),
                 ),
-              if (widget.allowDelete) const SizedBox(width: DesignTokens.spaceSm),
+              if (widget.allowDelete)
+                const SizedBox(width: DesignTokens.spaceSm),
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
@@ -423,11 +443,21 @@ class _SupplierFormState extends State<_SupplierForm> {
                       context,
                       _SupplierFormResult(
                         name: name,
-                        contactName: _contactCtrl.text.trim().isEmpty ? null : _contactCtrl.text.trim(),
-                        phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-                        email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-                        address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
-                        notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+                        contactName: _contactCtrl.text.trim().isEmpty
+                            ? null
+                            : _contactCtrl.text.trim(),
+                        phone: _phoneCtrl.text.trim().isEmpty
+                            ? null
+                            : _phoneCtrl.text.trim(),
+                        email: _emailCtrl.text.trim().isEmpty
+                            ? null
+                            : _emailCtrl.text.trim(),
+                        address: _addressCtrl.text.trim().isEmpty
+                            ? null
+                            : _addressCtrl.text.trim(),
+                        notes: _notesCtrl.text.trim().isEmpty
+                            ? null
+                            : _notesCtrl.text.trim(),
                         active: _active,
                       ),
                     );

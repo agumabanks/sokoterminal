@@ -8,22 +8,24 @@ import '../core/theme/design_tokens.dart';
 
 /// Sync status enum
 enum SyncStatus {
-  synced,   // All data synced
-  pending,  // Operations waiting to sync
-  syncing,  // Currently syncing
-  failed,   // Has failed operations
+  synced, // All data synced
+  pending, // Operations waiting to sync
+  syncing, // Currently syncing
+  failed, // Has failed operations
 }
 
 /// Provider that watches sync queue status
 final syncStatusProvider = StreamProvider<SyncStatusData>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  
+
   // Watch the SyncOps table for changes
   return db.select(db.syncOps).watch().map((ops) {
     final pending = ops.where((o) => o.status == 'pending').length;
-    final failed = ops.where((o) => o.status == 'failed' || o.retryCount > 3).length;
+    final failed = ops
+        .where((o) => o.status == 'failed' || o.retryCount > 3)
+        .length;
     final total = ops.length;
-    
+
     SyncStatus status;
     if (failed > 0) {
       status = SyncStatus.failed;
@@ -32,7 +34,7 @@ final syncStatusProvider = StreamProvider<SyncStatusData>((ref) {
     } else {
       status = SyncStatus.synced;
     }
-    
+
     return SyncStatusData(
       status: status,
       pendingCount: pending,
@@ -52,13 +54,13 @@ class SyncStatusData {
     required this.totalOps,
     this.ops = const [],
   });
-  
+
   final SyncStatus status;
   final int pendingCount;
   final int failedCount;
   final int totalOps;
   final List<SyncOp> ops;
-  
+
   String get statusText {
     switch (status) {
       case SyncStatus.synced:
@@ -76,26 +78,26 @@ class SyncStatusData {
 /// Compact badge for app bar
 class SyncStatusBadge extends ConsumerWidget {
   const SyncStatusBadge({super.key, this.onTap});
-  
+
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statusAsync = ref.watch(syncStatusProvider);
-    
+
     return statusAsync.when(
       data: (data) => _buildBadge(context, data, ref),
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
-  
+
   Widget _buildBadge(BuildContext context, SyncStatusData data, WidgetRef ref) {
     // Don't show if everything is synced and no pending
     if (data.status == SyncStatus.synced && data.totalOps == 0) {
       return const SizedBox.shrink();
     }
-    
+
     return GestureDetector(
       onTap: onTap ?? () => _showSyncDetails(context, ref),
       child: Container(
@@ -112,8 +114,8 @@ class SyncStatusBadge extends ConsumerWidget {
             if (data.pendingCount > 0 || data.failedCount > 0) ...[
               const SizedBox(width: 4),
               Text(
-                data.failedCount > 0 
-                    ? '${data.failedCount}' 
+                data.failedCount > 0
+                    ? '${data.failedCount}'
                     : '${data.pendingCount}',
                 style: TextStyle(
                   color: _getTextColor(data.status),
@@ -127,7 +129,7 @@ class SyncStatusBadge extends ConsumerWidget {
       ),
     );
   }
-  
+
   Color _getBackgroundColor(SyncStatus status) {
     switch (status) {
       case SyncStatus.synced:
@@ -139,7 +141,7 @@ class SyncStatusBadge extends ConsumerWidget {
         return DesignTokens.error.withValues(alpha: 0.15);
     }
   }
-  
+
   Color _getTextColor(SyncStatus status) {
     switch (status) {
       case SyncStatus.synced:
@@ -151,13 +153,17 @@ class SyncStatusBadge extends ConsumerWidget {
         return DesignTokens.error;
     }
   }
-  
+
   Widget _getIcon(SyncStatus status) {
     switch (status) {
       case SyncStatus.synced:
         return Icon(Icons.cloud_done, size: 16, color: DesignTokens.success);
       case SyncStatus.pending:
-        return Icon(Icons.cloud_upload_outlined, size: 16, color: DesignTokens.warning);
+        return Icon(
+          Icons.cloud_upload_outlined,
+          size: 16,
+          color: DesignTokens.warning,
+        );
       case SyncStatus.syncing:
         return SizedBox(
           width: 14,
@@ -171,7 +177,7 @@ class SyncStatusBadge extends ConsumerWidget {
         return Icon(Icons.cloud_off, size: 16, color: DesignTokens.error);
     }
   }
-  
+
   void _showSyncDetails(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
@@ -189,7 +195,7 @@ class SyncDetailsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statusAsync = ref.watch(syncStatusProvider);
     final sync = ref.read(syncServiceProvider);
-    
+
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
       minChildSize: 0.3,
@@ -235,8 +241,10 @@ class SyncDetailsSheet extends ConsumerWidget {
               // Content
               Expanded(
                 child: statusAsync.when(
-                  data: (data) => _buildContent(context, data, ref, scrollController),
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  data: (data) =>
+                      _buildContent(context, data, ref, scrollController),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('Error: $e')),
                 ),
               ),
@@ -246,10 +254,10 @@ class SyncDetailsSheet extends ConsumerWidget {
       },
     );
   }
-  
+
   Widget _buildContent(
-    BuildContext context, 
-    SyncStatusData data, 
+    BuildContext context,
+    SyncStatusData data,
     WidgetRef ref,
     ScrollController scrollController,
   ) {
@@ -264,19 +272,23 @@ class SyncDetailsSheet extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               'Your data is safely backed up',
-              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
           ],
         ),
       );
     }
-    
+
     // Group ops by status
-    final failed =
-        data.ops.where((o) => o.status == 'failed' || o.retryCount > 3).toList();
-    final pending =
-        data.ops.where((o) => o.status == 'pending' && o.retryCount <= 3).toList();
-    
+    final failed = data.ops
+        .where((o) => o.status == 'failed' || o.retryCount > 3)
+        .toList();
+    final pending = data.ops
+        .where((o) => o.status == 'pending' && o.retryCount <= 3)
+        .toList();
+
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.all(16),
@@ -291,8 +303,12 @@ class SyncDetailsSheet extends ConsumerWidget {
           child: Row(
             children: [
               Icon(
-                data.status == SyncStatus.failed ? Icons.warning_amber : Icons.info_outline,
-                color: data.status == SyncStatus.failed ? DesignTokens.error : DesignTokens.brandPrimary,
+                data.status == SyncStatus.failed
+                    ? Icons.warning_amber
+                    : Icons.info_outline,
+                color: data.status == SyncStatus.failed
+                    ? DesignTokens.error
+                    : DesignTokens.brandPrimary,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -302,7 +318,9 @@ class SyncDetailsSheet extends ConsumerWidget {
                     Text(data.statusText, style: DesignTokens.textBodyBold),
                     Text(
                       _getSummaryMessage(data),
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                     ),
                   ],
                 ),
@@ -310,14 +328,14 @@ class SyncDetailsSheet extends ConsumerWidget {
             ],
           ),
         ),
-        
+
         if (failed.isNotEmpty) ...[
           const SizedBox(height: 24),
           Text('Failed Operations', style: DesignTokens.textBodyBold),
           const SizedBox(height: 8),
           ...failed.map((op) => _SyncOpCard(op: op, isFailed: true)),
         ],
-        
+
         if (pending.isNotEmpty) ...[
           const SizedBox(height: 24),
           Text('Pending Operations', style: DesignTokens.textBodyBold),
@@ -327,7 +345,7 @@ class SyncDetailsSheet extends ConsumerWidget {
       ],
     );
   }
-  
+
   Color _getSummaryColor(SyncStatus status) {
     switch (status) {
       case SyncStatus.synced:
@@ -339,7 +357,7 @@ class SyncDetailsSheet extends ConsumerWidget {
         return DesignTokens.error.withValues(alpha: 0.1);
     }
   }
-  
+
   String _getSummaryMessage(SyncStatusData data) {
     if (data.failedCount > 0) {
       return 'Some operations could not be synced. Check your connection.';
@@ -352,7 +370,7 @@ class SyncDetailsSheet extends ConsumerWidget {
 
 class _SyncOpCard extends StatelessWidget {
   const _SyncOpCard({required this.op, required this.isFailed});
-  
+
   final SyncOp op;
   final bool isFailed;
 
@@ -368,14 +386,16 @@ class _SyncOpCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isFailed 
+                color: isFailed
                     ? DesignTokens.error.withValues(alpha: 0.1)
                     : DesignTokens.brandPrimary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 _getOpIcon(op.opType),
-                color: isFailed ? DesignTokens.error : DesignTokens.brandPrimary,
+                color: isFailed
+                    ? DesignTokens.error
+                    : DesignTokens.brandPrimary,
                 size: 20,
               ),
             ),
@@ -384,18 +404,25 @@ class _SyncOpCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_formatOpType(op.opType), style: DesignTokens.textBodyBold),
+                  Text(
+                    _formatOpType(op.opType),
+                    style: DesignTokens.textBodyBold,
+                  ),
                   if (op.lastError != null && isFailed)
                     Text(
                       op.lastError!,
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.error,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     )
                   else
                     Text(
                       'Retry #${op.retryCount}',
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                     ),
                 ],
               ),
@@ -415,10 +442,11 @@ class _SyncOpCard extends StatelessWidget {
       ),
     );
   }
-  
+
   IconData _getOpIcon(String opType) {
     if (opType.contains('ledger')) return Icons.receipt_long;
-    if (opType.contains('item') || opType.contains('product')) return Icons.inventory_2;
+    if (opType.contains('item') || opType.contains('product'))
+      return Icons.inventory_2;
     if (opType.contains('service')) return Icons.handyman;
     if (opType.contains('customer')) return Icons.person;
     if (opType.contains('quotation')) return Icons.description;
@@ -426,12 +454,14 @@ class _SyncOpCard extends StatelessWidget {
     if (opType.contains('cash')) return Icons.payments;
     return Icons.sync;
   }
-  
+
   String _formatOpType(String opType) {
     return opType
         .replaceAll('_', ' ')
         .split(' ')
-        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+        .map(
+          (w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '',
+        )
         .join(' ');
   }
 }

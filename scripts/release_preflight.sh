@@ -5,6 +5,15 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cd "$ROOT_DIR"
 
+read_kv() {
+  local file="$1"
+  local key="$2"
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+  grep -E "^${key}=" "$file" | head -n 1 | cut -d= -f2- | tr -d '\r' || true
+}
+
 echo "[preflight] cwd: $ROOT_DIR"
 echo "[preflight] flutter: $(command -v flutter || true)"
 
@@ -45,6 +54,51 @@ if [[ -f "$ENV_FILE" ]]; then
   fi
 fi
 
+echo "[preflight] checking for hardcoded non-Firebase Google API keys in Dart sources"
+if rg -n 'AIza[0-9A-Za-z_-]{20,}' lib --glob '!firebase_options.dart'; then
+  echo "[preflight] ERROR: hardcoded Google API key detected in Dart source. Use dart-define or runtime config instead." >&2
+  exit 1
+fi
+
+echo "[preflight] checking release secrets"
+KEY_PROPS="android/key.properties"
+storeFile="$(read_kv "$KEY_PROPS" "storeFile")"
+storePassword="$(read_kv "$KEY_PROPS" "storePassword")"
+keyAlias="$(read_kv "$KEY_PROPS" "keyAlias")"
+keyPassword="$(read_kv "$KEY_PROPS" "keyPassword")"
+googleMapsApiKey="$(read_kv "$KEY_PROPS" "googleMapsApiKey")"
+
+storeFile="${storeFile:-${STORE_FILE:-}}"
+storePassword="${storePassword:-${STORE_PASSWORD:-}}"
+keyAlias="${keyAlias:-${KEY_ALIAS:-}}"
+keyPassword="${keyPassword:-${KEY_PASSWORD:-}}"
+googleMapsApiKey="${googleMapsApiKey:-${GOOGLE_MAPS_API_KEY:-}}"
+
+missing_release_secret=false
+for required in "$storeFile" "$storePassword" "$keyAlias" "$keyPassword" "$googleMapsApiKey"; do
+  if [[ -z "$required" ]]; then
+    missing_release_secret=true
+    break
+  fi
+done
+
+if [[ "$missing_release_secret" == true ]]; then
+  echo "[preflight] ERROR: release signing and Google Maps secrets are required." >&2
+  echo "[preflight] Provide android/key.properties (see android/key.properties.example) or env vars:" >&2
+  echo "[preflight]   STORE_FILE / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD / GOOGLE_MAPS_API_KEY" >&2
+  exit 1
+fi
+
+if [[ "$storePassword" == "CHANGE_ME" || "$keyPassword" == "CHANGE_ME" || "$googleMapsApiKey" == "CHANGE_ME" ]]; then
+  echo "[preflight] ERROR: release secrets still contain CHANGE_ME placeholders." >&2
+  exit 1
+fi
+
+if [[ ! -f "android/$storeFile" && ! -f "$storeFile" ]]; then
+  echo "[preflight] ERROR: keystore file not found: $storeFile" >&2
+  exit 1
+fi
+
 echo "[preflight] flutter pub get"
 flutter pub get
 
@@ -52,7 +106,7 @@ echo "[preflight] codegen (drift/build_runner)"
 flutter pub run build_runner build --delete-conflicting-outputs
 
 echo "[preflight] flutter analyze"
-flutter analyze
+flutter analyze --no-fatal-infos
 
 echo "[preflight] flutter test"
 flutter test

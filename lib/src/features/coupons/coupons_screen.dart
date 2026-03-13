@@ -45,7 +45,11 @@ class CouponsState {
   final List<CouponDto> items;
   final String? error;
 
-  CouponsState copyWith({bool? loading, List<CouponDto>? items, String? error}) {
+  CouponsState copyWith({
+    bool? loading,
+    List<CouponDto>? items,
+    String? error,
+  }) {
     return CouponsState(
       loading: loading ?? this.loading,
       items: items ?? this.items,
@@ -56,9 +60,9 @@ class CouponsState {
 
 final couponsControllerProvider =
     StateNotifierProvider<CouponsController, CouponsState>((ref) {
-  final api = ref.watch(sellerApiProvider);
-  return CouponsController(api)..load();
-});
+      final api = ref.watch(sellerApiProvider);
+      return CouponsController(api)..load();
+    });
 
 class CouponsController extends StateNotifier<CouponsState> {
   CouponsController(this.api) : super(const CouponsState());
@@ -69,7 +73,9 @@ class CouponsController extends StateNotifier<CouponsState> {
     try {
       final res = await api.fetchCoupons();
       final data = res.data;
-      final list = data is Map<String, dynamic> ? (data['data'] as List? ?? const []) : const [];
+      final list = data is Map<String, dynamic>
+          ? (data['data'] as List? ?? const [])
+          : const [];
       final items = list
           .whereType<Map>()
           .map((e) => CouponDto.fromJson(Map<String, dynamic>.from(e)))
@@ -131,7 +137,8 @@ class CouponsScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(couponsControllerProvider.notifier).load(),
+            onPressed: () =>
+                ref.read(couponsControllerProvider.notifier).load(),
           ),
         ],
       ),
@@ -144,7 +151,8 @@ class CouponsScreen extends ConsumerWidget {
       body: state.loading && state.items.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () => ref.read(couponsControllerProvider.notifier).load(),
+              onRefresh: () =>
+                  ref.read(couponsControllerProvider.notifier).load(),
               child: ListView.builder(
                 padding: DesignTokens.paddingScreen,
                 itemCount: state.items.length + (state.items.isEmpty ? 1 : 0),
@@ -190,14 +198,19 @@ class CouponsScreen extends ConsumerWidget {
               children: [
                 Text('Type: ${coupon.type}', style: DesignTokens.textSmallBold),
                 const SizedBox(height: DesignTokens.spaceXs),
-                Text('Valid: ${coupon.startDateLabel} → ${coupon.endDateLabel}', style: DesignTokens.textSmall),
+                Text(
+                  'Valid: ${coupon.startDateLabel} → ${coupon.endDateLabel}',
+                  style: DesignTokens.textSmall,
+                ),
               ],
             ),
           ),
           const SizedBox(height: DesignTokens.spaceLg),
           OutlinedButton.icon(
             onPressed: () async {
-              await ref.read(couponsControllerProvider.notifier).delete(coupon.id);
+              await ref
+                  .read(couponsControllerProvider.notifier)
+                  .delete(coupon.id);
               if (context.mounted) Navigator.pop(context);
             },
             icon: const Icon(Icons.delete_outline),
@@ -257,10 +270,17 @@ class CouponsScreen extends ConsumerWidget {
                     child: DropdownButtonFormField<String>(
                       initialValue: discountType,
                       items: const [
-                        DropdownMenuItem(value: 'percent', child: Text('Percent')),
-                        DropdownMenuItem(value: 'amount', child: Text('Amount')),
+                        DropdownMenuItem(
+                          value: 'percent',
+                          child: Text('Percent'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'amount',
+                          child: Text('Amount'),
+                        ),
                       ],
-                      onChanged: (v) => setState(() => discountType = v ?? discountType),
+                      onChanged: (v) =>
+                          setState(() => discountType = v ?? discountType),
                       decoration: const InputDecoration(labelText: 'Type'),
                     ),
                   ),
@@ -305,17 +325,25 @@ class CouponsScreen extends ConsumerWidget {
                   if (picked != null) setState(() => range = picked);
                 },
                 icon: const Icon(Icons.date_range),
-                label: Text(range == null ? 'Pick date range' : '${_ymd(range!.start)} → ${_ymd(range!.end)}'),
+                label: Text(
+                  range == null
+                      ? 'Pick date range'
+                      : '${_ymd(range!.start)} → ${_ymd(range!.end)}',
+                ),
               ),
               const SizedBox(height: DesignTokens.spaceLg),
               ElevatedButton.icon(
                 onPressed: () async {
                   final code = codeCtrl.text.trim().toUpperCase();
-                  final discount = double.tryParse(discountCtrl.text.trim()) ?? 0;
+                  final discount =
+                      double.tryParse(discountCtrl.text.trim()) ?? 0;
                   final minBuy = double.tryParse(minBuyCtrl.text.trim()) ?? 0;
-                  final maxDiscount = double.tryParse(maxDiscountCtrl.text.trim()) ?? 0;
+                  final maxDiscount =
+                      double.tryParse(maxDiscountCtrl.text.trim()) ?? 0;
                   if (code.isEmpty || discount <= 0 || range == null) return;
-                  await ref.read(couponsControllerProvider.notifier).createCartBase(
+                  await ref
+                      .read(couponsControllerProvider.notifier)
+                      .createCartBase(
                         code: code,
                         discount: discount,
                         discountType: discountType,
@@ -337,7 +365,11 @@ class CouponsScreen extends ConsumerWidget {
 }
 
 class _CouponCard extends StatelessWidget {
-  const _CouponCard({required this.coupon, required this.label, required this.onTap});
+  const _CouponCard({
+    required this.coupon,
+    required this.label,
+    required this.onTap,
+  });
   final CouponDto coupon;
   final String label;
   final VoidCallback onTap;
@@ -353,7 +385,9 @@ class _CouponCard extends StatelessWidget {
           color: DesignTokens.surfaceWhite,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
-          border: Border.all(color: DesignTokens.grayLight.withValues(alpha: 0.8)),
+          border: Border.all(
+            color: DesignTokens.grayLight.withValues(alpha: 0.8),
+          ),
         ),
         child: Row(
           children: [
@@ -363,7 +397,10 @@ class _CouponCard extends StatelessWidget {
                 color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                 borderRadius: DesignTokens.borderRadiusSm,
               ),
-              child: const Icon(Icons.confirmation_number_outlined, color: DesignTokens.brandAccent),
+              child: const Icon(
+                Icons.confirmation_number_outlined,
+                color: DesignTokens.brandAccent,
+              ),
             ),
             const SizedBox(width: DesignTokens.spaceMd),
             Expanded(
@@ -376,7 +413,9 @@ class _CouponCard extends StatelessWidget {
                   const SizedBox(height: DesignTokens.spaceXs),
                   Text(
                     '${coupon.startDateLabel} → ${coupon.endDateLabel}',
-                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ],
               ),
@@ -399,12 +438,20 @@ class _EmptyCouponsState extends StatelessWidget {
       padding: DesignTokens.paddingMd,
       child: Column(
         children: [
-          Icon(Icons.confirmation_number_outlined, size: 48, color: DesignTokens.grayMedium),
+          Icon(
+            Icons.confirmation_number_outlined,
+            size: 48,
+            color: DesignTokens.grayMedium,
+          ),
           const SizedBox(height: DesignTokens.spaceMd),
           Text('No coupons yet', style: DesignTokens.textBodyBold),
           if (error != null) ...[
             const SizedBox(height: DesignTokens.spaceSm),
-            Text(error!, style: DesignTokens.textSmall, textAlign: TextAlign.center),
+            Text(
+              error!,
+              style: DesignTokens.textSmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ],
       ),
