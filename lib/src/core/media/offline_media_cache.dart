@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
@@ -19,7 +20,10 @@ class OfflineMediaCache {
   final Map<String, Future<File?>> _inflight = {};
   Directory? _cacheDir;
 
-  Future<File?> resolve(String urlOrPath, {bool downloadIfMissing = true}) async {
+  Future<File?> resolve(
+    String urlOrPath, {
+    bool downloadIfMissing = true,
+  }) async {
     final raw = urlOrPath.trim();
     if (raw.isEmpty) return null;
 
@@ -77,6 +81,15 @@ class OfflineMediaCache {
       );
       await Future.wait(batch.map((url) => resolve(url)));
     }
+  }
+
+  Future<Uint8List?> resolveBytes(
+    String urlOrPath, {
+    bool downloadIfMissing = true,
+  }) async {
+    final file = await resolve(urlOrPath, downloadIfMissing: downloadIfMissing);
+    if (file == null || !file.existsSync()) return null;
+    return file.readAsBytes();
   }
 
   Future<File> _cacheFileForUrl(String url) async {

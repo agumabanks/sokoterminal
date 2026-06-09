@@ -11,13 +11,15 @@ import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../widgets/bottom_sheet_modal.dart';
 import '../orders/orders_controller.dart';
 import '../notifications/notifications_controller.dart';
+import '../refunds/refunds_screen.dart';
 import '../services/service_bookings_controller.dart';
 
 enum InboxBucket { needsAction, inProgress, completed }
 
-enum InboxType { all, orders, bookings, alerts, stock }
+enum InboxType { all, orders, bookings, refunds, alerts, stock }
 
 final inboxBucketProvider = StateProvider<InboxBucket>(
   (ref) => InboxBucket.needsAction,
@@ -60,6 +62,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       if (telemetry != null) {
         unawaited(telemetry.event('inbox_open'));
       }
+      unawaited(ref.read(refundsControllerProvider.notifier).load());
     });
   }
 
@@ -72,6 +75,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     final notifications = ref.watch(notificationsControllerProvider);
     final pendingOpsAsync = ref.watch(pendingSyncOpsStreamProvider);
     final stockAlertsAsync = ref.watch(stockAlertsStreamProvider);
+    final refundsState = ref.watch(refundsControllerProvider);
 
     final pendingIds = pendingOpsAsync.maybeWhen(
       data: (ops) => _PendingIds.from(ops),
@@ -112,6 +116,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             .toList(growable: false),
         orElse: () => const [],
       ),
+      ...refundsState.items.map(_InboxItem.fromRefund),
     ];
 
     final filtered = _filter(items, bucket: bucket, type: type)
@@ -128,8 +133,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
             onPressed: () async {
               final sync = ref.read(syncServiceProvider);
               await sync.syncNow();
-              // Warm up notifications.
               await ref.read(notificationsControllerProvider.notifier).load();
+              await ref.read(refundsControllerProvider.notifier).load();
             },
           ),
         ],
@@ -150,6 +155,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 final sync = ref.read(syncServiceProvider);
                 await sync.syncNow();
                 await ref.read(notificationsControllerProvider.notifier).load();
+                await ref.read(refundsControllerProvider.notifier).load();
               },
               child: filtered.isEmpty
                   ? _EmptyState(bucket: bucket, type: type)
@@ -224,6 +230,7 @@ class _InboxItem {
     this.pendingSync = false,
     this.notification,
     this.stockAlert,
+    this.refund,
   });
 
   final InboxType type;
@@ -238,6 +245,7 @@ class _InboxItem {
 
   final NotificationDto? notification;
   final StockAlertWithItem? stockAlert;
+  final RefundRequestDto? refund;
 
   static _InboxItem fromOrderJson(
     Map<String, dynamic> order, {
@@ -297,6 +305,26 @@ class _InboxItem {
       default:
         return InboxBucket.needsAction;
     }
+  }
+
+  static _InboxItem fromRefund(RefundRequestDto refund) {
+    final pending = refund.refundStatus == 0;
+    return _InboxItem(
+      type: InboxType.refunds,
+      bucket: pending ? InboxBucket.needsAction : InboxBucket.completed,
+      id: refund.id.toString(),
+      title: refund.orderCode.isEmpty
+          ? 'Refund #${refund.id}'
+          : 'Refund ${refund.orderCode}',
+      subtitle: refund.productName.isEmpty
+          ? refund.reason
+          : '${refund.productName} • ${refund.reason}',
+      timestamp:
+          DateTime.tryParse(refund.dateLabel)?.toUtc() ??
+          DateTime.now().toUtc(),
+      status: refund.refundLabel,
+      refund: refund,
+    );
   }
 
   static _InboxItem fromBookingJson(
@@ -394,6 +422,7 @@ class _InboxTile extends ConsumerWidget {
     final icon = switch (item.type) {
       InboxType.orders => Icons.shopping_bag_outlined,
       InboxType.bookings => Icons.event_note_outlined,
+      InboxType.refunds => Icons.assignment_return_outlined,
       InboxType.alerts => Icons.notifications_outlined,
       InboxType.stock => Icons.inventory_2_outlined,
       InboxType.all => Icons.inbox_outlined,
@@ -402,6 +431,7 @@ class _InboxTile extends ConsumerWidget {
     final color = switch (item.type) {
       InboxType.orders => DesignTokens.info,
       InboxType.bookings => DesignTokens.brandAccent,
+      InboxType.refunds => DesignTokens.warning,
       InboxType.alerts => DesignTokens.grayMedium,
       InboxType.stock => DesignTokens.warning,
       InboxType.all => DesignTokens.brandPrimary,
@@ -429,9 +459,89 @@ class _InboxTile extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: _Actions(item: item),
+        onTap: () => _openInboxItem(context, ref, item),
       ),
     );
   }
+}
+
+void _openInboxItem(BuildContext context, WidgetRef ref, _InboxItem item) {
+  if (item.type != InboxType.refunds || item.refund == null) return;
+  _showRefundDecision(context, ref, item.refund!);
+}
+
+void _showRefundDecision(
+  BuildContext context,
+  WidgetRef ref,
+  RefundRequestDto refund,
+) {
+  BottomSheetModal.show(
+    context: context,
+    title: refund.orderCode.isEmpty
+        ? 'Refund #${refund.id}'
+        : refund.orderCode,
+    subtitle: refund.dateLabel.isEmpty ? null : refund.dateLabel,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: DesignTokens.paddingMd,
+          decoration: BoxDecoration(
+            color: DesignTokens.grayLight.withValues(alpha: 0.25),
+            borderRadius: DesignTokens.borderRadiusMd,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                refund.productName.isEmpty
+                    ? 'Refund request'
+                    : refund.productName,
+                style: DesignTokens.textBodyBold,
+              ),
+              const SizedBox(height: DesignTokens.spaceXs),
+              Text(refund.reason, style: DesignTokens.textBody),
+            ],
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceLg),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.check),
+                label: const Text('Approve'),
+                onPressed: refund.refundStatus == 1
+                    ? null
+                    : () async {
+                        await ref
+                            .read(refundsControllerProvider.notifier)
+                            .approve(refund.id);
+                        if (context.mounted) Navigator.pop(context);
+                      },
+              ),
+            ),
+            const SizedBox(width: DesignTokens.spaceSm),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.close),
+                label: const Text('Reject'),
+                onPressed: refund.refundStatus == 2
+                    ? null
+                    : () async {
+                        await ref
+                            .read(refundsControllerProvider.notifier)
+                            .reject(refund.id);
+                        if (context.mounted) Navigator.pop(context);
+                      },
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
 class _Actions extends ConsumerWidget {
@@ -537,6 +647,42 @@ class _Actions extends ConsumerWidget {
           await ref
               .read(ordersControllerProvider.notifier)
               .updateStatus(orderId: id, delivery: next, payment: '');
+        },
+      );
+    }
+
+    if (item.type == InboxType.refunds) {
+      final refund = item.refund;
+      if (refund == null) return const SizedBox.shrink();
+      return PopupMenuButton<String>(
+        icon: const Icon(Icons.more_horiz),
+        itemBuilder: (context) => [
+          if (refund.refundStatus != 1)
+            const PopupMenuItem(value: 'approve', child: Text('Approve')),
+          if (refund.refundStatus != 2)
+            const PopupMenuItem(value: 'reject', child: Text('Reject')),
+          const PopupMenuItem(
+            value: 'open_refunds',
+            child: Text('Open refunds'),
+          ),
+        ],
+        onSelected: (action) async {
+          switch (action) {
+            case 'approve':
+              await ref
+                  .read(refundsControllerProvider.notifier)
+                  .approve(refund.id);
+              break;
+            case 'reject':
+              await ref
+                  .read(refundsControllerProvider.notifier)
+                  .reject(refund.id);
+              break;
+            case 'open_refunds':
+              if (!context.mounted) return;
+              ref.read(routerProvider).go('/home/more/refunds');
+              break;
+          }
         },
       );
     }
@@ -662,6 +808,8 @@ class _TypeChips extends StatelessWidget {
             const SizedBox(width: 8),
             _chip(InboxType.bookings, 'Bookings'),
             const SizedBox(width: 8),
+            _chip(InboxType.refunds, 'Refunds'),
+            const SizedBox(width: 8),
             _chip(InboxType.stock, 'Stock'),
             const SizedBox(width: 8),
             _chip(InboxType.alerts, 'Alerts'),
@@ -679,6 +827,25 @@ class _TypeChips extends StatelessWidget {
       onSelected: (_) => onSelect(type),
     );
   }
+}
+
+String _bucketLabel(InboxBucket bucket) {
+  return switch (bucket) {
+    InboxBucket.needsAction => 'needs action',
+    InboxBucket.inProgress => 'in progress',
+    InboxBucket.completed => 'completed',
+  };
+}
+
+String _typeLabel(InboxType type) {
+  return switch (type) {
+    InboxType.all => 'all types',
+    InboxType.orders => 'orders',
+    InboxType.bookings => 'bookings',
+    InboxType.refunds => 'refunds',
+    InboxType.alerts => 'alerts',
+    InboxType.stock => 'stock',
+  };
 }
 
 class _EmptyState extends StatelessWidget {
@@ -702,7 +869,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Nothing in ${bucket.name} for ${type.name}.',
+          'Nothing in ${_bucketLabel(bucket)} for ${_typeLabel(type)}.',
           style: DesignTokens.textSmall,
           textAlign: TextAlign.center,
         ),

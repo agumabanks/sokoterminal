@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +11,7 @@ import '../db/app_database.dart';
 import '../network/seller_api.dart';
 import '../storage/secure_storage.dart';
 import '../sync/sync_service.dart';
+import 'pin_hash_service.dart';
 import 'pos_staff_prefs.dart';
 
 class PosSessionState {
@@ -31,7 +33,11 @@ class PosSessionState {
   final bool loading;
   final String? error;
 
-  bool get isActive => token != null && token!.trim().isNotEmpty;
+  bool get isActive {
+    if (token == null || token!.trim().isEmpty) return false;
+    if (expiresAt == null) return true;
+    return expiresAt!.isAfter(DateTime.now());
+  }
   bool get isManager => (staffRole ?? '').toLowerCase() == 'manager';
 
   PosSessionState copyWith({
@@ -70,6 +76,7 @@ final posSessionProvider =
         db: db,
         syncService: sync,
         prefs: prefs,
+        pinHash: PinHashService(storage: storage),
       )..load();
     });
 
@@ -80,11 +87,13 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     required AppDatabase db,
     required SyncService syncService,
     required SharedPreferences prefs,
+    required PinHashService pinHash,
   }) : _storage = storage,
        _api = api,
        _db = db,
        _sync = syncService,
        _prefs = prefs,
+       _pinHash = pinHash,
        super(PosSessionState.empty);
 
   final SecureStorage _storage;
@@ -92,6 +101,7 @@ class PosSessionController extends StateNotifier<PosSessionState> {
   final AppDatabase _db;
   final SyncService _sync;
   final SharedPreferences _prefs;
+  final PinHashService _pinHash;
 
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
@@ -100,6 +110,20 @@ class PosSessionController extends StateNotifier<PosSessionState> {
     final cachedStaffName = await _storage.readPosSessionStaffName();
     final cachedStaffRole = await _storage.readPosSessionStaffRole();
     final cachedExpiresAt = await _storage.readPosSessionExpiresAt();
+
+    // Offline sessions bypass backend validation
+    if (token != null && token.startsWith('OFFLINE_')) {
+      state = PosSessionState(
+        token: token,
+        expiresAt: cachedExpiresAt,
+        staffId: cachedStaffId,
+        staffName: cachedStaffName,
+        staffRole: cachedStaffRole,
+        loading: false,
+      );
+      return;
+    }
+
     try {
       final res = await _api.posSessionMe();
       final data = res.data;
@@ -160,10 +184,35 @@ class PosSessionController extends StateNotifier<PosSessionState> {
           staffRole: staffRole,
           expiresAt: expiresAt,
         );
-        await _upsertLocalStaff(staffId: staffId, staffName: staffName);
+        await _storage.writePosStaffRole(staffId, staffRole);
+        await _upsertLocalStaff(
+          staffId: staffId,
+          staffName: staffName,
+        );
       }
-    } catch (_) {
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
+        await _storage.deletePosSessionToken();
+        await _storage.deletePosSessionMeta();
+        state = PosSessionState.empty;
+        return;
+      }
       // Best-effort: keep the token (offline) but avoid blocking the UI.
+      if (token == null || token.trim().isEmpty) {
+        state = PosSessionState.empty;
+        return;
+      }
+      state = PosSessionState(
+        token: token,
+        expiresAt: cachedExpiresAt,
+        staffId: cachedStaffId,
+        staffName: cachedStaffName,
+        staffRole: cachedStaffRole,
+      );
+      await _upsertCachedStaff(cachedStaffId, cachedStaffName);
+    } catch (e) {
+      // Non-network/storage parsing failures should not block the UI.
+      debugPrint('[PosSession] load failed: $e');
       if (token == null || token.trim().isEmpty) {
         state = PosSessionState.empty;
         return;
@@ -228,7 +277,13 @@ class PosSessionController extends StateNotifier<PosSessionState> {
           staffRole: staffRole,
           expiresAt: expiresAt,
         );
-        await _upsertLocalStaff(staffId: staffId, staffName: staffName);
+        await _storage.writePosStaffRole(staffId, staffRole);
+        final hashedPin = await _pinHash.hash(trimmed);
+        await _upsertLocalStaff(
+          staffId: staffId,
+          staffName: staffName,
+          pin: hashedPin,
+        );
       }
 
       state = PosSessionState(
@@ -240,11 +295,64 @@ class PosSessionController extends StateNotifier<PosSessionState> {
         loading: false,
       );
 
-      // If the user just fixed a missing/expired session, retry blocked ops that
-      // are recoverable by re-authenticating a POS session.
       unawaited(_retryRecoverableBlockedOps());
       unawaited(_sync.syncNow());
       return true;
+    } on DioException catch (e) {
+      // Offline fallback: verify against locally cached staff PIN
+      final isOffline =
+          e.response == null ||
+          e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.unknown;
+      if (isOffline) {
+        final hashedPin = await _pinHash.hash(trimmed);
+        final localStaff = await _db.getStaffByPin(hashedPin);
+        if (localStaff != null) {
+          final staffId = int.tryParse(localStaff.id);
+          final staffName = localStaff.name;
+          final staffRole =
+              staffId != null
+                  ? await _storage.readPosStaffRole(staffId)
+                  : null;
+          final resolvedRole = staffRole ?? 'cashier';
+
+          if (requiredRole != null &&
+              resolvedRole.toLowerCase() != requiredRole.toLowerCase()) {
+            state = prevState.copyWith(
+              loading: false,
+              error: 'This action requires a $requiredRole PIN.',
+            );
+            return false;
+          }
+
+          final offlineToken =
+              'OFFLINE_${localStaff.id}_${DateTime.now().millisecondsSinceEpoch}';
+          if (staffId != null) {
+            await _storage.writePosSessionToken(offlineToken);
+            await _storage.writePosSessionMeta(
+              staffId: staffId,
+              staffName: staffName,
+              staffRole: resolvedRole,
+              expiresAt: null,
+            );
+          }
+
+          state = PosSessionState(
+            token: offlineToken,
+            staffId: staffId,
+            staffName: staffName,
+            staffRole: resolvedRole,
+            loading: false,
+          );
+          return true;
+        }
+      }
+
+      state = prevState.copyWith(
+        loading: false,
+        error: _extractErrorMessage(e),
+      );
+      return false;
     } catch (e) {
       state = prevState.copyWith(
         loading: false,
@@ -261,7 +369,8 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       if (token != null && token.trim().isNotEmpty) {
         await _api.endPosSession();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[PosSession] end session API call failed: $e');
       // Best effort.
     } finally {
       await _storage.deletePosSessionToken();
@@ -279,12 +388,17 @@ class PosSessionController extends StateNotifier<PosSessionState> {
   Future<void> _upsertLocalStaff({
     required int staffId,
     required String staffName,
+    String? pin,
   }) async {
     final now = DateTime.now().toUtc();
     await _db.upsertStaff(
       StaffCompanion.insert(
         id: drift.Value(staffId.toString()),
         name: staffName,
+        pin:
+            pin == null
+                ? const drift.Value.absent()
+                : drift.Value(pin),
         roleId: const drift.Value.absent(),
         active: const drift.Value(true),
         updatedAt: drift.Value(now),

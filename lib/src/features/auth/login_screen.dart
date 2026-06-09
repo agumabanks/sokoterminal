@@ -1,3 +1,4 @@
+import '../../core/util/haptics.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:dio/dio.dart';
@@ -37,13 +38,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _usePassword = false; // Optional fallback when an account has PIN.
   bool _obscureText = true;
 
+  int _failedAttempts = 0;
+  int _cooldownSeconds = 0;
+  Timer? _cooldownTimer;
+
   // Animations
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // Minimal “Apple-ish” palette
-  static const Color _bg = Color(0xFF000000);
-  static const Color _accent = Color(0xFF6C63FF);
+  // Soko brand palette — aligned with DesignTokens
+  static const Color _bg = Color(0xFF02040A);
+  static const Color _accent = Color(0xFF0EBE7E);
   static const Color _surface = Color(0xFF0B0B10);
   static const Color _stroke = Color(0x22FFFFFF);
 
@@ -87,12 +92,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _fadeController.dispose();
     _phoneFocus.dispose();
     _authFocus.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
   void _clearErrorOnInput() {
     if (_errorMessage == null || !mounted) return;
     setState(() => _errorMessage = null);
+  }
+
+  void _startCooldown() {
+    _cooldownSeconds = 30;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _cooldownSeconds--;
+        if (_cooldownSeconds <= 0) timer.cancel();
+      });
+    });
+    if (mounted) setState(() {});
   }
 
   String get _normalizedPhone {
@@ -163,7 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _isLoading = true;
       _errorMessage = null;
     });
-    HapticFeedback.lightImpact();
+    Haptics.soft();
 
     try {
       final auth = ref.read(authControllerProvider.notifier);
@@ -204,8 +226,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         context.go('/register', extra: {'phone': _normalizedPhone});
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError(_humanizeError(e));
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(_humanizeError(e));
+      }
     }
   }
 
@@ -233,7 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _isLoading = true;
       _errorMessage = null;
     });
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
 
     try {
       final auth = ref.read(authControllerProvider.notifier);
@@ -250,30 +274,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
       final state = ref.read(authControllerProvider);
       if (state.status == AuthStatus.authenticated) {
+        _failedAttempts = 0;
         if (!usePinAuth && !_hasPin) {
+          // Offer PIN setup but allow skipping — don't block access
           final configured = await _promptPinSetupAfterPasswordLogin(input);
           if (!mounted) return;
-          if (!configured) {
-            setState(() => _isLoading = false);
-            _showError('PIN setup is required before continuing.');
-            return;
+          if (configured) {
+            setState(() {
+              _hasPin = true;
+              _usePassword = false;
+            });
           }
-          setState(() {
-            _hasPin = true;
-            _usePassword = false;
-          });
+          // If not configured (skipped), proceed to home with password-only login
         }
         if (!mounted) return;
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
         context.go('/home/checkout');
       } else {
         setState(() => _isLoading = false);
         _showError(state.message ?? 'Authentication failed');
         _pinController.clear();
+        _failedAttempts++;
+        if (_failedAttempts >= 5) {
+          _startCooldown();
+        }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError(_humanizeError(e));
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError(_humanizeError(e));
+        _failedAttempts++;
+        if (_failedAttempts >= 5) {
+          _startCooldown();
+        }
+      }
     }
   }
 
@@ -301,7 +335,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final cleaned = message.trim();
     if (cleaned.isEmpty) return;
     setState(() => _errorMessage = cleaned);
-    HapticFeedback.heavyImpact();
+    Haptics.warning();
   }
 
   Future<bool> _promptPinSetupAfterPasswordLogin(String password) async {
@@ -312,7 +346,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     final result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -365,7 +399,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'For account security, set a 6-digit PIN now. You can login with phone using password or PIN.',
+                    'Set a 6-digit PIN for faster logins. You can also skip this and always log in with your password.',
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
@@ -405,14 +439,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 TextButton(
                   onPressed: saving
                       ? null
-                      : () async {
-                          await ref
-                              .read(authControllerProvider.notifier)
-                              .logout();
-                          if (!dialogContext.mounted) return;
-                          Navigator.of(dialogContext).pop(false);
-                        },
-                  child: const Text('Sign out'),
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text(
+                    'Skip for now',
+                    style: TextStyle(color: Colors.white54),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: saving ? null : submit,
@@ -563,25 +594,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Welcome',
+              'Soko24',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.95),
                 fontSize: 42,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
                 letterSpacing: -1.2,
                 height: 1.05,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
-              'Enter your phone number to continue.',
+              'Seller Terminal',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.62),
-                fontSize: 16,
-                height: 1.35,
+                color: _accent.withOpacity(0.95),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.6,
               ),
             ),
-            const SizedBox(height: 44),
+            const SizedBox(height: 14),
+            Text(
+              'Sell in-store, online, and offline — one terminal for your whole business.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.62),
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 22),
+            const _LoginFeatureRow(),
+            const SizedBox(height: 36),
+            Text(
+              'Enter your phone number',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
             _buildPhoneField(),
             const SizedBox(height: 28),
             _MainButton(
@@ -666,22 +718,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             _buildAuthField(),
             const SizedBox(height: 28),
             _MainButton(
-              text: (_hasPin && !_usePassword) ? 'Unlock' : 'Login',
-              isLoading: _isLoading,
-              onTap: _handleAuthSubmit,
+              text: (_hasPin && !_usePassword)
+                  ? 'Unlock'
+                  : _cooldownSeconds > 0
+                      ? 'Wait $_cooldownSeconds s'
+                      : 'Login',
+              isLoading: _isLoading || _cooldownSeconds > 0,
+              onTap: () { _handleAuthSubmit(); },
             ),
             if (_hasPin) ...[
               const SizedBox(height: 8),
               TextButton(
-                onPressed: _isLoading
+                onPressed: (_isLoading || _cooldownSeconds > 0)
                     ? null
-                    : () => setState(() {
-                        _usePassword = !_usePassword;
-                        _pinController.clear();
-                      }),
+                    : () {
+                        setState(() {
+                          _usePassword = !_usePassword;
+                          _pinController.clear();
+                        });
+                      },
                 child: Text(
                   _usePassword ? 'Use PIN instead' : 'Use password instead',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+                ),
+              ),
+            ],
+            if (_usePassword) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: (_isLoading || _cooldownSeconds > 0)
+                    ? null
+                    : () => context.push('/forgot-password'),
+                child: Text(
+                  'Forgot password?',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
                 ),
               ),
             ],
@@ -932,6 +1002,55 @@ class _GlassField extends StatelessWidget {
   }
 }
 
+class _LoginFeatureRow extends StatelessWidget {
+  const _LoginFeatureRow();
+
+  static const _accent = Color(0xFF0EBE7E);
+  static const _stroke = Color(0x22FFFFFF);
+
+  static const _items = [
+    (Icons.point_of_sale_rounded, 'POS checkout'),
+    (Icons.sync_rounded, 'Instant sync'),
+    (Icons.brush_rounded, 'Soko Studio'),
+    (Icons.wifi_off_rounded, 'Works offline'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _items
+          .map(
+            (item) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _stroke),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(item.$1, size: 14, color: _accent),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.$2,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
 /// Soft background glow blob
 class _GlowBlob extends StatelessWidget {
   const _GlowBlob({required this.color, required this.size});
@@ -983,9 +1102,9 @@ class _MainButtonState extends State<_MainButton> {
     return GestureDetector(
       onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
       onTapCancel: disabled ? null : () => setState(() => _pressed = false),
-      onTapUp: disabled
+      onTap: disabled
           ? null
-          : (_) {
+          : () {
               setState(() => _pressed = false);
               widget.onTap();
             },
@@ -999,7 +1118,7 @@ class _MainButtonState extends State<_MainButton> {
             height: 56,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFF0EBE7E),
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
@@ -1020,13 +1139,13 @@ class _MainButtonState extends State<_MainButton> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.black,
+                      color: Colors.white,
                     ),
                   )
                 : Text(
                     widget.text,
                     style: const TextStyle(
-                      color: Colors.black,
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.2,

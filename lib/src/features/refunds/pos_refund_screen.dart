@@ -79,11 +79,13 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
       }
       final results = await q.get();
 
+      if (!mounted) return;
       setState(() {
         _searchResults = results;
         _searching = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _searching = false;
@@ -99,6 +101,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         db.ledgerLines,
       )..where((t) => t.entryId.equals(sale.id))).get();
 
+      if (!mounted) return;
       setState(() {
         _selectedSale = sale;
         _saleLines = lines;
@@ -110,6 +113,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -236,24 +240,30 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         );
       }
 
-      // Queue sync
-      await sync.enqueue('ledger_push', {
-        'entry_id': refundId,
-        'idempotency_key': idempotencyKey,
-        'type': 'refund',
-        'original_entry_id': _selectedSale!.id,
-        'subtotal': _refundTotal,
-        'discount': 0,
-        'tax': 0,
-        'total': _refundTotal,
-        'note': refundNote,
-        'occurred_at': occurredAt.toIso8601String(),
-        'customer_id': _selectedSale!.customerId,
-        'payments': [
-          {'method': 'cash', 'amount': _refundTotal},
-        ],
-        'lines': apiLines,
-      });
+      // Queue sync (best-effort; local audit log is the source of truth)
+      try {
+        await sync.enqueue('ledger_push', {
+          'entry_id': refundId,
+          'idempotency_key': idempotencyKey,
+          'type': 'refund',
+          'original_entry_id': _selectedSale!.id,
+          'subtotal': _refundTotal,
+          'discount': 0,
+          'tax': 0,
+          'total': _refundTotal,
+          'note': refundNote,
+          'occurred_at': occurredAt.toIso8601String(),
+          'customer_id': _selectedSale!.customerId,
+          'payments': [
+            {'method': 'cash', 'amount': _refundTotal},
+          ],
+          'lines': apiLines,
+        });
+        unawaited(sync.syncNow());
+      } catch (e) {
+        debugPrint('[Refund] Ledger sync enqueue failed: $e');
+      }
+
       await db.recordAuditLog(
         actorStaffId: actorStaffId,
         action: 'refund',
@@ -266,7 +276,6 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           if (refundNote.trim().isNotEmpty) 'note': refundNote.trim(),
         },
       );
-      unawaited(sync.syncNow());
 
       if (!mounted) return;
 

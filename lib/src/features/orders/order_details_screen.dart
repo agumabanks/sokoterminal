@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
+import '../../core/theme/design_tokens.dart';
+import '../../core/util/formatters.dart';
 import '../invoices/invoice_providers.dart';
+import 'marketplace_order.dart';
 import 'orders_controller.dart';
 
 class OrderDetailsScreen extends ConsumerStatefulWidget {
@@ -12,14 +16,14 @@ class OrderDetailsScreen extends ConsumerStatefulWidget {
   });
 
   final int orderId;
-  final Map<String, dynamic>? initialData;
+  final MarketplaceOrder? initialData;
 
   @override
   ConsumerState<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
 class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
-  Map<String, dynamic>? _order;
+  MarketplaceOrder? _order;
   bool _loading = true;
   bool _requestingSokoDelivery = false;
 
@@ -56,193 +60,158 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       );
     }
 
-    final code =
-        _order!['order_code']?.toString() ??
-        _order!['code']?.toString() ??
-        _order!['id']?.toString() ??
-        'N/A';
-    final dateStr = _order!['created_at']?.toString();
-    final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-    final formattedDate = date != null
-        ? DateFormat('MMM d, y HH:mm').format(date)
+    final order = _order!;
+    final code = order.displayCode;
+    final formattedDate = order.orderedAt != null
+        ? DateFormat('MMM d, y HH:mm').format(order.orderedAt!.toLocal())
         : '-';
 
     return Scaffold(
+      backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text('Order #$code'),
+        title: Text('Order #$code', style: DesignTokens.textTitleLight),
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Share invoice PDF',
-            onPressed: _order == null
-                ? null
-                : () async {
-                    final current = _order;
-                    if (current == null) return;
-                    try {
-                      await ref
-                          .read(invoiceServiceProvider)
-                          .shareOrderInvoicePdf(current);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Invoice export failed: $e')),
-                      );
-                    }
-                  },
+            onPressed: () async {
+              try {
+                await ref
+                    .read(invoiceServiceProvider)
+                    .shareOrderInvoicePdf(order.toJson());
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Invoice export failed: $e')),
+                );
+              }
+            },
           ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchDetails),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: DesignTokens.paddingMd,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(code, formattedDate),
-            const SizedBox(height: 24),
-            _buildActions(context),
-            const SizedBox(height: 24),
+            _buildHeader(formattedDate, order.displayTotal),
+            const SizedBox(height: DesignTokens.spaceLg),
+            _buildActions(context, order),
+            const SizedBox(height: DesignTokens.spaceLg),
             _buildSectionTitle('Items'),
-            _buildItemsList(),
-            const SizedBox(height: 24),
+            _buildItemsList(order),
+            const SizedBox(height: DesignTokens.spaceLg),
             _buildSectionTitle('Payment & Shipping'),
-            const SizedBox(height: 8),
+            const SizedBox(height: DesignTokens.spaceSm),
             _buildInfoCard([
               _InfoRow(
                 'Payment Status',
-                _order!['payment_status']?.toString().toUpperCase() ??
-                    'PENDING',
+                order.normalizedPaymentStatus.toUpperCase(),
                 isBadge: true,
-                color: _getStatusColor(
-                  _order!['payment_status']?.toString() ?? '',
-                ),
+                color: _getStatusColor(order.normalizedPaymentStatus),
               ),
               _InfoRow(
                 'Delivery Status',
-                (_order!['delivery_status']?.toString() ?? 'pending')
-                    .toUpperCase()
-                    .replaceAll('_', ' '),
+                order.normalizedDeliveryStatus.toUpperCase().replaceAll('_', ' '),
                 isBadge: true,
-                color: _getStatusColor(
-                  _order!['delivery_status']?.toString() ?? '',
-                ),
+                color: _getStatusColor(order.normalizedDeliveryStatus),
               ),
               _InfoRow(
                 'Payment Method',
-                _order!['payment_type']?.toString() ?? '-',
+                order.displayPaymentMethod.isEmpty ? '-' : order.displayPaymentMethod,
               ),
               _InfoRow(
                 'Shipping Cost',
-                (_order!['shipping_cost'] ?? 'UGX 0').toString(),
+                (order.shippingCost ?? 'UGX 0').toString(),
               ),
-              if ((_order!['soko_delivery_request'] as Map?) != null)
+              if (order.sokoDeliveryRequest != null)
                 _InfoRow(
                   'Soko24 Delivery',
-                  ((_order!['soko_delivery_request'] as Map)['status'] ?? 'pending')
+                  (order.sokoDeliveryRequest!['status'] ?? 'pending')
                       .toString()
                       .toUpperCase(),
                   isBadge: true,
                   color: _getStatusColor(
-                    ((_order!['soko_delivery_request'] as Map)['status'] ?? '')
-                        .toString(),
+                    (order.sokoDeliveryRequest!['status'] ?? '').toString(),
                   ),
                 ),
             ]),
-            const SizedBox(height: 24),
+            const SizedBox(height: DesignTokens.spaceLg),
             _buildSectionTitle('Customer'),
-            const SizedBox(height: 8),
+            const SizedBox(height: DesignTokens.spaceSm),
             _buildInfoCard([
-              _InfoRow(
-                'Name',
-                _order!['customer_name']?.toString() ??
-                    _order!['shipping_address']?['name'] ??
-                    '-',
-              ),
-              _InfoRow(
-                'Phone',
-                _order!['customer_phone']?.toString() ??
-                    _order!['shipping_address']?['phone'] ??
-                    '-',
-              ),
+              _InfoRow('Name', order.displayCustomer),
+              _InfoRow('Phone', order.displayPhone),
               _InfoRow(
                 'Address',
-                _order!['shipping_address']?['address'] ?? '-',
+                order.shippingAddress?['address']?.toString() ?? '-',
               ),
-              _InfoRow('City', _order!['shipping_address']?['city'] ?? '-'),
+              _InfoRow(
+                'City',
+                order.shippingAddress?['city']?.toString() ?? '-',
+              ),
             ]),
-            const SizedBox(height: 32),
+            const SizedBox(height: DesignTokens.spaceXl),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(String code, String date) {
-    final total =
-        double.tryParse(_order!['grand_total']?.toString() ?? '0') ?? 0;
+  Widget _buildHeader(String date, double total) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Placed on $date', style: TextStyle(color: Colors.grey[600])),
-        const SizedBox(height: 8),
-        Text(
-          'UGX ${NumberFormat('#,###').format(total)}',
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
+        Text('Placed on $date', style: DesignTokens.textSmall),
+        const SizedBox(height: DesignTokens.spaceSm),
+        Text(total.toUgx(), style: DesignTokens.textMonoDisplay),
       ],
     );
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
+    return Text(title, style: DesignTokens.textTitle);
   }
 
-  Widget _buildActions(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildActions(BuildContext context, MarketplaceOrder order) {
+    return Container(
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceWhite,
+        borderRadius: DesignTokens.borderRadiusMd,
+        boxShadow: DesignTokens.shadowSm,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: DesignTokens.paddingMd,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Manage Order',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+            Text('Manage Order', style: DesignTokens.textBodyBold),
+            const SizedBox(height: DesignTokens.spaceMd),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.local_shipping),
                     label: const Text('Update Status'),
-                    onPressed: () => _showStatusModal(context),
+                    onPressed: () => _showStatusModal(context, order),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: DesignTokens.spaceSm + DesignTokens.spaceXs),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _canRequestSokoDelivery() && !_requestingSokoDelivery
+                    onPressed: order.canRequestSokoDelivery && !_requestingSokoDelivery
                         ? _requestSokoDelivery
                         : null,
                     icon: _requestingSokoDelivery
                         ? const SizedBox(
-                            width: 16,
-                            height: 16,
+                            width: DesignTokens.iconSm,
+                            height: DesignTokens.iconSm,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.delivery_dining_outlined),
                     label: Text(
-                      _hasSokoDeliveryRequest()
+                      order.hasSokoDeliveryRequest
                           ? 'Soko24 Requested'
                           : 'Request Soko24',
                     ),
@@ -250,29 +219,15 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: DesignTokens.spaceSm + DesignTokens.spaceXs),
             Text(
               'Use seller delivery for nearby buyers, or request Soko24 delivery for marketplace orders that need platform fulfillment.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: DesignTokens.textSmall,
             ),
           ],
         ),
       ),
     );
-  }
-
-  bool _hasSokoDeliveryRequest() {
-    final request = _order?['soko_delivery_request'];
-    return request is Map && request.isNotEmpty;
-  }
-
-  bool _canRequestSokoDelivery() {
-    if (_hasSokoDeliveryRequest()) return false;
-    final deliveryStatus = (_order?['delivery_status'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
-    return deliveryStatus != 'delivered' && deliveryStatus != 'cancelled';
   }
 
   Future<void> _requestSokoDelivery() async {
@@ -298,18 +253,17 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     }
   }
 
-  Widget _buildItemsList() {
-    final itemsRaw = _order!['order_items'] ?? _order!['items'];
-    final items = (itemsRaw is List ? itemsRaw : const [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    if (items.isEmpty) return const Text('No items found');
+  Widget _buildItemsList(MarketplaceOrder order) {
+    final items = order.orderItems.isNotEmpty ? order.orderItems : order.items;
+    if (items.isEmpty) {
+      return Text('No items found', style: DesignTokens.textBody);
+    }
 
-    return Card(
-      elevation: 0,
-      color: Colors.grey[50],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      decoration: BoxDecoration(
+        color: DesignTokens.canvasCloud,
+        borderRadius: DesignTokens.borderRadiusMd,
+      ),
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -317,33 +271,21 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final item = items[index];
-          final name =
-              item['product_name']?.toString() ??
-              item['name']?.toString() ??
-              'Item';
-          final qty = int.tryParse(item['quantity']?.toString() ?? '0') ?? 0;
-          final unitPrice = item['unit_price'] is num
-              ? (item['unit_price'] as num).toDouble()
-              : double.tryParse(item['unit_price']?.toString() ?? '') ?? 0;
-          final lineTotal = item['total'] is num
-              ? (item['total'] as num).toDouble()
-              : (unitPrice * qty);
-          final variant = item['variation']?.toString() ?? '';
+          final variant = item.variant ?? '';
 
           return ListTile(
-            title: Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            subtitle: variant.isNotEmpty ? Text(variant) : null,
+            title: Text(item.name, style: DesignTokens.textBodyBold),
+            subtitle: variant.isNotEmpty
+                ? Text(variant, style: DesignTokens.textSmall)
+                : null,
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('x$qty', style: TextStyle(color: Colors.grey[600])),
+                Text('x${item.quantity}', style: DesignTokens.textSmall),
                 Text(
-                  'UGX ${NumberFormat('#,###').format(lineTotal)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  item.lineTotal.toUgx(),
+                  style: DesignTokens.textMono,
                 ),
               ],
             ),
@@ -354,25 +296,23 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   }
 
   Widget _buildInfoCard(List<_InfoRow> rows) {
-    return Card(
-      elevation: 0,
-      color: Colors.grey[50],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      decoration: BoxDecoration(
+        color: DesignTokens.canvasCloud,
+        borderRadius: DesignTokens.borderRadiusMd,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: DesignTokens.paddingMd,
         child: Column(
           children: rows.map((row) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm + DesignTokens.spaceXs),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
                     width: 120,
-                    child: Text(
-                      row.label,
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
+                    child: Text(row.label, style: DesignTokens.textSmall),
                   ),
                   Expanded(
                     child: row.isBadge
@@ -380,31 +320,27 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
+                                  horizontal: DesignTokens.spaceSm,
+                                  vertical: DesignTokens.spaceXxs,
                                 ),
                                 decoration: BoxDecoration(
                                   color: row.color.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: DesignTokens.borderRadiusXs,
                                   border: Border.all(
                                     color: row.color.withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: Text(
                                   row.value,
-                                  style: TextStyle(
+                                  style: DesignTokens.textCaption.copyWith(
                                     color: row.color,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
                             ],
                           )
-                        : Text(
-                            row.value,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
+                        : Text(row.value, style: DesignTokens.textBodyBold),
                   ),
                 ],
               ),
@@ -415,7 +351,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     );
   }
 
-  void _showStatusModal(BuildContext context) {
+  void _showStatusModal(BuildContext context, MarketplaceOrder order) {
     final statuses = [
       'pending',
       'confirmed',
@@ -426,35 +362,25 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     ];
     final paymentStatuses = ['paid', 'unpaid'];
 
-    String delivery =
-        (_order!['delivery_status_raw'] ??
-                _order!['delivery_status'] ??
-                'pending')
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replaceAll(' ', '_');
-    String payment = _order!['payment_status']?.toString() ?? 'unpaid';
+    String delivery = order.normalizedDeliveryStatus;
+    String payment = order.normalizedPaymentStatus;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          left: 16,
-          right: 16,
-          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + DesignTokens.spaceMd,
+          left: DesignTokens.spaceMd,
+          right: DesignTokens.spaceMd,
+          top: DesignTokens.spaceMd,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Update Order Status',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
+            Text('Update Order Status', style: DesignTokens.textTitle),
+            const SizedBox(height: DesignTokens.spaceLg),
             DropdownButtonFormField<String>(
               initialValue: statuses.contains(delivery)
                   ? delivery
@@ -473,7 +399,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   .toList(),
               onChanged: (v) => delivery = v!,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: DesignTokens.spaceMd),
             DropdownButtonFormField<String>(
               initialValue: paymentStatuses.contains(payment)
                   ? payment
@@ -492,12 +418,15 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   .toList(),
               onChanged: (v) => payment = v!,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: DesignTokens.spaceLg),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
+                padding: DesignTokens.paddingVerticalSm.copyWith(
+                  top: DesignTokens.spaceMd,
+                  bottom: DesignTokens.spaceMd,
+                ),
+                backgroundColor: DesignTokens.ink,
+                foregroundColor: DesignTokens.canvas,
               ),
               onPressed: () async {
                 Navigator.pop(context);
@@ -508,7 +437,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       delivery: delivery,
                       payment: payment,
                     );
-                _fetchDetails(); // Refresh details
+                _fetchDetails();
               },
               child: const Text('Save Changes'),
             ),
@@ -523,14 +452,14 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       case 'paid':
       case 'delivered':
       case 'completed':
-        return Colors.green;
+        return DesignTokens.success;
       case 'pending':
       case 'unpaid':
-        return Colors.orange;
+        return DesignTokens.warning;
       case 'cancelled':
-        return Colors.red;
+        return DesignTokens.error;
       default:
-        return Colors.blue;
+        return DesignTokens.info;
     }
   }
 }
@@ -545,6 +474,6 @@ class _InfoRow {
     this.label,
     this.value, {
     this.isBadge = false,
-    this.color = Colors.black,
+    this.color = DesignTokens.ink,
   });
 }

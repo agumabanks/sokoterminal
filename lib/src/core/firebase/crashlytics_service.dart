@@ -1,27 +1,51 @@
 import 'dart:async';
+
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
+
+import '../telemetry/bug_logger.dart';
+import 'firebase_runtime.dart';
 
 /// Firebase Crashlytics service for error reporting
 class CrashlyticsService {
   CrashlyticsService._();
   static final instance = CrashlyticsService._();
 
-  final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
+  FirebaseCrashlytics? _crashlytics;
+
+  FirebaseCrashlytics? get _crashlyticsOrNull {
+    if (!FirebaseRuntime.instance.firebaseEnabled) return null;
+    return _crashlytics ??= FirebaseCrashlytics.instance;
+  }
 
   /// Initialize crashlytics and set up error handlers
   Future<void> init() async {
-    // Disable in debug mode to avoid noise
-    await _crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
 
-    // Pass Flutter errors to Crashlytics
+    // Disable in debug mode to avoid noise
+    await crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+
+    // Pass Flutter errors to Crashlytics + local bug logger for admin upload.
     FlutterError.onError = (errorDetails) {
-      _crashlytics.recordFlutterFatalError(errorDetails);
+      crashlytics.recordFlutterFatalError(errorDetails);
+      unawaited(
+        BugLogger.instance.logCrash(
+          error: errorDetails.exception,
+          stackTrace: errorDetails.stack ?? StackTrace.current,
+        ),
+      );
     };
 
-    // Pass async errors to Crashlytics
+    // Pass async errors to Crashlytics + bug logger.
     PlatformDispatcher.instance.onError = (error, stack) {
-      _crashlytics.recordError(error, stack, fatal: true);
+      crashlytics.recordError(error, stack, fatal: true);
+      unawaited(
+        BugLogger.instance.logCrash(
+          error: error,
+          stackTrace: stack,
+        ),
+      );
       return true;
     };
   }
@@ -32,26 +56,36 @@ class CrashlyticsService {
     StackTrace? stack, {
     String? reason,
   }) async {
-    await _crashlytics.recordError(exception, stack, reason: reason);
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
+    await crashlytics.recordError(exception, stack, reason: reason);
   }
 
   /// Log a message (appears in crash reports)
   Future<void> log(String message) async {
-    await _crashlytics.log(message);
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
+    await crashlytics.log(message);
   }
 
   /// Set user identifier for crash reports
   Future<void> setUserId(String userId) async {
-    await _crashlytics.setUserIdentifier(userId);
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
+    await crashlytics.setUserIdentifier(userId);
   }
 
   /// Set custom key-value for crash reports
   Future<void> setCustomKey(String key, dynamic value) async {
-    await _crashlytics.setCustomKey(key, value);
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
+    await crashlytics.setCustomKey(key, value);
   }
 
   /// Force a test crash (for testing only)
   void testCrash() {
-    _crashlytics.crash();
+    final crashlytics = _crashlyticsOrNull;
+    if (crashlytics == null) return;
+    crashlytics.crash();
   }
 }

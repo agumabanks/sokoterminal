@@ -144,6 +144,7 @@ void main() {
       receiptPaymentMethodsJson:
           '{"cash":true,"bank_transfer":true,"mobile_money":true}',
       deliveryProfileJson: '{"enabled":true,"pricing_mode":"flat"}',
+      verificationStatus: 0,
       updatedAt: DateTime.utc(2026, 3, 7),
       synced: true,
     );

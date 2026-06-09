@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../core/sync/sync_status_provider.dart';
 import '../core/sync/sync_service.dart';
 import '../core/theme/design_tokens.dart';
@@ -12,89 +11,74 @@ class SyncStatusBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(syncStatusProvider);
 
-    if (status.state == SyncState.idle && status.pendingCount == 0) {
-      return const SizedBox.shrink();
-    }
+    final bool isVisible =
+        status.state == SyncState.syncing || status.state == SyncState.error;
 
-    Color bgColor;
-    IconData icon;
-    String label;
-    bool showProgress = false;
-
+    Widget bar;
     switch (status.state) {
       case SyncState.syncing:
-        bgColor = Colors.blue.shade700;
-        icon = Icons.sync;
-        label = status.message ?? 'Syncing your data...';
-        showProgress = true;
+        bar = const LinearProgressIndicator(
+          minHeight: 2,
+          backgroundColor: Colors.transparent,
+          valueColor: AlwaysStoppedAnimation<Color>(DesignTokens.brandAccent),
+        );
         break;
       case SyncState.error:
-        bgColor = Colors.red.shade700;
-        icon = Icons.sync_problem;
-        label = 'Sync issue: ${status.message}';
+        bar = const _PulsingErrorBar();
         break;
       case SyncState.offline:
-        bgColor = Colors.orange.shade800;
-        icon = Icons.cloud_off;
-        label = 'Offline: ${status.pendingCount} items waiting to sync';
-        break;
       case SyncState.idle:
-        if (status.pendingCount > 0) {
-          bgColor = Colors.blueGrey;
-          icon = Icons.cloud_queue;
-          label = '${status.pendingCount} items queued for sync';
-        } else {
-          return const SizedBox.shrink();
-        }
+        bar = const SizedBox.shrink();
+        break;
     }
 
     return GestureDetector(
       onTap: () => ref.read(syncServiceProvider).syncNow(),
-      child: Container(
+      child: AnimatedContainer(
+        duration: DesignTokens.durationFast,
+        curve: DesignTokens.curveStandard,
+        height: isVisible ? 2 : 0,
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceMd,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(color: bgColor),
-        child: Row(
-          children: [
-            if (showProgress)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            else
-              Icon(icon, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (status.lastSyncTime != null && status.state == SyncState.idle)
-              Text(
-                'Synced ${DateFormat('HH:mm').format(status.lastSyncTime!)}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontSize: 10,
-                ),
-              ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: Colors.white70, size: 14),
-          ],
-        ),
+        color: Colors.transparent,
+        child: isVisible ? bar : null,
+      ),
+    );
+  }
+}
+
+class _PulsingErrorBar extends StatefulWidget {
+  const _PulsingErrorBar();
+
+  @override
+  State<_PulsingErrorBar> createState() => _PulsingErrorBarState();
+}
+
+class _PulsingErrorBarState extends State<_PulsingErrorBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller.drive(Tween<double>(begin: 0.4, end: 1.0)),
+      child: Container(
+        height: 2,
+        color: DesignTokens.error,
       ),
     );
   }

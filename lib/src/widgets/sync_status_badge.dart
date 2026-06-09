@@ -14,8 +14,8 @@ enum SyncStatus {
   failed, // Has failed operations
 }
 
-/// Provider that watches sync queue status
-final syncStatusProvider = StreamProvider<SyncStatusData>((ref) {
+/// Provider that watches sync queue status (detailed data for badge & sheet).
+final syncBadgeDataProvider = StreamProvider<SyncStatusData>((ref) {
   final db = ref.watch(appDatabaseProvider);
 
   // Watch the SyncOps table for changes
@@ -83,7 +83,7 @@ class SyncStatusBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statusAsync = ref.watch(syncStatusProvider);
+    final statusAsync = ref.watch(syncBadgeDataProvider);
 
     return statusAsync.when(
       data: (data) => _buildBadge(context, data, ref),
@@ -93,38 +93,21 @@ class SyncStatusBadge extends ConsumerWidget {
   }
 
   Widget _buildBadge(BuildContext context, SyncStatusData data, WidgetRef ref) {
-    // Don't show if everything is synced and no pending
-    if (data.status == SyncStatus.synced && data.totalOps == 0) {
+    // WhatsApp-style: only show badge when something is actually wrong.
+    // Pending ops sync automatically — no need to show a badge.
+    if (data.status != SyncStatus.failed) {
       return const SizedBox.shrink();
     }
 
     return GestureDetector(
       onTap: onTap ?? () => _showSyncDetails(context, ref),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: _getBackgroundColor(data.status),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _getIcon(data.status),
-            if (data.pendingCount > 0 || data.failedCount > 0) ...[
-              const SizedBox(width: 4),
-              Text(
-                data.failedCount > 0
-                    ? '${data.failedCount}'
-                    : '${data.pendingCount}',
-                style: TextStyle(
-                  color: _getTextColor(data.status),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ],
+        width: 8,
+        height: 8,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: const BoxDecoration(
+          color: DesignTokens.error,
+          shape: BoxShape.circle,
         ),
       ),
     );
@@ -193,7 +176,7 @@ class SyncDetailsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statusAsync = ref.watch(syncStatusProvider);
+    final statusAsync = ref.watch(syncBadgeDataProvider);
     final sync = ref.read(syncServiceProvider);
 
     return DraggableScrollableSheet(
@@ -445,8 +428,9 @@ class _SyncOpCard extends StatelessWidget {
 
   IconData _getOpIcon(String opType) {
     if (opType.contains('ledger')) return Icons.receipt_long;
-    if (opType.contains('item') || opType.contains('product'))
+    if (opType.contains('item') || opType.contains('product')) {
       return Icons.inventory_2;
+    }
     if (opType.contains('service')) return Icons.handyman;
     if (opType.contains('customer')) return Icons.person;
     if (opType.contains('quotation')) return Icons.description;

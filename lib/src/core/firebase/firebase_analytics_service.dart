@@ -1,15 +1,31 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'firebase_runtime.dart';
+
 /// Firebase Analytics service for tracking user events
 class FirebaseAnalyticsService {
   FirebaseAnalyticsService._();
   static final instance = FirebaseAnalyticsService._();
 
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  FirebaseAnalytics? _analytics;
 
-  FirebaseAnalyticsObserver get observer =>
-      FirebaseAnalyticsObserver(analytics: _analytics);
+  FirebaseAnalytics? get _analyticsOrNull {
+    if (!FirebaseRuntime.instance.firebaseEnabled) return null;
+    return _analytics ??= FirebaseAnalytics.instance;
+  }
+
+  FirebaseAnalyticsObserver? get observer {
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return null;
+    return FirebaseAnalyticsObserver(analytics: analytics);
+  }
+
+  Future<void> init() async {
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.setAnalyticsCollectionEnabled(true);
+  }
 
   /// Track sale completed
   Future<void> logSaleCompleted({
@@ -17,7 +33,9 @@ class FirebaseAnalyticsService {
     required int itemCount,
     String? paymentMethod,
   }) async {
-    await _analytics.logEvent(
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logEvent(
       name: 'sale_completed',
       parameters: {
         'amount': amount,
@@ -29,7 +47,9 @@ class FirebaseAnalyticsService {
 
   /// Track refund issued
   Future<void> logRefundIssued({required double amount}) async {
-    await _analytics.logEvent(
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logEvent(
       name: 'refund_issued',
       parameters: {'amount': amount},
     );
@@ -37,7 +57,9 @@ class FirebaseAnalyticsService {
 
   /// Track contact synced
   Future<void> logContactSynced({required int count}) async {
-    await _analytics.logEvent(
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logEvent(
       name: 'contacts_synced',
       parameters: {'count': count},
     );
@@ -45,7 +67,9 @@ class FirebaseAnalyticsService {
 
   /// Track template changed
   Future<void> logTemplateChanged({required String templateId}) async {
-    await _analytics.logEvent(
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logEvent(
       name: 'template_changed',
       parameters: {'template_id': templateId},
     );
@@ -53,16 +77,22 @@ class FirebaseAnalyticsService {
 
   /// Track screen view
   Future<void> logScreenView(String screenName) async {
-    await _analytics.logScreenView(screenName: screenName);
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logScreenView(screenName: screenName);
   }
 
   /// Set user properties
   Future<void> setUserId(String userId) async {
-    await _analytics.setUserId(id: userId);
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.setUserId(id: userId);
   }
 
   Future<void> setUserProperty(String name, String value) async {
-    await _analytics.setUserProperty(name: name, value: value);
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.setUserProperty(name: name, value: value);
   }
 
   /// Track custom event
@@ -70,7 +100,9 @@ class FirebaseAnalyticsService {
     required String name,
     Map<String, Object>? parameters,
   }) async {
-    await _analytics.logEvent(name: name, parameters: parameters);
+    final analytics = _analyticsOrNull;
+    if (analytics == null) return;
+    await analytics.logEvent(name: name, parameters: parameters);
   }
 }
 

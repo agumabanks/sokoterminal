@@ -3,13 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'core/app_providers.dart';
+import 'core/firebase/fcm_service.dart';
+import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/design_tokens.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/staff_login_screen.dart';
 import 'features/auth/seller_registration_screen.dart';
+import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/post_registration_welcome_provider.dart';
 import 'features/auth/pos_login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -24,7 +29,9 @@ import 'features/marketing/bulk_sms_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/staff_management_screen.dart';
+import 'features/settings/staff_menu_access_screen.dart';
 import 'features/settings/sync_health_screen.dart';
+import 'features/settings/device_health_screen.dart';
 import 'features/settings/export_screen.dart';
 import 'features/settings/print_queue_screen.dart';
 import 'features/settings/print_diagnostics_screen.dart';
@@ -34,18 +41,19 @@ import 'features/profile/shop_info_screen.dart';
 import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
 import 'features/wallet/seller_wallet_screen.dart';
-import 'features/auctions/auctions_screen.dart';
-import 'features/chat/chat_screen.dart';
+// import 'features/auctions/auctions_screen.dart';
+// import 'features/chat/chat_screen.dart';
 import 'features/coupons/coupons_screen.dart';
 import 'features/refunds/refunds_screen.dart';
 import 'features/verification/verification_screen.dart';
-import 'features/wholesale/wholesale_screen.dart';
+// import 'features/wholesale/wholesale_screen.dart';
 import 'features/shifts/shifts_screen.dart';
 import 'features/delivery/delivery_settings_screen.dart';
 import 'features/quotations/quotations_screen.dart';
 import 'features/settings/receipt_templates_screen.dart';
 import 'features/settings/void_reason_codes_screen.dart';
 import 'features/expenses/expenses_screen.dart';
+import 'features/backup/backup_screen.dart';
 import 'features/procurement/suppliers_screen.dart';
 import 'features/procurement/purchase_orders_screen.dart';
 import 'features/procurement/receive_stock_screen.dart';
@@ -58,32 +66,199 @@ import 'features/catalog/catalog_screen.dart';
 
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
+final routerRefreshProvider = Provider<RouterRefreshNotifier>((ref) {
+  final notifier = RouterRefreshNotifier();
+  ref.onDispose(notifier.dispose);
+
+  void refresh<T>(T? _, T __) {
+    notifier.refresh();
+  }
+
+  ref.listen<AuthState>(authControllerProvider, refresh);
+  ref.listen<bool>(businessSetupCompletedProvider, refresh);
+  ref.listen<bool>(postRegistrationWelcomePendingProvider, refresh);
+
+  return notifier;
+});
+
+Page<dynamic> _buildPage({required Widget child, GoRouterState? state}) {
+  return CustomTransitionPage(
+    key: state?.pageKey,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final slideIn = Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      ));
+
+      final slideOut = Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-0.3, 0.0),
+      ).animate(CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: Curves.easeOutCubic,
+      ));
+
+      return SlideTransition(
+        position: slideOut,
+        child: SlideTransition(
+          position: slideIn,
+          child: child,
+        ),
+      );
+    },
+    transitionDuration: DesignTokens.durationPageTransition,
+    reverseTransitionDuration: DesignTokens.durationPageTransition,
+  );
+}
+
 class SokoSellerApp extends ConsumerWidget {
   const SokoSellerApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    return _LifecycleAwareApp(router: router);
+  }
+}
+
+/// Root-level lifecycle listener that survives navigation.
+/// SplashScreen's listener is disposed after login; this one persists
+/// for the entire app session so token refresh on resume always works.
+class _LifecycleAwareApp extends ConsumerStatefulWidget {
+  const _LifecycleAwareApp({required this.router});
+  final GoRouter router;
+
+  @override
+  ConsumerState<_LifecycleAwareApp> createState() => _LifecycleAwareAppState();
+}
+
+class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
+  AppLifecycleListener? _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () {
+        final auth = ref.read(authControllerProvider.notifier);
+        unawaited(auth.refreshToken());
+        // Resume contact background sync when app comes to foreground.
+        unawaited(_backgroundContactSync());
+      },
+    );
+    // Kick off contact sync shortly after the widget tree settles.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_backgroundContactSync());
+      _configurePushNavigation();
+    });
+  }
+
+  void _configurePushNavigation() {
+    FCMService.instance.configureHandlers(
+      onNavigate: (route) {
+        if (!mounted) return;
+        widget.router.go(route);
+      },
+      onForegroundBanner: ({
+        required title,
+        body,
+        actionLabel,
+        onAction,
+      }) {
+        final messenger = rootScaffoldMessengerKey.currentState;
+        if (messenger == null) return;
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              body == null || body.isEmpty ? title : '$title\n$body',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            action: actionLabel == null || onAction == null
+                ? null
+                : SnackBarAction(label: actionLabel, onPressed: onAction),
+          ),
+        );
+      },
+      onSyncHint: () async {
+        try {
+          await ref.read(syncServiceProvider).syncNow();
+        } catch (_) {}
+      },
+    );
+  }
+
+  /// Silently syncs device contacts if permission is already granted and the
+  /// user has opted in. Never shows a dialog — the contacts screen owns the
+  /// first-time permission request UX.
+  Future<void> _backgroundContactSync() async {
+    try {
+      final sync = ref.read(syncServiceProvider);
+      final optedIn = await sync.isDeviceContactsOptedIn();
+
+      if (!optedIn) {
+        // Auto-opt-in if the OS contact permission was granted at some point
+        // (e.g., from a previous session or device restore) but the in-app
+        // opt-in flag was never persisted.
+        final status = await Permission.contacts.status;
+        if (status.isGranted) {
+          await sync.setDeviceContactsOptIn(true);
+          unawaited(sync.syncDeviceContacts(force: false));
+          unawaited(sync.pullCrmContacts());
+        }
+        return;
+      }
+
+      final status = await Permission.contacts.status;
+      if (!status.isGranted) return;
+
+      // Let the sync service's throttle logic decide if a sync is due.
+      unawaited(sync.syncDeviceContacts(force: false));
+      unawaited(sync.pullCrmContacts());
+    } catch (_) {
+      // Background sync must never crash the app.
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Soko 24 Seller Terminal',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       scaffoldMessengerKey: rootScaffoldMessengerKey,
-      routerConfig: router,
+      routerConfig: widget.router,
     );
   }
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
-  final refresh = GoRouterRefreshStream(
-    ref.watch(authControllerProvider.notifier).stream,
-  );
+  ref.read(authControllerProvider.notifier);
+  final refresh = ref.watch(routerRefreshProvider);
 
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) {
+      final authState = ref.read(authControllerProvider);
+      final setupCompleted = ref.read(businessSetupCompletedProvider);
+      final postRegistrationPending = ref.read(
+        postRegistrationWelcomePendingProvider,
+      );
+      final prefs = ref.read(sharedPreferencesProvider);
+      final setupRequired =
+          prefs.getBool(businessSetupRequiredPrefKey) ?? false;
       final loggedIn = authState.status == AuthStatus.authenticated;
       final onLogin = state.matchedLocation == '/login';
       final onRegister = state.matchedLocation == '/register';
@@ -91,12 +266,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onOnboarding = state.matchedLocation.startsWith('/onboarding');
       final onBusinessSetup =
           state.matchedLocation == '/home/more/business-setup';
-      final setupCompleted = ref.watch(businessSetupCompletedProvider);
-      final setupRequired =
-          ref
-              .read(sharedPreferencesProvider)
-              .getBool(businessSetupRequiredPrefKey) ??
-          false;
 
       if (onSplash) return null; // Let splash handle logic
 
@@ -106,16 +275,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (!loggedIn && !onLogin && !onRegister) return '/login';
       if (loggedIn && setupRequired && !setupCompleted && !onBusinessSetup) {
-        final postRegistrationPending = ref.read(
-          postRegistrationWelcomePendingProvider,
-        );
         if (onRegister && postRegistrationPending) return null;
         return '/home/more/business-setup';
       }
       if (loggedIn && (onLogin || onRegister)) {
-        final postRegistrationPending = ref.read(
-          postRegistrationWelcomePendingProvider,
-        );
         if (onRegister && postRegistrationPending) return null;
         if (setupRequired && !setupCompleted) {
           return '/home/more/business-setup';
@@ -128,33 +291,38 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/splash',
         name: 'splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _buildPage(state: state, child: const SplashScreen()),
       ),
       GoRoute(
         path: '/pos-login',
         name: 'pos-login',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final redirectTo = state.uri.queryParameters['redirect'];
-          return PosLoginScreen(redirectTo: redirectTo);
+          return _buildPage(child: PosLoginScreen(redirectTo: redirectTo));
         },
       ),
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _buildPage(state: state, child: const LoginScreen()),
       ),
       GoRoute(
         path: '/staff-login',
         name: 'staff-login',
-        builder: (context, state) => const StaffLoginScreen(),
+        pageBuilder: (context, state) => _buildPage(state: state, child: const StaffLoginScreen()),
       ),
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return SellerRegistrationScreen(initialPhone: extra?['phone']);
+          return _buildPage(child: SellerRegistrationScreen(initialPhone: extra?['phone']));
         },
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        pageBuilder: (context, state) => _buildPage(state: state, child: const ForgotPasswordScreen()),
       ),
       GoRoute(
         path: '/onboarding',
@@ -190,7 +358,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/checkout',
                 name: 'checkout',
-                builder: (context, state) => HomeShell.checkoutTab(),
+                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.checkoutTab()),
               ),
             ],
           ),
@@ -199,7 +367,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/transactions',
                 name: 'transactions',
-                builder: (context, state) => HomeShell.transactionsTab(),
+                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.transactionsTab()),
               ),
             ],
           ),
@@ -208,7 +376,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/notifications',
                 name: 'notifications',
-                builder: (context, state) => HomeShell.notificationsTab(),
+                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.notificationsTab()),
               ),
             ],
           ),
@@ -217,219 +385,235 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/more',
                 name: 'more',
-                builder: (context, state) => HomeShell.moreTab(),
+                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.moreTab()),
                 routes: [
                   GoRoute(
                     path: 'dashboard',
                     name: 'dashboard',
-                    builder: (context, state) => const DashboardScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const DashboardScreen()),
                   ),
                   GoRoute(
                     path: 'items',
                     name: 'items',
-                    builder: (context, state) => const ItemsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ItemsScreen()),
                   ),
                   GoRoute(
                     path: 'suppliers',
                     name: 'suppliers',
-                    builder: (context, state) => const SuppliersScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const SuppliersScreen()),
                   ),
                   GoRoute(
                     path: 'purchase-orders',
                     name: 'purchase-orders',
-                    builder: (context, state) => const PurchaseOrdersScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const PurchaseOrdersScreen()),
                   ),
                   GoRoute(
                     path: 'receive-stock',
                     name: 'receive-stock',
-                    builder: (context, state) => const ReceiveStockScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReceiveStockScreen()),
                   ),
                   GoRoute(
                     path: 'stocktake',
                     name: 'stocktake',
-                    builder: (context, state) => const StocktakeScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const StocktakeScreen()),
                   ),
                   GoRoute(
                     path: 'low-stock',
                     name: 'low-stock',
-                    builder: (context, state) => const LowStockScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const LowStockScreen()),
                   ),
                   GoRoute(
                     path: 'services',
                     name: 'services',
-                    builder: (context, state) => const ServicesScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ServicesScreen()),
                   ),
-                  GoRoute(
-                    path: 'auctions',
-                    name: 'auctions',
-                    builder: (context, state) => const AuctionsScreen(),
-                  ),
-                  GoRoute(
-                    path: 'chat',
-                    name: 'chat',
-                    builder: (context, state) => const ChatScreen(),
-                  ),
+                  // Hidden: dead features (not MVP-ready)
+                  // GoRoute(
+                  //   path: 'auctions',
+                  //   name: 'auctions',
+                  //   builder: (context, state) => _buildPage(child: const AuctionsScreen()),
+                  // ),
+                  // GoRoute(
+                  //   path: 'chat',
+                  //   name: 'chat',
+                  //   builder: (context, state) => _buildPage(child: const ChatScreen()),
+                  // ),
                   GoRoute(
                     path: 'analytics',
                     name: 'analytics',
-                    builder: (context, state) => const AnalyticsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const AnalyticsScreen()),
                   ),
-                  GoRoute(
-                    path: 'chat/:conversationId',
-                    name: 'chat-detail',
-                    builder: (context, state) {
-                      final convoId = int.tryParse(
-                        state.pathParameters['conversationId'] ?? '',
-                      );
-                      return ChatScreen(conversationId: convoId);
-                    },
-                  ),
+                  // GoRoute(
+                  //   path: 'chat/:conversationId',
+                  //   name: 'chat-detail',
+                  //   builder: (context, state) {
+                  //     final convoId = int.tryParse(
+                  //       state.pathParameters['conversationId'] ?? '',
+                  //     );
+                  //     return ChatScreen(conversationId: convoId);
+                  //   },
+                  // ),
                   GoRoute(
                     path: 'coupons',
                     name: 'coupons',
-                    builder: (context, state) => const CouponsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const CouponsScreen()),
                   ),
                   GoRoute(
                     path: 'orders',
                     name: 'orders',
-                    builder: (context, state) => const OrdersScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const OrdersScreen()),
                   ),
                   GoRoute(
                     path: 'catalog',
                     name: 'catalog',
-                    builder: (context, state) => const CatalogScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const CatalogScreen()),
                   ),
-                  GoRoute(
-                    path: 'wholesale',
-                    name: 'wholesale',
-                    builder: (context, state) => const WholesaleScreen(),
-                  ),
+                  // GoRoute(
+                  //   path: 'wholesale',
+                  //   name: 'wholesale',
+                  //   builder: (context, state) => _buildPage(child: const WholesaleScreen()),
+                  // ),
                   GoRoute(
                     path: 'ads',
                     name: 'ads',
-                    builder: (context, state) => const AdsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const AdsScreen()),
                   ),
                   GoRoute(
                     path: 'bulk-sms',
                     name: 'bulk-sms',
-                    builder: (context, state) => const BulkSmsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const BulkSmsScreen()),
                   ),
                   GoRoute(
                     path: 'reports',
                     name: 'reports',
-                    builder: (context, state) => const ReportsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReportsScreen()),
                   ),
                   GoRoute(
                     path: 'expenses',
                     name: 'expenses',
-                    builder: (context, state) => const ExpensesScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ExpensesScreen()),
                   ),
                   GoRoute(
                     path: 'refunds',
                     name: 'refunds',
-                    builder: (context, state) => const RefundsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const RefundsScreen()),
                   ),
                   GoRoute(
                     path: 'settings',
                     name: 'settings',
-                    builder: (context, state) => const SettingsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const SettingsScreen()),
+                  ),
+                  GoRoute(
+                    path: 'backup',
+                    name: 'backup',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const BackupScreen()),
                   ),
                   GoRoute(
                     path: 'delivery-settings',
                     name: 'delivery-settings',
-                    builder: (context, state) => const DeliverySettingsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const DeliverySettingsScreen()),
                   ),
                   GoRoute(
                     path: 'print-queue',
                     name: 'print-queue',
-                    builder: (context, state) => const PrintQueueScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const PrintQueueScreen()),
                   ),
                   GoRoute(
                     path: 'print-diagnostics',
                     name: 'print-diagnostics',
-                    builder: (context, state) => const PrintDiagnosticsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const PrintDiagnosticsScreen()),
                   ),
                   GoRoute(
                     path: 'sync-health',
                     name: 'sync-health',
-                    builder: (context, state) => const SyncHealthScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const SyncHealthScreen()),
+                  ),
+                  GoRoute(
+                    path: 'device-health',
+                    name: 'device-health',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const DeviceHealthScreen()),
                   ),
                   GoRoute(
                     path: 'export',
                     name: 'export',
-                    builder: (context, state) => const ExportScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ExportScreen()),
                   ),
                   GoRoute(
                     path: 'profile',
                     name: 'profile',
-                    builder: (context, state) => const ProfileScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ProfileScreen()),
                   ),
                   GoRoute(
                     path: 'seller-profile',
                     name: 'seller-profile',
-                    builder: (context, state) =>
-                        const SellerProfileEditScreen(),
+                    pageBuilder: (context, state) => _buildPage(
+                        child: const SellerProfileEditScreen()),
                   ),
                   GoRoute(
                     path: 'shop-info',
                     name: 'shop-info',
-                    builder: (context, state) => const ShopInfoScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShopInfoScreen()),
                   ),
                   GoRoute(
                     path: 'shop-seo',
                     name: 'shop-seo',
-                    builder: (context, state) => const ShopSeoScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShopSeoScreen()),
                   ),
                   GoRoute(
                     path: 'payment-settings',
                     name: 'payment-settings',
-                    builder: (context, state) => const PaymentSettingsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const PaymentSettingsScreen()),
                   ),
                   GoRoute(
                     path: 'wallet',
                     name: 'wallet',
-                    builder: (context, state) => const SellerWalletScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const SellerWalletScreen()),
                   ),
                   GoRoute(
                     path: 'verification',
                     name: 'verification',
-                    builder: (context, state) => const VerificationScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const VerificationScreen()),
                   ),
                   GoRoute(
                     path: 'staff',
                     name: 'staff',
-                    builder: (context, state) => const StaffManagementScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const StaffManagementScreen()),
+                  ),
+                  GoRoute(
+                    path: 'staff-menu-access',
+                    name: 'staff-menu-access',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const StaffMenuAccessScreen()),
                   ),
                   GoRoute(
                     path: 'shifts',
                     name: 'shifts',
-                    builder: (context, state) => const ShiftsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShiftsScreen()),
                   ),
                   GoRoute(
                     path: 'contacts',
                     name: 'contacts',
-                    builder: (context, state) => const ContactsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ContactsScreen()),
                   ),
                   GoRoute(
                     path: 'quotations',
                     name: 'quotations',
-                    builder: (context, state) => const QuotationsScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const QuotationsScreen()),
                   ),
                   GoRoute(
                     path: 'receipt-templates',
                     name: 'receipt-templates',
-                    builder: (context, state) => const ReceiptTemplatesScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReceiptTemplatesScreen()),
                   ),
                   GoRoute(
                     path: 'void-reason-codes',
                     name: 'void-reason-codes',
-                    builder: (context, state) => const VoidReasonCodesScreen(),
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const VoidReasonCodesScreen()),
                   ),
                   GoRoute(
                     path: 'business-setup',
                     name: 'business-setup',
-                    builder: (context, state) =>
-                        const BusinessSetupWizardScreen(),
+                    pageBuilder: (context, state) => _buildPage(
+                        child: const BusinessSetupWizardScreen()),
                   ),
                 ],
               ),
@@ -441,17 +625,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Replacement for the removed GoRouterRefreshStream in go_router 14.x.
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
+class RouterRefreshNotifier extends ChangeNotifier {
+  void refresh() => notifyListeners();
 }

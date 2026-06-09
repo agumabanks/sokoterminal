@@ -1,3 +1,4 @@
+import '../../core/util/haptics.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -6,19 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/sync/sync_service.dart';
-import '../../core/telemetry/telemetry.dart';
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
+import '../../core/theme/design_tokens.dart';
 import 'contacts_controller.dart';
+import 'crm_contact_notes_widget.dart';
 import 'keypad_screen.dart';
 
-final deviceContactsOptInProvider = FutureProvider<bool>((ref) async {
-  return ref.watch(syncServiceProvider).isDeviceContactsOptedIn();
-});
-
-/// WhatsApp-inspired Contacts Screen — Premium, dark, minimal.
-/// Following Steve Jobs standard: Maximum impact, minimum complexity.
+/// Contacts Screen — Premium, light, wow-grade.
+/// Following Steve Jobs standard: invisible until useful.
 class ContactsScreen extends ConsumerStatefulWidget {
   const ContactsScreen({super.key});
 
@@ -31,14 +28,6 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   late TabController _tabController;
   final _searchController = TextEditingController();
   bool _showSearch = false;
-
-  // WhatsApp colors
-  static const _bgBlack = Color(0xFF000000);
-  static const _bgDark = Color(0xFF0B141A);
-  static const _headerBg = Color(0xFF1F2C34);
-  static const _whatsappGreen = Color(0xFF00A884);
-  static const _cardBg = Color(0xFF111B21);
-  static const _missedRed = Color(0xFFEF5350);
 
   @override
   void initState() {
@@ -57,55 +46,28 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(contactsControllerProvider);
-    final controller = ref.read(contactsControllerProvider.notifier);
-    final optInAsync = ref.watch(deviceContactsOptInProvider);
+    final controller = ref.watch(contactsControllerProvider.notifier);
 
     return Scaffold(
-      backgroundColor: _bgBlack,
+      backgroundColor: DesignTokens.surface,
       appBar: _buildAppBar(state, controller),
       body: Column(
         children: [
-          // Quick action buttons row
-          _buildQuickActions(),
-
-          // Contacts sync toggle (privacy-safe)
-          optInAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (enabled) => _SyncBanner(
-              enabled: enabled,
-              onChanged: (next) async {
-                await ref
-                    .read(syncServiceProvider)
-                    .setDeviceContactsOptIn(next);
-                ref.invalidate(deviceContactsOptInProvider);
-                final telemetry = Telemetry.instance;
-                if (telemetry != null) {
-                  unawaited(
-                    telemetry.event(
-                      'contacts_opt_in_changed',
-                      props: {'enabled': next},
-                    ),
-                  );
-                }
-                // Refresh immediately to import + (if enabled) sync.
-                await controller.refresh();
-              },
-            ),
-          ),
+          // Contextual permission preview / sync status
+          _ContactsStatusArea(state: state, controller: controller),
 
           // Recent contacts section with header
           if (state.filteredContacts.isNotEmpty) _buildRecentSection(state),
 
           // Tabs
           Container(
-            color: _bgDark,
+            color: DesignTokens.surfaceWhite,
             child: TabBar(
               controller: _tabController,
-              indicatorColor: _whatsappGreen,
+              indicatorColor: DesignTokens.brandAccent,
               indicatorWeight: 3,
-              labelColor: _whatsappGreen,
-              unselectedLabelColor: Colors.grey,
+              labelColor: DesignTokens.brandAccent,
+              unselectedLabelColor: DesignTokens.grayMedium,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600),
               tabs: const [
                 Tab(text: 'Contacts'),
@@ -130,17 +92,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           ? Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _whatsappGreen.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                boxShadow: DesignTokens.shadowMd,
               ),
               child: FloatingActionButton(
                 onPressed: () => _showAddContactSheet(context, controller),
-                backgroundColor: _whatsappGreen,
+                backgroundColor: DesignTokens.brandAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -157,10 +113,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   ) {
     if (_showSearch) {
       return AppBar(
-        backgroundColor: _headerBg,
+        backgroundColor: DesignTokens.surfaceWhite,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: DesignTokens.grayDark),
           onPressed: () {
             setState(() => _showSearch = false);
             _searchController.clear();
@@ -170,11 +126,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         title: TextField(
           controller: _searchController,
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-          cursorColor: _whatsappGreen,
-          decoration: const InputDecoration(
+          style: TextStyle(color: DesignTokens.grayDark, fontSize: 18),
+          cursorColor: DesignTokens.brandAccent,
+          decoration: InputDecoration(
             hintText: 'Search...',
-            hintStyle: TextStyle(color: Colors.grey),
+            hintStyle: TextStyle(color: DesignTokens.grayMedium),
             border: InputBorder.none,
           ),
           onChanged: controller.search,
@@ -182,7 +138,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         actions: [
           if (_searchController.text.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: Icon(Icons.close, color: DesignTokens.grayDark),
               onPressed: () {
                 _searchController.clear();
                 controller.clearSearch();
@@ -193,25 +149,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     }
 
     return AppBar(
-      backgroundColor: _bgBlack,
+      backgroundColor: DesignTokens.surface,
       elevation: 0,
       leadingWidth: 48,
       leading: Padding(
         padding: const EdgeInsets.only(left: 16),
-        child: Icon(Icons.more_horiz, color: Colors.grey.shade400),
+        child: Icon(Icons.more_horiz, color: DesignTokens.grayMedium),
       ),
-      title: const Text(
+      title: Text(
         'Contacts',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 26,
-          fontWeight: FontWeight.bold,
-          letterSpacing: -0.5,
-        ),
+        style: DesignTokens.textTitle,
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.search, color: Colors.white),
+          icon: Icon(Icons.search, color: DesignTokens.grayDark),
           onPressed: () => setState(() => _showSearch = true),
         ),
         Padding(
@@ -225,8 +176,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: _whatsappGreen,
+                color: DesignTokens.brandAccent,
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: DesignTokens.shadowSm,
               ),
               child: const Icon(Icons.add, color: Colors.white, size: 22),
             ),
@@ -236,50 +188,27 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     );
   }
 
-  Widget _buildQuickActions() {
-    return Container(
-      color: _bgBlack,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          _QuickActionButton(
-            icon: Icons.phone_outlined,
-            label: 'Call',
-            onTap: () => _tabController.animateTo(1),
-          ),
-          const SizedBox(width: 20),
-          _QuickActionButton(
-            icon: Icons.calendar_today_outlined,
-            label: 'Schedule',
-            onTap: () {},
-          ),
-          const SizedBox(width: 20),
-          _QuickActionButton(
-            icon: Icons.grid_view_rounded,
-            label: 'Keypad',
-            onTap: () => _tabController.animateTo(1),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRecentSection(ContactsState state) {
     final recentContacts = state.filteredContacts.take(5).toList();
 
-    return Container(
-      color: _bgBlack,
-      padding: const EdgeInsets.only(bottom: 16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Recent contacts horizontal scroll
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Recent',
+              style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.grayDark),
+            ),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 88,
+            height: 92,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: recentContacts.length,
               itemBuilder: (context, index) {
                 final contact = recentContacts[index];
@@ -300,150 +229,83 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     ContactsController controller,
   ) {
     if (state.loading && state.contacts.isEmpty) {
-      return Container(
-        color: _bgBlack,
-        child: const Center(
-          child: CircularProgressIndicator(color: _whatsappGreen),
-        ),
+      return const Center(
+        child: CircularProgressIndicator(color: DesignTokens.brandAccent),
       );
     }
 
     if (!state.permissionGranted && state.contacts.isEmpty) {
-      return Container(
-        color: _bgBlack,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.contacts_outlined,
-                    size: 40,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Contacts Permission',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Allow access to sync your contacts',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () {
-                    if (state.isPermanentlyDenied) {
-                      openAppSettings();
-                    } else {
-                      controller.refresh();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _whatsappGreen,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: Text(
-                    state.isPermanentlyDenied
-                        ? 'Open Settings'
-                        : 'Grant Access',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      return _EmptySearchState(
+        icon: Icons.contacts_outlined,
+        title: 'No contacts yet',
+        subtitle: 'Sync your phone contacts or add your first customer.',
+        ctaText: 'Sync My Contacts',
+        onCta: () => controller.requestContactPermission(),
       );
     }
 
     if (state.filteredContacts.isEmpty) {
-      return Container(
-        color: _bgBlack,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.search_off, size: 48, color: Colors.grey.shade600),
-              const SizedBox(height: 16),
-              Text(
-                state.searchQuery.isNotEmpty
-                    ? 'No results for "${state.searchQuery}"'
-                    : 'No contacts yet',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
-              ),
-            ],
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48, color: DesignTokens.grayMedium),
+            const SizedBox(height: 16),
+            Text(
+              state.searchQuery.isNotEmpty
+                  ? 'No results for "${state.searchQuery}"'
+                  : 'No contacts yet',
+              style: TextStyle(color: DesignTokens.grayMedium, fontSize: 16),
+            ),
+          ],
         ),
       );
     }
 
-    return Container(
-      color: _bgBlack,
-      child: RefreshIndicator(
-        onRefresh: () async {
-          HapticFeedback.mediumImpact();
-          await controller.refresh();
-        },
-        color: _whatsappGreen,
-        backgroundColor: _cardBg,
-        child: ListView.builder(
-          padding: EdgeInsets.zero,
-          itemCount: state.filteredContacts.length,
-          itemBuilder: (context, index) {
-            final contact = state.filteredContacts[index];
-            final canDelete =
-                contact.isFromSoko &&
-                contact.id.startsWith('soko_') &&
-                !contact.isFromDevice;
-            final tile = _ContactListTile(
-              contact: contact,
-              onTap: () => _showContactDetails(context, contact),
-            );
-            if (!canDelete) return tile;
-            return Dismissible(
-              key: Key(contact.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 24),
-                color: _missedRed,
-                child: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.white,
-                  size: 28,
-                ),
+    return RefreshIndicator(
+      onRefresh: () async {
+        Haptics.impact();
+        await controller.refresh();
+      },
+      color: DesignTokens.brandAccent,
+      backgroundColor: DesignTokens.surfaceWhite,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: state.filteredContacts.length,
+        itemBuilder: (context, index) {
+          final contact = state.filteredContacts[index];
+          final canDelete =
+              contact.isFromSoko &&
+              contact.id.startsWith('soko_') &&
+              !contact.isFromDevice;
+          final tile = _ContactListTile(
+            contact: contact,
+            index: index,
+            onTap: () => _showContactDetails(context, contact),
+          );
+          if (!canDelete) return tile;
+          return Dismissible(
+            key: Key(contact.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 24),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: DesignTokens.error,
+                borderRadius: DesignTokens.borderRadiusMd,
               ),
-              confirmDismiss: (direction) => _confirmDelete(context, contact),
-              onDismissed: (direction) => controller.deleteContact(contact.id),
-              child: tile,
-            );
-          },
-        ),
+              child: const Icon(
+                Icons.delete_outline,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            confirmDismiss: (direction) => _confirmDelete(context, contact),
+            onDismissed: (direction) => controller.deleteContact(contact.id),
+            child: tile,
+          );
+        },
       ),
     );
   }
@@ -452,27 +314,27 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: _cardBg,
+        backgroundColor: DesignTokens.surfaceWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Delete Contact',
-          style: TextStyle(color: Colors.white),
+          style: DesignTokens.textTitle,
         ),
         content: Text(
           'Remove ${contact.name} from your contacts?',
-          style: TextStyle(color: Colors.grey.shade400),
+          style: DesignTokens.textBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.grey.shade400),
+              style: TextStyle(color: DesignTokens.grayMedium),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: _missedRed)),
+            child: Text('Delete', style: TextStyle(color: DesignTokens.error)),
           ),
         ],
       ),
@@ -480,9 +342,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   }
 
   void _showContactDetails(BuildContext context, ContactItem contact) {
-    HapticFeedback.selectionClick();
+    Haptics.selection();
     if ((contact.remoteCustomerId ?? '').trim().isNotEmpty) {
       _showCrmContactDetails(context, contact);
+      return;
+    }
+    // For Soko CRM contacts without a remote ID, show local POS stats
+    if (contact.isFromSoko && contact.id.startsWith('soko_')) {
+      final localId = contact.id.substring(5);
+      _showLocalStatsSheet(context, contact, localId);
       return;
     }
     _showQuickContactDetails(context, contact);
@@ -501,11 +369,128 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     return _CrmContactDetail.fromJson(data);
   }
 
+  void _showLocalStatsSheet(BuildContext context, ContactItem contact, String localCustomerId) {
+    final db = ref.read(appDatabaseProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: DesignTokens.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.6,
+        child: SafeArea(
+          child: FutureBuilder(
+            future: db.getLocalCustomerStats(localCustomerId),
+            builder: (context, snapshot) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(
+                          color: DesignTokens.grayLight,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Center(child: _LargeAvatar(name: contact.name)),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        contact.name,
+                        style: DesignTokens.textTitle.copyWith(fontSize: 22),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    if ((contact.phone ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Center(
+                        child: Text(
+                          contact.phone!,
+                          style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    // Data source label
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: DesignTokens.brandAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Local POS data',
+                          style: DesignTokens.textSmallBold.copyWith(
+                            color: DesignTokens.brandAccent,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (snapshot.connectionState == ConnectionState.waiting)
+                      const Center(child: CircularProgressIndicator(color: DesignTokens.brandAccent))
+                    else if (snapshot.hasData)
+                      Builder(builder: (ctx) {
+                        final stats = snapshot.data!;
+                        return _CrmSection(
+                          title: 'Client summary · Local POS data',
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              _MetricCard(
+                                label: 'Orders',
+                                value: stats.totalOrders.toString(),
+                              ),
+                              _MetricCard(
+                                label: 'Revenue',
+                                value: 'UGX ${_formatCurrency(stats.totalRevenue)}',
+                              ),
+                              _MetricCard(
+                                label: 'Average',
+                                value: 'UGX ${_formatCurrency(stats.avgOrderValue)}',
+                              ),
+                              if (stats.lastPurchaseAt != null)
+                                _MetricCard(
+                                  label: 'Last purchase',
+                                  value: _formatDateTime(stats.lastPurchaseAt),
+                                ),
+                            ],
+                          ),
+                        );
+                      })
+                    else ...[
+                      Center(
+                        child: Text(
+                          'No local sales data yet.',
+                          style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showCrmContactDetails(BuildContext context, ContactItem contact) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: _cardBg,
+      backgroundColor: DesignTokens.surfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -525,7 +510,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     final controller = ref.read(contactsControllerProvider.notifier);
     showModalBottomSheet(
       context: context,
-      backgroundColor: _cardBg,
+      backgroundColor: DesignTokens.surfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -540,7 +525,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade700,
+                  color: DesignTokens.grayLight,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -553,18 +538,14 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               // Name
               Text(
                 contact.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: DesignTokens.textTitle.copyWith(fontSize: 24),
               ),
               const SizedBox(height: 4),
 
               // Phone/Email
               Text(
                 contact.phone ?? contact.email ?? 'No contact info',
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 16),
+                style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
               ),
 
               // Source badges
@@ -574,20 +555,21 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               const SizedBox(height: 28),
 
               // Action buttons row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
                 children: [
                   if (contact.phone != null) ...[
                     _ActionChip(
                       icon: Icons.call,
                       label: 'Call',
-                      color: _whatsappGreen,
+                      color: DesignTokens.brandAccent,
                       onTap: () {
                         Navigator.pop(context);
                         launchUrl(Uri.parse('tel:${contact.phone}'));
                       },
                     ),
-                    const SizedBox(width: 12),
                     _ActionChip(
                       icon: Icons.chat_bubble,
                       label: 'WhatsApp',
@@ -602,7 +584,6 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                         );
                       },
                     ),
-                    const SizedBox(width: 12),
                     _ActionChip(
                       icon: Icons.message,
                       label: 'SMS',
@@ -620,31 +601,31 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               if (contact.isFromDevice && !contact.isFromSoko) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1F2C34),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white10),
+                    color: DesignTokens.surfaceTint,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: DesignTokens.grayLight.withValues(alpha: 0.6),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
+                      Text(
                         'Soko CRM',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                        style: DesignTokens.textBodyBold.copyWith(
+                          color: DesignTokens.grayDark,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Save this contact as a customer so you can attach sales, send receipts, and track history.',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 13,
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.grayMedium,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () async {
                           Navigator.pop(context);
@@ -655,19 +636,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Saved to Soko CRM'),
+                                backgroundColor: DesignTokens.brandAccent,
                               ),
                             );
                           }
                         },
                         icon: const Icon(Icons.person_add_alt_1_outlined),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _whatsappGreen,
+                          backgroundColor: DesignTokens.brandAccent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         label: const Text('Save as customer'),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: () async {
                           final picked = await _pickExistingCustomer(context);
@@ -679,13 +661,16 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Linked to customer')),
+                            const SnackBar(
+                              content: Text('Linked to customer'),
+                              backgroundColor: DesignTokens.brandAccent,
+                            ),
                           );
                         },
                         icon: const Icon(Icons.link),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.grey.shade700),
+                          foregroundColor: DesignTokens.grayDark,
+                          side: BorderSide(color: DesignTokens.grayLight),
                         ),
                         label: const Text('Link to existing customer'),
                       ),
@@ -717,7 +702,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
 
     return showModalBottomSheet<Customer?>(
       context: context,
-      backgroundColor: _cardBg,
+      backgroundColor: DesignTokens.surfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -726,14 +711,14 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           shrinkWrap: true,
           itemCount: customers.length,
           separatorBuilder: (_, __) =>
-              const Divider(height: 1, color: Colors.white12),
+              const Divider(height: 1, color: DesignTokens.grayLight),
           itemBuilder: (context, index) {
             final c = customers[index];
             return ListTile(
-              title: Text(c.name, style: const TextStyle(color: Colors.white)),
+              title: Text(c.name, style: DesignTokens.textBodyBold),
               subtitle: Text(
                 c.phone ?? c.email ?? '',
-                style: TextStyle(color: Colors.grey.shade400),
+                style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
               ),
               onTap: () => Navigator.of(context).pop(c),
             );
@@ -755,7 +740,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: _cardBg,
+      backgroundColor: DesignTokens.surfaceCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -777,7 +762,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
+                    color: DesignTokens.grayLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -787,16 +772,12 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'New Contact',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: DesignTokens.textTitle.copyWith(fontSize: 22),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: Colors.grey.shade500),
+                    icon: Icon(Icons.close, color: DesignTokens.grayMedium),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -834,26 +815,30 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _headerBg,
+                  color: DesignTokens.surfaceTint,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: DesignTokens.grayLight.withValues(alpha: 0.6),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.people_outline, color: Colors.grey.shade400),
+                    Icon(Icons.people_outline, color: DesignTokens.grayMedium),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Share with team',
-                            style: TextStyle(color: Colors.white),
+                            style: DesignTokens.textBody.copyWith(
+                              color: DesignTokens.grayDark,
+                            ),
                           ),
                           Text(
                             'Visible to all staff members',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 12,
+                            style: DesignTokens.textSmall.copyWith(
+                              color: DesignTokens.grayMedium,
                             ),
                           ),
                         ],
@@ -862,7 +847,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     Switch(
                       value: shareWithTeam,
                       onChanged: (v) => setModalState(() => shareWithTeam = v),
-                      activeThumbColor: _whatsappGreen,
+                      activeThumbColor: DesignTokens.brandAccent,
                     ),
                   ],
                 ),
@@ -899,13 +884,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('$name added'),
-                          backgroundColor: _whatsappGreen,
+                          backgroundColor: DesignTokens.brandAccent,
                         ),
                       );
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _whatsappGreen,
+                    backgroundColor: DesignTokens.brandAccent,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -929,105 +914,125 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   }
 }
 
+
 // ============================================================================
 // WIDGETS
 // ============================================================================
 
-class _SyncBanner extends StatelessWidget {
-  const _SyncBanner({required this.enabled, required this.onChanged});
+/// Contextual permission / sync status area with animated transitions
+class _ContactsStatusArea extends StatelessWidget {
+  const _ContactsStatusArea({
+    required this.state,
+    required this.controller,
+  });
 
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
+  final ContactsState state;
+  final ContactsController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF0B141A),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF111B21),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white10),
-        ),
+    return AnimatedSwitcher(
+      duration: DesignTokens.durationFast,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: _buildChild(context),
+    );
+  }
+
+  Widget _buildChild(BuildContext context) {
+    // Synced + permission granted
+    if (state.permissionGranted && state.optedIn) {
+      return Container(
+        key: const ValueKey('synced'),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
         child: Row(
           children: [
-            const Icon(Icons.sync, color: Color(0xFF00A884)),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sync device contacts',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Imports contacts locally for matching + WhatsApp, then syncs to Soko CRM during normal sync.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: enabled,
-              onChanged: onChanged,
-              activeThumbColor: Color(0xFF00A884),
-              activeTrackColor: Color(0xFF00A884),
-            ),
+            const Spacer(),
+            _SyncedPill(count: state.contacts.length),
           ],
         ),
+      );
+    }
+
+    // Permanently denied
+    if (state.isPermanentlyDenied) {
+      return Container(
+        key: const ValueKey('denied'),
+        child: _ContactPreviewCard(
+          icon: Icons.lock_outline,
+          iconColor: Colors.amber,
+          title: 'Contacts access disabled',
+          subtitle: 'Enable in Settings to sync your phone contacts.',
+          ctaText: 'Open Settings',
+          onCta: () async => openAppSettings(),
+        ),
+      );
+    }
+
+    // Permission granted but opted out
+    if (state.permissionGranted && !state.optedIn) {
+      return Container(
+        key: const ValueKey('off'),
+        child: _ContactPreviewCard(
+          icon: Icons.cloud_off_outlined,
+          iconColor: DesignTokens.grayMedium,
+          title: 'Contact sync is off',
+          subtitle: 'Turn on to see your phone contacts in Soko.',
+          ctaText: 'Turn On',
+          previewCount: state.deviceContactCount,
+          onCta: () async => controller.setDeviceContactsOptIn(true),
+        ),
+      );
+    }
+
+    // Not granted -> teaser
+    return Container(
+      key: const ValueKey('teaser'),
+      child: _ContactPreviewCard(
+        icon: Icons.contacts_rounded,
+        iconColor: DesignTokens.brandAccent,
+        title: 'Never lose a customer',
+        subtitle: state.deviceContactCount > 0
+            ? 'You have ${state.deviceContactCount} contacts on this phone. Sync them to Soko and they\'ll appear on all your Soko terminals instantly.'
+            : 'Sync your phone contacts so they\'re available on every Soko terminal — even after you switch devices.',
+        ctaText: 'Allow Contacts Access',
+        previewCount: state.deviceContactCount > 0 ? state.deviceContactCount : null,
+        onCta: () async => controller.requestContactPermission(),
       ),
     );
   }
 }
 
-/// Quick action button (Call, Schedule, Keypad)
-class _QuickActionButton extends StatelessWidget {
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+class _SyncedPill extends StatelessWidget {
+  const _SyncedPill({required this.count});
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: DesignTokens.brandAccentLight,
+        borderRadius: DesignTokens.borderRadiusFull,
+        border: Border.all(color: DesignTokens.brandAccent.withValues(alpha: 0.2)),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1F2C34),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: const Color(0xFF00A884).withValues(alpha: 0.3),
-                width: 1,
-              ),
+            width: 6, height: 6,
+            decoration: const BoxDecoration(
+              color: DesignTokens.brandAccent,
+              shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: const Color(0xFF00A884), size: 26),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(width: 6),
           Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey.shade400,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+            '$count contacts · all devices',
+            style: DesignTokens.textSmallBold.copyWith(
+              color: DesignTokens.brandAccent,
+              fontSize: 11,
             ),
           ),
         ],
@@ -1036,7 +1041,151 @@ class _QuickActionButton extends StatelessWidget {
   }
 }
 
-/// Recent contact circular avatar with name
+class _ContactPreviewCard extends StatelessWidget {
+  const _ContactPreviewCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.ctaText,
+    this.previewCount,
+    required this.onCta,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String ctaText;
+  final int? previewCount;
+  final VoidCallback onCta;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceCard,
+          borderRadius: DesignTokens.borderRadiusLg,
+          boxShadow: DesignTokens.shadowSm,
+          border: Border.all(
+            color: DesignTokens.grayLight.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: DesignTokens.textBodyBold.copyWith(
+                          color: DesignTokens.grayDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.grayMedium,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (previewCount != null && previewCount! > 0) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  ...List.generate(3, (i) {
+                    return Container(
+                      width: 28,
+                      height: 28,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: _avatarColors[i % _avatarColors.length]
+                            .withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          String.fromCharCode(65 + i),
+                          style: TextStyle(
+                            color: _avatarColors[i % _avatarColors.length],
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: DesignTokens.surfaceTint,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '+$previewCount more',
+                      style: DesignTokens.textSmallBold.copyWith(
+                        color: DesignTokens.grayDark,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: onCta,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: DesignTokens.brandAccent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  ctaText,
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RecentContactAvatar extends StatelessWidget {
   const _RecentContactAvatar({required this.contact, required this.onTap});
 
@@ -1045,162 +1194,45 @@ class _RecentContactAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = _getAvatarColor(contact.name);
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 70,
-        margin: const EdgeInsets.only(right: 16),
+        width: 74,
+        margin: const EdgeInsets.only(right: 14),
         child: Column(
           children: [
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: _getAvatarColor(contact.name),
+                color: color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _getAvatarColor(contact.name).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
+                border: Border.all(
+                  color: DesignTokens.grayLight.withValues(alpha: 0.6),
+                  width: 2,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              contact.name.split(' ').first,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getAvatarColor(String name) {
-    final colors = [
-      const Color(0xFFE91E63),
-      const Color(0xFF9C27B0),
-      const Color(0xFF673AB7),
-      const Color(0xFF3F51B5),
-      const Color(0xFF2196F3),
-      const Color(0xFF00BCD4),
-      const Color(0xFF009688),
-      const Color(0xFF4CAF50),
-      const Color(0xFFFF9800),
-      const Color(0xFFFF5722),
-    ];
-    return colors[name.hashCode % colors.length];
-  }
-}
-
-/// Contact list tile with WhatsApp styling
-class _ContactListTile extends StatelessWidget {
-  const _ContactListTile({required this.contact, required this.onTap});
-
-  final ContactItem contact;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            // Avatar
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: _getAvatarColor(contact.name),
-                shape: BoxShape.circle,
-              ),
               child: Center(
                 child: Text(
                   contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: color,
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-
-            // Name and info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    contact.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        contact.isFromSoko
-                            ? Icons.cloud_done
-                            : Icons.phone_android,
-                        size: 14,
-                        color: contact.isFromSoko
-                            ? const Color(0xFF00A884)
-                            : Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          contact.phone ?? 'No phone',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Info button
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade700, width: 1),
-              ),
-              child: Icon(
-                Icons.info_outline,
-                size: 16,
-                color: Colors.grey.shade500,
+            const SizedBox(height: 8),
+            Text(
+              contact.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayDark,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -1208,98 +1240,232 @@ class _ContactListTile extends StatelessWidget {
       ),
     );
   }
+}
 
-  Color _getAvatarColor(String name) {
-    final colors = [
-      const Color(0xFFE91E63),
-      const Color(0xFF9C27B0),
-      const Color(0xFF673AB7),
-      const Color(0xFF3F51B5),
-      const Color(0xFF2196F3),
-      const Color(0xFF00BCD4),
-      const Color(0xFF009688),
-      const Color(0xFF4CAF50),
-      const Color(0xFFFF9800),
-      const Color(0xFFFF5722),
-    ];
-    return colors[name.hashCode % colors.length];
+class _ContactListTile extends StatelessWidget {
+  const _ContactListTile({
+    required this.contact,
+    required this.index,
+    required this.onTap,
+  });
+
+  final ContactItem contact;
+  final int index;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarColor = _getAvatarColor(contact.name);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: DesignTokens.surfaceCard,
+        borderRadius: DesignTokens.borderRadiusMd,
+        elevation: 0,
+        child: InkWell(
+          borderRadius: DesignTokens.borderRadiusMd,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: DesignTokens.surfaceCard,
+              borderRadius: DesignTokens.borderRadiusMd,
+              border: Border.all(
+                color: DesignTokens.grayLight.withValues(alpha: 0.55),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: avatarColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      contact.name.isNotEmpty
+                          ? contact.name[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        color: avatarColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          contact.name,
+                          style: DesignTokens.textBodyBold.copyWith(
+                            color: DesignTokens.grayDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        if (contact.phone != null && contact.phone!.isNotEmpty)
+                          Text(
+                            contact.phone!,
+                            style: DesignTokens.textSmall.copyWith(
+                              color: DesignTokens.grayMedium,
+                            ),
+                          )
+                        else if (contact.email != null &&
+                            contact.email!.isNotEmpty)
+                          Text(
+                            contact.email!,
+                            style: DesignTokens.textSmall.copyWith(
+                              color: DesignTokens.grayMedium,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: DesignTokens.grayLight,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
   }
 }
 
-/// Large avatar for contact detail sheet
+class _EmptySearchState extends StatelessWidget {
+  const _EmptySearchState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.ctaText,
+    this.onCta,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? ctaText;
+  final VoidCallback? onCta;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: DesignTokens.surfaceTint,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 40, color: DesignTokens.brandAccent),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: DesignTokens.textTitle.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+            ),
+            if (ctaText != null) ...[
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: onCta,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DesignTokens.brandAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    ctaText!,
+                    style: DesignTokens.textBodyBold.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LargeAvatar extends StatelessWidget {
   const _LargeAvatar({required this.name});
-
   final String name;
 
   @override
   Widget build(BuildContext context) {
+    final color = _getAvatarColor(name);
     return Container(
-      width: 80,
-      height: 80,
+      width: 84,
+      height: 84,
       decoration: BoxDecoration(
-        color: _getAvatarColor(name),
+        color: color.withValues(alpha: 0.12),
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: _getAvatarColor(name).withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        border: Border.all(
+          color: DesignTokens.grayLight.withValues(alpha: 0.6),
+          width: 3,
+        ),
       ),
       child: Center(
         child: Text(
           name.isNotEmpty ? name[0].toUpperCase() : '?',
-          style: const TextStyle(
-            fontSize: 36,
-            color: Colors.white,
+          style: TextStyle(
+            color: color,
             fontWeight: FontWeight.bold,
+            fontSize: 32,
           ),
         ),
       ),
     );
   }
-
-  Color _getAvatarColor(String name) {
-    final colors = [
-      const Color(0xFFE91E63),
-      const Color(0xFF9C27B0),
-      const Color(0xFF673AB7),
-      const Color(0xFF3F51B5),
-      const Color(0xFF2196F3),
-      const Color(0xFF00BCD4),
-      const Color(0xFF009688),
-      const Color(0xFF4CAF50),
-      const Color(0xFFFF9800),
-      const Color(0xFFFF5722),
-    ];
-    return colors[name.hashCode % colors.length];
-  }
 }
 
-/// Source badges (Soko, Device)
 class _SourceBadges extends StatelessWidget {
   const _SourceBadges({required this.contact});
-
   final ContactItem contact;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      alignment: WrapAlignment.center,
       children: [
-        if (contact.isFromSoko)
-          _Badge(
-            icon: Icons.cloud_done,
-            label: 'Soko',
-            color: const Color(0xFF00A884),
-          ),
         if (contact.isFromDevice)
           _Badge(
-            icon: Icons.phone_android,
-            label: 'Device',
-            color: Colors.blue,
+            label: 'Phone',
+            color: DesignTokens.info,
+          ),
+        if (contact.isFromSoko)
+          _Badge(
+            label: 'Soko CRM',
+            color: DesignTokens.brandAccent,
           ),
       ],
     );
@@ -1307,34 +1473,29 @@ class _SourceBadges extends StatelessWidget {
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.icon, required this.label, required this.color});
-
-  final IconData icon;
+  const _Badge({required this.label, required this.color});
   final String label;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 5),
-          Text(label, style: TextStyle(color: color, fontSize: 12)),
-        ],
+      child: Text(
+        label,
+        style: DesignTokens.textSmallBold.copyWith(
+          color: color,
+          fontSize: 11,
+        ),
       ),
     );
   }
 }
 
-/// Action chip button for contact detail
 class _ActionChip extends StatelessWidget {
   const _ActionChip({
     required this.icon,
@@ -1353,23 +1514,19 @@ class _ActionChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(24),
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
+              style: DesignTokens.textSmallBold.copyWith(color: color),
             ),
           ],
         ),
@@ -1378,7 +1535,7 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
-class _CrmContactDetailSheet extends StatelessWidget {
+class _CrmContactDetailSheet extends StatefulWidget {
   const _CrmContactDetailSheet({
     required this.contact,
     required this.detailsFuture,
@@ -1387,61 +1544,54 @@ class _CrmContactDetailSheet extends StatelessWidget {
   final ContactItem contact;
   final Future<_CrmContactDetail> detailsFuture;
 
-  static const _sectionBg = Color(0xFF1F2C34);
-  static const _accent = Color(0xFF00A884);
+  @override
+  State<_CrmContactDetailSheet> createState() => _CrmContactDetailSheetState();
+}
+
+class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
+  _CrmContactDetail? _cached;
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_CrmContactDetail>(
-      future: detailsFuture,
+      future: widget.detailsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        final detail = snapshot.data ?? _cached;
+        if (detail != null) {
+          _cached = detail;
+        }
+        if (snapshot.connectionState == ConnectionState.waiting && detail == null) {
           return const Center(
-            child: CircularProgressIndicator(color: _accent),
+            child: CircularProgressIndicator(color: DesignTokens.brandAccent),
           );
         }
-
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Padding(
-            padding: const EdgeInsets.all(24),
+        if (detail == null) {
+          return Center(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _LargeAvatar(name: contact.name),
-                const SizedBox(height: 16),
-                Text(
-                  contact.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Icon(Icons.error_outline, size: 48, color: DesignTokens.grayMedium),
                 const SizedBox(height: 12),
                 Text(
-                  'Failed to load CRM history right now.',
-                  style: TextStyle(color: Colors.grey.shade400),
+                  'Could not load details',
+                  style: DesignTokens.textTitle.copyWith(fontSize: 20),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please try again later.',
+                  style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
                 ),
               ],
             ),
           );
         }
 
-        final detail = snapshot.data!;
         final primaryPhone = detail.contact.phones.isNotEmpty
             ? detail.contact.phones.first
-            : contact.phone;
+            : widget.contact.phone;
         final primaryEmail = detail.contact.emails.isNotEmpty
             ? detail.contact.emails.first
-            : contact.email;
+            : widget.contact.email;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
@@ -1453,7 +1603,7 @@ class _CrmContactDetailSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
+                    color: DesignTokens.grayLight,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1464,11 +1614,7 @@ class _CrmContactDetailSheet extends StatelessWidget {
               Center(
                 child: Text(
                   detail.contact.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: DesignTokens.textTitle.copyWith(fontSize: 24),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -1477,11 +1623,13 @@ class _CrmContactDetailSheet extends StatelessWidget {
                 Center(
                   child: Text(
                     primaryPhone ?? primaryEmail ?? '',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 16),
+                    style: DesignTokens.textBody.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ),
               const SizedBox(height: 12),
-              Center(child: _SourceBadges(contact: contact)),
+              Center(child: _SourceBadges(contact: widget.contact)),
               const SizedBox(height: 18),
               Wrap(
                 alignment: WrapAlignment.center,
@@ -1492,7 +1640,7 @@ class _CrmContactDetailSheet extends StatelessWidget {
                     _ActionChip(
                       icon: Icons.call,
                       label: 'Call',
-                      color: _accent,
+                      color: DesignTokens.brandAccent,
                       onTap: () => launchUrl(Uri.parse('tel:$primaryPhone')),
                     ),
                   if ((primaryPhone ?? '').isNotEmpty)
@@ -1600,7 +1748,9 @@ class _CrmContactDetailSheet extends StatelessWidget {
                 child: detail.orders.isEmpty
                     ? Text(
                         'No seller orders linked to this contact yet.',
-                        style: TextStyle(color: Colors.grey.shade400),
+                        style: DesignTokens.textBody.copyWith(
+                          color: DesignTokens.grayMedium,
+                        ),
                       )
                     : Column(
                         children: detail.orders
@@ -1620,6 +1770,17 @@ class _CrmContactDetailSheet extends StatelessWidget {
                   ),
                 ),
               ],
+
+              // ── Activity & Notes (live, interactive) ─────────────────────
+              const SizedBox(height: 16),
+              CrmContactNotesWidget(
+                contactId: widget.contact.remoteCustomerId!,
+                contactName: detail.contact.name.isNotEmpty
+                    ? detail.contact.name
+                    : widget.contact.name,
+              ),
+
+              const SizedBox(height: 24),
             ],
           ),
         );
@@ -1640,19 +1801,20 @@ class _CrmSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _CrmContactDetailSheet._sectionBg,
+        color: DesignTokens.surfaceTint,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(
+          color: DesignTokens.grayLight.withValues(alpha: 0.6),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: DesignTokens.textBodyBold.copyWith(
+              color: DesignTokens.grayDark,
               fontSize: 16,
-              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 14),
@@ -1675,20 +1837,28 @@ class _MetricCard extends StatelessWidget {
       width: 140,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: DesignTokens.surfaceTint,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: DesignTokens.grayLight.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+          Text(
+            label,
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: DesignTokens.textBodyBold.copyWith(
+              color: DesignTokens.grayDark,
               fontSize: 15,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -1714,13 +1884,19 @@ class _ProfileLine extends StatelessWidget {
             width: 108,
             child: Text(
               label,
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayMedium,
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayDark,
+                fontSize: 14,
+              ),
             ),
           ),
         ],
@@ -1740,8 +1916,11 @@ class _OrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: DesignTokens.surfaceTint,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: DesignTokens.grayLight.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1751,17 +1930,15 @@ class _OrderCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   order.code,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: DesignTokens.grayDark,
                   ),
                 ),
               ),
               Text(
                 'UGX ${_formatCurrency(order.grandTotal)}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+                style: DesignTokens.textBodyBold.copyWith(
+                  color: DesignTokens.grayDark,
                 ),
               ),
             ],
@@ -1769,16 +1946,22 @@ class _OrderCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             _formatDateTime(order.createdAt),
-            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _StatusPill(label: order.paymentStatus, color: Colors.blue),
-              _StatusPill(label: order.deliveryStatus, color: Colors.orange),
-              _StatusPill(label: '${order.items.length} item(s)', color: Colors.green),
+              _StatusPill(label: order.paymentStatus, color: DesignTokens.info),
+              _StatusPill(label: order.deliveryStatus, color: DesignTokens.warning),
+              _StatusPill(
+                label: '${order.items.length} item(s)',
+                color: DesignTokens.success,
+              ),
             ],
           ),
           if (order.items.isNotEmpty) ...[
@@ -1788,7 +1971,10 @@ class _OrderCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   '${item.name} • ${item.quantity} x UGX ${_formatCurrency(item.price)}',
-                  style: TextStyle(color: Colors.grey.shade300, fontSize: 13),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -1842,7 +2028,7 @@ class _TimelineRow extends StatelessWidget {
             height: 10,
             margin: const EdgeInsets.only(top: 5),
             decoration: const BoxDecoration(
-              color: Color(0xFF00A884),
+              color: DesignTokens.brandAccent,
               shape: BoxShape.circle,
             ),
           ),
@@ -1853,9 +2039,9 @@ class _TimelineRow extends StatelessWidget {
               children: [
                 Text(
                   event.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: DesignTokens.grayDark,
+                    fontSize: 14,
                   ),
                 ),
                 if ((event.description ?? '').isNotEmpty)
@@ -1863,13 +2049,19 @@ class _TimelineRow extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       event.description!,
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 3),
                 Text(
                   _formatDateTime(event.date),
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -2139,21 +2331,21 @@ class _PremiumTextField extends StatelessWidget {
       controller: controller,
       autofocus: autofocus,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white, fontSize: 16),
-      cursorColor: const Color(0xFF00A884),
+      style: TextStyle(color: DesignTokens.grayDark, fontSize: 16),
+      cursorColor: DesignTokens.brandAccent,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.grey.shade500),
-        prefixIcon: Icon(icon, color: Colors.grey.shade500),
+        labelStyle: TextStyle(color: DesignTokens.grayMedium),
+        prefixIcon: Icon(icon, color: DesignTokens.grayMedium),
         filled: true,
-        fillColor: const Color(0xFF1F2C34),
+        fillColor: DesignTokens.surfaceTint,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF00A884), width: 1.5),
+          borderSide: BorderSide(color: DesignTokens.brandAccent, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -2163,3 +2355,19 @@ class _PremiumTextField extends StatelessWidget {
     );
   }
 }
+
+Color _getAvatarColor(String name) {
+  final colors = [
+    DesignTokens.brandAccent,
+    DesignTokens.info,
+    DesignTokens.warning,
+    DesignTokens.brandPrimary,
+  ];
+  return colors[name.length % colors.length];
+}
+
+const _avatarColors = [
+  Color(0xFF0EBE7E),
+  Color(0xFF4299E1),
+  Color(0xFFF6AD55),
+];

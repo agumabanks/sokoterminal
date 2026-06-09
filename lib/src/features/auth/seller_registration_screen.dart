@@ -1,3 +1,4 @@
+import '../../core/util/haptics.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' as drift;
@@ -11,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_api_availability/google_api_availability.dart';
 import '../../core/util/phone_normalizer.dart';
 import '../../core/firebase/firebase_analytics_service.dart';
 import 'dart:ui';
@@ -56,9 +56,11 @@ class _SellerRegistrationScreenState
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _pinController = TextEditingController();
+  final _pinConfirmController = TextEditingController();
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _pinFocus = FocusNode();
+  final _pinConfirmFocus = FocusNode();
 
   CountryCode _selectedCountry = defaultCountryCode;
   bool _obscurePin = true;
@@ -89,6 +91,9 @@ class _SellerRegistrationScreenState
   bool _fallbackTilesFailed = false;
   double _fallbackZoom = 15;
   final fmap.MapController _fallbackMapController = fmap.MapController();
+  bool _locationPermissionGranted = false;
+  bool _locationServicesEnabled = false;
+  bool _mapReady = false;
 
   GoogleMapController? _mapController;
   Set<Circle> _circles = {};
@@ -208,7 +213,12 @@ class _SellerRegistrationScreenState
     });
 
     if (widget.initialPhone != null) {
-      _phoneController.text = widget.initialPhone!;
+      var phone = widget.initialPhone!;
+      final codeDigits = _selectedCountry.code.replaceFirst('+', '');
+      if (phone.startsWith(codeDigits)) {
+        phone = phone.substring(codeDigits.length);
+      }
+      _phoneController.text = phone;
     }
     _fadeController.forward();
     unawaited(_loadPlans());
@@ -247,7 +257,8 @@ class _SellerRegistrationScreenState
               );
         _loadingPlans = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Registration] loadPlans failed: $e');
       if (!mounted) return;
       setState(() {
         _loadingPlans = false;
@@ -256,23 +267,14 @@ class _SellerRegistrationScreenState
   }
 
   Future<void> _checkGooglePlayServices() async {
-    try {
-      final availability = await GoogleApiAvailability.instance
-          .checkGooglePlayServicesAvailability();
-      if (mounted) {
-        setState(() {
-          _useGoogleMaps =
-              availability == GooglePlayServicesAvailability.success;
-          _checkingMaps = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _useGoogleMaps = false;
-          _checkingMaps = false;
-        });
-      }
+    // Force OpenStreetMap fallback to avoid native GoogleMap crashes on
+    // devices with missing/restricted Google Play Services or API keys.
+    // This lets testers use the app immediately without Google Cloud Console setup.
+    if (mounted) {
+      setState(() {
+        _useGoogleMaps = false;
+        _checkingMaps = false;
+      });
     }
   }
 
@@ -283,14 +285,17 @@ class _SellerRegistrationScreenState
     _nameController.dispose();
     _phoneController.dispose();
     _pinController.dispose();
+    _pinConfirmController.dispose();
     _shopNameController.dispose();
     _addressController.dispose();
     _nameFocus.dispose();
     _phoneFocus.dispose();
     _pinFocus.dispose();
+    _pinConfirmFocus.dispose();
     _shopNameFocus.dispose();
     _addressFocus.dispose();
     _mapController?.dispose();
+    _fallbackMapController.dispose();
     _debounce?.cancel();
     _errorTimer?.cancel();
     _removeOverlay();
@@ -300,17 +305,19 @@ class _SellerRegistrationScreenState
   void _onAddressChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    // Clear location if user types manually (to ensure integrity)
-    // But we keep it until they select a new one or clear it
     if (query.isEmpty) {
       _removeOverlay();
       return;
     }
 
     _debounce = Timer(const Duration(milliseconds: 500), () async {
-      final predictions = await _placesService.search(query);
-      if (mounted && _addressFocus.hasFocus) {
-        _showOverlay(predictions);
+      try {
+        final predictions = await _placesService.search(query);
+        if (mounted && _addressFocus.hasFocus) {
+          _showOverlay(predictions);
+        }
+      } catch (e) {
+        debugPrint('[Registration] address search failed: $e');
       }
     });
   }
@@ -319,8 +326,9 @@ class _SellerRegistrationScreenState
     _removeOverlay();
     if (predictions.isEmpty) return;
 
-    final renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    final size = renderObject.size;
 
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -411,7 +419,7 @@ class _SellerRegistrationScreenState
 
     // Optimistic UI update
     _addressController.text = prediction.description;
-    HapticFeedback.selectionClick();
+    Haptics.selection();
 
     try {
       final details = await _placesService.getDetails(prediction.placeId);
@@ -422,13 +430,19 @@ class _SellerRegistrationScreenState
         });
         _updateLocationMap(LatLng(details.lat, details.lng));
         if (_useGoogleMaps && _mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newLatLngZoom(_location!, 16),
-          );
+          try {
+            await _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(_location!, 16),
+            );
+          } catch (e) {
+            debugPrint('[Map] animateCamera failed: $e');
+          }
         }
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Registration] selectSuggestion failed: $e');
+    }
   }
 
   void _schedulePostRegistrationTasks({
@@ -472,13 +486,24 @@ class _SellerRegistrationScreenState
     if (_currentStep < 2) {
       if (!_validateCurrentStep()) return;
 
+      _addressFocus.unfocus();
+      _removeOverlay();
+
       _fadeController.reverse().then((_) {
-        setState(() => _currentStep++);
-        _pageController.animateToPage(
+        if (!mounted) return;
+        setState(() {
+          _currentStep++;
+          if (_currentStep == 2) _mapReady = false;
+        });
+          _pageController.animateToPage(
           _currentStep,
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeOutQuint,
-        );
+        ).then((_) {
+          if (mounted && _currentStep == 2) {
+            setState(() => _mapReady = true);
+          }
+        });
         _fadeController.forward();
         if (_currentStep == 2 && !_useGoogleMaps) {
           _maybeResolveAddressOnEntry();
@@ -490,7 +515,11 @@ class _SellerRegistrationScreenState
   void _previousStep() {
     if (_currentStep > 0) {
       _fadeController.reverse().then((_) {
-        setState(() => _currentStep--);
+        if (!mounted) return;
+        setState(() {
+          _currentStep--;
+          _mapReady = false;
+        });
         _pageController.animateToPage(
           _currentStep,
           duration: const Duration(milliseconds: 600),
@@ -510,6 +539,8 @@ class _SellerRegistrationScreenState
           return _showError('Phone number required');
         if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text))
           return _showError('PIN must be exactly 6 digits');
+        if (_pinController.text != _pinConfirmController.text)
+          return _showError('PINs do not match');
         return true;
       case 1:
         if (_shopNameController.text.trim().isEmpty)
@@ -534,7 +565,7 @@ class _SellerRegistrationScreenState
       _errorTitle = title;
       _errorMessage = message;
     });
-    HapticFeedback.heavyImpact();
+    Haptics.warning();
     _errorTimer = Timer(duration, () {
       if (!mounted) return;
       setState(() {
@@ -549,14 +580,25 @@ class _SellerRegistrationScreenState
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
+        permission = await Geolocator.requestPermission();
       }
-    } catch (_) {}
+      final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+      if (mounted) {
+        setState(() {
+          _locationPermissionGranted =
+              permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always;
+          _locationServicesEnabled = servicesEnabled;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Registration] location permission request failed: $e');
+    }
   }
 
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoadingLocation = true);
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -571,26 +613,40 @@ class _SellerRegistrationScreenState
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-      );
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+        ),
+      ).timeout(const Duration(seconds: 10));
       final latLng = LatLng(position.latitude, position.longitude);
 
       if (_useGoogleMaps && _mapController != null) {
-        _mapController!.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+        try {
+          await _mapController!.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+        } catch (e) {
+          debugPrint('[Map] animateCamera failed: $e');
+        }
         _updateLocationMap(latLng);
       } else {
-        HapticFeedback.mediumImpact();
+        Haptics.impact();
+        _updateLocationMap(latLng);
         setState(() {
-          _location = latLng;
           _gpsLabel =
               '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
           _lastResolvedQuery = null;
         });
       }
     } catch (e) {
-      _showError('GPS signal weak. Try again.');
+      debugPrint('[Registration] GPS failed: $e');
+      // Fallback to Kampala so the user can proceed and adjust manually
+      const fallback = LatLng(0.3476, 32.5825);
+      _updateLocationMap(fallback);
+      setState(() {
+        _gpsLabel = 'Kampala (tap map to adjust)';
+        _lastResolvedQuery = null;
+      });
+      _showError('GPS unavailable. Set location manually on the map.');
     } finally {
-      setState(() => _isLoadingLocation = false);
+      if (mounted) setState(() => _isLoadingLocation = false);
     }
   }
 
@@ -602,7 +658,7 @@ class _SellerRegistrationScreenState
     LatLng location, {
     required bool withHaptics,
   }) {
-    if (withHaptics) HapticFeedback.selectionClick();
+    if (withHaptics) Haptics.selection();
     setState(() {
       _location = location;
       _fallbackTilesFailed = false;
@@ -634,6 +690,17 @@ class _SellerRegistrationScreenState
     }
   }
 
+  Future<void> _animateMapTo(LatLng location) async {
+    if (!_useGoogleMaps || _mapController == null) return;
+    try {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(location, 16),
+      );
+    } catch (e) {
+      debugPrint('[Map] animateCamera failed: $e');
+    }
+  }
+
   String _normalizePhone(String phone) {
     // Use standard normalizer to ensure consistency with Auth/Backend (e.g. 256xxxx vs +256xxxx)
     if (_selectedCountry.code == '+256') {
@@ -645,7 +712,7 @@ class _SellerRegistrationScreenState
   }
 
   void _showCategoryPicker() {
-    HapticFeedback.lightImpact();
+    Haptics.soft();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -654,7 +721,7 @@ class _SellerRegistrationScreenState
         categories: _allCategories,
         selected: _selectedCategory,
         onSelect: (category) {
-          HapticFeedback.mediumImpact();
+          Haptics.impact();
           setState(() => _selectedCategory = category);
           Navigator.pop(context);
         },
@@ -696,12 +763,17 @@ class _SellerRegistrationScreenState
 
       _updateLocationMap(nextLocation);
       if (_useGoogleMaps && _mapController != null) {
-        _mapController!.animateCamera(
-          CameraUpdate.newLatLngZoom(nextLocation, 16),
-        );
+        try {
+          await _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(nextLocation, 16),
+          );
+        } catch (e) {
+          debugPrint('[Map] animateCamera failed: $e');
+        }
       }
-      HapticFeedback.mediumImpact();
-    } catch (_) {
+      Haptics.impact();
+    } catch (e) {
+      debugPrint('[Registration] resolveAddressToLocation failed: $e');
     } finally {
       if (mounted) setState(() => _isResolvingAddress = false);
     }
@@ -720,7 +792,7 @@ class _SellerRegistrationScreenState
       _errorMessage = null;
       _errorTitle = null;
     });
-    HapticFeedback.heavyImpact();
+    Haptics.warning();
 
     try {
       final api = ref.read(sellerApiProvider);
@@ -746,7 +818,9 @@ class _SellerRegistrationScreenState
       double? registrationLng;
       try {
         final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium,
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+          ),
         ).timeout(const Duration(seconds: 5));
         registrationLat = position.latitude;
         registrationLng = position.longitude;
@@ -784,13 +858,27 @@ class _SellerRegistrationScreenState
         throw Exception('Registration Failed');
       }
 
-      final data = registerResponse.data as Map<String, dynamic>;
+      final rawData = registerResponse.data;
+      if (rawData is! Map<String, dynamic>) {
+        throw Exception('Invalid registration response from server');
+      }
+      final data = Map<String, dynamic>.from(rawData);
       final token =
           data['access_token']?.toString() ?? data['token']?.toString();
       if (token == null) throw Exception('No access token');
 
       final secureStorage = ref.read(secureStorageProvider);
-      await secureStorage.writeAccessToken(token);
+      final normalizedToken = token.trim();
+      if (normalizedToken.isEmpty) {
+        throw Exception('Missing access token');
+      }
+      await secureStorage.writeAccessToken(normalizedToken);
+      final persistedToken = await secureStorage.readAccessToken();
+      if ((persistedToken ?? '').trim().isEmpty) {
+        throw Exception(
+          'Unable to persist the access token on this device. Please try again.',
+        );
+      }
       final user = data['user'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['user'] as Map<String, dynamic>)
           : null;
@@ -798,6 +886,8 @@ class _SellerRegistrationScreenState
       if (sellerUuid != null && sellerUuid.isNotEmpty) {
         await secureStorage.writeSellerUUID(sellerUuid);
       }
+      final db = ref.read(appDatabaseProvider);
+      await db.clearAllData();
       await _seedLocalBusinessCache(
         registrationData: data,
         sellerName: name,
@@ -822,7 +912,7 @@ class _SellerRegistrationScreenState
         return;
       }
       setState(() => _isLoading = false);
-      HapticFeedback.mediumImpact();
+      Haptics.impact();
       debugPrint(
         '[Registration] SUCCESS - showing post-registration welcome dialog',
       );
@@ -902,7 +992,8 @@ class _SellerRegistrationScreenState
           )
         : const <String, dynamic>{};
     final sellerId = user['id']?.toString() ?? existingProfile?.sellerId;
-    final sellerEmail = user['email']?.toString() ?? existingProfile?.sellerEmail;
+    final sellerEmail =
+        user['email']?.toString() ?? existingProfile?.sellerEmail;
     final outletId =
         registrationData['shop_id']?.toString() ??
         registrationData['outlet_id']?.toString() ??
@@ -910,7 +1001,9 @@ class _SellerRegistrationScreenState
         'primary-outlet';
     final cleanedAddress = address.trim();
     final cleanedPhone = phone.trim();
-    final cleanedShopName = shopName.trim().isEmpty ? sellerName.trim() : shopName.trim();
+    final cleanedShopName = shopName.trim().isEmpty
+        ? sellerName.trim()
+        : shopName.trim();
 
     await db.upsertOutlet(
       OutletsCompanion.insert(
@@ -938,7 +1031,9 @@ class _SellerRegistrationScreenState
             : drift.Value(cleanedPhone),
         shopId: drift.Value(outletId),
         shopName: cleanedShopName,
-        shopAddress: drift.Value(cleanedAddress.isEmpty ? null : cleanedAddress),
+        shopAddress: drift.Value(
+          cleanedAddress.isEmpty ? null : cleanedAddress,
+        ),
         shopPhone: cleanedPhone.isEmpty
             ? const drift.Value.absent()
             : drift.Value(cleanedPhone),
@@ -1028,14 +1123,12 @@ class _SellerRegistrationScreenState
           .markSetupRequired();
 
       final api = ref.read(sellerApiProvider);
-      final shopPayload = <String, dynamic>{
-        'name': shopName,
-        if (address.isNotEmpty) 'address': address,
-        if (category != null) 'category': category,
-        'delivery_pickup_latitude': location.latitude,
-        'delivery_pickup_longitude': location.longitude,
-        'delivery_radius_km': _deliveryRadiusKm,
-      };
+      final shopPayload = _buildShopLocationPayload(
+        shopName: shopName,
+        address: address,
+        category: category,
+        location: location,
+      );
 
       try {
         await api.updateProfile({'name': name});
@@ -1049,6 +1142,15 @@ class _SellerRegistrationScreenState
         debugPrint('[Registration] shop update failed: $e');
       }
 
+      await _seedLocalBusinessCache(
+        registrationData: const <String, dynamic>{},
+        sellerName: name,
+        phone: phone,
+        shopName: shopName,
+        address: address,
+        location: location,
+      );
+
       _schedulePostRegistrationTasks(location: location, address: address);
 
       if (!mounted) {
@@ -1056,7 +1158,7 @@ class _SellerRegistrationScreenState
         return true;
       }
       setState(() => _isLoading = false);
-      HapticFeedback.mediumImpact();
+      Haptics.impact();
       await _showPostRegistrationWelcome();
       return true;
     } catch (e) {
@@ -1070,6 +1172,26 @@ class _SellerRegistrationScreenState
       );
       return false;
     }
+  }
+
+  Map<String, dynamic> _buildShopLocationPayload({
+    required String shopName,
+    required String address,
+    required String? category,
+    required LatLng location,
+  }) {
+    return <String, dynamic>{
+      'name': shopName,
+      'shop_name': shopName,
+      if (address.isNotEmpty) 'address': address,
+      if (category != null) 'category': category,
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+      'delivery_pickup_latitude': location.latitude,
+      'delivery_pickup_longitude': location.longitude,
+      'delivery_radius_km': _deliveryRadiusKm,
+      'self_delivery_active': true,
+    };
   }
 
   Future<void> _showPostRegistrationWelcome() async {
@@ -1398,6 +1520,19 @@ class _SellerRegistrationScreenState
               LengthLimitingTextInputFormatter(6),
             ],
           ),
+          const SizedBox(height: 24),
+          _PremiumTextField(
+            label: 'Confirm PIN',
+            controller: _pinConfirmController,
+            focusNode: _pinConfirmFocus,
+            icon: Icons.pin_rounded,
+            obscureText: _obscurePin,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+          ),
           const SizedBox(height: 48),
           _MainButton(text: 'Continue', onTap: _nextStep),
           const SizedBox(height: 32),
@@ -1464,7 +1599,13 @@ class _SellerRegistrationScreenState
     return Stack(
       children: [
         Positioned.fill(
-          child: _useGoogleMaps ? _buildGoogleMap() : _buildFallbackMap(),
+          child: _useGoogleMaps
+              ? (_mapReady
+                  ? _buildGoogleMap()
+                  : const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ))
+              : _buildFallbackMap(),
         ),
         Positioned(
           top: 0,
@@ -1703,6 +1844,7 @@ class _SellerRegistrationScreenState
 
   Widget _buildGoogleMap() {
     return GoogleMap(
+      style: _darkMapStyle,
       initialCameraPosition: CameraPosition(
         target: _location ?? const LatLng(0.3476, 32.5825),
         zoom: 15,
@@ -1713,21 +1855,29 @@ class _SellerRegistrationScreenState
       onMapCreated: (c) {
         debugPrint('[Map] GoogleMap created. hasLocation=${_location != null}');
         _mapController = c;
-        c.setMapStyle(_darkMapStyle);
         final addressQuery = _addressController.text.trim();
         if (_location != null) {
-          c.moveCamera(CameraUpdate.newLatLngZoom(_location!, 15));
-          _updateLocationMap(_location!);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _updateLocationMap(_location!);
+            _animateMapTo(_location!);
+          });
         } else if (addressQuery.isNotEmpty) {
-          _resolveAddressToLocation(addressQuery, force: true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _resolveAddressToLocation(addressQuery, force: true);
+          });
         } else {
-          _getCurrentLocation();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _getCurrentLocation();
+          });
         }
       },
       onTap: _updateLocationMap,
       markers: _markers,
       circles: _circles,
-      myLocationEnabled: true,
+      myLocationEnabled: _locationPermissionGranted && _locationServicesEnabled,
       myLocationButtonEnabled: false,
       scrollGesturesEnabled: true,
       zoomGesturesEnabled: true,
@@ -1795,6 +1945,7 @@ class _SellerRegistrationScreenState
               userAgentPackageName: 'soko_seller_terminal',
               errorTileCallback: (tile, error, stackTrace) {
                 if (_fallbackTilesFailed) return;
+                if (!mounted) return;
                 setState(() => _fallbackTilesFailed = true);
               },
             ),
@@ -2177,12 +2328,23 @@ class _PremiumTextField extends StatefulWidget {
 
 class _PremiumTextFieldState extends State<_PremiumTextField> {
   bool _isFocused = false;
+
+  void _onFocusChange() {
+    if (mounted) {
+      setState(() => _isFocused = widget.focusNode.hasFocus);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    widget.focusNode.addListener(
-      () => setState(() => _isFocused = widget.focusNode.hasFocus),
-    );
+    widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
   }
 
   @override
@@ -2382,7 +2544,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
       curve: Curves.easeOut,
     );
     _controller.forward();
-    HapticFeedback.heavyImpact();
+    Haptics.warning();
   }
 
   @override
@@ -2483,7 +2645,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       icon: null,
                       isPrimary: true,
                       onTap: () {
-                        HapticFeedback.mediumImpact();
+                        Haptics.impact();
                         Navigator.of(
                           context,
                         ).pop(_PostRegistrationChoice.products);
@@ -2496,7 +2658,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       icon: null,
                       isPrimary: false,
                       onTap: () {
-                        HapticFeedback.mediumImpact();
+                        Haptics.impact();
                         Navigator.of(
                           context,
                         ).pop(_PostRegistrationChoice.services);
@@ -2518,7 +2680,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       button: true,
                       child: TextButton.icon(
                         onPressed: () {
-                          HapticFeedback.lightImpact();
+                          Haptics.soft();
                           Navigator.of(
                             context,
                           ).pop(_PostRegistrationChoice.guidedSetup);
@@ -2544,7 +2706,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       button: true,
                       child: GestureDetector(
                         onTap: () {
-                          HapticFeedback.lightImpact();
+                          Haptics.soft();
                           Navigator.of(
                             context,
                           ).pop(_PostRegistrationChoice.checkout);

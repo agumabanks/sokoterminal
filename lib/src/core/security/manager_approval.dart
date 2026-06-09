@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../app_providers.dart';
+import '../auth/pin_hash_service.dart';
 import '../auth/pos_session_controller.dart';
 import '../auth/pos_staff_prefs.dart';
 import '../../widgets/pin_prompt_sheet.dart';
@@ -46,30 +47,48 @@ Future<bool> requireManagerPin(
       return ok;
     }
 
-    // Offline fallback: allow device-level PIN if configured, but syncing will
-    // still require a manager POS session.
-    final expected = await ref.read(secureStorageProvider).readPin();
-    if (expected == null || expected.trim().isEmpty) {
+    // Offline fallback: verify against locally cached manager staff PINs.
+    final db = ref.read(appDatabaseProvider);
+    final pinHash = PinHashService(storage: ref.read(secureStorageProvider));
+    final hashedPin = await pinHash.hash(entered);
+    final manager = await (db.select(db.staff)
+          ..where((t) => t.pin.equals(hashedPin))
+          ..where((t) => t.active.equals(true))
+          ..limit(1))
+        .getSingleOrNull();
+
+    if (manager == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Manager approval needs internet, or set an offline Staff PIN in Settings.',
-            ),
-          ),
+          const SnackBar(content: Text('Incorrect PIN')),
         );
       }
       return false;
     }
 
-    final ok = entered.trim() == expected.trim();
-    if (!context.mounted) return ok;
-    if (!ok) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
+    // Verify role is manager
+    if (manager.roleId != null) {
+      final role = await (db.select(db.roles)
+            ..where((t) => t.id.equals(manager.roleId!))
+            ..limit(1))
+          .getSingleOrNull();
+      final isManager = role?.name.toLowerCase() == 'manager' ||
+          (role?.canRefund == true &&
+              role?.canVoid == true &&
+              role?.canPriceOverride == true);
+      if (!isManager) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This action requires a manager PIN.'),
+            ),
+          );
+        }
+        return false;
+      }
     }
-    return ok;
+
+    return true;
   }
 
   // Legacy single-owner mode: optional device-level PIN lock.

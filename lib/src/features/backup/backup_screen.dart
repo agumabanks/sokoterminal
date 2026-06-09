@@ -10,7 +10,8 @@ final backupsProvider = FutureProvider.autoDispose<List<BackupItem>>((
 ) async {
   final client = ref.watch(apiClientProvider);
   final response = await client.get<Map<String, dynamic>>('/v2/seller/backups');
-  final data = response.data?['data'] as List<dynamic>? ?? [];
+  final raw = response.data?['data'];
+  final data = raw is List ? raw : const <dynamic>[];
   return data
       .map((e) => BackupItem.fromJson(e as Map<String, dynamic>))
       .toList();

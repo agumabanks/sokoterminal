@@ -166,7 +166,7 @@ class ProductVariantsScreen extends ConsumerWidget {
         );
 
     await _recomputeItemSummary(ref, item);
-    await _enqueueVariantSync(ref, item);
+    await _enqueueVariantSync(ref);
 
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
@@ -364,7 +364,7 @@ class ProductVariantsScreen extends ConsumerWidget {
       );
 
       await _recomputeItemSummary(ref, item);
-      await _enqueueVariantSync(ref, item);
+      await _enqueueVariantSync(ref);
 
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -407,14 +407,28 @@ class ProductVariantsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _enqueueVariantSync(WidgetRef ref, Item? item) async {
-    if (item == null) return;
+  Future<void> _enqueueVariantSync(WidgetRef ref) async {
+    final db = ref.read(appDatabaseProvider);
     final sync = ref.read(syncServiceProvider);
+    final item = await db.getItemById(itemId);
+    if (item == null) return;
+
+    // Re-fetch stocks so payload uses fresh summary values
+    final stocks = await db.getItemStocksForItem(itemId);
+    final totalStock = stocks.fold<int>(0, (sum, s) => sum + s.stockQty);
+    final minPrice = stocks.isEmpty
+        ? item.price
+        : stocks.map((s) => s.price).reduce((a, b) => a < b ? a : b);
+
     await sync.enqueue('item_update', {
       'local_id': itemId,
       if (item.remoteId != null) 'remote_id': item.remoteId,
+      'name': item.name,
+      'unit_price': minPrice,
+      'current_stock': totalStock,
+      'published': item.publishedOnline ? 1 : 0,
     });
-    unawaited(sync.syncNow());
+    unawaited(sync.syncCatalogImmediately());
   }
 
   void _toast(BuildContext context, String msg) {

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -86,12 +88,92 @@ class CartController extends StateNotifier<CartState> {
   }) : _db = db,
        _syncService = syncService,
        _storage = secureStorage,
-       super(const CartState());
+       super(const CartState()) {
+    unawaited(_restoreCart());
+  }
 
   final AppDatabase _db;
   final SyncService _syncService;
   final SecureStorage _storage;
   final _uuid = const Uuid();
+
+  @override
+  set state(CartState value) {
+    super.state = value;
+    unawaited(_persistCart());
+  }
+
+  /// Persist current cart state to SQLite so it survives app kills.
+  Future<void> _persistCart() async {
+    try {
+      if (state.lines.isEmpty && state.notes == null && state.customer == null) {
+        await _db.clearActiveCartSale();
+        return;
+      }
+      final linesJson = jsonEncode(
+        state.lines
+            .map(
+              (l) => {
+                'id': l.id,
+                'title': l.title,
+                'price': l.price,
+                'itemId': l.itemId,
+                'serviceId': l.serviceId,
+                'variant': l.variant,
+                'availableStock': l.availableStock,
+                'quantity': l.quantity,
+              },
+            )
+            .toList(),
+      );
+      await _db.saveParkedSale(
+        ParkedSalesCompanion.insert(
+          id: const Value(AppDatabase.activeCartSaleId),
+          saleKind: const Value(AppDatabase.activeCartSaleKind),
+          linesJson: linesJson,
+          notes: Value(state.notes),
+          customerId: Value(state.customer?.id),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[CartController] Failed to persist cart: $e\n$st');
+    }
+  }
+
+  /// Restore cart from SQLite on controller creation.
+  Future<void> _restoreCart() async {
+    try {
+      final parked = await _db.getLatestParkedSale();
+      if (parked == null) return;
+      final List<dynamic> decoded = jsonDecode(parked.linesJson);
+      final lines = decoded
+          .map(
+            (json) => CartLine(
+              id: json['id'] as String,
+              title: json['title'] as String,
+              price: (json['price'] as num).toDouble(),
+              itemId: json['itemId'] as String?,
+              serviceId: json['serviceId'] as String?,
+              variant: json['variant'] as String?,
+              availableStock: json['availableStock'] as int?,
+              quantity: json['quantity'] as int,
+            ),
+          )
+          .toList();
+      Customer? customer;
+      if (parked.customerId != null) {
+        customer = await _db.getCustomerById(parked.customerId!);
+      }
+      super.state = CartState(
+        lines: lines,
+        notes: parked.notes,
+        customer: customer,
+      );
+    } catch (e, st) {
+      debugPrint('[CartController] Failed to restore cart: $e\n$st');
+    }
+  }
 
   String? addItem({required Item item, int quantity = 1, int? availableStock}) {
     final enforceStock = item.stockEnabled;
@@ -388,7 +470,10 @@ class CartController extends StateNotifier<CartState> {
     );
   }
 
-  void clear() => state = const CartState();
+  void clear() {
+    state = const CartState();
+    unawaited(_db.clearActiveCartSale());
+  }
 
   CartState snapshot() => CartState(
     lines: List<CartLine>.from(state.lines),
@@ -434,35 +519,6 @@ class CartController extends StateNotifier<CartState> {
     }
     if (payments.any((p) => p.amount <= 0)) {
       throw ArgumentError('Payment amounts must be greater than 0.');
-    }
-
-    final stockShortages = <String>[];
-    for (final line in state.lines) {
-      final itemId = line.itemId;
-      if (itemId == null || itemId.isEmpty) continue;
-      final item = await _db.getItemById(itemId);
-      if (item == null) continue;
-      if (!item.stockEnabled) continue;
-
-      final variant = (line.variant ?? '').trim();
-      var available = variant.isEmpty ? item.stockQty : 0;
-      final stockRow =
-          await (_db.select(_db.itemStocks)..where(
-                (t) => t.itemId.equals(itemId) & t.variant.equals(variant),
-              ))
-              .getSingleOrNull();
-      if (stockRow != null) {
-        available = stockRow.stockQty;
-      }
-      if (available < line.quantity) {
-        final label = variant.isEmpty ? item.name : '${item.name} • $variant';
-        stockShortages.add(
-          '$label (stock $available, requested ${line.quantity})',
-        );
-      }
-    }
-    if (stockShortages.isNotEmpty) {
-      throw StateError('Insufficient stock: ${stockShortages.join(', ')}');
     }
 
     final transactionId = _uuid.v4();
@@ -514,7 +570,14 @@ class CartController extends StateNotifier<CartState> {
     // Get next sequential receipt number
     final receiptNumber = await _db.getNextReceiptNumber();
 
-    await _db.saveLedgerEntry(
+    // Atomic checkout: stock validation + ledger save + stock decrement
+    // all inside a single Drift transaction. No race conditions.
+    final stockDeltas = state.lines
+        .where((l) => l.itemId != null && l.itemId!.isNotEmpty)
+        .map((l) => (itemId: l.itemId!, quantity: l.quantity, variant: l.variant))
+        .toList();
+
+    await _db.checkoutSale(
       entry: LedgerEntriesCompanion.insert(
         id: Value(transactionId),
         receiptNumber: Value(receiptNumber),
@@ -532,71 +595,79 @@ class CartController extends StateNotifier<CartState> {
       ),
       lines: lines,
       payments: paymentRows,
+      stockDeltas: stockDeltas,
     );
 
-    // Update local stock immediately (offline-first). Server reconciliation will
-    // happen via delta pull; this keeps POS inventory accurate while offline.
-    for (final line in state.lines) {
-      final itemId = line.itemId;
-      if (itemId == null || itemId.isEmpty) continue;
-      await _db.recordInventoryMovement(
-        itemId: itemId,
-        delta: -line.quantity,
-        note: 'sale',
-        variant: line.variant ?? '',
-      );
-    }
+    // Post-sale bookkeeping (best-effort; local sale is the source of truth).
+    try {
 
-    // Create local booking records for service lines (unified booking history)
-    for (final line in state.lines) {
-      final serviceId = line.serviceId;
-      if (serviceId == null || serviceId.isEmpty) continue;
-      await _db.createLocalBooking(
-        serviceId: serviceId,
-        variantName: line.variant,
-        customerId: resolvedCustomer?.id,
-        ledgerEntryId: transactionId,
-        price: line.total,
-        completedAt: occurredAt,
-      );
-    }
+      // Create local booking records for service lines (unified booking history)
+      for (final line in state.lines) {
+        final serviceId = line.serviceId;
+        if (serviceId == null || serviceId.isEmpty) continue;
+        try {
+          await _db.createLocalBooking(
+            serviceId: serviceId,
+            variantName: line.variant,
+            customerId: resolvedCustomer?.id,
+            ledgerEntryId: transactionId,
+            price: line.total,
+            completedAt: occurredAt,
+          );
+        } catch (e) {
+          debugPrint('[Checkout] Local booking failed for $serviceId: $e');
+        }
+      }
 
-    await _syncService.enqueue('ledger_push', {
-      'entry_id': transactionId,
-      'idempotency_key': idempotencyKey,
-      'type': 'sale',
-      'subtotal': total,
-      'discount': 0,
-      'tax': 0,
-      'total': total,
-      'note': notes,
-      'occurred_at': occurredAt.toIso8601String(),
-      'customer_id': resolvedCustomer?.id,
-      'payments': payments
-          .map(
-            (p) => {
-              'method': p.method,
-              'amount': p.amount,
-              if (p.externalRef != null) 'external_ref': p.externalRef,
-            },
-          )
-          .toList(),
-      'lines': state.lines
-          .map(
-            (e) => {
-              'product_id': e.itemId,
-              'service_id': e.serviceId,
-              'name': e.title,
-              if (e.variant != null && e.variant!.trim().isNotEmpty)
-                'variation': e.variant,
-              'price': e.price,
-              'quantity': e.quantity,
-              'subtotal': e.total,
-            },
-          )
-          .toList(),
-    });
-    unawaited(_syncService.syncNow());
+      try {
+        await _ensureCatalogDependenciesQueued();
+      } catch (e) {
+        debugPrint('[Checkout] Catalog dependency queueing failed: $e');
+      }
+
+      try {
+        await _syncService.enqueue('ledger_push', {
+          'entry_id': transactionId,
+          'idempotency_key': idempotencyKey,
+          'type': 'sale',
+          'subtotal': total,
+          'discount': 0,
+          'tax': 0,
+          'total': total,
+          'note': notes,
+          'occurred_at': occurredAt.toIso8601String(),
+          'customer_id': resolvedCustomer?.id,
+          'payments': payments
+              .map(
+                (p) => {
+                  'method': p.method,
+                  'amount': p.amount,
+                  if (p.externalRef != null) 'external_ref': p.externalRef,
+                },
+              )
+              .toList(),
+          'lines': state.lines
+              .map(
+                (e) => {
+                  'product_id': e.itemId,
+                  'service_id': e.serviceId,
+                  'name': e.title,
+                  if (e.variant != null && e.variant!.trim().isNotEmpty)
+                    'variation': e.variant,
+                  'price': e.price,
+                  'quantity': e.quantity,
+                  'subtotal': e.total,
+                },
+              )
+              .toList(),
+        });
+        unawaited(_syncService.syncNow());
+      } catch (e) {
+        debugPrint('[Checkout] Ledger sync enqueue failed: $e');
+      }
+    } catch (e) {
+      debugPrint('[Checkout] Post-sale bookkeeping error: $e');
+    }
 
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
@@ -617,6 +688,122 @@ class CartController extends StateNotifier<CartState> {
 
     clear();
     return transactionId;
+  }
+
+  Future<void> _ensureCatalogDependenciesQueued() async {
+    final queuedItemCreates = await _queuedLocalIdsFor('item_create');
+    final queuedServiceCreates = await _queuedLocalIdsFor('service_create');
+
+    for (final line in state.lines) {
+      final itemId = line.itemId;
+      if (itemId != null && itemId.isNotEmpty) {
+        final item = await _db.getItemById(itemId);
+        if (item != null &&
+            item.remoteId == null &&
+            !queuedItemCreates.contains(item.id)) {
+          await _syncService.enqueue(
+            'item_create',
+            _buildItemCreatePayload(item),
+          );
+          queuedItemCreates.add(item.id);
+        }
+      }
+
+      final serviceId = line.serviceId;
+      if (serviceId != null && serviceId.isNotEmpty) {
+        final service = await _db.getServiceById(serviceId);
+        if (service != null &&
+            service.remoteId == null &&
+            !queuedServiceCreates.contains(service.id)) {
+          await _syncService.enqueue(
+            'service_create',
+            _buildServiceCreatePayload(service),
+          );
+          queuedServiceCreates.add(service.id);
+        }
+      }
+    }
+  }
+
+  Future<Set<String>> _queuedLocalIdsFor(String opType) async {
+    final ids = <String>{};
+    final ops = [...await _db.pendingSyncOps(), ...await _db.blockedSyncOps()];
+    for (final op in ops) {
+      if (op.opType != opType) continue;
+      try {
+        final payload = jsonDecode(op.payload);
+        if (payload is! Map) continue;
+        final localId = payload['local_id']?.toString().trim();
+        if (localId != null && localId.isNotEmpty) {
+          ids.add(localId);
+        }
+      } catch (_) {
+        // Ignore malformed legacy payloads.
+      }
+    }
+    return ids;
+  }
+
+  Map<String, dynamic> _buildItemCreatePayload(Item item) {
+    final payload = <String, dynamic>{
+      'local_id': item.id,
+      'name': item.name,
+      'unit_price': item.price,
+      'current_stock': item.stockQty,
+      'published': item.publishedOnline ? 1 : 0,
+      'unit': (item.unit ?? '').trim().isEmpty ? 'pc' : item.unit,
+      'min_qty': item.minPurchaseQty,
+      'refundable': item.refundable ? 1 : 0,
+      'cash_on_delivery': item.cashOnDelivery ? 1 : 0,
+    };
+    if (item.categoryId != null) {
+      payload['category_id'] = item.categoryId;
+      payload['category_ids'] = [item.categoryId];
+    }
+    if (item.brandId != null) {
+      payload['brand_id'] = item.brandId;
+    }
+    if (item.weight != null) {
+      payload['weight'] = item.weight;
+    }
+    if ((item.description ?? '').trim().isNotEmpty) {
+      payload['description'] = item.description!.trim();
+    }
+    if ((item.sku ?? '').trim().isNotEmpty) {
+      payload['sku'] = item.sku!.trim();
+    }
+    if ((item.barcode ?? '').trim().isNotEmpty) {
+      payload['barcode'] = item.barcode!.trim();
+    }
+    if (item.discount != null) {
+      payload['discount'] = item.discount;
+      payload['discount_type'] = item.discountType == 'flat'
+          ? 'amount'
+          : 'percent';
+    }
+    if (item.shippingDays != null) {
+      payload['est_shipping_days'] = item.shippingDays;
+    }
+    if (item.shippingFee != null) {
+      payload['shipping_cost'] = item.shippingFee;
+    }
+    if (item.lowStockWarning != null) {
+      payload['low_stock_quantity'] = item.lowStockWarning;
+    }
+    return payload;
+  }
+
+  Map<String, dynamic> _buildServiceCreatePayload(Service service) {
+    return {
+      'local_id': service.id,
+      'title': service.title,
+      if ((service.description ?? '').trim().isNotEmpty)
+        'description': service.description!.trim(),
+      'base_price': service.price,
+      if (service.durationMinutes != null)
+        'duration_minutes': service.durationMinutes,
+      'is_published': service.publishedOnline,
+    };
   }
 }
 

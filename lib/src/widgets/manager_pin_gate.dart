@@ -100,8 +100,8 @@ class _ManagerPinSheetState extends ConsumerState<_ManagerPinSheet> {
 
   Future<void> _verify() async {
     final pin = _pinController.text.trim();
-    if (pin.length < 4) {
-      setState(() => _error = 'PIN must be at least 4 digits');
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      setState(() => _error = 'PIN must be exactly 6 digits');
       return;
     }
 

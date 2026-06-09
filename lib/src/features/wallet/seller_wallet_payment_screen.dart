@@ -31,6 +31,8 @@ class _SellerWalletPaymentScreenState
   bool _loading = true;
   bool _completing = false;
   String? _statusMessage;
+  int _pollCount = 0;
+  static const int _maxPolls = 120; // ~6 minutes at 3-second intervals
 
   @override
   void initState() {
@@ -58,6 +60,16 @@ class _SellerWalletPaymentScreenState
     );
   }
 
+  void _stopPollingWithTimeout() {
+    _pollTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _completing = false;
+      _statusMessage =
+          'Payment status check timed out. Please verify your balance later.';
+    });
+  }
+
   @override
   void dispose() {
     _pollTimer?.cancel();
@@ -66,6 +78,12 @@ class _SellerWalletPaymentScreenState
 
   Future<void> _pollStatus() async {
     if (_completing || !mounted) return;
+
+    _pollCount++;
+    if (_pollCount > _maxPolls) {
+      _stopPollingWithTimeout();
+      return;
+    }
 
     try {
       final response = await ref
@@ -107,7 +125,8 @@ class _SellerWalletPaymentScreenState
           _statusMessage = message ?? 'Payment was not completed.';
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Wallet payment polling error: $e');
       // Keep polling quietly while the checkout page remains open.
     }
   }

@@ -128,8 +128,12 @@ class ServiceVariantsScreen extends ConsumerWidget {
     final sync = ref.read(syncServiceProvider);
 
     await db.deleteServiceVariant(v.id);
-    await sync.enqueue('service_variant_delete', {'variant_id': v.id});
-    unawaited(sync.syncNow());
+    // Only enqueue remote delete if this variant was ever synced to the server.
+    // Unsynced local variants don't exist on the backend yet.
+    if (v.synced) {
+      await sync.enqueue('service_variant_delete', {'variant_id': v.id});
+      unawaited(sync.syncCatalogImmediately());
+    }
   }
 
   Future<void> _showEditor(
@@ -142,83 +146,100 @@ class ServiceVariantsScreen extends ConsumerWidget {
     final unitCtrl = TextEditingController(text: variant?.unit ?? 'unit');
     bool isDefault = variant?.isDefault ?? false;
 
-    await BottomSheetModal.show<void>(
-      context: context,
-      title: variant == null ? 'Add Variant' : 'Edit Variant',
-      child: StatefulBuilder(
-        builder: (ctx, setState) => Column(
-          children: [
-            AppInput(
-              controller: nameCtrl,
-              label: 'Variant Name (e.g. A4 Color)',
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            AppInput(
-              controller: priceCtrl,
-              label: 'Price (UGX)',
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: DesignTokens.spaceMd),
-            AppInput(controller: unitCtrl, label: 'Unit (e.g. page, hr)'),
-            const SizedBox(height: DesignTokens.spaceMd),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Set as Default'),
-              value: isDefault,
-              onChanged: (v) => setState(() => isDefault = v),
-            ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            AppButton(
-              label: 'Save Variant',
-              onPressed: () async {
-                final name = nameCtrl.text.trim();
-                final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
-                final unit = unitCtrl.text.trim();
+    try {
+      await BottomSheetModal.show<void>(
+        context: context,
+        title: variant == null ? 'Add Variant' : 'Edit Variant',
+        child: StatefulBuilder(
+          builder: (ctx, setState) => Column(
+            children: [
+              AppInput(
+                controller: nameCtrl,
+                label: 'Variant Name (e.g. A4 Color)',
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              AppInput(
+                controller: priceCtrl,
+                label: 'Price (UGX)',
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              AppInput(controller: unitCtrl, label: 'Unit (e.g. page, hr)'),
+              const SizedBox(height: DesignTokens.spaceMd),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Set as Default'),
+                value: isDefault,
+                onChanged: (v) => setState(() => isDefault = v),
+              ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              AppButton(
+                label: 'Save Variant',
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+                  final unit = unitCtrl.text.trim();
 
-                if (name.isEmpty || price <= 0) return;
+                  if (name.isEmpty || price <= 0) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter a valid name and price.'),
+                        backgroundColor: DesignTokens.error,
+                      ),
+                    );
+                    return;
+                  }
 
-                Navigator.pop(ctx);
+                  Navigator.pop(ctx);
 
-                final db = ref.read(appDatabaseProvider);
-                final sync = ref.read(syncServiceProvider);
-                final id = variant?.id ?? const Uuid().v4();
-                final now = DateTime.now().toUtc();
+                  final db = ref.read(appDatabaseProvider);
+                  final sync = ref.read(syncServiceProvider);
+                  final id = variant?.id ?? const Uuid().v4();
+                  final now = DateTime.now().toUtc();
 
-                // If setting as default, unset others
-                if (isDefault) {
-                  await db.unsetDefaultVariants(serviceId);
-                }
+                  // If setting as default, unset others
+                  if (isDefault) {
+                    await db.unsetDefaultVariants(serviceId);
+                  }
 
-                final companion = ServiceVariantsCompanion(
-                  id: Value(id),
-                  serviceId: Value(serviceId),
-                  name: Value(name),
-                  price: Value(price),
-                  unit: Value(unit),
-                  isDefault: Value(isDefault),
-                  updatedAt: Value(now),
-                  synced: const Value(false),
-                );
+                  final companion = ServiceVariantsCompanion(
+                    id: Value(id),
+                    serviceId: Value(serviceId),
+                    name: Value(name),
+                    price: Value(price),
+                    unit: Value(unit),
+                    isDefault: Value(isDefault),
+                    updatedAt: Value(now),
+                    synced: const Value(false),
+                  );
 
-                await db.upsertServiceVariant(companion);
+                  await db.upsertServiceVariant(companion);
 
-                await sync.enqueue('service_variant_push', {
-                  'id': id,
-                  'service_id': serviceId,
-                  'name': name,
-                  'price': price,
-                  'unit': unit,
-                  'is_default': isDefault ? 1 : 0,
-                });
-
-                // Trigger immediate sync attempt
-                unawaited(sync.syncNow());
-              },
-            ),
-          ],
+                  try {
+                    await sync.enqueue('service_variant_push', {
+                      'id': id,
+                      'service_id': serviceId,
+                      'name': name,
+                      'price': price,
+                      'unit': unit,
+                      'is_default': isDefault ? 1 : 0,
+                    });
+                    unawaited(sync.syncCatalogImmediately());
+                  } catch (e) {
+                    debugPrint('[ServiceVariant] Sync enqueue failed: $e');
+                    // Offline-first: local change is saved; periodic sync will retry.
+                  }
+                },
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      nameCtrl.dispose();
+      priceCtrl.dispose();
+      unitCtrl.dispose();
+    }
   }
 }
 

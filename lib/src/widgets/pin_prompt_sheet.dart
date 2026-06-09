@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/design_tokens.dart';
+import '../core/util/haptics.dart';
 import 'bottom_sheet_modal.dart';
 
 class PinPromptSheet extends StatefulWidget {
@@ -77,7 +78,7 @@ class _PinPromptSheetState extends State<PinPromptSheet> {
   }
 
   void _submit() {
-    HapticFeedback.selectionClick();
+    Haptics.selection();
     final pin = _pinCtrl.text.trim();
     Navigator.of(context).pop(pin.isEmpty ? null : pin);
   }

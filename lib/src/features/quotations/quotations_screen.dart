@@ -10,6 +10,7 @@ import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/error_page.dart';
+import '../ads/brand_kit_screen.dart';
 import '../invoices/invoice_providers.dart';
 import 'quotation_creator.dart';
 
@@ -267,6 +268,10 @@ class _QuotationCard extends ConsumerWidget {
     final validUntil = quotation.validUntil?.toLocal();
     final isExpired =
         validUntil != null && DateTime.now().isAfter(validUntil);
+    final brandKit = ref.watch(brandKitProvider);
+    final businessName = brandKit.businessName.trim().isNotEmpty
+        ? brandKit.businessName.trim()
+        : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
@@ -276,6 +281,18 @@ class _QuotationCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Business name from brand kit (if available)
+              if (businessName != null) ...[
+                Text(
+                  businessName,
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.brandPrimary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -370,9 +387,10 @@ class _QuotationCard extends ConsumerWidget {
                     child: OutlinedButton.icon(
                       onPressed: () async {
                         try {
+                          final kit = ref.read(brandKitProvider);
                           await ref
                               .read(invoiceServiceProvider)
-                              .shareQuotationPdf(row);
+                              .shareQuotationPdf(row, brandKit: kit);
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(

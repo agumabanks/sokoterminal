@@ -388,6 +388,15 @@ class _ActionsCard extends ConsumerWidget {
                 outletId: outletId,
                 staffId: staffId,
               );
+              final sync = ref.read(syncServiceProvider);
+              await sync.enqueue('shift_open', {
+                'idempotency_key': shiftId,
+                'shift_id': shiftId,
+                'opened_at': DateTime.now().toUtc().toIso8601String(),
+                'opening_float': opening,
+                if (staffId != null) 'staff_id': staffId,
+                if (outletId != null) 'outlet_id': outletId,
+              });
               await db.recordCashMovement(
                 type: 'open',
                 amount: opening,
@@ -395,7 +404,7 @@ class _ActionsCard extends ConsumerWidget {
                 outletId: outletId,
                 staffId: staffId,
               );
-              unawaited(ref.read(syncServiceProvider).syncNow());
+              unawaited(sync.syncNow());
               if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -580,6 +589,13 @@ class _ActionsCard extends ConsumerWidget {
               final counted = double.tryParse(countedCtrl.text.trim()) ?? 0;
               final db = ref.read(appDatabaseProvider);
               await db.closeShift(shiftId: shift.id, closingFloat: counted);
+              final sync = ref.read(syncServiceProvider);
+              await sync.enqueue('shift_close', {
+                'idempotency_key': shift.id,
+                'shift_id': shift.id,
+                'closed_at': DateTime.now().toUtc().toIso8601String(),
+                'closing_float': counted,
+              });
               await db.recordCashMovement(
                 type: 'close',
                 amount: counted,
@@ -587,7 +603,7 @@ class _ActionsCard extends ConsumerWidget {
                 outletId: shift.outletId,
                 staffId: shift.staffId,
               );
-              unawaited(ref.read(syncServiceProvider).syncNow());
+              unawaited(sync.syncNow());
               if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(

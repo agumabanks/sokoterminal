@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/design_tokens.dart';
+import '../core/util/haptics.dart';
 
 /// A unified action tile for list-style navigation.
 ///
 /// Used in the More screen and similar menus for consistent
 /// navigation and action items.
-class ActionTile extends StatelessWidget {
+class ActionTile extends StatefulWidget {
   const ActionTile({
     required this.title,
     required this.icon,
@@ -32,80 +33,111 @@ class ActionTile extends StatelessWidget {
   final String? badge;
 
   @override
+  State<ActionTile> createState() => _ActionTileState();
+}
+
+class _ActionTileState extends State<ActionTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: DesignTokens.surfaceWhite,
-      borderRadius: DesignTokens.borderRadiusMd,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap?.call();
-        },
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: DesignTokens.durationFast,
+      curve: DesignTokens.curveStandard,
+      child: Material(
+        color: DesignTokens.surfaceWhite,
         borderRadius: DesignTokens.borderRadiusMd,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: DesignTokens.spaceMd,
-            vertical: DesignTokens.spaceMd,
-          ),
-          child: Row(
-            children: [
-              _IconContainer(
-                icon: icon,
-                color: iconColor,
-                backgroundColor: iconBackgroundColor,
-              ),
-              const SizedBox(width: DesignTokens.spaceMd),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: DesignTokens.textBodyBold,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: DesignTokens.spaceXxs),
+        child: InkWell(
+          onTap: () {
+            Haptics.selection();
+            widget.onTap?.call();
+          },
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          borderRadius: DesignTokens.borderRadiusMd,
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: DesignTokens.surfaceGrouped,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceMd,
+              vertical: DesignTokens.spaceMd,
+            ),
+            child: Row(
+              children: [
+                _IconContainer(
+                  icon: widget.icon,
+                  color: widget.iconColor,
+                  backgroundColor: widget.iconBackgroundColor,
+                ),
+                const SizedBox(width: DesignTokens.spaceMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitle!,
-                        style: DesignTokens.textSmall,
+                        widget.title,
+                        style: DesignTokens.textBodyBold,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (widget.subtitle != null) ...[
+                        const SizedBox(height: DesignTokens.spaceXxs),
+                        Text(
+                          widget.subtitle!,
+                          style: DesignTokens.textSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              if (badge != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spaceSm,
-                    vertical: DesignTokens.spaceXs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: DesignTokens.error,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    badge!,
-                    style: DesignTokens.textSmall.copyWith(
-                      color: DesignTokens.surfaceWhite,
-                      fontWeight: FontWeight.w600,
+                if (widget.badge != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DesignTokens.spaceSm,
+                      vertical: DesignTokens.spaceXs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: DesignTokens.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      widget.badge!,
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.surfaceWhite,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: DesignTokens.spaceSm),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                ],
+                if (widget.trailing != null)
+                  widget.trailing!
+                else if (widget.showChevron)
+                  TweenAnimationBuilder<Offset>(
+                    duration: DesignTokens.durationFast,
+                    curve: DesignTokens.curveStandard,
+                    tween: Tween<Offset>(
+                      begin: Offset.zero,
+                      end: _pressed ? const Offset(4, 0) : Offset.zero,
+                    ),
+                    builder: (context, offset, child) {
+                      return Transform.translate(
+                        offset: offset,
+                        child: child,
+                      );
+                    },
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: DesignTokens.grayMedium,
+                      size: DesignTokens.iconMd,
+                    ),
+                  ),
               ],
-              if (trailing != null)
-                trailing!
-              else if (showChevron)
-                Icon(
-                  Icons.chevron_right,
-                  color: DesignTokens.grayMedium,
-                  size: DesignTokens.iconMd,
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -166,10 +198,12 @@ class ActionTileCompact extends StatelessWidget {
       borderRadius: DesignTokens.borderRadiusMd,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          Haptics.selection();
           onTap?.call();
         },
         borderRadius: DesignTokens.borderRadiusMd,
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: DesignTokens.surfaceGrouped,
         child: Stack(
           children: [
             Padding(

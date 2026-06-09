@@ -1,47 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'design_tokens.dart';
 
-/// Soko Seller Terminal Theme
+/// Soko Seller Terminal Theme V4
+/// Apple × Nike design language applied to a B2B POS.
 ///
-/// Premium theme following "Steve Jobs standard" design principles:
-/// - Clean, minimal aesthetics
-/// - Consistent spacing (8pt grid)
-/// - Limited color palette
-/// - Refined typography
+/// Rules carried from the design system:
+///   • Pill geometry (radiusFull) on every CTA button.
+///   • brandAccent is the ONLY CTA background — never brandPrimary.
+///   • Zero elevation on cards — no card shadow, no fill-color drift.
+///   • Bottom bars and modals get shadowBar / shadowModal.
+///   • Typography uses Inter with negative letter-spacing on headlines.
 class AppTheme {
   AppTheme._();
 
   static ThemeData light() {
+    final baseTextTheme = GoogleFonts.interTextTheme();
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
 
-      // Color scheme
+      // ─── Color Scheme ───────────────────────────────────────────────────
       colorScheme: ColorScheme.fromSeed(
-        seedColor: DesignTokens.brandPrimary,
-        primary: DesignTokens.brandPrimary,
-        secondary: DesignTokens.brandAccent,
-        surface: DesignTokens.surface,
+        seedColor: DesignTokens.brandAccent,
+        primary: DesignTokens.brandAccent,
+        secondary: DesignTokens.brandPrimary,
+        surface: DesignTokens.canvas,
         error: DesignTokens.error,
-        onPrimary: DesignTokens.surfaceWhite,
-        onSecondary: DesignTokens.surfaceWhite,
-        onSurface: DesignTokens.grayDark,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onSurface: DesignTokens.ink,
+        onError: Colors.white,
       ),
 
-      // Scaffold
-      scaffoldBackgroundColor: DesignTokens.surface,
+      scaffoldBackgroundColor: DesignTokens.canvasParchment,
 
-      // App Bar
+      // ─── AppBar ─────────────────────────────────────────────────────────
       appBarTheme: AppBarTheme(
         elevation: 0,
-        scrolledUnderElevation: 1,
-        backgroundColor: DesignTokens.surfaceWhite,
-        foregroundColor: DesignTokens.grayDark,
+        scrolledUnderElevation: 0.5,
+        backgroundColor: DesignTokens.canvas,
+        foregroundColor: DesignTokens.ink,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
         titleTextStyle: DesignTokens.textTitle,
+        iconTheme: const IconThemeData(color: DesignTokens.ink, size: 22),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.dark,
@@ -49,247 +57,287 @@ class AppTheme {
         ),
       ),
 
-      // Bottom Navigation
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: DesignTokens.surfaceWhite,
-        selectedItemColor: DesignTokens.brandPrimary,
-        unselectedItemColor: DesignTokens.grayMedium,
-        selectedLabelStyle: DesignTokens.textSmall.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: DesignTokens.textSmall,
-        showUnselectedLabels: true,
-        elevation: 8,
+      // ─── Navigation Bar (M3) ────────────────────────────────────────────
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: DesignTokens.canvas,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        indicatorColor: DesignTokens.brandAccentDim,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final on = states.contains(WidgetState.selected);
+          return DesignTokens.textCaption.copyWith(
+            fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+            color: on ? DesignTokens.brandAccent : DesignTokens.inkMuted,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final on = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: on ? DesignTokens.brandAccent : DesignTokens.inkMuted,
+            size: 22,
+          );
+        }),
+        height: 64,
       ),
 
-      // Cards
+      // ─── Bottom Nav Bar (legacy) ─────────────────────────────────────────
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: DesignTokens.canvas,
+        selectedItemColor: DesignTokens.brandAccent,
+        unselectedItemColor: DesignTokens.inkMuted,
+        selectedLabelStyle: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: DesignTokens.textCaption,
+        showUnselectedLabels: true,
+        elevation: 0,
+      ),
+
+      // ─── Cards ──────────────────────────────────────────────────────────
+      // Zero elevation, zero shadow — the product photo carries the weight.
       cardTheme: CardThemeData(
         elevation: 0,
-        color: DesignTokens.surfaceWhite,
-        shape: RoundedRectangleBorder(
+        color: DesignTokens.canvas,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
           borderRadius: DesignTokens.borderRadiusMd,
+          side: BorderSide(color: DesignTokens.hairline, width: 0.5),
         ),
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
       ),
 
-      // Elevated Buttons
+      // ─── Elevated Buttons ────────────────────────────────────────────────
+      // Pill shape, brandAccent fill — Nike primary CTA grammar.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: DesignTokens.brandPrimary,
-          foregroundColor: DesignTokens.surfaceWhite,
+          backgroundColor: DesignTokens.brandAccent,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: DesignTokens.hairline,
+          disabledForegroundColor: DesignTokens.inkDisabled,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(
-            horizontal: DesignTokens.spaceLg,
-            vertical: DesignTokens.spaceMd,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: DesignTokens.borderRadiusMd,
-          ),
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+          shape: const StadiumBorder(),
           textStyle: DesignTokens.textBody.copyWith(
             fontWeight: FontWeight.w600,
-            color: DesignTokens.surfaceWhite,
+            color: Colors.white,
+            letterSpacing: 0,
           ),
+          minimumSize: const Size(0, 48),
         ),
       ),
 
-      // Outlined Buttons
+      // ─── Outlined Buttons ────────────────────────────────────────────────
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: DesignTokens.brandPrimary,
-          side: const BorderSide(color: DesignTokens.grayLight, width: 1.5),
-          padding: const EdgeInsets.symmetric(
-            horizontal: DesignTokens.spaceLg,
-            vertical: DesignTokens.spaceMd,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: DesignTokens.borderRadiusMd,
-          ),
-          textStyle: DesignTokens.textBody.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          foregroundColor: DesignTokens.ink,
+          side: const BorderSide(color: DesignTokens.hairline, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: const StadiumBorder(),
+          textStyle: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w500),
+          minimumSize: const Size(0, 44),
         ),
       ),
 
-      // Text Buttons
+      // ─── Text Buttons ────────────────────────────────────────────────────
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: DesignTokens.brandPrimary,
-          padding: const EdgeInsets.symmetric(
-            horizontal: DesignTokens.spaceMd,
-            vertical: DesignTokens.spaceSm,
-          ),
-          textStyle: DesignTokens.textBody.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          foregroundColor: DesignTokens.brandAccent,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          textStyle: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+          shape: const StadiumBorder(),
         ),
       ),
 
-      // Icon Buttons
-      iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(foregroundColor: DesignTokens.grayDark),
-      ),
-
-      // Floating Action Button
+      // ─── FAB ─────────────────────────────────────────────────────────────
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: DesignTokens.brandAccent,
-        foregroundColor: DesignTokens.surfaceWhite,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: DesignTokens.borderRadiusMd,
-        ),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        shape: const StadiumBorder(),
       ),
 
-      // Input Decoration
+      // ─── Chips ───────────────────────────────────────────────────────────
+      // Nike filter-chip grammar: pill shape, soft-cloud bg, ink → accent when active.
+      chipTheme: ChipThemeData(
+        backgroundColor: DesignTokens.canvasCloud,
+        selectedColor: DesignTokens.brandAccentDim,
+        disabledColor: DesignTokens.hairline,
+        labelStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+        secondaryLabelStyle: DesignTokens.textSmall.copyWith(
+          fontWeight: FontWeight.w600,
+          color: DesignTokens.brandAccent,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        shape: const StadiumBorder(),
+        side: BorderSide.none,
+        elevation: 0,
+        pressElevation: 0,
+        showCheckmark: false,
+      ),
+
+      // ─── Input Decoration ────────────────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: DesignTokens.surfaceWhite,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceMd,
-          vertical: DesignTokens.spaceMd,
-        ),
+        fillColor: DesignTokens.canvasCloud,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.grayLight),
+          borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.grayLight),
+          borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(
-            color: DesignTokens.brandPrimary,
-            width: 2,
-          ),
+          borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.error),
+          borderSide: const BorderSide(color: DesignTokens.error, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.error, width: 2),
+          borderSide: const BorderSide(color: DesignTokens.error, width: 1.5),
         ),
-        labelStyle: DesignTokens.textBody.copyWith(
-          color: DesignTokens.grayMedium,
-        ),
-        hintStyle: DesignTokens.textBody.copyWith(
-          color: DesignTokens.grayMedium,
-        ),
-        prefixIconColor: DesignTokens.grayMedium,
-        suffixIconColor: DesignTokens.grayMedium,
+        labelStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkMuted),
+        hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkDisabled),
+        prefixIconColor: DesignTokens.inkMuted,
+        suffixIconColor: DesignTokens.inkMuted,
+        errorStyle: DesignTokens.textCaption.copyWith(color: DesignTokens.error),
       ),
 
-      // Chips
-      chipTheme: ChipThemeData(
-        backgroundColor: DesignTokens.grayLight.withValues(alpha: 0.5),
-        labelStyle: DesignTokens.textSmall.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceSm,
-          vertical: DesignTokens.spaceXs,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: DesignTokens.borderRadiusSm,
-        ),
-        side: BorderSide.none,
-      ),
-
-      // Switch
+      // ─── Switch ──────────────────────────────────────────────────────────
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return DesignTokens.brandAccent;
-          }
-          return DesignTokens.grayMedium;
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return DesignTokens.brandAccent.withValues(alpha: 0.3);
-          }
-          return DesignTokens.grayLight;
-        }),
+        thumbColor: WidgetStateProperty.all(Colors.white),
+        trackColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? DesignTokens.brandAccent : DesignTokens.hairline),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
 
-      // Divider
-      dividerTheme: DividerThemeData(
-        color: DesignTokens.grayLight.withValues(alpha: 0.5),
-        thickness: 1,
-        space: 1,
+      // ─── Checkbox ────────────────────────────────────────────────────────
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? DesignTokens.brandAccent : Colors.transparent),
+        checkColor: WidgetStateProperty.all(Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        side: const BorderSide(color: DesignTokens.hairline, width: 1.5),
       ),
 
-      // List Tile
-      listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceMd,
-          vertical: DesignTokens.spaceXs,
-        ),
-        titleTextStyle: DesignTokens.textBody,
-        subtitleTextStyle: DesignTokens.textSmall,
-        leadingAndTrailingTextStyle: DesignTokens.textSmall,
-        shape: RoundedRectangleBorder(
-          borderRadius: DesignTokens.borderRadiusMd,
-        ),
+      // ─── Tab Bar ─────────────────────────────────────────────────────────
+      tabBarTheme: TabBarThemeData(
+        labelColor: DesignTokens.brandAccent,
+        unselectedLabelColor: DesignTokens.inkMuted,
+        indicatorColor: DesignTokens.brandAccent,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: DesignTokens.hairline,
+        labelStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: DesignTokens.textSmall,
       ),
 
-      // Bottom Sheet
-      bottomSheetTheme: BottomSheetThemeData(
+      // ─── Bottom Sheet ────────────────────────────────────────────────────
+      bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.transparent,
         modalBackgroundColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: DesignTokens.borderRadiusBottomSheet,
         ),
         elevation: 0,
+        modalElevation: 0,
+        dragHandleColor: DesignTokens.hairline,
       ),
 
-      // Dialog
+      // ─── Dialog ──────────────────────────────────────────────────────────
       dialogTheme: DialogThemeData(
-        backgroundColor: DesignTokens.surfaceWhite,
-        shape: RoundedRectangleBorder(
+        backgroundColor: DesignTokens.canvas,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
           borderRadius: DesignTokens.borderRadiusLg,
         ),
+        elevation: 0,
         titleTextStyle: DesignTokens.textTitle,
         contentTextStyle: DesignTokens.textBody,
       ),
 
-      // Snackbar
+      // ─── Snackbar ────────────────────────────────────────────────────────
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: DesignTokens.grayDark,
-        contentTextStyle: DesignTokens.textBody.copyWith(
-          color: DesignTokens.surfaceWhite,
-        ),
-        shape: RoundedRectangleBorder(
+        backgroundColor: DesignTokens.ink,
+        contentTextStyle: DesignTokens.textSmall.copyWith(color: Colors.white),
+        shape: const StadiumBorder(),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+
+      // ─── Divider ─────────────────────────────────────────────────────────
+      dividerTheme: const DividerThemeData(
+        thickness: 0.5,
+        color: DesignTokens.hairline,
+        space: 0.5,
+      ),
+
+      // ─── List Tile ───────────────────────────────────────────────────────
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        titleTextStyle: DesignTokens.textBody.copyWith(color: DesignTokens.ink),
+        subtitleTextStyle: DesignTokens.textSmall,
+        iconColor: DesignTokens.inkMuted,
+        shape: const RoundedRectangleBorder(
           borderRadius: DesignTokens.borderRadiusMd,
         ),
-        behavior: SnackBarBehavior.floating,
-        elevation: 4,
       ),
 
-      // Text Theme
-      textTheme: TextTheme(
-        headlineLarge: DesignTokens.textTitle.copyWith(fontSize: 24),
-        headlineMedium: DesignTokens.textTitle,
-        headlineSmall: DesignTokens.textTitle.copyWith(fontSize: 18),
-        titleLarge: DesignTokens.textTitle,
-        titleMedium: DesignTokens.textBodyBold,
-        titleSmall: DesignTokens.textSmallBold,
-        bodyLarge: DesignTokens.textBody,
-        bodyMedium: DesignTokens.textBody,
-        bodySmall: DesignTokens.textSmall,
-        labelLarge: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
-        labelMedium: DesignTokens.textSmall.copyWith(
-          fontWeight: FontWeight.w500,
+      // ─── Tooltip ─────────────────────────────────────────────────────────
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: DesignTokens.ink.withValues(alpha: 0.92),
+          borderRadius: DesignTokens.borderRadiusSm,
         ),
-        labelSmall: DesignTokens.textSmall,
+        textStyle: DesignTokens.textCaption.copyWith(color: Colors.white),
+        waitDuration: const Duration(milliseconds: 500),
       ),
 
-      // Progress Indicator
+      // ─── Progress Indicator ───────────────────────────────────────────────
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: DesignTokens.brandAccent,
-        linearTrackColor: DesignTokens.grayLight,
+        linearTrackColor: DesignTokens.hairline,
+        circularTrackColor: DesignTokens.hairline,
+      ),
+
+      // ─── Segmented Button ────────────────────────────────────────────────
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: DesignTokens.canvasCloud,
+          foregroundColor: DesignTokens.inkMuted,
+          selectedBackgroundColor: DesignTokens.brandAccent,
+          selectedForegroundColor: Colors.white,
+          side: const BorderSide(color: DesignTokens.hairline, width: 0.5),
+          shape: const StadiumBorder(),
+          textStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+        ),
+      ),
+
+      // ─── Text Theme ──────────────────────────────────────────────────────
+      textTheme: TextTheme(
+        displayLarge:  baseTextTheme.displayLarge?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -1),
+        displayMedium: baseTextTheme.displayMedium?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -0.8),
+        displaySmall:  baseTextTheme.displaySmall?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+        headlineLarge:  DesignTokens.textHeadline.copyWith(fontSize: 24),
+        headlineMedium: DesignTokens.textHeadline,
+        headlineSmall:  DesignTokens.textTitle.copyWith(fontSize: 19),
+        titleLarge:   DesignTokens.textTitle,
+        titleMedium:  DesignTokens.textBodyBold,
+        titleSmall:   DesignTokens.textSmallBold,
+        bodyLarge:    DesignTokens.textBody.copyWith(fontSize: 17, color: DesignTokens.ink),
+        bodyMedium:   DesignTokens.textBody,
+        bodySmall:    DesignTokens.textSmall,
+        labelLarge:   DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+        labelMedium:  DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+        labelSmall:   DesignTokens.textCaption,
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/security/manager_approval.dart';
@@ -11,7 +12,11 @@ import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../widgets/offline_cached_image.dart';
+import '../../widgets/sync_status_badge.dart';
+import '../../widgets/sync_status_chip.dart';
 import 'add_product_screen.dart';
+import 'stock_history_sheet.dart';
 import 'product_preview_screen.dart';
 
 /// Items Screen — Product catalog management.
@@ -36,54 +41,91 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     final db = ref.watch(appDatabaseProvider);
 
     return Scaffold(
-      backgroundColor: DesignTokens.surface,
+      backgroundColor: DesignTokens.surfaceGrouped,
       appBar: AppBar(
         title: Text('Products', style: DesignTokens.textTitle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () => _syncFromSeller(context),
-            tooltip: 'Sync from seller',
-          ),
+          const SyncStatusBadge(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _RotatingFab(
         onPressed: () => unawaited(_showItemEditor(context, null)),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Product'),
-        backgroundColor: DesignTokens.brandAccent,
       ),
       body: Column(
         children: [
+          // Shop approval banner
+          StreamBuilder<AppSetting?>(
+            stream: db.watchAppSetting('shop_verification_status'),
+            builder: (context, snapshot) {
+              final value = snapshot.data?.valueJson;
+              if (value == '1') {
+                return const SizedBox.shrink();
+              }
+              return Container(
+                margin: DesignTokens.paddingScreen,
+                padding: DesignTokens.paddingMd,
+                decoration: BoxDecoration(
+                  color: DesignTokens.warning.withValues(alpha: 0.12),
+                  borderRadius: DesignTokens.borderRadiusMd,
+                  border: Border.all(
+                    color: DesignTokens.warning.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: DesignTokens.warning,
+                      size: 20,
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Expanded(
+                      child: Text(
+                        'Your shop is awaiting admin approval. Online listings will be visible once approved.',
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
           // Search bar
           Padding(
             padding: DesignTokens.paddingScreen,
             child: Container(
               decoration: BoxDecoration(
-                color: DesignTokens.surfaceWhite,
-                borderRadius: DesignTokens.borderRadiusMd,
-                boxShadow: DesignTokens.shadowSm,
+                color: DesignTokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: TextField(
-                onChanged: (v) =>
-                    setState(() => _searchQuery = v.toLowerCase()),
-                decoration: InputDecoration(
-                  hintText: 'Search products...',
-                  hintStyle: DesignTokens.textBody.copyWith(
-                    color: DesignTokens.grayMedium,
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceSm + DesignTokens.spaceXs,
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, size: 20, color: DesignTokens.textTertiary),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) =>
+                          setState(() => _searchQuery = v.toLowerCase()),
+                      decoration: InputDecoration(
+                        hintText: 'Search products...',
+                        hintStyle: DesignTokens.textBody.copyWith(
+                          color: DesignTokens.textTertiary,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: DesignTokens.spaceMd - DesignTokens.spaceXxs,
+                        ),
+                      ),
+                    ),
                   ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: DesignTokens.grayMedium,
-                  ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spaceMd,
-                    vertical: DesignTokens.spaceMd,
-                  ),
-                ),
+                ],
               ),
             ),
           ),
@@ -128,6 +170,16 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                           unawaited(_showStockAdjust(context, item)),
                       onDelete: () => _confirmDelete(context, item),
                       onToggleOnline: (v) => _toggleOnline(item, v),
+                      onLongPress: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => StockHistorySheet(itemId: item.id),
+                        );
+                      },
                     );
                   },
                 );
@@ -194,7 +246,10 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         child: StatefulBuilder(
           builder: (context, setLocalState) {
             final selectedStock = hasVariants
-                ? stocks.firstWhere((s) => s.variant == selectedVariant)
+                ? stocks.firstWhere(
+                    (s) => s.variant == selectedVariant,
+                    orElse: () => stocks.first,
+                  )
                 : null;
             final current = selectedStock?.stockQty ?? item.stockQty;
             final unitPrice = selectedStock?.price ?? item.price;
@@ -304,39 +359,45 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                     if (appliedDelta == 0) return;
                     final newStock = current + appliedDelta;
 
-                    await db.recordInventoryMovement(
-                      itemId: item.id,
-                      delta: appliedDelta,
-                      note: reason,
-                      variant: hasVariants ? selectedVariant : null,
-                    );
-                    await db.updateItemFields(
-                      item.id,
-                      const ItemsCompanion(synced: Value(false)),
-                    );
+                    try {
+                      await db.adjustStockAndEnqueueSync(
+                        itemId: item.id,
+                        delta: appliedDelta,
+                        note: reason,
+                        variant: hasVariants ? selectedVariant : null,
+                        syncPayload: {
+                          'local_id': item.id,
+                          if (item.remoteId != null) 'remote_id': item.remoteId,
+                          'delta': appliedDelta,
+                          'current_stock': newStock,
+                          'unit_price': unitPrice,
+                          'published': item.publishedOnline ? 1 : 0,
+                          if (hasVariants && selectedVariant.trim().isNotEmpty)
+                            'variation': selectedVariant.trim(),
+                        },
+                      );
+                      unawaited(sync.syncCatalogImmediately());
 
-                    await sync.enqueue('stock_adjust', {
-                      'local_id': item.id,
-                      if (item.remoteId != null) 'remote_id': item.remoteId,
-                      'delta': appliedDelta,
-                      'current_stock': newStock,
-                      'unit_price': unitPrice,
-                      'published': item.publishedOnline ? 1 : 0,
-                      if (hasVariants && selectedVariant.trim().isNotEmpty)
-                        'variation': selectedVariant.trim(),
-                    });
-                    unawaited(sync.syncNow());
-
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Stock adjusted: ${appliedDelta > 0 ? '+' : ''}$appliedDelta units',
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Stock adjusted: ${appliedDelta > 0 ? '+' : ''}$appliedDelta units',
+                          ),
+                          backgroundColor: DesignTokens.brandAccent,
                         ),
-                        backgroundColor: DesignTokens.brandAccent,
-                      ),
-                    );
+                      );
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Stock adjust failed: $e'),
+                            backgroundColor: DesignTokens.error,
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: const Text('Apply Adjustment'),
                 ),
@@ -392,18 +453,19 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                 child: ElevatedButton(
                   onPressed: () async {
                     final db = ref.read(appDatabaseProvider);
-                    final remoteId = item.remoteId ?? int.tryParse(item.id);
+                    final remoteId = item.remoteId;
 
                     // Remove locally immediately (offline-first), and enqueue remote delete if possible.
-                    await db.deletePendingItemOps(item.id);
-                    await db.deleteItemAndDetach(item.id);
-
-                    if (remoteId != null) {
-                      await db.enqueueSync(
-                        'item_delete',
-                        '{"remote_id":"$remoteId"}',
+                    try {
+                      await db.deleteItemAndEnqueueSync(
+                        itemId: item.id,
+                        remoteId: remoteId,
                       );
-                      unawaited(ref.read(syncServiceProvider).syncNow());
+                      if (remoteId != null) {
+                        unawaited(ref.read(syncServiceProvider).syncCatalogImmediately());
+                      }
+                    } catch (e) {
+                      debugPrint('[ItemsDelete] Delete failed: $e');
                     }
 
                     if (!context.mounted) return;
@@ -465,8 +527,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
 
     final db = ref.read(appDatabaseProvider);
     final sync = ref.read(syncServiceProvider);
-    await db.upsertItem(
-      ItemsCompanion(
+    await db.saveItemAndEnqueueSync(
+      item: ItemsCompanion(
         id: Value(item.id),
         name: Value(item.name),
         price: Value(item.price),
@@ -474,18 +536,17 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         publishedOnline: Value(value),
         synced: const Value(false),
       ),
-    );
-    await _enqueueItemSync(
-      sync: sync,
       opType: 'item_update',
-      itemId: item.id,
-      remoteId: item.remoteId,
-      name: item.name,
-      price: item.price,
-      stockQty: item.stockQty,
-      publishedOnline: value,
+      syncPayload: {
+        'local_id': item.id,
+        if (item.remoteId != null) 'remote_id': item.remoteId,
+        'name': item.name,
+        'unit_price': item.price,
+        'current_stock': item.stockQty,
+        'published': value ? 1 : 0,
+      },
     );
-    unawaited(sync.syncNow());
+    unawaited(sync.syncCatalogImmediately());
   }
 
   List<String> _missingMarketplaceFields(Item item) {
@@ -502,53 +563,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     return missing;
   }
 
-  Future<void> _enqueueItemSync({
-    required SyncService sync,
-    required String opType,
-    required String itemId,
-    required int? remoteId,
-    required String name,
-    required double price,
-    required int stockQty,
-    required bool publishedOnline,
-  }) async {
-    final payload = <String, dynamic>{
-      'local_id': itemId,
-      'name': name,
-      'price': price,
-      'unit_price': price,
-      'stock_qty': stockQty,
-      'current_stock': stockQty,
-      'published': publishedOnline ? 1 : 0,
-    };
-    if (remoteId != null) {
-      payload['remote_id'] = remoteId;
-    }
-    await sync.enqueue(opType, payload);
-  }
-
-  void _syncFromSeller(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Syncing products from server…')),
-    );
-    unawaited(() async {
-      try {
-        await ref.read(syncServiceProvider).pullSellerProducts();
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Products updated'),
-            backgroundColor: DesignTokens.brandAccent,
-          ),
-        );
-      } catch (e) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
-      }
-    }());
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -563,6 +577,7 @@ class _ItemCard extends StatelessWidget {
     required this.onStockTap,
     required this.onDelete,
     required this.onToggleOnline,
+    this.onLongPress,
   });
 
   final Item item;
@@ -571,180 +586,223 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onStockTap;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleOnline;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final threshold = item.lowStockWarning ?? 5;
-    final lowStock = item.stockEnabled && item.stockQty <= threshold;
+    final outOfStock = item.stockEnabled && item.stockQty <= 0;
+    final lowStock = item.stockEnabled && item.stockQty > 0 && item.stockQty <= threshold;
+    final imageUrl = (item.thumbnailUrl ?? item.imageUrl)?.trim();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        borderRadius: DesignTokens.borderRadiusMd,
-        boxShadow: DesignTokens.shadowSm,
-        border: lowStock
-            ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
-            : null,
+    final Color stockColor;
+    final String stockLabel;
+    if (outOfStock) {
+      stockColor = DesignTokens.error;
+      stockLabel = 'Out';
+    } else if (lowStock) {
+      stockColor = DesignTokens.warning;
+      stockLabel = 'Low';
+    } else {
+      stockColor = DesignTokens.success;
+      stockLabel = 'In Stock';
+    }
+
+    return Slidable(
+      key: ValueKey(item.id),
+      // Swipe right → Edit, Preview
+      startActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.35,
+        children: [
+          CustomSlidableAction(
+            onPressed: (_) => onTap(),
+            backgroundColor: DesignTokens.info,
+            foregroundColor: Colors.white,
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(DesignTokens.radiusMd),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.edit_outlined, size: 22),
+                const SizedBox(height: DesignTokens.spaceXs),
+                Text('Edit', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          CustomSlidableAction(
+            onPressed: (_) => onPreview(),
+            backgroundColor: DesignTokens.brandPrimary,
+            foregroundColor: Colors.white,
+            borderRadius: BorderRadius.zero,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.preview_outlined, size: 22),
+                const SizedBox(height: DesignTokens.spaceXs),
+                Text('Preview', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: DesignTokens.borderRadiusMd,
-        child: Padding(
-          padding: DesignTokens.paddingMd,
-          child: Row(
-            children: [
-              // Product icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withValues(alpha: 0.3),
-                  borderRadius: DesignTokens.borderRadiusSm,
-                ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  color: DesignTokens.grayMedium,
-                ),
-              ),
-              const SizedBox(width: DesignTokens.spaceMd),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.name,
-                            style: DesignTokens.textBodyBold,
-                          ),
-                        ),
-                        if (!item.synced)
-                          Icon(
-                            Icons.cloud_off,
-                            size: 16,
-                            color: DesignTokens.warning,
-                          ),
-                      ],
+      // Swipe left → Stock, Delete
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.35,
+        children: [
+          CustomSlidableAction(
+            onPressed: (_) => onStockTap(),
+            backgroundColor: DesignTokens.success,
+            foregroundColor: Colors.white,
+            borderRadius: BorderRadius.zero,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.inventory_2_outlined, size: 22),
+                const SizedBox(height: DesignTokens.spaceXs),
+                Text('Stock', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          CustomSlidableAction(
+            onPressed: (_) => onDelete(),
+            backgroundColor: DesignTokens.error,
+            foregroundColor: Colors.white,
+            borderRadius: const BorderRadius.horizontal(
+              right: Radius.circular(DesignTokens.radiusMd),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.delete_outline, size: 22),
+                const SizedBox(height: DesignTokens.spaceXs),
+                Text('Delete', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: DesignTokens.spaceXs),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: DesignTokens.borderRadiusMd,
+          boxShadow: DesignTokens.shadowSm,
+          border: lowStock
+              ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
+              : null,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          borderRadius: DesignTokens.borderRadiusMd,
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: DesignTokens.surfaceGrouped,
+          child: Padding(
+            padding: DesignTokens.paddingMd,
+            child: Row(
+              children: [
+                Hero(
+                  tag: 'item-image-${item.id}',
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: DesignTokens.surfaceGrouped,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: DesignTokens.spaceXxs),
-                    Row(
-                      children: [
-                        Text(
-                          'UGX ${item.price.toStringAsFixed(0)}',
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.brandAccent,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: DesignTokens.spaceMd),
-                        GestureDetector(
-                          onTap: onStockTap,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: DesignTokens.spaceSm,
-                              vertical: DesignTokens.spaceXxs,
-                            ),
-                            decoration: BoxDecoration(
-                              color: lowStock
-                                  ? DesignTokens.warning.withValues(alpha: 0.1)
-                                  : DesignTokens.grayLight.withValues(
-                                      alpha: 0.5,
-                                    ),
-                              borderRadius: DesignTokens.borderRadiusSm,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.inventory,
-                                  size: 12,
-                                  color: lowStock
-                                      ? DesignTokens.warning
-                                      : DesignTokens.grayMedium,
-                                ),
-                                const SizedBox(width: DesignTokens.spaceXs),
-                                Text(
-                                  '${item.stockQty}',
-                                  style: DesignTokens.textSmall.copyWith(
-                                    color: lowStock
-                                        ? DesignTokens.warning
-                                        : DesignTokens.grayMedium,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Actions
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Switch(
-                    value: item.publishedOnline,
-                    onChanged: onToggleOnline,
+                    clipBehavior: Clip.antiAlias,
+                    child: imageUrl != null && imageUrl.isNotEmpty
+                        ? OfflineCachedImage(
+                            imageUrl: imageUrl,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            placeholder: _productFallback(),
+                            errorWidget: _productFallback(),
+                          )
+                        : _productFallback(),
                   ),
-                  PopupMenuButton<_ItemMenuAction>(
-                    tooltip: 'Actions',
-                    icon: const Icon(Icons.more_horiz),
-                    onSelected: (action) {
-                      switch (action) {
-                        case _ItemMenuAction.preview:
-                          onPreview();
-                          break;
-                        case _ItemMenuAction.edit:
-                          onTap();
-                          break;
-                        case _ItemMenuAction.adjustStock:
-                          onStockTap();
-                          break;
-                        case _ItemMenuAction.delete:
-                          onDelete();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _ItemMenuAction.preview,
-                        child: Text('Preview'),
+                ),
+                const SizedBox(width: DesignTokens.spaceMd),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.name,
+                              style: DesignTokens.textBody.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: DesignTokens.textPrimary,
+                              ),
+                            ),
+                          ),
+                          SyncStatusChip(
+                            isSynced: item.synced,
+                            localId: item.id,
+                          ),
+                        ],
                       ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: _ItemMenuAction.edit,
-                        child: Text('Edit'),
-                      ),
-                      PopupMenuItem(
-                        value: _ItemMenuAction.adjustStock,
-                        child: Text('Adjust stock'),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: _ItemMenuAction.delete,
-                        child: Text('Delete'),
+                      const SizedBox(height: DesignTokens.spaceXxs),
+                      Row(
+                        children: [
+                          Text(
+                            'UGX ${item.price.toStringAsFixed(0)}',
+                            style: DesignTokens.textMono.copyWith(fontSize: 14),
+                          ),
+                          const SizedBox(width: DesignTokens.spaceMd),
+                          GestureDetector(
+                            onTap: onStockTap,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: stockColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                stockLabel,
+                                style: DesignTokens.textCaption.copyWith(
+                                  color: stockColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
+                ),
+
+                _LiveToggle(
+                  value: item.publishedOnline,
+                  onChanged: onToggleOnline,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-enum _ItemMenuAction { preview, edit, adjustStock, delete }
+  Widget _productFallback() {
+    return const Icon(
+      Icons.inventory_2_outlined,
+      color: DesignTokens.textTertiary,
+      size: 20,
+    );
+  }
+}
 
 class _ReasonChip extends StatelessWidget {
   const _ReasonChip({
@@ -800,31 +858,31 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: DesignTokens.paddingLg,
-              decoration: BoxDecoration(
-                color: DesignTokens.brandPrimary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.inventory_2_outlined,
-                size: 48,
-                color: DesignTokens.brandPrimary,
-              ),
+            const Icon(
+              Icons.inventory_2_outlined,
+              size: 56,
+              color: DesignTokens.textTertiary,
             ),
-            const SizedBox(height: DesignTokens.spaceLg),
-            Text('No products yet', style: DesignTokens.textTitle),
-            const SizedBox(height: DesignTokens.spaceSm),
-            Text(
-              'Add your first product to start selling',
-              style: DesignTokens.textBody.copyWith(
-                color: DesignTokens.grayMedium,
+            const SizedBox(height: DesignTokens.spaceMd),
+            Text('No products yet', style: DesignTokens.textHeadline),
+            const SizedBox(height: DesignTokens.spaceXs),
+            SizedBox(
+              width: 260,
+              child: Text(
+                'Add your products here or sync from your online store',
+                style: DesignTokens.textBody.copyWith(
+                  color: DesignTokens.textSecondary,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: DesignTokens.spaceLg),
             ElevatedButton.icon(
               onPressed: onAddProduct,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: DesignTokens.brandAccent,
+                foregroundColor: Colors.white,
+              ),
               icon: const Icon(Icons.add),
               label: const Text('Add Product'),
             ),
@@ -834,3 +892,98 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+class _LiveToggle extends StatelessWidget {
+  const _LiveToggle({required this.value, required this.onChanged});
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: DesignTokens.durationFast,
+        width: 72,
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceXs),
+        decoration: BoxDecoration(
+          color: value ? DesignTokens.brandAccent : DesignTokens.grayLight,
+          borderRadius: BorderRadius.circular(DesignTokens.radiusFull),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedAlign(
+              duration: DesignTokens.durationFast,
+              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceXs + DesignTokens.spaceXxs,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Live',
+                    style: DesignTokens.textCaption.copyWith(
+                      color: value ? Colors.white : Colors.transparent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'Draft',
+                    style: DesignTokens.textCaption.copyWith(
+                      color: !value ? DesignTokens.grayDark : Colors.transparent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RotatingFab extends StatefulWidget {
+  const _RotatingFab({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  State<_RotatingFab> createState() => _RotatingFabState();
+}
+
+class _RotatingFabState extends State<_RotatingFab> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      heroTag: 'items-fab',
+      onPressed: () {
+        setState(() => _pressed = !_pressed);
+        widget.onPressed();
+      },
+      icon: AnimatedRotation(
+        turns: _pressed ? 0.5 : 0,
+        duration: DesignTokens.durationFast,
+        child: const Icon(Icons.add),
+      ),
+      label: const Text('New Product'),
+      backgroundColor: DesignTokens.brandAccent,
+    );
+  }
+}
+

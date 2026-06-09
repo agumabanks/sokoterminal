@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_api_availability/google_api_availability.dart';
 
 import '../../core/onboarding/onboarding_controller.dart';
 
@@ -507,7 +508,11 @@ class _BusinessDetailsEnhancedScreenState
     LatLng? initialLocation = _selectedLocation;
     if (initialLocation == null) {
       try {
-        final position = await Geolocator.getCurrentPosition();
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        ).timeout(const Duration(seconds: 10));
         initialLocation = LatLng(position.latitude, position.longitude);
       } catch (e) {
         // Default to Kampala if current location fails
@@ -516,6 +521,30 @@ class _BusinessDetailsEnhancedScreenState
     }
 
     if (!mounted) return;
+
+    // Check Google Play Services availability before showing GoogleMap
+    GooglePlayServicesAvailability? gmsAvailability;
+    try {
+      gmsAvailability = await GoogleApiAvailability.instance
+          .checkGooglePlayServicesAvailability();
+    } catch (_) {
+      gmsAvailability = GooglePlayServicesAvailability.unknown;
+    }
+
+    if (!mounted) return;
+
+    if (gmsAvailability != GooglePlayServicesAvailability.success) {
+      // Fallback: use GPS location directly when Google Play Services is unavailable
+      setState(() => _selectedLocation = initialLocation);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Map picker unavailable. Using your current GPS location.',
+          ),
+        ),
+      );
+      return;
+    }
 
     // Show map dialog
     final result = await showDialog<LatLng>(

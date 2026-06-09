@@ -4,11 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/auth/pos_staff_prefs.dart';
+import '../../core/firebase/fcm_service.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/dio_auth_utils.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/util/phone_normalizer.dart';
 import '../backup/migration_controller.dart';
+import '../checkout/cart_controller.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated, loading, error }
 
@@ -71,11 +75,23 @@ class AuthController extends StateNotifier<AuthState> {
 
     final token = await _storage.readAccessToken();
     if (token != null && token.isNotEmpty) {
+      debugPrint(
+        '[Auth] Restored persisted access token (${token.length} chars)',
+      );
       state = AuthState(status: AuthStatus.authenticated, token: token);
       _scheduleTokenRefresh();
+      // Subscribe to seller sync topic (best-effort; sellerId may not be stored yet)
+      final sellerId = await _storage.readSellerId();
+      if (sellerId != null && sellerId.isNotEmpty) {
+        unawaited(FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'));
+      }
+      unawaited(
+        FCMService.instance.init(sellerApi: ref.read(sellerApiProvider)),
+      );
       // Trigger background sync on bootstrap
       unawaited(ref.read(syncServiceProvider).syncNow());
     } else {
+      debugPrint('[Auth] No persisted access token found during bootstrap');
       state = AuthState.unauthenticated;
     }
   }
@@ -86,43 +102,56 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(status: AuthStatus.loading, message: null);
     try {
+      final rawIdentifier = emailOrPhone.trim();
       final isEmail = emailOrPhone.contains('@');
       final normalizedPhone = isEmail ? null : normalizeUgPhone(emailOrPhone);
-      final payload = <String, dynamic>{
-        'login_by': isEmail ? 'email' : 'phone',
-        // Backend always expects 'email' key for the identifier (email or phone)
-        'email': (isEmail ? emailOrPhone.trim() : normalizedPhone),
-        'password': password,
-        'user_type': 'seller',
-      };
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        '/v2/auth/login',
-        data: payload,
+      final response = await _performSellerLoginRequest(
+        isEmail: isEmail,
+        identifier: isEmail ? emailOrPhone.trim() : (normalizedPhone ?? ''),
+        rawIdentifier: rawIdentifier,
+        password: password,
       );
       final data = response.data ?? {};
-      final token = data['access_token'] ?? data['token'] ?? '';
-      if (token.isEmpty) {
-        throw Exception('Missing token from API');
-      }
+      final token = _extractAccessToken(data);
 
       // Ensure local database is cleared before starting a new session
       // This prevents data bleeding between different users on the same device
       final db = ref.read(appDatabaseProvider);
       await db.clearAllData();
 
-      await _storage.writeAccessToken(token);
+      final persistedToken = await _persistAccessToken(token);
 
       // Store seller UUID for identity persistence
-      final user = data['user'] as Map<String, dynamic>?;
-      final sellerUUID = user?['seller_uuid'] as String?;
+      final user = data['user'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(data['user'] as Map<String, dynamic>)
+          : null;
+      final sellerUUID = user?['seller_uuid']?.toString();
       if (sellerUUID != null && sellerUUID.isNotEmpty) {
         await _storage.writeSellerUUID(sellerUUID);
       }
+      final sellerId = user?['id']?.toString();
+      if (sellerId != null && sellerId.isNotEmpty) {
+        await _storage.writeSellerId(sellerId);
+        // Subscribe to real-time sync topic for this seller
+        unawaited(FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'));
+      }
+      unawaited(
+        FCMService.instance.init(sellerApi: ref.read(sellerApiProvider)),
+      );
 
       if (normalizedPhone != null && normalizedPhone.isNotEmpty) {
         await _storage.writeLastLoginPhone(normalizedPhone);
       }
-      state = AuthState(status: AuthStatus.authenticated, token: token);
+      debugPrint(
+        '[Auth] Login succeeded for seller account; '
+        'persistedToken=${persistedToken.isNotEmpty} '
+        'sellerUuid=${sellerUUID != null && sellerUUID.isNotEmpty}',
+      );
+      _apiClient.resetLogoutGuard();
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        token: persistedToken,
+      );
       _scheduleTokenRefresh();
       // Trigger full sync after login
       unawaited(ref.read(syncServiceProvider).syncNow());
@@ -177,7 +206,7 @@ class AuthController extends StateNotifier<AuthState> {
         },
       );
       final data = response.data ?? {};
-      final token = data['access_token'] ?? data['token'] ?? '';
+      final token = _extractAccessToken(data, allowMissing: true);
       if (token.isEmpty) {
         // Check if registration succeeded but needs verification
         final result = data['result'];
@@ -194,9 +223,23 @@ class AuthController extends StateNotifier<AuthState> {
         }
         throw Exception(message ?? 'Registration failed');
       }
-      await _storage.writeAccessToken(token);
+      final db = ref.read(appDatabaseProvider);
+      await db.clearAllData();
+      final persistedToken = await _persistAccessToken(token);
       await _storage.writeLastLoginPhone(phone);
-      state = AuthState(status: AuthStatus.authenticated, token: token);
+      final user = data['user'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(data['user'] as Map<String, dynamic>)
+          : null;
+      final sellerUUID = user?['seller_uuid']?.toString();
+      if (sellerUUID != null && sellerUUID.isNotEmpty) {
+        await _storage.writeSellerUUID(sellerUUID);
+      }
+      debugPrint('[Auth] Registration created an authenticated session');
+      _apiClient.resetLogoutGuard();
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        token: persistedToken,
+      );
       _scheduleTokenRefresh();
       unawaited(ref.read(syncServiceProvider).syncNow());
       unawaited(ref.read(migrationProvider.notifier).checkForBackups());
@@ -233,16 +276,21 @@ class AuthController extends StateNotifier<AuthState> {
 
       final data = response.data ?? {};
       if (data['result'] == true && data['access_token'] != null) {
-        final token = data['access_token'];
+        final token = _extractAccessToken(data);
 
         // Ensure local database is cleared before starting a new session
         // This prevents data bleeding between different users on the same device
         final db = ref.read(appDatabaseProvider);
         await db.clearAllData();
 
-        await _storage.writeAccessToken(token);
+        final persistedToken = await _persistAccessToken(token);
         await _storage.writeLastLoginPhone(normalized);
-        state = AuthState(status: AuthStatus.authenticated, token: token);
+        debugPrint('[Auth] Quick PIN login succeeded');
+        _apiClient.resetLogoutGuard();
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          token: persistedToken,
+        );
         _scheduleTokenRefresh();
         unawaited(ref.read(syncServiceProvider).syncNow());
         // Quick PIN login check for backups
@@ -302,6 +350,36 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     _refreshTimer?.cancel();
+    debugPrint('[Auth] Clearing local session state');
+
+    // Reset the logout callback so late-fired interceptor errors
+    // don't trigger a second logout.
+    ref.read(authLogoutCallbackProvider.notifier).state = null;
+    // Also reset the API client's internal guard so a fresh login
+    // can trigger logout again if needed.
+    _apiClient.resetLogoutGuard();
+
+    // Unsubscribe from seller sync topic before clearing data
+    final sellerId = await _storage.readSellerId();
+    if (sellerId != null && sellerId.isNotEmpty) {
+      unawaited(FCMService.instance.unsubscribeFromTopic('seller_${sellerId}_pos_sync'));
+    }
+
+    // Notify backend to revoke the token (best-effort)
+    try {
+      await _apiClient.get('/v2/auth/logout');
+    } catch (e) {
+      debugPrint('[Auth] Server logout failed or offline: $e');
+    }
+
+    // Stop sync timers and streams before clearing data to prevent
+    // race conditions where sync pumps against a partially-cleared DB.
+    await ref.read(syncServiceProvider).dispose();
+    ref.invalidate(syncServiceProvider);
+
+    // Clear cart in-memory state so the next seller doesn't see leftovers.
+    ref.read(cartControllerProvider.notifier).clear();
+    ref.invalidate(cartControllerProvider);
 
     // Clear all business data from the local database
     // This ensures complete data isolation between different sellers on the same device
@@ -311,35 +389,214 @@ class AuthController extends StateNotifier<AuthState> {
     // Clear all secure storage (tokens, credentials, POS sessions, quick login data)
     await _storage.clearAll();
 
-    // Clear SharedPreferences (POS staff initialization flag and other prefs)
+    // Remove only auth-related SharedPreferences keys.
+    // Keep printer settings, business setup flags, receipt templates, etc.
     final prefs = ref.read(sharedPreferencesProvider);
-    await prefs.clear();
+    await prefs.remove('login_type');
+    await prefs.remove('staff_shop_id');
+    await prefs.remove('staff_id');
+    await prefs.remove('staff_name');
+    await prefs.remove('staff_phone');
+    await prefs.remove(posStaffInitializedPrefKey);
 
     state = AuthState.unauthenticated;
+  }
+
+  /// Attempts to refresh the access token immediately.
+  /// Returns true if a new token was obtained.
+  Future<bool> refreshToken() async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/v2/auth/refresh',
+      );
+      final newToken = response.data?['access_token'];
+      if (newToken != null && newToken is String && newToken.isNotEmpty) {
+        await _storage.writeAccessToken(newToken);
+        state = state.copyWith(token: newToken);
+        return true;
+      }
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (DioAuthUtils.isAuthStatus(statusCode)) {
+        DioAuthUtils.notifyAuthExpired();
+        await logout();
+      }
+      debugPrint('[Auth] Token refresh failed: $statusCode');
+    } catch (e) {
+      debugPrint('[Auth] Token refresh error: $e');
+    }
+    return false;
   }
 
   void _scheduleTokenRefresh() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(const Duration(minutes: 55), (timer) async {
-      try {
-        final response = await _apiClient.post<Map<String, dynamic>>(
-          '/v2/auth/refresh',
-        );
-        final newToken = response.data?['access_token'];
-        if (newToken != null && newToken is String && newToken.isNotEmpty) {
-          await _storage.writeAccessToken(newToken);
-          state = state.copyWith(token: newToken);
-        }
-      } on DioException catch (e) {
-        final statusCode = e.response?.statusCode;
-        if (statusCode == 401 || statusCode == 403) {
-          timer.cancel();
-          await logout();
-        }
-        debugPrint('[Auth] Token refresh failed: $statusCode');
-      } catch (e) {
-        debugPrint('[Auth] Token refresh error: $e');
-      }
+      await refreshToken();
     });
+  }
+
+  String _extractAccessToken(
+    Map<String, dynamic> data, {
+    bool allowMissing = false,
+  }) {
+    final token = (data['access_token'] ?? data['token'] ?? '')
+        .toString()
+        .trim();
+    if (!allowMissing && token.isEmpty) {
+      throw Exception('Missing token from API');
+    }
+    return token;
+  }
+
+  Future<String> _persistAccessToken(String token) async {
+    final normalized = token.trim();
+    if (normalized.isEmpty) {
+      throw Exception('Missing token from API');
+    }
+
+    await _storage.writeAccessToken(normalized);
+    final persisted = await _storage.readAccessToken();
+    final stored = persisted?.trim() ?? '';
+    if (stored.isEmpty) {
+      debugPrint('[Auth] Access token write verification failed');
+      throw Exception(
+        'Unable to persist the access token on this device. Please try again.',
+      );
+    }
+
+    debugPrint('[Auth] Access token persisted successfully');
+    return stored;
+  }
+
+  Future<Response<Map<String, dynamic>>> _performSellerLoginRequest({
+    required bool isEmail,
+    required String identifier,
+    required String rawIdentifier,
+    required String password,
+  }) async {
+    Future<Response<Map<String, dynamic>>> request(String loginIdentifier) {
+      return _apiClient.post<Map<String, dynamic>>(
+        '/v2/auth/login',
+        data: {
+          'login_by': isEmail ? 'email' : 'phone',
+          // Backend expects the identifier under the `email` key.
+          'email': loginIdentifier,
+          'password': password,
+          'user_type': 'seller',
+        },
+      );
+    }
+
+    final candidates = _loginIdentifierCandidates(
+      isEmail: isEmail,
+      identifier: identifier,
+      rawIdentifier: rawIdentifier,
+    );
+    DioException? lastDioError;
+    Exception? lastBusinessError;
+
+    for (var index = 0; index < candidates.length; index++) {
+      final loginIdentifier = candidates[index];
+      if (index > 0) {
+        debugPrint(
+          '[Auth] Retrying seller password login with alternate phone format',
+        );
+      }
+
+      try {
+        final response = await request(loginIdentifier);
+        final failureMessage = _loginFailureMessage(response.data);
+        if (failureMessage != null) {
+          if (_shouldRetryPhoneVariant(
+            isEmail: isEmail,
+            message: failureMessage,
+          )) {
+            lastBusinessError = Exception(failureMessage);
+            continue;
+          }
+          throw Exception(failureMessage);
+        }
+        return response;
+      } on DioException catch (error) {
+        final failureMessage = _loginFailureMessage(error.response?.data);
+        if (_shouldRetryPhoneVariant(
+          isEmail: isEmail,
+          message: failureMessage,
+        )) {
+          lastDioError = error;
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    if (lastBusinessError != null) throw lastBusinessError;
+    if (lastDioError != null) throw lastDioError;
+
+    return request(identifier);
+  }
+
+  List<String> _loginIdentifierCandidates({
+    required bool isEmail,
+    required String identifier,
+    required String rawIdentifier,
+  }) {
+    if (isEmail) return [identifier];
+
+    final candidates = <String>[];
+    void addCandidate(String value) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || candidates.contains(trimmed)) return;
+      candidates.add(trimmed);
+    }
+
+    addCandidate(identifier);
+
+    final digits = identifier.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('256') && digits.length == 12) {
+      addCandidate('+$digits');
+      addCandidate('0${digits.substring(3)}');
+    }
+
+    final raw = rawIdentifier.trim();
+    addCandidate(raw);
+    if (raw.startsWith('+')) {
+      addCandidate(raw.substring(1));
+    }
+
+    final rawDigits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    addCandidate(rawDigits);
+
+    return candidates;
+  }
+
+  String? _loginFailureMessage(dynamic payload) {
+    if (payload is! Map) return null;
+    final data = Map<String, dynamic>.from(payload);
+    final token = _extractAccessToken(data, allowMissing: true);
+    final result = data['result'];
+    final succeeded =
+        token.isNotEmpty ||
+        result == null ||
+        result == true ||
+        result == 'true';
+    if (succeeded) return null;
+
+    final message = data['message']?.toString().trim();
+    if (message != null && message.isNotEmpty) {
+      return message;
+    }
+
+    return 'Login failed';
+  }
+
+  bool _shouldRetryPhoneVariant({
+    required bool isEmail,
+    required String? message,
+  }) {
+    if (isEmail) return false;
+
+    final normalized = message?.toLowerCase().trim() ?? '';
+    return normalized.contains('user not found');
   }
 }

@@ -43,6 +43,8 @@ class BugReport {
     this.networkStatus,
     this.resolved = false,
     this.resolution,
+    this.uploadedToServer = false,
+    this.appVersion,
   });
 
   final String id;
@@ -57,6 +59,8 @@ class BugReport {
   final String? networkStatus;
   final bool resolved;
   final String? resolution;
+  final bool uploadedToServer;
+  final String? appVersion;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -71,6 +75,22 @@ class BugReport {
     if (networkStatus != null) 'networkStatus': networkStatus,
     'resolved': resolved,
     if (resolution != null) 'resolution': resolution,
+    'uploadedToServer': uploadedToServer,
+    if (appVersion != null) 'appVersion': appVersion,
+  };
+
+  Map<String, dynamic> toUploadPayload() => {
+    'report_id': id,
+    'severity': severity.name,
+    'category': category.name,
+    'title': title,
+    'description': description,
+    if (stackTrace != null) 'stack_trace': stackTrace,
+    if (context != null) 'context': context,
+    if (deviceInfo != null) 'device_info': deviceInfo,
+    if (networkStatus != null) 'network_status': networkStatus,
+    if (appVersion != null) 'app_version': appVersion,
+    'occurred_at': timestamp.toUtc().toIso8601String(),
   };
 
   factory BugReport.fromJson(Map<String, dynamic> json) => BugReport(
@@ -92,6 +112,8 @@ class BugReport {
     networkStatus: json['networkStatus'] as String?,
     resolved: json['resolved'] as bool? ?? false,
     resolution: json['resolution'] as String?,
+    uploadedToServer: json['uploadedToServer'] as bool? ?? false,
+    appVersion: json['appVersion'] as String?,
   );
 }
 
@@ -105,6 +127,7 @@ class BugLogger {
   static BugLogger? _instance;
   static File? _logFile;
   static File? _summaryFile;
+  static const String appVersion = '1.2.0+2020';
 
   static BugLogger get instance {
     _instance ??= BugLogger._();
@@ -154,6 +177,7 @@ class BugLogger {
       },
       deviceInfo: _getDeviceInfo(),
       networkStatus: networkStatus,
+      appVersion: appVersion,
     );
 
     await _writeReport(report);
@@ -274,6 +298,41 @@ class BugLogger {
         if (action != null) 'action': action,
       },
     );
+  }
+
+  /// Reports not yet acknowledged by the backend.
+  Future<List<BugReport>> getPendingUploads() async {
+    final bugs = await _readAllBugs();
+    return bugs.where((b) => !b.uploadedToServer).toList();
+  }
+
+  /// Mark a report as uploaded to the server (dedup by client report id).
+  Future<void> markUploaded(String reportId) async {
+    final bugs = await _readAllBugs();
+    final updated = bugs
+        .map(
+          (b) => b.id == reportId
+              ? BugReport(
+                  id: b.id,
+                  timestamp: b.timestamp,
+                  severity: b.severity,
+                  category: b.category,
+                  title: b.title,
+                  description: b.description,
+                  stackTrace: b.stackTrace,
+                  context: b.context,
+                  deviceInfo: b.deviceInfo,
+                  networkStatus: b.networkStatus,
+                  resolved: b.resolved,
+                  resolution: b.resolution,
+                  uploadedToServer: true,
+                  appVersion: b.appVersion,
+                )
+              : b,
+        )
+        .toList();
+    await _writeAllBugs(updated);
+    await _updateSummary();
   }
 
   /// Get all unresolved bugs

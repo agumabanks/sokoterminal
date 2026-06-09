@@ -1,6 +1,8 @@
+import '../../core/util/haptics.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -73,6 +75,8 @@ class ContactsState {
   final String? error;
   final bool permissionGranted;
   final bool isPermanentlyDenied;
+  final bool optedIn;
+  final int deviceContactCount;
   final String searchQuery;
 
   ContactsState({
@@ -82,6 +86,8 @@ class ContactsState {
     this.error,
     this.permissionGranted = false,
     this.isPermanentlyDenied = false,
+    this.optedIn = false,
+    this.deviceContactCount = 0,
     this.searchQuery = '',
   });
 
@@ -92,6 +98,8 @@ class ContactsState {
     String? error,
     bool? permissionGranted,
     bool? isPermanentlyDenied,
+    bool? optedIn,
+    int? deviceContactCount,
     String? searchQuery,
   }) {
     return ContactsState(
@@ -101,6 +109,8 @@ class ContactsState {
       error: error,
       permissionGranted: permissionGranted ?? this.permissionGranted,
       isPermanentlyDenied: isPermanentlyDenied ?? this.isPermanentlyDenied,
+      optedIn: optedIn ?? this.optedIn,
+      deviceContactCount: deviceContactCount ?? this.deviceContactCount,
       searchQuery: searchQuery ?? this.searchQuery,
     );
   }
@@ -130,20 +140,21 @@ class ContactsController extends StateNotifier<ContactsState> {
     state = state.copyWith(loading: true, error: null);
     try {
       final optedIn = await _syncService.isDeviceContactsOptedIn();
-      PermissionStatus status = PermissionStatus.denied;
-      if (optedIn) {
-        // Request contacts and location together for better UX
-        final results = await [
-          Permission.contacts.request(),
-          Permission.locationWhenInUse.request(),
-        ].wait;
-        status = results[0];
-      }
+      final status = await Permission.contacts.status;
 
-      final hasPermission = optedIn ? status.isGranted : true;
-      final isPermanentlyDenied = optedIn ? status.isPermanentlyDenied : false;
+      final hasPermission = status.isGranted;
+      final isPermanentlyDenied = status.isPermanentlyDenied;
 
       List<ContactItem> items = [];
+
+      // Count device contacts if permission is granted (for preview UI)
+      int deviceCount = 0;
+      if (status.isGranted) {
+        try {
+          final allDevice = await FlutterContacts.getContacts(withProperties: true);
+          deviceCount = allDevice.length;
+        } catch (_) {}
+      }
 
       // 1. Fetch from Device if permitted + opted in
       if (optedIn && status.isGranted) {
@@ -154,6 +165,9 @@ class ContactsController extends StateNotifier<ContactsState> {
         try {
           await _syncService.importDeviceContacts(deviceContacts);
         } catch (_) {}
+
+        // Yield to event loop so the UI doesn't freeze on large phonebooks.
+        await Future.delayed(Duration.zero);
 
         final cached = await _db.getDeviceContacts();
         items.addAll(
@@ -181,7 +195,15 @@ class ContactsController extends StateNotifier<ContactsState> {
         }
       }
 
-      // 2. Fetch from Soko DB (Local Cache of Seller Customers)
+      // 2. Pull CRM contacts from server so cross-device contacts appear
+      try {
+        await _syncService.pullCrmContacts();
+      } catch (_) {}
+
+      // Yield to event loop before heavy DB + merge work.
+      await Future.delayed(Duration.zero);
+
+      // 3. Fetch from Soko DB (Local Cache of Seller Customers)
       final sokoCustomers = await _db.select(_db.customers).get();
       items.addAll(
         sokoCustomers.map(
@@ -208,6 +230,9 @@ class ContactsController extends StateNotifier<ContactsState> {
         }
       }
 
+      // Yield once more before sorting and state update.
+      await Future.delayed(Duration.zero);
+
       final uniqueItems = merged.values.toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
@@ -217,6 +242,8 @@ class ContactsController extends StateNotifier<ContactsState> {
         filteredContacts: _applySearch(uniqueItems, state.searchQuery),
         permissionGranted: hasPermission,
         isPermanentlyDenied: isPermanentlyDenied,
+        optedIn: optedIn,
+        deviceContactCount: deviceCount,
       );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
@@ -243,6 +270,40 @@ class ContactsController extends StateNotifier<ContactsState> {
 
   void clearSearch() {
     state = state.copyWith(searchQuery: '', filteredContacts: state.contacts);
+  }
+
+  /// Request contacts permission and trigger sync when granted.
+  Future<void> requestContactPermission() async {
+    final status = await Permission.contacts.request();
+    if (status.isGranted) {
+      await _syncService.setDeviceContactsOptIn(true);
+      try {
+        await _syncService.syncDeviceContacts(force: true);
+      } catch (_) {}
+      try {
+        await _syncService.pullCrmContacts();
+      } catch (_) {}
+      // Success haptic
+      Haptics.soft();
+    }
+    await refresh();
+  }
+
+  /// Toggle device-contacts opt-in from settings or banner.
+  Future<void> setDeviceContactsOptIn(bool enabled) async {
+    await _syncService.setDeviceContactsOptIn(enabled);
+    if (enabled) {
+      final status = await Permission.contacts.status;
+      if (status.isGranted) {
+        try {
+          await _syncService.syncDeviceContacts(force: true);
+        } catch (_) {}
+        try {
+          await _syncService.pullCrmContacts();
+        } catch (_) {}
+      }
+    }
+    await refresh();
   }
 
   /// Create a new contact - saves locally first, then syncs IMMEDIATELY to backend

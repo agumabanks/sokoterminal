@@ -65,3 +65,15 @@ final dbExecutorProvider = Provider<drift.QueryExecutor>((ref) {
 final connectivityProvider = StreamProvider<List<ConnectivityResult>>((ref) {
   return Connectivity().onConnectivityChanged;
 });
+
+/// Lightweight stream of pending sync operation count.
+final pendingSyncCountProvider = StreamProvider<int>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchPendingSyncOpsCount();
+});
+
+/// Lightweight stream of permanently blocked sync operation count.
+final blockedSyncCountProvider = StreamProvider<int>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchBlockedSyncOpsCount();
+});

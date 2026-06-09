@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import '../../core/app_providers.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/security/manager_approval.dart';
+import '../../core/auth/pos_session_controller.dart';
 import '../../core/firebase/remote_config_service.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../auth/auth_controller.dart';
@@ -27,6 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final printer = ref.watch(printQueueServiceProvider);
     final remoteConfig = ref.watch(remoteConfigProvider);
+    final posSession = ref.watch(posSessionProvider);
     final config = ref.watch(appConfigProvider);
     final enabled = printer.printerEnabled;
     final printerLabel = printer.preferredPrinterLabel();
@@ -177,6 +180,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ).showSnackBar(const SnackBar(content: Text('Sync finished')));
             },
           ),
+          FutureBuilder<bool>(
+            future: ref.read(syncServiceProvider).isDeviceContactsOptedIn(),
+            builder: (context, snapshot) {
+              final optedIn = snapshot.data ?? false;
+              return SwitchListTile(
+                secondary: const Icon(Icons.contacts_outlined),
+                title: const Text('Sync device contacts'),
+                subtitle: const Text(
+                  'Back up phone contacts to your Soko account',
+                ),
+                value: optedIn,
+                onChanged: (v) async {
+                  final syncService = ref.read(syncServiceProvider);
+                  await syncService.setDeviceContactsOptIn(v);
+                  if (v) {
+                    final status = await Permission.contacts.request();
+                    if (status.isGranted) {
+                      try {
+                        await syncService.syncDeviceContacts(force: true);
+                      } catch (_) {}
+                      try {
+                        await syncService.pullCrmContacts();
+                      } catch (_) {}
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Contacts synced'),
+                            backgroundColor: DesignTokens.brandAccent,
+                          ),
+                        );
+                      }
+                    } else if (status.isPermanentlyDenied) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Permission permanently denied. Enable it in Settings.',
+                            ),
+                          ),
+                        );
+                      }
+                    }
+                  }
+                  if (mounted) setState(() {});
+                },
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.monitor_heart_outlined),
             title: const Text('Sync health'),
@@ -189,6 +240,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: const Text('Share CSV exports'),
             onTap: () => context.go('/home/more/export'),
           ),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('Backup & restore'),
+            subtitle: const Text('Secure and recover local business data'),
+            onTap: () => context.go('/home/more/backup'),
+          ),
+          if (posSession.isManager)
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: const Text('Staff menu access'),
+              subtitle: const Text('Control what staff can see in More'),
+              onTap: () => context.go('/home/more/staff-menu-access'),
+            ),
           ListTile(
             leading: const Icon(Icons.local_shipping_outlined),
             title: const Text('Delivery settings'),

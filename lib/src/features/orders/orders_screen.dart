@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/error_page.dart';
+import 'marketplace_order.dart';
 import 'order_details_screen.dart';
 import 'orders_controller.dart';
 
@@ -38,10 +39,10 @@ class OrdersScreen extends ConsumerWidget {
           }
           final orders = state.orders;
 
-          final totalRevenue = orders.fold<double>(0, (sum, order) {
-            return sum +
-                (double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0);
-          });
+          final totalRevenue = orders.fold<double>(
+            0,
+            (sum, order) => sum + order.displayTotal,
+          );
 
           return Column(
             children: [
@@ -59,19 +60,28 @@ class OrdersScreen extends ConsumerWidget {
               ),
               Expanded(
                 child: RefreshIndicator(
+                  color: DesignTokens.brandAccent,
                   onRefresh: () =>
                       ref.read(ordersControllerProvider.notifier).load(),
-                  child: ListView.builder(
-                    padding: DesignTokens.paddingScreen,
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      final order = orders[index];
-                      return _OrderTile(
-                        order: order,
-                        onTap: () => _showDetails(context, order),
-                      );
-                    },
-                  ),
+                  child: orders.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: DesignTokens.paddingScreen,
+                          children: const [
+                            _EmptyState(),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: DesignTokens.paddingScreen,
+                          itemCount: orders.length,
+                          itemBuilder: (context, index) {
+                            final order = orders[index];
+                            return _OrderTile(
+                              order: order,
+                              onTap: () => _showDetails(context, order),
+                            );
+                          },
+                        ),
                 ),
               ),
             ],
@@ -81,14 +91,15 @@ class OrdersScreen extends ConsumerWidget {
     );
   }
 
-  void _showDetails(BuildContext context, Map<String, dynamic> order) {
-    final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
-    if (orderId == 0) return;
+  void _showDetails(BuildContext context, MarketplaceOrder order) {
+    if (order.id == 0) return;
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            OrderDetailsScreen(orderId: orderId, initialData: order),
+        builder: (_) => OrderDetailsScreen(
+          orderId: order.id,
+          initialData: order,
+        ),
       ),
     );
   }
@@ -113,23 +124,16 @@ class _SummaryItem extends StatelessWidget {
 
 class _OrderTile extends StatelessWidget {
   const _OrderTile({required this.order, required this.onTap});
-  final Map<String, dynamic> order;
+  final MarketplaceOrder order;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final id =
-        order['order_code']?.toString() ??
-        order['code']?.toString() ??
-        order['id']?.toString() ??
-        'N/A';
-    final customer = order['customer_name']?.toString() ?? 'Customer';
-    final status =
-        order['delivery_status']?.toString() ??
-        order['delivery_status_raw']?.toString() ??
-        'pending';
-    final paymentStatus = order['payment_status']?.toString() ?? 'unpaid';
-    final total = double.tryParse(order['grand_total']?.toString() ?? '') ?? 0;
+    final id = order.displayCode;
+    final customer = order.displayCustomer;
+    final status = order.normalizedDeliveryStatus;
+    final paymentStatus = order.normalizedPaymentStatus;
+    final total = order.displayTotal;
 
     final statusColor = _statusColor(status);
     final paymentColor = paymentStatus == 'paid'
@@ -142,6 +146,9 @@ class _OrderTile extends StatelessWidget {
         color: DesignTokens.surfaceWhite,
         borderRadius: DesignTokens.borderRadiusMd,
         boxShadow: DesignTokens.shadowSm,
+        border: Border(
+          left: BorderSide(color: statusColor, width: 4),
+        ),
       ),
       child: ListTile(
         leading: Container(
@@ -154,18 +161,27 @@ class _OrderTile extends StatelessWidget {
         ),
         title: Row(
           children: [
-            Expanded(child: Text(id, style: DesignTokens.textBodyBold)),
+            Expanded(
+              child: Text(
+                id,
+                style: DesignTokens.textBodyBold.copyWith(
+                  decoration: _isCancelled(status)
+                      ? TextDecoration.lineThrough
+                      : null,
+                ),
+              ),
+            ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(DesignTokens.radiusFull),
               ),
               child: Text(
                 status.toUpperCase().replaceAll('_', ' '),
-                style: DesignTokens.textSmall.copyWith(
+                style: DesignTokens.textCaption.copyWith(
                   color: statusColor,
-                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -199,12 +215,13 @@ class _OrderTile extends StatelessWidget {
         return DesignTokens.warning;
       case 'confirmed':
       case 'processing':
-        return DesignTokens.brandAccent;
+        return DesignTokens.info;
       case 'packed':
       case 'out_for_delivery':
         return DesignTokens.info;
       case 'delivered':
       case 'complete':
+      case 'completed':
         return DesignTokens.success;
       case 'cancelled':
       case 'canceled':
@@ -212,5 +229,43 @@ class _OrderTile extends StatelessWidget {
       default:
         return DesignTokens.grayMedium;
     }
+  }
+
+  bool _isCancelled(String status) {
+    final s = status.toLowerCase();
+    return s == 'cancelled' || s == 'canceled';
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: DesignTokens.paddingScreen,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 80,
+              color: DesignTokens.grayLight,
+            ),
+            const SizedBox(height: DesignTokens.spaceLg),
+            Text('No orders yet', style: DesignTokens.textTitle),
+            const SizedBox(height: DesignTokens.spaceSm),
+            Text(
+              'Your marketplace orders will appear here',
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

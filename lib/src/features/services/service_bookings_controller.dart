@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -128,21 +129,25 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
     required String action,
     String? reason,
   }) async {
-    final opType = 'booking_action:$bookingId';
-    await sync.enqueue(opType, {
-      'booking_id': bookingId,
-      'action': action,
-      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
-      'idempotency_key': _uuid.v4(),
-    });
-    final telemetry = Telemetry.instance;
-    if (telemetry != null) {
-      unawaited(
-        telemetry.event(
-          'booking_action_queued',
-          props: {'booking_id': bookingId, 'action': action},
-        ),
-      );
+    try {
+      final opType = 'booking_action:$bookingId';
+      await sync.enqueue(opType, {
+        'booking_id': bookingId,
+        'action': action,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        'idempotency_key': _uuid.v4(),
+      });
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'booking_action_queued',
+            props: {'booking_id': bookingId, 'action': action},
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Bookings] Action sync enqueue failed: $e');
     }
   }
 

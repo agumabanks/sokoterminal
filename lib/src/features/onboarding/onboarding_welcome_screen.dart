@@ -25,74 +25,78 @@ class _OnboardingWelcomeScreenState
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 24),
 
-              // Success Icon
-              Container(
-                width: 120,
-                height: 120,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF4CAF50),
-                  shape: BoxShape.circle,
+                // Success Icon
+                Center(
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4CAF50),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 64,
+                    ),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 64,
+                const SizedBox(height: 32),
+
+                const Text(
+                  'Your Shop is Ready!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 16),
 
-              const Text(
-                'Your Shop is Ready!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
+                Text(
+                  'Start selling and growing your business',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 48),
 
-              Text(
-                'Start selling and growing your business',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 48),
+                // Quick Tips
+                _buildTipCard(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Add Your First Product',
+                  subtitle: 'Start building your catalog',
+                  color: const Color(0xFF2196F3),
+                ),
+                const SizedBox(height: 16),
 
-              // Quick Tips
-              _buildTipCard(
-                icon: Icons.inventory_2_outlined,
-                title: 'Add Your First Product',
-                subtitle: 'Start building your catalog',
-                color: const Color(0xFF2196F3),
-              ),
-              const SizedBox(height: 16),
+                _buildTipCard(
+                  icon: Icons.point_of_sale_outlined,
+                  title: 'Make Your First Sale',
+                  subtitle: 'Use the POS to sell in-store',
+                  color: const Color(0xFFFF9800),
+                ),
+                const SizedBox(height: 16),
 
-              _buildTipCard(
-                icon: Icons.point_of_sale_outlined,
-                title: 'Make Your First Sale',
-                subtitle: 'Use the POS to sell in-store',
-                color: const Color(0xFFFF9800),
-              ),
-              const SizedBox(height: 16),
+                _buildTipCard(
+                  icon: Icons.analytics_outlined,
+                  title: 'Track Your Performance',
+                  subtitle: 'Monitor sales and inventory',
+                  color: const Color(0xFF9C27B0),
+                ),
+                const SizedBox(height: 48),
 
-              _buildTipCard(
-                icon: Icons.analytics_outlined,
-                title: 'Track Your Performance',
-                subtitle: 'Monitor sales and inventory',
-                color: const Color(0xFF9C27B0),
-              ),
-              const Spacer(),
-
-              // Go to Dashboard Button
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
+                // Go to Dashboard Button
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
@@ -120,11 +124,13 @@ class _OnboardingWelcomeScreenState
                         ),
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTipCard({
@@ -136,9 +142,9 @@ class _OnboardingWelcomeScreenState
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

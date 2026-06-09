@@ -17,6 +17,8 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/formatters.dart';
+import '../../core/util/haptics.dart';
+import '../../core/audio/pos_sound_service.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../../widgets/offline_cached_image.dart';
 import 'cart_controller.dart';
@@ -24,12 +26,24 @@ import 'parked_sales_controller.dart';
 import '../receipts/receipt_details_sheet.dart';
 import '../receipts/receipt_providers.dart';
 
+/// All locally-synced items are eligible for POS checkout.
+/// The backend [PosSyncController] already filters out digital/auction/wholesale
+/// Items eligible for POS checkout: either published (Live) or synced from backend.
+/// Local draft items (publishedOnline=false AND synced=false) are hidden.
 final itemsStreamProvider = StreamProvider<List<Item>>((ref) {
-  return ref.watch(appDatabaseProvider).watchItems();
+  return ref
+      .watch(appDatabaseProvider)
+      .watchItems()
+      .map((items) => items.where((i) => i.publishedOnline || i.synced).toList());
 });
 
+/// Services eligible for POS checkout: either published (Live) or synced from backend.
+/// Local draft services (publishedOnline=false AND synced=false) are hidden.
 final servicesStreamProvider = StreamProvider<List<Service>>((ref) {
-  return ref.watch(appDatabaseProvider).watchServices();
+  return ref
+      .watch(appDatabaseProvider)
+      .watchServices()
+      .map((svcs) => svcs.where((s) => s.publishedOnline || s.synced).toList());
 });
 
 final customersStreamProvider = StreamProvider<List<Customer>>((ref) {
@@ -59,8 +73,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Timer? _searchDebounce;
   String _query = '';
   bool _scanLocked = false;
+  bool _addingProduct = false;
   bool _syncingCatalog = false;
   bool _checkingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // WhatsApp-style silent auto-sync on screen open
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_syncCatalogSilently());
+    });
+  }
 
   @override
   void dispose() {
@@ -78,7 +102,38 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     });
   }
 
-  Future<void> _syncCatalog(BuildContext context) async {
+  /// Returns true if the currently logged-in seller is the shop owner
+  /// (bypasses staff PIN requirement for solo sellers).
+  Future<bool> _isOwnerSoloSeller() async {
+    final sellerId = await ref.read(secureStorageProvider).readSellerId();
+    if (sellerId == null || sellerId.isEmpty) return false;
+    final profile =
+        await ref.read(appDatabaseProvider).getBusinessProfile();
+    return profile?.sellerId == sellerId;
+  }
+
+  /// Creates an implicit offline manager session for the shop owner
+  /// so that backend APIs receive a valid X-POS-Session header.
+  Future<void> _ensureOwnerPosSession() async {
+    final storage = ref.read(secureStorageProvider);
+    final existingToken = await storage.readPosSessionToken();
+    if (existingToken != null && existingToken.trim().isNotEmpty) return;
+
+    final ownerToken =
+        'OFFLINE_owner_${DateTime.now().millisecondsSinceEpoch}';
+    await storage.writePosSessionToken(ownerToken);
+    await storage.writePosSessionMeta(
+      staffId: 0,
+      staffName: 'Owner',
+      staffRole: 'manager',
+    );
+    await ref
+        .read(sharedPreferencesProvider)
+        .setBool(posStaffInitializedPrefKey, true);
+  }
+
+  /// WhatsApp-style silent sync — no UI feedback, no SnackBars.
+  Future<void> _syncCatalogSilently() async {
     if (_syncingCatalog) return;
     setState(() => _syncingCatalog = true);
     try {
@@ -92,53 +147,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             .read(secureStorageProvider)
             .readPosSessionToken();
         if (token == null || token.trim().isEmpty) {
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Staff login required to sync (enter cashier/manager PIN).',
-              ),
-            ),
-          );
-          context.go('/pos-login?redirect=/home');
-          return;
+          // Solo sellers (owner account) bypass staff PIN requirement
+          if (await _isOwnerSoloSeller()) {
+            await _ensureOwnerPosSession();
+          } else {
+            return; // Silent fail — will retry on next cycle
+          }
         }
       }
 
-      // Check if we have any products - if not, do a full resync from epoch
       final items = await ref.read(appDatabaseProvider).getAllItems();
       final syncService = ref.read(syncServiceProvider);
-      if (!context.mounted) return;
 
       if (items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No products found - doing full sync…')),
-        );
         await syncService.forceFullResync();
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Syncing catalog…')));
         await syncService.syncNow();
       }
 
       ref.invalidate(productsLastPulledAtProvider);
-      if (!context.mounted) return;
-
-      // Check again if we now have products
-      final newItems = await ref.read(appDatabaseProvider).getAllItems();
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Catalog updated - ${newItems.length} products'),
-          backgroundColor: DesignTokens.brandAccent,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
+    } catch (_) {
+      // Silent fail — sync service handles retries automatically
     } finally {
       if (mounted) {
         setState(() => _syncingCatalog = false);
@@ -146,7 +175,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
+  /// Legacy manual sync (kept for pull-to-refresh or edge cases).
+  Future<void> _syncCatalog(BuildContext context) async {
+    await _syncCatalogSilently();
+  }
+
   Future<String?> _addProduct(BuildContext context, Item item) async {
+    if (_addingProduct) return null;
+    _addingProduct = true;
+    try {
+      return await _addProductInner(context, item);
+    } finally {
+      _addingProduct = false;
+    }
+  }
+
+  Future<String?> _addProductInner(BuildContext context, Item item) async {
     final cartController = ref.read(cartControllerProvider.notifier);
     final db = ref.read(appDatabaseProvider);
     final stocks = await db.getItemStocksForItem(item.id);
@@ -158,7 +202,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     if (stocks.isEmpty) {
-      HapticFeedback.selectionClick();
+      Haptics.selection();
       final msg = cartController.addItem(item: item);
       if (msg != null) {
         ScaffoldMessenger.of(
@@ -166,6 +210,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
+      PosSoundService().playAddToCart();
       return item.name;
     }
 
@@ -173,7 +218,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         stocks.length > 1 ||
         (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
     if (!hasChoices) {
-      HapticFeedback.selectionClick();
+      Haptics.selection();
       final s = stocks.first;
       final msg = cartController.addItem(
         item: item,
@@ -185,6 +230,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
+      PosSoundService().playAddToCart();
       return item.name;
     }
 
@@ -217,7 +263,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 );
                 return;
               }
-              HapticFeedback.selectionClick();
+              Haptics.selection();
               Navigator.of(context).pop(s.variant);
             },
           );
@@ -230,6 +276,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final normalized = pickedVariant.trim();
     final pickedStock = stocks.firstWhere(
       (e) => e.variant.trim() == normalized,
+      orElse: () => stocks.first,
     );
     if (normalized.isEmpty) {
       final msg = cartController.addItem(
@@ -242,6 +289,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ).showSnackBar(SnackBar(content: Text(msg)));
         if (msg.startsWith('Out of stock')) return null;
       }
+      PosSoundService().playAddToCart();
       return item.name;
     }
     final msg = cartController.addItemVariant(
@@ -254,6 +302,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (msg.startsWith('Out of stock')) return null;
     }
+    PosSoundService().playAddToCart();
     return '${item.name} • $normalized';
   }
 
@@ -280,17 +329,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
             ),
           IconButton(
-            icon: _syncingCatalog
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            onPressed: _syncingCatalog ? null : () => _syncCatalog(context),
-            tooltip: 'Sync catalog',
-          ),
-          IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () => _showMoreOptions(context, ref),
             tooltip: 'More options',
@@ -300,10 +338,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 720;
-          final productsPulledAt = ref
-              .watch(productsLastPulledAtProvider)
-              .valueOrNull;
-
           // ─────────────────────────────────────────────────────────────────
           // CATALOG PANE
           // ─────────────────────────────────────────────────────────────────
@@ -322,36 +356,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       _searchCtrl.clear();
                       setState(() => _query = '');
                     },
-                  ),
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DesignTokens.spaceMd,
-                    0,
-                    DesignTokens.spaceMd,
-                    DesignTokens.spaceSm,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          productsPulledAt == null
-                              ? 'Catalog not synced yet'
-                              : 'Last sync: ${productsPulledAt.toRelativeLabel()}',
-                          style: DesignTokens.textSmall,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _syncingCatalog
-                            ? null
-                            : () => _syncCatalog(context),
-                        icon: const Icon(Icons.sync, size: 18),
-                        label: Text(_syncingCatalog ? 'Syncing…' : 'Sync'),
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -380,19 +384,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               .where((item) => _matchesItem(item, _query))
                               .toList();
                     if (filtered.isEmpty) {
-                      final missingInitialSync =
-                          _query.isEmpty && productsPulledAt == null;
                       return SliverToBoxAdapter(
                         child: _EmptySearchState(
-                          message: missingInitialSync
-                              ? 'Sync your products to start selling offline.'
-                              : _query.isEmpty
+                          message: _query.isEmpty
                               ? 'No products yet'
                               : 'No matching products',
-                          actionLabel: missingInitialSync ? 'Sync now' : null,
-                          onAction: missingInitialSync
-                              ? () => _syncCatalog(context)
-                              : null,
                         ),
                       );
                     }
@@ -542,6 +538,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             onPark: () => _showParkSale(context, ref),
             onCheckout: () => _handleCheckout(context, ref),
             onClear: () => cartController.clear(),
+            onRemove: (id) => cartController.removeLine(id),
           );
 
           // ─────────────────────────────────────────────────────────────────
@@ -619,7 +616,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     // No variants: use base price
     if (variants.isEmpty) {
-      HapticFeedback.selectionClick();
+      Haptics.selection();
       cartController.addService(service: service);
       return;
     }
@@ -627,7 +624,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // Single variant: auto-use it
     if (variants.length == 1) {
       final v = variants.first;
-      HapticFeedback.selectionClick();
+      Haptics.selection();
       cartController.addService(
         service: service,
         variant: v.name,
@@ -668,7 +665,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ],
             ),
             onTap: () {
-              HapticFeedback.selectionClick();
+              Haptics.selection();
               Navigator.of(ctx).pop(v);
             },
           );
@@ -705,7 +702,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<void> _handleScannedCode(String code) async {
     _searchDebounce?.cancel();
     _searchCtrl.text = code;
-    setState(() => _query = code.toLowerCase());
+    if (mounted) setState(() => _query = code.toLowerCase());
 
     final db = ref.read(appDatabaseProvider);
     final cartController = ref.read(cartControllerProvider.notifier);
@@ -835,10 +832,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
 
       if (addedLabel == null) return;
-      HapticFeedback.selectionClick();
+      Haptics.selection();
       _searchCtrl.clear();
-      setState(() => _query = '');
       if (!mounted) return;
+      setState(() => _query = '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Added "$addedLabel"'),
@@ -868,10 +865,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!mounted) return;
     final addedLabel = await _addProduct(context, match);
     if (addedLabel == null) return;
-    HapticFeedback.selectionClick();
+    Haptics.selection();
     _searchCtrl.clear();
-    setState(() => _query = '');
     if (!mounted) return;
+    setState(() => _query = '');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added "$addedLabel"'),
@@ -1085,17 +1082,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         final db = ref.read(appDatabaseProvider);
                         final sync = ref.read(syncServiceProvider);
 
-                        await db.upsertCustomer(
-                          CustomersCompanion.insert(
-                            id: Value(id),
-                            name: name,
-                            phone: phone.isEmpty
-                                ? const Value.absent()
-                                : Value(phone),
-                            synced: const Value(false),
-                            updatedAt: Value(now),
-                          ),
-                        );
+                        try {
+                          await db.upsertCustomer(
+                            CustomersCompanion.insert(
+                              id: Value(id),
+                              name: name,
+                              phone: phone.isEmpty
+                                  ? const Value.absent()
+                                  : Value(phone),
+                              synced: const Value(false),
+                              updatedAt: Value(now),
+                            ),
+                          );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to save customer: $e'),
+                                backgroundColor: DesignTokens.error,
+                              ),
+                            );
+                          }
+                          return;
+                        }
 
                         // Try immediate cloud sync; fallback to outbox when offline or blocked.
                         try {
@@ -1130,16 +1139,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             ),
                           );
                         } catch (_) {
-                          await sync.enqueue('customer_push', {
-                            'idempotency_key': id,
-                            'customer_id': id,
-                            'display_name': name,
-                            if (phone.isNotEmpty) 'phone': phone,
-                            'phones': phone.isEmpty ? const [] : [phone],
-                            'emails': const [],
-                            'source': 'pos_terminal',
-                            'shared_with_business': true,
-                          });
+                          try {
+                            await sync.enqueue('customer_push', {
+                              'idempotency_key': id,
+                              'customer_id': id,
+                              'display_name': name,
+                              if (phone.isNotEmpty) 'phone': phone,
+                              'phones': phone.isEmpty ? const [] : [phone],
+                              'emails': const [],
+                              'source': 'pos_terminal',
+                              'shared_with_business': true,
+                            });
+                          } catch (e) {
+                            debugPrint('[Checkout] Customer push enqueue failed: $e');
+                          }
                         }
 
                         if (!sheetContext.mounted) return;
@@ -1281,6 +1294,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               cartController.clear();
               Navigator.of(sheetContext).pop();
             },
+            onRemove: (id) => cartController.removeLine(id),
           );
         },
       ),
@@ -1313,16 +1327,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (online && staffInitialized) {
       final token = await ref.read(secureStorageProvider).readPosSessionToken();
       if (token == null || token.trim().isEmpty) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Staff login required to sync sales. Enter cashier PIN to continue.',
+        // Solo sellers (owner account) bypass staff PIN requirement
+        if (await _isOwnerSoloSeller()) {
+          await _ensureOwnerPosSession();
+        } else {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Staff login required to sync sales. Enter cashier PIN to continue.',
+              ),
             ),
-          ),
-        );
-        context.go('/pos-login?redirect=/home');
-        return;
+          );
+          context.go('/pos-login?redirect=/home');
+          return;
+        }
       }
     }
     final paymentSettings = ShopPaymentSettingsCache.read(
@@ -1507,11 +1526,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           .checkout(payments: payments, notes: note);
     } catch (e) {
       if (!context.mounted) return;
+      PosSoundService().playError();
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Checkout failed: $e')));
       return;
     }
+
+    Haptics.impact();
+    PosSoundService().playSuccess();
 
     if (context.mounted) {
       _showPostCheckoutActions(context, ref, id);
@@ -1568,7 +1591,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 );
                 return;
               }
-              await printer.enqueueReceipt(entryId);
+              try {
+                await printer.enqueueReceipt(entryId);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Print failed: $e')),
+                  );
+                }
+                return;
+              }
               if (!context.mounted) return;
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1606,7 +1638,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           const SizedBox(height: DesignTokens.spaceSm),
           OutlinedButton.icon(
             onPressed: () async {
-              await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
+              try {
+                await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Share failed: $e')),
+                  );
+                }
+              }
               if (context.mounted) Navigator.of(context).pop();
             },
             icon: const Icon(Icons.chat),
@@ -1615,7 +1655,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           const SizedBox(height: DesignTokens.spaceSm),
           OutlinedButton.icon(
             onPressed: () async {
-              await ref.read(receiptServiceProvider).sharePdf(entryId);
+              try {
+                await ref.read(receiptServiceProvider).sharePdf(entryId);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Share failed: $e')),
+                  );
+                }
+              }
               if (context.mounted) Navigator.of(context).pop();
             },
             icon: const Icon(Icons.picture_as_pdf),
@@ -1680,10 +1728,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final online = connectivity.any((r) => r != ConnectivityResult.none);
 
     if (!online) {
-      await ref.read(syncServiceProvider).enqueue('sms_send', {
-        ...payload,
-        'idempotency_key': idempotencyKey,
-      });
+      try {
+        await ref.read(syncServiceProvider).enqueue('sms_send', {
+          ...payload,
+          'idempotency_key': idempotencyKey,
+        });
+      } catch (e) {
+        debugPrint('[Checkout] SMS sync enqueue failed: $e');
+      }
       if (!context.mounted) return true;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2072,8 +2124,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: DesignTokens.spaceSm),
                 OutlinedButton.icon(
                   onPressed: () => setState(() {
+                    final clampLow = total < 0 ? total : 0.0;
+                    final clampHigh = total < 0 ? 0.0 : total;
                     final remainingAmount = remaining.isFinite
-                        ? remaining.clamp(0, total)
+                        ? remaining.clamp(clampLow, clampHigh)
                         : total;
                     final methods = _paymentMethods(
                       hasCustomer: hasCustomer,
@@ -2350,7 +2404,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 // COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SearchBar extends StatelessWidget {
+class _SearchBar extends StatefulWidget {
   const _SearchBar({
     required this.controller,
     required this.onChanged,
@@ -2364,64 +2418,78 @@ class _SearchBar extends StatelessWidget {
   final VoidCallback onClear;
 
   @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        borderRadius: DesignTokens.borderRadiusMd,
-        boxShadow: DesignTokens.shadowSm,
-      ),
-      child: ValueListenableBuilder<TextEditingValue>(
-        valueListenable: controller,
-        builder: (context, value, _) {
-          final hasText = value.text.trim().isNotEmpty;
-          return TextField(
-            controller: controller,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              hintText: 'Search products or scan…',
-              hintStyle: DesignTokens.textBody.copyWith(
-                color: DesignTokens.grayMedium,
-              ),
-              prefixIcon: const Icon(
-                Icons.search,
-                color: DesignTokens.grayMedium,
-              ),
-              suffixIcon: SizedBox(
-                width: hasText ? 96 : 52,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (hasText)
-                      IconButton(
-                        icon: const Icon(
-                          Icons.clear,
-                          color: DesignTokens.grayMedium,
-                        ),
-                        tooltip: 'Clear',
-                        onPressed: onClear,
-                      ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.qr_code_scanner,
-                        color: DesignTokens.grayMedium,
-                      ),
-                      tooltip: 'Scan',
-                      onPressed: onScan,
-                    ),
-                  ],
+    return Focus(
+      onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
+      child: AnimatedContainer(
+        duration: DesignTokens.durationFast,
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceGrouped,
+          borderRadius: BorderRadius.circular(10),
+          border: _focused
+              ? Border.all(color: DesignTokens.brandAccent, width: 1.5)
+              : null,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceSm + DesignTokens.spaceXs,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search, size: 20, color: DesignTokens.textTertiary),
+            const SizedBox(width: DesignTokens.spaceSm),
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                onChanged: widget.onChanged,
+                style: DesignTokens.textBody,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Search products…',
+                  hintStyle: DesignTokens.textBody.copyWith(
+                    color: DesignTokens.textTertiary,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: DesignTokens.spaceMd - DesignTokens.spaceXxs,
+                  ),
                 ),
               ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: DesignTokens.spaceMd,
-                vertical: DesignTokens.spaceMd,
+            ),
+            AnimatedSlide(
+              duration: DesignTokens.durationFast,
+              offset: _focused ? Offset.zero : const Offset(0.5, 0),
+              child: AnimatedOpacity(
+                duration: DesignTokens.durationFast,
+                opacity: _focused ? 1.0 : 0.0,
+                child: TextButton(
+                  onPressed: () {
+                    widget.onClear();
+                    FocusScope.of(context).unfocus();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(48, 32),
+                  ),
+                  child: const Text('Cancel'),
+                ),
               ),
             ),
-          );
-        },
+            if (!_focused)
+              IconButton(
+                icon: const Icon(Icons.qr_code_scanner, size: 20, color: DesignTokens.textTertiary),
+                tooltip: 'Scan',
+                onPressed: widget.onScan,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -2454,76 +2522,131 @@ class _ProductTile extends StatelessWidget {
         effectiveStock != null &&
         effectiveStock > 0 &&
         effectiveStock <= lowStockThreshold;
-    final isDisabled = onTap == null;
 
-    return Opacity(
-      opacity: isDisabled ? 0.55 : 1,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: DesignTokens.surfaceWhite,
-            borderRadius: DesignTokens.borderRadiusMd,
-            boxShadow: DesignTokens.shadowSm,
-            border: outOfStock
-                ? Border.all(color: DesignTokens.error.withValues(alpha: 0.55))
-                : lowStock
-                ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(DesignTokens.radiusMd),
-                  ),
-                  child: _buildImage(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(DesignTokens.spaceSm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: DesignTokens.textSmall.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: DesignTokens.grayDark,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+    return _ScaleButton(
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: DesignTokens.borderRadiusMd,
+          child: Container(
+            decoration: BoxDecoration(
+              color: DesignTokens.surfaceWhite,
+              borderRadius: DesignTokens.borderRadiusMd,
+              boxShadow: DesignTokens.shadowSm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(DesignTokens.radiusMd),
                     ),
-                    const SizedBox(height: DesignTokens.spaceXxs),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        Text(
-                          price.toUgx(),
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.brandAccent,
-                            fontWeight: FontWeight.w600,
+                        _buildImage(),
+                        if (outOfStock)
+                          Container(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Out of Stock',
+                              style: DesignTokens.textSmallBold.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        Positioned(
+                          left: DesignTokens.spaceSm,
+                          bottom: DesignTokens.spaceSm,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: DesignTokens.brandAccent,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              price.toUgx(),
+                              style: DesignTokens.textCaption.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
-                        if (effectiveStock != null)
-                          Text(
-                            outOfStock ? 'OUT' : '$effectiveStock',
-                            style: DesignTokens.textSmall.copyWith(
-                              color: outOfStock
-                                  ? DesignTokens.error
-                                  : lowStock
-                                  ? DesignTokens.warning
-                                  : DesignTokens.grayMedium,
+                        if (lowStock)
+                          Positioned(
+                            top: DesignTokens.spaceSm,
+                            right: DesignTokens.spaceSm,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                color: DesignTokens.warning,
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(DesignTokens.spaceSm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: DesignTokens.textBody.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: DesignTokens.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Spacer(),
+                        if (effectiveStock != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: DesignTokens.spaceXs + DesignTokens.spaceXxs,
+                              vertical: DesignTokens.spaceXxs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: outOfStock
+                                  ? DesignTokens.error.withValues(alpha: 0.12)
+                                  : lowStock
+                                  ? DesignTokens.warning.withValues(alpha: 0.12)
+                                  : DesignTokens.success.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              outOfStock ? 'Out' : lowStock ? 'Low' : 'In stock',
+                              style: DesignTokens.textCaption.copyWith(
+                                color: outOfStock
+                                    ? DesignTokens.error
+                                    : lowStock
+                                    ? DesignTokens.warning
+                                    : DesignTokens.success,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2549,19 +2672,13 @@ class _ProductTile extends StatelessWidget {
   }
 
   Widget _buildPlaceholder() {
-    final color = Colors.primaries[name.hashCode % Colors.primaries.length];
-    final initials = name
-        .trim()
-        .split(' ')
-        .take(2)
-        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
-        .join();
     return Container(
-      color: color.withValues(alpha: 0.1),
+      color: DesignTokens.surfaceGrouped,
       alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: DesignTokens.textTitle.copyWith(color: color),
+      child: const Icon(
+        Icons.inventory_2_outlined,
+        color: DesignTokens.textTertiary,
+        size: 32,
       ),
     );
   }
@@ -2584,13 +2701,11 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Colors.primaries[title.hashCode % Colors.primaries.length];
-
-    return GestureDetector(
+    return _ScaleButton(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite,
+          color: DesignTokens.surfaceRaised,
           borderRadius: DesignTokens.borderRadiusMd,
           boxShadow: DesignTokens.shadowSm,
         ),
@@ -2606,34 +2721,10 @@ class _ServiceCard extends StatelessWidget {
                     ? OfflineCachedImage(
                         imageUrl: imageUrl!.trim(),
                         fit: BoxFit.cover,
-                        placeholder: Container(
-                          color: color.withValues(alpha: 0.1),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.room_service_outlined,
-                            size: 36,
-                            color: color,
-                          ),
-                        ),
-                        errorWidget: Container(
-                          color: color.withValues(alpha: 0.1),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.room_service_outlined,
-                            size: 36,
-                            color: color,
-                          ),
-                        ),
+                        placeholder: _buildPlaceholder(),
+                        errorWidget: _buildPlaceholder(),
                       )
-                    : Container(
-                        color: color.withValues(alpha: 0.1),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.room_service_outlined,
-                          size: 36,
-                          color: color,
-                        ),
-                      ),
+                    : _buildPlaceholder(),
               ),
             ),
             Padding(
@@ -2643,9 +2734,9 @@ class _ServiceCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: DesignTokens.textSmall.copyWith(
+                    style: DesignTokens.textBody.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: DesignTokens.grayDark,
+                      color: DesignTokens.textPrimary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -2656,6 +2747,7 @@ class _ServiceCard extends StatelessWidget {
                     style: DesignTokens.textSmall.copyWith(
                       color: DesignTokens.brandAccent,
                       fontWeight: FontWeight.w600,
+                      fontFeatures: DesignTokens.textMono.fontFeatures,
                     ),
                   ),
                 ],
@@ -2663,6 +2755,47 @@ class _ServiceCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: DesignTokens.surfaceGrouped,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.room_service_outlined,
+        color: DesignTokens.textTertiary,
+        size: 32,
+      ),
+    );
+  }
+}
+
+class _ScaleButton extends StatefulWidget {
+  const _ScaleButton({required this.child, this.onTap});
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  State<_ScaleButton> createState() => _ScaleButtonState();
+}
+
+class _ScaleButtonState extends State<_ScaleButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+      onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+      onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 120),
+        scale: _pressed ? 0.96 : 1.0,
+        curve: Curves.easeOut,
+        child: widget.child,
       ),
     );
   }
@@ -2679,6 +2812,7 @@ class _CartPane extends StatelessWidget {
     required this.onPark,
     required this.onCheckout,
     required this.onClear,
+    required this.onRemove,
   });
 
   final CartState cart;
@@ -2690,6 +2824,7 @@ class _CartPane extends StatelessWidget {
   final VoidCallback onPark;
   final VoidCallback onCheckout;
   final VoidCallback onClear;
+  final void Function(String id) onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -2792,6 +2927,7 @@ class _CartPane extends StatelessWidget {
                         title: line.title,
                         price: line.price,
                         quantity: line.quantity,
+                        variant: line.variant,
                         availableStock: line.availableStock,
                         onIncrement: () => unawaited(
                           onUpdateQuantity(line.id, line.quantity + 1),
@@ -2800,6 +2936,7 @@ class _CartPane extends StatelessWidget {
                           onUpdateQuantity(line.id, line.quantity - 1),
                         ),
                         onEditPrice: () => onEditPrice(line),
+                        onRemove: () => onRemove(line.id),
                       );
                     },
                   ),
@@ -2808,15 +2945,11 @@ class _CartPane extends StatelessWidget {
           // Footer with totals
           Container(
             padding: DesignTokens.paddingMd,
+            margin: const EdgeInsets.all(DesignTokens.spaceMd),
             decoration: BoxDecoration(
               color: DesignTokens.surfaceWhite,
-              boxShadow: [
-                BoxShadow(
-                  color: DesignTokens.grayDark.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
+              borderRadius: DesignTokens.borderRadiusMd,
+              boxShadow: DesignTokens.shadowMd,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2874,83 +3007,175 @@ class _CartItem extends StatelessWidget {
     required this.title,
     required this.price,
     required this.quantity,
-    required this.availableStock,
+    this.variant,
+    this.availableStock,
     required this.onIncrement,
     required this.onDecrement,
     required this.onEditPrice,
+    required this.onRemove,
   });
 
   final String title;
   final double price;
   final int quantity;
+  final String? variant;
   final int? availableStock;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
   final VoidCallback onEditPrice;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final atMax = availableStock != null && quantity >= availableStock!;
-    return GestureDetector(
-      onLongPress: onEditPrice,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceMd,
-          vertical: DesignTokens.spaceXs,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: DesignTokens.textBody),
-                  Row(
-                    children: [
-                      Text(price.toUgx(), style: DesignTokens.textSmall),
-                      if (availableStock != null) ...[
-                        const SizedBox(width: DesignTokens.spaceXs),
-                        Text(
-                          'Stock ${availableStock!}',
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.grayMedium,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(width: DesignTokens.spaceXs),
-                      Icon(
-                        Icons.edit,
-                        size: 14,
-                        color: DesignTokens.grayMedium.withValues(alpha: 0.7),
-                      ),
-                    ],
-                  ),
-                ],
+    final subtotal = (price * quantity).roundToDouble();
+    final initials = title
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
+        .join();
+    final thumbColor = Colors.primaries[title.hashCode % Colors.primaries.length];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceMd,
+        vertical: DesignTokens.spaceXs,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: thumbColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: DesignTokens.textCaption.copyWith(
+                color: thumbColor,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withValues(alpha: 0.3),
-                borderRadius: DesignTokens.borderRadiusSm,
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove, size: 18),
-                    onPressed: onDecrement,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  Text('$quantity', style: DesignTokens.textBodyBold),
-                  IconButton(
-                    icon: const Icon(Icons.add, size: 18),
-                    onPressed: atMax ? null : onIncrement,
-                    visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: DesignTokens.spaceSm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: DesignTokens.textBody,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (variant != null && variant!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DesignTokens.spaceXs + DesignTokens.spaceXxs,
+                      vertical: DesignTokens.spaceXxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: DesignTokens.grayLight.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      variant!,
+                      style: DesignTokens.textCaption,
+                    ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 2),
+                GestureDetector(
+                  onLongPress: onEditPrice,
+                  child: Text(
+                    '${price.toUgx()} each',
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+          const SizedBox(width: DesignTokens.spaceSm),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _StepperButton(
+                icon: Icons.remove,
+                onPressed: () {
+                  Haptics.selection();
+                  PosSoundService().playClick();
+                  onDecrement();
+                },
+              ),
+              Container(
+                width: 32,
+                alignment: Alignment.center,
+                child: Text('$quantity', style: DesignTokens.textBodyBold),
+              ),
+              _StepperButton(
+                icon: Icons.add,
+                onPressed: atMax
+                    ? null
+                    : () {
+                        Haptics.selection();
+                        PosSoundService().playClick();
+                        onIncrement();
+                      },
+              ),
+            ],
+          ),
+          const SizedBox(width: DesignTokens.spaceSm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                subtotal.toUgx(),
+                style: DesignTokens.textBodyBold,
+              ),
+              const SizedBox(height: 2),
+              GestureDetector(
+                onTap: onRemove,
+                child: const Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: DesignTokens.error,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({required this.icon, this.onPressed});
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          side: const BorderSide(color: DesignTokens.brandAccent),
+          shape: const CircleBorder(),
+          foregroundColor: DesignTokens.brandAccent,
         ),
+        child: Icon(icon, size: 16),
       ),
     );
   }
@@ -2969,51 +3194,72 @@ class _FloatingCartSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceMd,
-          vertical: DesignTokens.spaceMd,
-        ),
-        decoration: BoxDecoration(
-          gradient: DesignTokens.brandGradient,
-          borderRadius: DesignTokens.borderRadiusMd,
-          boxShadow: DesignTokens.shadowLg,
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: DesignTokens.paddingSm,
-              decoration: BoxDecoration(
-                color: DesignTokens.surfaceWhite.withValues(alpha: 0.2),
-                borderRadius: DesignTokens.borderRadiusSm,
-              ),
-              child: Text(
-                '$itemCount',
-                style: DesignTokens.textBodyBold.copyWith(
-                  color: DesignTokens.surfaceWhite,
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      offset: itemCount > 0 ? Offset.zero : const Offset(0, 1.2),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: itemCount > 0 ? 1.0 : 0.0,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.all(DesignTokens.spaceMd),
+            padding: DesignTokens.paddingPage.copyWith(
+              top: DesignTokens.spaceMd - DesignTokens.spaceXxs,
+              bottom: DesignTokens.spaceMd - DesignTokens.spaceXxs,
+            ),
+            decoration: BoxDecoration(
+              gradient: DesignTokens.accentGradient,
+              borderRadius: BorderRadius.circular(DesignTokens.radiusFull),
+              boxShadow: [
+                BoxShadow(
+                  color: DesignTokens.brandAccent.withValues(alpha: 0.30),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: DesignTokens.spaceMd),
-            Expanded(
-              child: Text(
-                'View Cart',
-                style: DesignTokens.textBodyBold.copyWith(
-                  color: DesignTokens.surfaceWhite,
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$itemCount',
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.brandAccent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(
+                  width: DesignTokens.spaceSm + DesignTokens.spaceXs,
+                ),
+                Text(
+                  'View Cart',
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  total.toUgx(),
+                  style: DesignTokens.textTitle.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right, color: Colors.white, size: 18),
+              ],
             ),
-            Text(
-              total.toUgx(),
-              style: DesignTokens.textBodyBold.copyWith(
-                color: DesignTokens.surfaceWhite,
-              ),
-            ),
-            const SizedBox(width: DesignTokens.spaceSm),
-            const Icon(Icons.arrow_forward, color: DesignTokens.surfaceWhite),
-          ],
+          ),
         ),
       ),
     );
@@ -3038,7 +3284,11 @@ class _PaymentMethodTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          Haptics.selection();
+          PosSoundService().playClick();
+          onTap();
+        },
         borderRadius: DesignTokens.borderRadiusMd,
         child: Ink(
           padding: DesignTokens.paddingMd,
@@ -3126,16 +3376,37 @@ class _EmptySearchState extends StatelessWidget {
     return Padding(
       padding: DesignTokens.paddingMd,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, color: DesignTokens.grayMedium),
-          const SizedBox(height: DesignTokens.spaceSm),
-          Text(message, style: DesignTokens.textSmall),
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 56,
+            color: DesignTokens.textTertiary,
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Text(
+            message,
+            style: DesignTokens.textHeadline,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: DesignTokens.spaceXs),
+          SizedBox(
+            width: 260,
+            child: Text(
+              'Add products to start selling, or sync from your online store.',
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
           if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: DesignTokens.spaceMd),
+            const SizedBox(height: DesignTokens.spaceLg),
             ElevatedButton.icon(
               onPressed: onAction,
               style: ElevatedButton.styleFrom(
                 backgroundColor: DesignTokens.brandAccent,
+                foregroundColor: Colors.white,
               ),
               icon: const Icon(Icons.sync),
               label: Text(actionLabel!),
@@ -3195,8 +3466,8 @@ class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet> {
                 final code = barcodes.first.rawValue;
                 if (code == null || code.trim().isEmpty) return;
                 _handled = true;
-                HapticFeedback.mediumImpact();
-                Navigator.of(context).pop(code.trim());
+                Haptics.impact();
+                if (mounted) Navigator.of(context).pop(code.trim());
               },
               errorBuilder:
                   (BuildContext context, MobileScannerException error) {

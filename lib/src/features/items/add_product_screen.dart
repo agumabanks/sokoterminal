@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,13 +12,16 @@ import '../../core/db/app_database.dart';
 import '../../core/firebase/remote_config_service.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/comma_number_formatter.dart';
+import '../../core/util/formatters.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
+import '../../widgets/html_editor.dart';
 import '../../widgets/offline_cached_image.dart';
 import 'product_form_controller.dart';
 import 'product_variants_screen.dart';
 
-/// Reactive multi-tab product creation screen
+/// Smooth single-scroll product creation & editing screen.
 class AddProductScreen extends ConsumerStatefulWidget {
   const AddProductScreen({
     super.key,
@@ -36,14 +38,14 @@ class AddProductScreen extends ConsumerStatefulWidget {
 class _AddProductScreenState extends ConsumerState<AddProductScreen>
     with SingleTickerProviderStateMixin {
   static const _uuid = Uuid();
-  late TabController _tabController;
   bool _hydratingRemote = false;
   bool _hydratedRemote = false;
 
-  // Text controllers (synced with state)
+  final _scrollController = ScrollController();
   final _nameCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _costCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
   final _discountCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
@@ -57,107 +59,117 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onTabChanged);
-
-    // Populate from existing item if editing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _populateFromExisting();
       unawaited(_hydrateFromServerIfNeeded());
       if (widget.startPublishOnline) {
-        unawaited(
-          ref.read(productFormProvider.notifier).setPublishOnline(true),
-        );
+        unawaited(ref.read(productFormProvider.notifier).setPublishOnline(true));
       }
     });
   }
 
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      ref.read(productFormProvider.notifier).setTab(_tabController.index);
-    }
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _nameCtrl.dispose();
+    _weightCtrl.dispose();
+    _priceCtrl.dispose();
+    _costCtrl.dispose();
+    _stockCtrl.dispose();
+    _discountCtrl.dispose();
+    _skuCtrl.dispose();
+    _minQtyCtrl.dispose();
+    _lowStockCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _tagsCtrl.dispose();
+    _shippingDaysCtrl.dispose();
+    _shippingFeeCtrl.dispose();
+    super.dispose();
   }
+
+  // ─── Populate from existing item ──────────────────────────────────────────
 
   void _populateFromExisting() {
     final item = widget.existingItem;
-    if (item != null) {
-      final ctrl = ref.read(productFormProvider.notifier);
-      ctrl.setName(item.name);
-      _nameCtrl.text = item.name;
-      if (item.categoryId != null) {
-        ctrl.setCategory(item.categoryId, item.categoryName);
-      }
-      if (item.brandId != null) {
-        ctrl.setBrand(item.brandId, item.brandName);
-      }
-      ctrl.setUnit(item.unit ?? 'pc');
-      _weightCtrl.text = item.weight?.toString() ?? '';
-      ctrl.setWeight(_weightCtrl.text);
-      _priceCtrl.text = item.price.toStringAsFixed(0);
-      ctrl.setPrice(item.price.toStringAsFixed(0));
-      _stockCtrl.text = item.stockQty.toString();
-      ctrl.setStock(item.stockQty.toString());
-      _discountCtrl.text = item.discount?.toStringAsFixed(0) ?? '';
-      ctrl.setDiscount(_discountCtrl.text);
-      ctrl.setDiscountType(item.discountType ?? 'flat');
-      _skuCtrl.text = item.sku ?? '';
-      ctrl.setSku(_skuCtrl.text);
-      _minQtyCtrl.text = item.minPurchaseQty.toString();
-      ctrl.setMinQty(_minQtyCtrl.text);
-      _lowStockCtrl.text = item.lowStockWarning?.toString() ?? '';
-      ctrl.setLowStockWarning(_lowStockCtrl.text);
-      _descriptionCtrl.text = item.description ?? '';
-      ctrl.setDescription(_descriptionCtrl.text);
-      _tagsCtrl.text = item.tags ?? '';
-      ctrl.setTags(_tagsCtrl.text);
-      _shippingDaysCtrl.text = item.shippingDays?.toString() ?? '';
-      ctrl.setShippingDays(_shippingDaysCtrl.text);
-      _shippingFeeCtrl.text = item.shippingFee?.toStringAsFixed(0) ?? '';
-      ctrl.setShippingFee(_shippingFeeCtrl.text);
-      ctrl.setRefundable(item.refundable);
-      ctrl.setCashOnDelivery(item.cashOnDelivery);
-      if (item.publishedOnline) {
-        ctrl.setPublishOnline(true);
-      }
+    if (item == null) return;
+    final ctrl = ref.read(productFormProvider.notifier);
+    ctrl.setName(item.name);
+    _nameCtrl.text = item.name;
+    if (item.categoryId != null) ctrl.setCategory(item.categoryId, item.categoryName);
+    if (item.brandId != null) ctrl.setBrand(item.brandId, item.brandName);
+    ctrl.setUnit(item.unit ?? 'pc');
+    _weightCtrl.text = item.weight?.toString() ?? '';
+    ctrl.setWeight(_weightCtrl.text);
+    _priceCtrl.text = CommaNumberFormatter.format(item.price.toStringAsFixed(0));
+    ctrl.setPrice(_priceCtrl.text);
+    _costCtrl.text = item.cost != null
+        ? CommaNumberFormatter.format(item.cost!.toStringAsFixed(0))
+        : '';
+    ctrl.setCost(_costCtrl.text);
+    _stockCtrl.text = CommaNumberFormatter.format(item.stockQty.toString());
+    ctrl.setStock(_stockCtrl.text);
+    _discountCtrl.text = item.discount != null
+        ? CommaNumberFormatter.format(item.discount!.toStringAsFixed(0))
+        : '';
+    ctrl.setDiscount(_discountCtrl.text);
+    ctrl.setDiscountType(item.discountType ?? 'flat');
+    _skuCtrl.text = item.sku ?? '';
+    ctrl.setSku(_skuCtrl.text);
+    _minQtyCtrl.text = CommaNumberFormatter.format(item.minPurchaseQty.toString());
+    ctrl.setMinQty(_minQtyCtrl.text);
+    _lowStockCtrl.text = item.lowStockWarning != null
+        ? CommaNumberFormatter.format(item.lowStockWarning!.toString())
+        : '';
+    ctrl.setLowStockWarning(_lowStockCtrl.text);
+    _descriptionCtrl.text = item.description ?? '';
+    ctrl.setDescription(_descriptionCtrl.text);
+    _tagsCtrl.text = item.tags ?? '';
+    ctrl.setTags(_tagsCtrl.text);
+    _shippingDaysCtrl.text = item.shippingDays != null
+        ? CommaNumberFormatter.format(item.shippingDays!.toString())
+        : '';
+    ctrl.setShippingDays(_shippingDaysCtrl.text);
+    _shippingFeeCtrl.text = item.shippingFee != null
+        ? CommaNumberFormatter.format(item.shippingFee!.toStringAsFixed(0))
+        : '';
+    ctrl.setShippingFee(_shippingFeeCtrl.text);
+    ctrl.setRefundable(item.refundable);
+    ctrl.setCashOnDelivery(item.cashOnDelivery);
+    if (item.publishedOnline) unawaited(ctrl.setPublishOnline(true));
 
-      // Hydrate images from local DB snapshot (remote urls + pending local paths).
-      final thumbRaw = (item.thumbnailUrl ?? item.imageUrl)?.trim();
-      final galleryUrlsAll = _decodeStringList(item.galleryUrls);
-      final galleryIdsAll = _decodeIntList(item.galleryUploadIds);
-      final remoteCount = galleryIdsAll.length < galleryUrlsAll.length
-          ? galleryIdsAll.length
-          : galleryUrlsAll.length;
-      final remoteGalleryUrls = galleryUrlsAll.take(remoteCount).toList();
-      final pendingGalleryFiles = galleryUrlsAll
-          .skip(remoteCount)
-          .map((p) => File(p))
-          .where((f) => f.existsSync())
-          .toList();
+    // Images
+    final thumbRaw = (item.thumbnailUrl ?? item.imageUrl)?.trim();
+    final galleryUrlsAll = _decodeStringList(item.galleryUrls);
+    final galleryIdsAll = _decodeIntList(item.galleryUploadIds);
+    final remoteCount =
+        galleryIdsAll.length < galleryUrlsAll.length ? galleryIdsAll.length : galleryUrlsAll.length;
+    final remoteGalleryUrls = galleryUrlsAll.take(remoteCount).toList();
+    final pendingGalleryFiles =
+        galleryUrlsAll.skip(remoteCount).map((p) => File(p)).where((f) => f.existsSync()).toList();
 
-      File? pendingThumbnailFile;
-      String? remoteThumbnailUrl = thumbRaw;
-      int? remoteThumbnailId = item.thumbnailUploadId;
-      if (thumbRaw != null &&
-          thumbRaw.isNotEmpty &&
-          !thumbRaw.startsWith('http')) {
-        final f = File(thumbRaw);
-        if (f.existsSync()) {
-          pendingThumbnailFile = f;
-          remoteThumbnailUrl = null;
-          remoteThumbnailId = null;
-        }
+    File? pendingThumbnailFile;
+    String? remoteThumbnailUrl = thumbRaw;
+    int? remoteThumbnailId = item.thumbnailUploadId;
+    if (thumbRaw != null && thumbRaw.isNotEmpty && !thumbRaw.startsWith('http')) {
+      final f = File(thumbRaw);
+      if (f.existsSync()) {
+        pendingThumbnailFile = f;
+        remoteThumbnailUrl = null;
+        remoteThumbnailId = null;
       }
-
-      ctrl.setExistingImages(
-        thumbnailUrl: remoteThumbnailUrl,
-        thumbnailUploadId: remoteThumbnailId,
-        galleryUrls: remoteGalleryUrls,
-        galleryUploadIds: galleryIdsAll.take(remoteCount).toList(),
-        pendingGalleryFiles: pendingGalleryFiles,
-        pendingThumbnailFile: pendingThumbnailFile,
-      );
     }
+
+    ctrl.setExistingImages(
+      thumbnailUrl: remoteThumbnailUrl,
+      thumbnailUploadId: remoteThumbnailId,
+      galleryUrls: remoteGalleryUrls,
+      galleryUploadIds: galleryIdsAll.take(remoteCount).toList(),
+      pendingGalleryFiles: pendingGalleryFiles,
+      pendingThumbnailFile: pendingThumbnailFile,
+    );
   }
+
+  // ─── Hydrate from server ───────────────────────────────────────────────────
 
   Future<void> _hydrateFromServerIfNeeded() async {
     final item = widget.existingItem;
@@ -166,8 +178,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final productId = item.remoteId ?? int.tryParse(item.id);
     if (productId == null) return;
 
-    final needsHydration =
-        item.categoryId == null ||
+    final needsHydration = item.categoryId == null ||
         item.brandId == null ||
         item.unit == null ||
         item.description == null ||
@@ -193,96 +204,55 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final unit = data['product_unit']?.toString() ?? data['unit']?.toString();
       final description = data['description']?.toString();
       final tags = data['tags']?.toString();
-
       final categoryId = data['category_id']?.toString();
       final brandId = data['brand_id']?.toString();
 
-      final unitPriceRaw = data['unit_price'];
-      final stockRaw = data['current_stock'];
-      final weightRaw = data['weight'];
-      final minQtyRaw = data['min_qty'];
-      final lowStockRaw = data['low_stock_quantity'];
-      final discountRaw = data['discount'];
-      final discountTypeRaw = data['discount_type']?.toString();
-      final shippingCostRaw = data['shipping_cost'];
-      final estShippingDaysRaw = data['est_shipping_days'];
-      final refundableRaw = data['refundable'];
-      final cashOnDeliveryRaw = data['cash_on_delivery'];
-      final publishedRaw = data['published'];
+      final unitPrice = double.tryParse(data['unit_price']?.toString() ?? '');
+      final stock = int.tryParse(data['current_stock']?.toString() ?? '');
+      final weight = double.tryParse(data['weight']?.toString() ?? '');
+      final minQty = int.tryParse(data['min_qty']?.toString() ?? '');
+      final lowStock = int.tryParse(data['low_stock_quantity']?.toString() ?? '');
+      final discount = double.tryParse(data['discount']?.toString() ?? '');
+      final shippingCost = double.tryParse(data['shipping_cost']?.toString() ?? '');
+      final estShippingDays = int.tryParse(data['est_shipping_days']?.toString() ?? '');
+      final refundable = data['refundable'] == true || data['refundable'] == 1;
+      final cashOnDelivery = data['cash_on_delivery'] == true || data['cash_on_delivery'] == 1;
+      final published = data['published'] == true || data['published'] == 1;
       final barcode = data['barcode']?.toString();
 
-      final unitPrice = double.tryParse(unitPriceRaw?.toString() ?? '');
-      final stock = int.tryParse(stockRaw?.toString() ?? '');
-      final weight = double.tryParse(weightRaw?.toString() ?? '');
-      final minQty = int.tryParse(minQtyRaw?.toString() ?? '');
-      final lowStock = int.tryParse(lowStockRaw?.toString() ?? '');
-      final discount = double.tryParse(discountRaw?.toString() ?? '');
-      final shippingCost = double.tryParse(shippingCostRaw?.toString() ?? '');
-      final estShippingDays = int.tryParse(
-        estShippingDaysRaw?.toString() ?? '',
-      );
-      final refundable = refundableRaw == true || refundableRaw == 1;
-      final cashOnDelivery =
-          cashOnDeliveryRaw == true || cashOnDeliveryRaw == 1;
-      final published = publishedRaw == true || publishedRaw == 1;
+      final rawDiscountType = data['discount_type']?.toString();
+      final localDiscountType =
+          rawDiscountType == null ? null : (rawDiscountType == 'amount' ? 'flat' : rawDiscountType);
 
-      final localDiscountType = discountTypeRaw == null
-          ? null
-          : (discountTypeRaw == 'amount' ? 'flat' : discountTypeRaw);
-
-      // Update local DB with richer fields (best effort).
-      unawaited(
-        db.updateItemFields(
-          item.id,
-          ItemsCompanion(
-            remoteId: Value(productId),
-            categoryId: categoryId != null
-                ? Value(categoryId)
-                : const Value.absent(),
-            brandId: brandId != null ? Value(brandId) : const Value.absent(),
-            unit: unit != null ? Value(unit) : const Value.absent(),
-            weight: weight != null ? Value(weight) : const Value.absent(),
-            minPurchaseQty: minQty != null
-                ? Value(minQty)
-                : const Value.absent(),
-            lowStockWarning: lowStock != null
-                ? Value(lowStock)
-                : const Value.absent(),
-            discount: discount != null ? Value(discount) : const Value.absent(),
-            discountType: localDiscountType != null
-                ? Value(localDiscountType)
-                : const Value.absent(),
-            shippingFee: shippingCost != null
-                ? Value(shippingCost)
-                : const Value.absent(),
-            shippingDays: estShippingDays != null
-                ? Value(estShippingDays)
-                : const Value.absent(),
-            refundable: Value(refundable),
-            cashOnDelivery: Value(cashOnDelivery),
-            barcode: barcode != null ? Value(barcode) : const Value.absent(),
-            tags: tags != null ? Value(tags) : const Value.absent(),
-            description: description != null
-                ? Value(description)
-                : const Value.absent(),
-          ),
+      unawaited(db.updateItemFields(
+        item.id,
+        ItemsCompanion(
+          remoteId: Value(productId),
+          categoryId: categoryId != null ? Value(categoryId) : const Value.absent(),
+          brandId: brandId != null ? Value(brandId) : const Value.absent(),
+          unit: unit != null ? Value(unit) : const Value.absent(),
+          weight: weight != null ? Value(weight) : const Value.absent(),
+          minPurchaseQty: minQty != null ? Value(minQty) : const Value.absent(),
+          lowStockWarning: lowStock != null ? Value(lowStock) : const Value.absent(),
+          discount: discount != null ? Value(discount) : const Value.absent(),
+          discountType: localDiscountType != null ? Value(localDiscountType) : const Value.absent(),
+          shippingFee: shippingCost != null ? Value(shippingCost) : const Value.absent(),
+          shippingDays: estShippingDays != null ? Value(estShippingDays) : const Value.absent(),
+          refundable: Value(refundable),
+          cashOnDelivery: Value(cashOnDelivery),
+          barcode: barcode != null ? Value(barcode) : const Value.absent(),
+          tags: tags != null ? Value(tags) : const Value.absent(),
+          description: description != null ? Value(description) : const Value.absent(),
         ),
-      );
+      ));
 
-      // Hydrate form state (only when data is present).
       if (name != null && name.trim().isNotEmpty) {
         _nameCtrl.text = name;
         ctrl.setName(name);
       }
-      if (unit != null && unit.trim().isNotEmpty) {
-        ctrl.setUnit(unit);
-      }
-      if (categoryId != null) {
-        ctrl.setCategory(categoryId, null);
-      }
-      if (brandId != null) {
-        ctrl.setBrand(brandId, null);
-      }
+      if (unit != null && unit.trim().isNotEmpty) ctrl.setUnit(unit);
+      if (categoryId != null) ctrl.setCategory(categoryId, null);
+      if (brandId != null) ctrl.setBrand(brandId, null);
       if (description != null) {
         _descriptionCtrl.text = description;
         ctrl.setDescription(description);
@@ -292,11 +262,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ctrl.setTags(tags);
       }
       if (unitPrice != null) {
-        _priceCtrl.text = unitPrice.toStringAsFixed(0);
+        _priceCtrl.text = CommaNumberFormatter.format(unitPrice.toStringAsFixed(0));
         ctrl.setPrice(_priceCtrl.text);
       }
       if (stock != null) {
-        _stockCtrl.text = stock.toString();
+        _stockCtrl.text = CommaNumberFormatter.format(stock.toString());
         ctrl.setStock(_stockCtrl.text);
       }
       if (weight != null) {
@@ -304,63 +274,211 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ctrl.setWeight(_weightCtrl.text);
       }
       if (minQty != null) {
-        _minQtyCtrl.text = minQty.toString();
+        _minQtyCtrl.text = CommaNumberFormatter.format(minQty.toString());
         ctrl.setMinQty(_minQtyCtrl.text);
       }
       if (lowStock != null) {
-        _lowStockCtrl.text = lowStock.toString();
+        _lowStockCtrl.text = CommaNumberFormatter.format(lowStock.toString());
         ctrl.setLowStockWarning(_lowStockCtrl.text);
       }
       if (discount != null) {
-        _discountCtrl.text = discount.toStringAsFixed(0);
+        _discountCtrl.text = CommaNumberFormatter.format(discount.toStringAsFixed(0));
         ctrl.setDiscount(_discountCtrl.text);
       }
-      if (localDiscountType != null) {
-        ctrl.setDiscountType(localDiscountType);
-      }
+      if (localDiscountType != null) ctrl.setDiscountType(localDiscountType);
       if (shippingCost != null) {
-        _shippingFeeCtrl.text = shippingCost.toStringAsFixed(0);
+        _shippingFeeCtrl.text = CommaNumberFormatter.format(shippingCost.toStringAsFixed(0));
         ctrl.setShippingFee(_shippingFeeCtrl.text);
       }
       if (estShippingDays != null) {
-        _shippingDaysCtrl.text = estShippingDays.toString();
+        _shippingDaysCtrl.text = CommaNumberFormatter.format(estShippingDays.toString());
         ctrl.setShippingDays(_shippingDaysCtrl.text);
       }
       ctrl.setRefundable(refundable);
       ctrl.setCashOnDelivery(cashOnDelivery);
-
       if (published && !ref.read(productFormProvider).publishOnline) {
         await ctrl.setPublishOnline(true);
       }
-
       _hydratedRemote = true;
     } catch (_) {
-      // Best effort: offline/unauthorized/etc.
+      // Best effort — offline / unauthorized
     } finally {
+      if (mounted) setState(() => _hydratingRemote = false);
+    }
+  }
+
+  // ─── Save ──────────────────────────────────────────────────────────────────
+
+  bool _isSaving = false;
+
+  Future<void> _saveProduct() async {
+    if (_isSaving) return;
+    _isSaving = true;
+
+    final state = ref.read(productFormProvider);
+    final ctrl = ref.read(productFormProvider.notifier);
+    if (!state.canSubmit) {
+      _isSaving = false;
+      return;
+    }
+
+    String finalSku = state.sku.trim();
+    if (finalSku.isEmpty) {
+      await ctrl.autoGenerateSKU();
+      finalSku = ref.read(productFormProvider).sku;
+    } else {
+      final skuError = await ctrl.validateSKU(editingItemId: widget.existingItem?.id);
+      if (skuError != null && mounted) {
+        _isSaving = false;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(skuError),
+          backgroundColor: DesignTokens.error,
+          action: SnackBarAction(
+            label: 'Auto-fix',
+            textColor: Colors.white,
+            onPressed: () async => ctrl.autoGenerateSKU(),
+          ),
+        ));
+        return;
+      }
+    }
+
+    ctrl.setSubmitting(true);
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final sync = ref.read(syncServiceProvider);
+      final id = widget.existingItem?.id ?? _uuid.v4();
+      final existing = widget.existingItem;
+
+      final thumbPathOrUrl = state.thumbnailFile?.path ?? state.thumbnailUrl;
+      final thumbUploadId = state.thumbnailFile != null ? null : state.thumbnailUploadId;
+
+      final pendingGalleryPaths = state.galleryFiles.map((f) => f.path).toList();
+      final combinedGalleryUrls = [...state.galleryUrls, ...pendingGalleryPaths];
+
+      final existingGalleryUrls = _decodeStringList(existing?.galleryUrls);
+      final existingGalleryIds = _decodeIntList(existing?.galleryUploadIds);
+      final existingRemoteCount =
+          existingGalleryIds.length < existingGalleryUrls.length
+          ? existingGalleryIds.length
+          : existingGalleryUrls.length;
+      final existingHasGallery =
+          existingRemoteCount > 0 ||
+          existingGalleryUrls.skip(existingRemoteCount).isNotEmpty;
+      final currentHasGallery = combinedGalleryUrls.isNotEmpty;
+      final shouldClearGallery = existingHasGallery && !currentHasGallery;
+
+      final companion = ItemsCompanion(
+        id: Value(id),
+        name: Value(state.name.trim()),
+        price: Value(double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0),
+        cost: Value(double.tryParse(CommaNumberFormatter.unformat(state.cost))),
+        stockQty: Value(int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0),
+        sku: Value(finalSku.isNotEmpty ? finalSku : null),
+        imageUrl: Value(thumbPathOrUrl),
+        publishedOnline: Value(state.publishOnline),
+        categoryId: Value(state.categoryId),
+        categoryName: Value(state.categoryName),
+        brandId: Value(state.brandId),
+        brandName: Value(state.brandName),
+        unit: Value(state.unit),
+        weight: Value(double.tryParse(CommaNumberFormatter.unformat(state.weight))),
+        minPurchaseQty: Value(int.tryParse(state.minQty) ?? 1),
+        tags: Value(state.tags.isNotEmpty ? state.tags : null),
+        description: Value(state.description.isNotEmpty ? state.description : null),
+        thumbnailUrl: Value(thumbPathOrUrl),
+        thumbnailUploadId: Value(thumbUploadId),
+        galleryUrls: currentHasGallery || shouldClearGallery
+            ? Value(jsonEncode(currentHasGallery ? combinedGalleryUrls : const <String>[]))
+            : const Value.absent(),
+        galleryUploadIds: currentHasGallery || shouldClearGallery
+            ? Value(jsonEncode(currentHasGallery ? state.galleryUploadIds : const <int>[]))
+            : const Value.absent(),
+        discount: Value(double.tryParse(CommaNumberFormatter.unformat(state.discount))),
+        discountType: Value(state.discountType),
+        shippingDays: Value(int.tryParse(CommaNumberFormatter.unformat(state.shippingDays))),
+        shippingFee: Value(double.tryParse(CommaNumberFormatter.unformat(state.shippingFee))),
+        refundable: Value(state.refundable),
+        cashOnDelivery: Value(state.cashOnDelivery),
+        lowStockWarning: Value(int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning))),
+        synced: const Value(false),
+      );
+
+      final opType = widget.existingItem == null ? 'item_create' : 'item_update';
+      final catId = int.tryParse(state.categoryId ?? '');
+
+      try {
+        await db.saveItemAndEnqueueSync(
+          item: companion,
+          opType: opType,
+          syncPayload: {
+            'local_id': id,
+            if (widget.existingItem?.remoteId != null) 'remote_id': widget.existingItem!.remoteId,
+            'name': state.name.trim(),
+            'unit_price': double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0,
+            'current_stock': int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0,
+            'published': state.publishOnline ? 1 : 0,
+            if (catId != null) 'category_ids': [catId],
+            if (catId != null) 'category_id': catId,
+            if (state.brandId != null) 'brand_id': int.tryParse(state.brandId!),
+            'unit': state.unit.isNotEmpty ? state.unit : 'pc',
+            if (state.weight.isNotEmpty) 'weight': double.tryParse(CommaNumberFormatter.unformat(state.weight)),
+            'min_qty': int.tryParse(CommaNumberFormatter.unformat(state.minQty)) ?? 1,
+            if (state.tags.isNotEmpty)
+              'tags': state.tags.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+            if (state.description.isNotEmpty) 'description': state.description,
+            'discount': double.tryParse(CommaNumberFormatter.unformat(state.discount)) ?? 0,
+            'discount_type': state.discountType == 'flat' ? 'amount' : 'percent',
+            if (state.shippingDays.isNotEmpty)
+              'est_shipping_days': int.tryParse(CommaNumberFormatter.unformat(state.shippingDays)),
+            if (state.shippingFee.isNotEmpty)
+              'shipping_cost': double.tryParse(CommaNumberFormatter.unformat(state.shippingFee)),
+            'refundable': state.refundable ? 1 : 0,
+            'cash_on_delivery': state.cashOnDelivery ? 1 : 0,
+            if (state.lowStockWarning.isNotEmpty)
+              'low_stock_quantity': int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning)),
+            if (finalSku.isNotEmpty) 'sku': finalSku,
+            if (state.cost.isNotEmpty)
+              'purchase_price': double.tryParse(CommaNumberFormatter.unformat(state.cost)),
+          },
+        );
+        unawaited(sync.syncCatalogImmediately());
+      } catch (e) {
+        _isSaving = false;
+        ctrl.setSubmitting(false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Save failed: $e'), backgroundColor: DesignTokens.error),
+          );
+        }
+        return;
+      }
+
       if (mounted) {
-        setState(() => _hydratingRemote = false);
+        ctrl.reset();
+        Navigator.pop(context, true);
+        final message = state.publishOnline
+            ? 'Saved — syncing to your online shop…'
+            : 'Saved on this device';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(message),
+          backgroundColor: DesignTokens.brandAccent,
+          duration: const Duration(seconds: 3),
+        ));
+      }
+    } catch (e) {
+      _isSaving = false;
+      ref.read(productFormProvider.notifier).setSubmitting(false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error saving: $e'),
+          backgroundColor: DesignTokens.error,
+        ));
       }
     }
   }
 
-  @override
-  void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
-    _nameCtrl.dispose();
-    _weightCtrl.dispose();
-    _priceCtrl.dispose();
-    _stockCtrl.dispose();
-    _discountCtrl.dispose();
-    _skuCtrl.dispose();
-    _minQtyCtrl.dispose();
-    _lowStockCtrl.dispose();
-    _descriptionCtrl.dispose();
-    _tagsCtrl.dispose();
-    _shippingDaysCtrl.dispose();
-    _shippingFeeCtrl.dispose();
-    super.dispose();
-  }
+  // ─── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -368,111 +486,539 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final ctrl = ref.read(productFormProvider.notifier);
 
     return Scaffold(
-      backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text(
-          widget.existingItem == null ? 'Add Product' : 'Edit Product',
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(100),
-          child: Column(
-            children: [
-              // Online toggle banner
-              _buildOnlineToggle(state, ctrl),
-              // Tabs
-              TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                labelColor: DesignTokens.brandPrimary,
-                unselectedLabelColor: DesignTokens.grayMedium,
-                indicatorColor: DesignTokens.brandPrimary,
-                tabs: [
-                  Tab(icon: Icon(Icons.info_outline), text: 'Basic'),
-                  Tab(icon: Icon(Icons.attach_money), text: 'Pricing'),
-                  if (state.publishOnline) ...[
-                    Tab(icon: Icon(Icons.image), text: 'Images'),
-                    Tab(icon: Icon(Icons.description), text: 'Details'),
-                  ] else ...[
-                    Tab(icon: Icon(Icons.image), text: 'Images'),
-                    Tab(icon: Icon(Icons.local_shipping), text: 'Shipping'),
-                  ],
+      backgroundColor: DesignTokens.surfaceGrouped,
+      appBar: _buildAppBar(state),
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Hero photo
+                _buildPhotoSection(state, ctrl),
+                const SizedBox(height: 8),
+
+                // 2. Marketplace toggle
+                _buildMarketplaceCard(state, ctrl),
+                const SizedBox(height: 8),
+
+                // 3. Product info
+                _buildFormSection(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Product Info',
+                  child: _buildProductInfoFields(state, ctrl),
+                ),
+                const SizedBox(height: 8),
+
+                // 4. Pricing & stock
+                _buildFormSection(
+                  icon: Icons.payments_outlined,
+                  title: 'Pricing & Stock',
+                  child: _buildPricingFields(state, ctrl),
+                ),
+                const SizedBox(height: 8),
+
+                // 5. Marketplace details (only when publishing online)
+                if (state.publishOnline) ...[
+                  _buildFormSection(
+                    icon: Icons.public_outlined,
+                    title: 'Marketplace Details',
+                    subtitle: 'Required for your online listing',
+                    child: _buildMarketplaceFields(state, ctrl),
+                  ),
+                  const SizedBox(height: 8),
                 ],
-              ),
-            ],
+
+                // 6. Variants (editing only, feature-flagged)
+                if (widget.existingItem != null &&
+                    ref.read(remoteConfigProvider).ffProductVariantsEditor) ...[
+                  _buildVariantsSection(widget.existingItem!),
+                  const SizedBox(height: 8),
+                ],
+
+                // Error from permission denial
+                if (state.error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: _buildErrorBanner(state.error!),
+                  ),
+
+                const SizedBox(height: 100),
+              ],
+            ),
           ),
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildBasicInfoTab(state, ctrl),
-          _buildPricingTab(state, ctrl),
-          _buildImagesTab(state, ctrl),
-          state.publishOnline
-              ? _buildDetailsTab(state, ctrl)
-              : _buildShippingTab(state, ctrl),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(state),
+      bottomNavigationBar: _buildSaveBar(state),
     );
   }
 
-  Widget _buildOnlineToggle(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
+  AppBar _buildAppBar(ProductFormState state) {
+    return AppBar(
+      backgroundColor: DesignTokens.surfaceRaised,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      title: Text(
+        widget.existingItem == null ? 'New Product' : 'Edit Product',
+        style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+      ),
+      actions: [
+        if (_hydratingRemote)
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ─── Photo Section ─────────────────────────────────────────────────────────
+
+  Widget _buildPhotoSection(ProductFormState state, ProductFormController ctrl) {
+    final hasThumb = state.thumbnailFile != null ||
+        (state.thumbnailUrl != null && state.thumbnailUrl!.isNotEmpty);
+    final isSynced = state.thumbnailUploadId != null ||
+        (state.thumbnailUrl?.startsWith('http') == true);
+
+    return GestureDetector(
+      onTap: () => _showPhotoOptions(ctrl),
+      child: Stack(
+        children: [
+          // Background image or placeholder
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            height: 240,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: hasThumb
+                  ? Colors.black
+                  : DesignTokens.brandPrimary.withValues(alpha: 0.05),
+            ),
+            child: hasThumb ? _buildThumbImage(state) : _buildPhotoPlaceholder(),
+          ),
+
+          // Gradient overlay at bottom for the "change photo" hint
+          if (hasThumb)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 80,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black54],
+                  ),
+                ),
+              ),
+            ),
+
+          // "Tap to change" label when image exists
+          if (hasThumb)
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.edit_outlined, size: 14, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          isSynced ? 'Change photo' : 'Tap to change photo',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Synced badge
+          if (isSynced && hasThumb)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: DesignTokens.brandAccent.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('Synced', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            )
+          else if (hasThumb && state.thumbnailFile != null)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_upload_outlined, size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text('Uploading on sync', style: TextStyle(color: Colors.white, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+
+          // Remove button
+          if (hasThumb)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: GestureDetector(
+                onTap: ctrl.removeThumbnail,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, size: 16, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThumbImage(ProductFormState state) {
+    if (state.thumbnailFile != null) {
+      return Image.file(
+        state.thumbnailFile!,
+        width: double.infinity,
+        height: 240,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPhotoPlaceholder(),
+      );
+    }
+    final url = state.thumbnailUrl!;
+    if (url.startsWith('http')) {
+      return OfflineCachedImage(
+        imageUrl: url,
+        width: double.infinity,
+        height: 240,
+        fit: BoxFit.cover,
+        errorWidget: _buildPhotoPlaceholder(),
+      );
+    }
+    final f = File(url);
+    if (f.existsSync()) {
+      return Image.file(f, width: double.infinity, height: 240, fit: BoxFit.cover);
+    }
+    return _buildPhotoPlaceholder();
+  }
+
+  Widget _buildPhotoPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.add_a_photo_outlined,
+            size: 32,
+            color: DesignTokens.brandPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Add product photo',
+          style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.brandPrimary),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Tap to shoot or choose from gallery',
+          style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+        ),
+      ],
+    );
+  }
+
+  void _showPhotoOptions(ProductFormController ctrl) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: DesignTokens.grayLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text('Add Photo', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
+            const SizedBox(height: 16),
+            _photoOptionTile(
+              icon: Icons.camera_alt_outlined,
+              label: 'Take a photo',
+              onTap: () {
+                Navigator.pop(context);
+                ctrl.takeThumbnailPhoto();
+              },
+            ),
+            const Divider(height: 1),
+            _photoOptionTile(
+              icon: Icons.photo_library_outlined,
+              label: 'Choose from gallery',
+              onTap: () {
+                Navigator.pop(context);
+                ctrl.pickThumbnail();
+              },
+            ),
+            const Divider(height: 1),
+            _photoOptionTile(
+              icon: Icons.collections_outlined,
+              label: 'Add gallery photos',
+              subtitle: 'Showcase multiple angles',
+              onTap: () {
+                Navigator.pop(context);
+                ctrl.pickGalleryImages();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _photoOptionTile({
+    required IconData icon,
+    required String label,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: DesignTokens.brandPrimary, size: 20),
+      ),
+      title: Text(label, style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w500)),
+      subtitle: subtitle != null ? Text(subtitle, style: DesignTokens.textSmall) : null,
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+    );
+  }
+
+  // Gallery strip (shown below the hero if gallery photos exist)
+  Widget _buildGalleryStrip(ProductFormState state, ProductFormController ctrl) {
+    final total = state.galleryUrls.length + state.galleryFiles.length;
+    if (total == 0) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 80,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: total + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          if (i == total) {
+            return GestureDetector(
+              onTap: ctrl.pickGalleryImages,
+              child: Container(
+                width: 70,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: DesignTokens.brandPrimary.withValues(alpha: 0.4),
+                    style: BorderStyle.solid,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: DesignTokens.brandPrimary.withValues(alpha: 0.04),
+                ),
+                child: const Icon(Icons.add, color: DesignTokens.brandPrimary),
+              ),
+            );
+          }
+          final isRemote = i < state.galleryUrls.length;
+          final fileIndex = i - state.galleryUrls.length;
+          return GestureDetector(
+            onLongPress: () {
+              if (isRemote) ctrl.setGalleryUrlAsThumbnail(i);
+              else ctrl.setGalleryFileAsThumbnail(fileIndex);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Set as main photo'), duration: Duration(seconds: 1)),
+              );
+            },
+            child: Stack(
+              children: [
+                Container(
+                  width: 70,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isRemote
+                          ? DesignTokens.brandAccent.withValues(alpha: 0.6)
+                          : DesignTokens.grayLight,
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: isRemote
+                        ? OfflineCachedImage(
+                            imageUrl: state.galleryUrls[i],
+                            width: 70,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorWidget: const SizedBox(),
+                          )
+                        : Image.file(
+                            state.galleryFiles[fileIndex],
+                            width: 70,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          ),
+                  ),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: GestureDetector(
+                    onTap: () => isRemote
+                        ? ctrl.removeExistingGalleryImage(i)
+                        : ctrl.removeGalleryImage(fileIndex),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Marketplace Toggle Card ────────────────────────────────────────────────
+
+  Widget _buildMarketplaceCard(ProductFormState state, ProductFormController ctrl) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: state.publishOnline
-          ? DesignTokens.brandAccent.withValues(alpha: 0.15)
-          : DesignTokens.grayLight.withValues(alpha: 0.3),
+      duration: const Duration(milliseconds: 250),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: state.publishOnline
+            ? DesignTokens.brandAccent.withValues(alpha: 0.1)
+            : DesignTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: state.publishOnline
+              ? DesignTokens.brandAccent.withValues(alpha: 0.4)
+              : DesignTokens.dividerSolid,
+        ),
+      ),
       child: Row(
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
-            child: Icon(
-              state.publishOnline ? Icons.public : Icons.store,
+            child: Container(
               key: ValueKey(state.publishOnline),
-              color: state.publishOnline
-                  ? DesignTokens.brandAccent
-                  : DesignTokens.grayMedium,
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: state.publishOnline
+                    ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                    : DesignTokens.surfaceGrouped,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                state.publishOnline ? Icons.public_rounded : Icons.store_outlined,
+                color: state.publishOnline ? DesignTokens.brandAccent : DesignTokens.grayMedium,
+                size: 22,
+              ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  state.publishOnline ? 'Marketplace Listing' : 'POS Only',
+                  state.publishOnline ? 'Listed on Marketplace' : 'In-Store Only',
                   style: DesignTokens.textBodyBold,
                 ),
                 Text(
                   state.publishOnline
-                      ? 'Visible on soko24.co'
-                      : 'Only at point of sale',
-                  style: DesignTokens.textSmall,
+                      ? 'Visible on soko24.co to all buyers'
+                      : 'Only available at point of sale',
+                  style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
                 ),
               ],
             ),
           ),
-          if (state.isLoadingCategories || state.isLoadingBrands)
+          if (state.isLoadingCategories || state.isLoadingBrands || _hydratingRemote)
             const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else if (_hydratingRemote)
-            const SizedBox(
-              width: 20,
-              height: 20,
+              width: 22,
+              height: 22,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           else
-            Switch(
+            Switch.adaptive(
               value: state.publishOnline,
+              activeColor: DesignTokens.brandAccent,
               onChanged: (v) => ctrl.setPublishOnline(v),
             ),
         ],
@@ -480,832 +1026,642 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildBasicInfoTab(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  // ─── Section card wrapper ──────────────────────────────────────────────────
+
+  Widget _buildFormSection({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: DesignTokens.dividerSolid.withValues(alpha: 0.5)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Product Information', style: DesignTokens.textTitle),
-          const SizedBox(height: 16),
-
-          AppInput(
-            controller: _nameCtrl,
-            label: 'Product Name *',
-            hint: 'E.g., iPhone 15 Pro Max',
-            prefixIcon: Icons.inventory_2_outlined,
-            textCapitalization: TextCapitalization.words,
-            onChanged: ctrl.setName,
-          ),
-          const SizedBox(height: 16),
-
-          if (state.publishOnline) ...[
-            // Category selector
-            _buildCategorySelector(state, ctrl),
-            const SizedBox(height: 16),
-
-            // Brand selector
-            _buildBrandSelector(state, ctrl),
-            const SizedBox(height: 16),
-          ],
-
-          // Unit selector
-          _buildUnitSelector(state, ctrl),
-
-          if (state.publishOnline) ...[
-            const SizedBox(height: 16),
-            AppInput(
-              controller: _weightCtrl,
-              label: 'Weight (kg)',
-              hint: '0.5',
-              prefixIcon: Icons.scale_outlined,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              onChanged: ctrl.setWeight,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 17, color: DesignTokens.brandPrimary),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: DesignTokens.textBodyBold),
+                    if (subtitle != null)
+                      Text(subtitle,
+                          style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCategorySelector(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Category *', style: DesignTokens.textSmallBold),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _showCategoryPicker(state, ctrl),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: state.categoryId == null && state.publishOnline
-                    ? DesignTokens.error
-                    : DesignTokens.grayLight,
-                width: state.categoryId == null && state.publishOnline ? 2 : 1,
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.category_outlined,
-                  color: state.categoryId != null
-                      ? DesignTokens.brandPrimary
-                      : DesignTokens.grayMedium,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    state.categoryName ?? 'Select category',
-                    style: state.categoryName != null
-                        ? DesignTokens.textBody
-                        : DesignTokens.textBody.copyWith(
-                            color: DesignTokens.grayMedium,
-                          ),
-                  ),
-                ),
-                if (state.isLoadingCategories)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  const Icon(Icons.chevron_right),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // ─── Product Info Fields ───────────────────────────────────────────────────
 
-  Widget _buildBrandSelector(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
+  Widget _buildProductInfoFields(ProductFormState state, ProductFormController ctrl) {
+    const units = ['pc', 'kg', 'g', 'set', 'pair', 'pack', 'box', 'dozen', 'liter', 'meter'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Brand (Optional)', style: DesignTokens.textSmallBold),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _showBrandPicker(state, ctrl),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: DesignTokens.grayLight),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.branding_watermark_outlined,
-                  color: state.brandId != null
-                      ? DesignTokens.brandPrimary
-                      : DesignTokens.grayMedium,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    state.brandName ?? 'Select brand',
-                    style: state.brandName != null
-                        ? DesignTokens.textBody
-                        : DesignTokens.textBody.copyWith(
-                            color: DesignTokens.grayMedium,
-                          ),
-                  ),
-                ),
-                if (state.brandId != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () => ctrl.setBrand(null, null),
-                  )
-                else if (state.isLoadingBrands)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  const Icon(Icons.chevron_right),
-              ],
-            ),
-          ),
+        AppInput(
+          controller: _nameCtrl,
+          label: 'Product Name *',
+          hint: 'E.g., iPhone 15 Pro Max 256GB',
+          prefixIcon: Icons.inventory_2_outlined,
+          textCapitalization: TextCapitalization.words,
+          onChanged: ctrl.setName,
         ),
-      ],
-    );
-  }
+        const SizedBox(height: 16),
 
-  Widget _buildUnitSelector(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
-    const units = [
-      'pc',
-      'kg',
-      'g',
-      'set',
-      'pair',
-      'pack',
-      'box',
-      'dozen',
-      'liter',
-      'meter',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        if (state.publishOnline) ...[
+          _buildCategorySelector(state, ctrl),
+          const SizedBox(height: 16),
+          _buildBrandSelector(state, ctrl),
+          const SizedBox(height: 16),
+        ],
+
+        // Unit chips
         Text('Unit *', style: DesignTokens.textSmallBold),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: units
-              .map(
-                (unit) => ChoiceChip(
-                  label: Text(unit),
-                  selected: state.unit == unit,
-                  onSelected: (v) {
-                    if (v) ctrl.setUnit(unit);
-                  },
-                  selectedColor: DesignTokens.brandPrimary.withValues(
-                    alpha: 0.2,
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPricingTab(ProductFormState state, ProductFormController ctrl) {
-    final remoteConfig = ref.read(remoteConfigProvider);
-    return SingleChildScrollView(
-      padding: DesignTokens.paddingScreen,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Pricing & Stock', style: DesignTokens.textTitle),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: AppInput(
-                  controller: _priceCtrl,
-                  label: 'Unit Price (UGX) *',
-                  hint: '50000',
-                  prefixIcon: Icons.attach_money,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: ctrl.setPrice,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppInput(
-                  controller: _stockCtrl,
-                  label: 'Stock *',
-                  hint: '10',
-                  prefixIcon: Icons.inventory,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: ctrl.setStock,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          if (state.publishOnline) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: AppInput(
-                    controller: _discountCtrl,
-                    label: 'Discount',
-                    hint: '0',
-                    prefixIcon: Icons.discount_outlined,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    onChanged: ctrl.setDiscount,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Type', style: DesignTokens.textSmallBold),
-                    const SizedBox(height: 8),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'flat', label: Text('UGX')),
-                        ButtonSegment(value: 'percent', label: Text('%')),
-                      ],
-                      selected: {state.discountType},
-                      onSelectionChanged: (v) => ctrl.setDiscountType(v.first),
-                    ),
-                  ],
-                ),
-              ],
+          children: units.map((unit) => ChoiceChip(
+            label: Text(unit),
+            selected: state.unit == unit,
+            onSelected: (v) { if (v) ctrl.setUnit(unit); },
+            selectedColor: DesignTokens.brandPrimary.withValues(alpha: 0.15),
+            labelStyle: TextStyle(
+              color: state.unit == unit ? DesignTokens.brandPrimary : DesignTokens.grayDark,
+              fontWeight: state.unit == unit ? FontWeight.w600 : FontWeight.normal,
             ),
-            const SizedBox(height: 16),
-          ],
+            side: BorderSide(
+              color: state.unit == unit
+                  ? DesignTokens.brandPrimary.withValues(alpha: 0.5)
+                  : DesignTokens.grayLight,
+            ),
+          )).toList(),
+        ),
 
-          Row(
-            children: [
-              Expanded(
-                child: AppInput(
-                  controller: _skuCtrl,
-                  label: 'SKU',
-                  hint: 'ABC-123',
-                  prefixIcon: Icons.qr_code,
-                  onChanged: ctrl.setSku,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppInput(
-                  controller: _minQtyCtrl,
-                  label: 'Min Qty',
-                  hint: '1',
-                  prefixIcon: Icons.shopping_bag_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: ctrl.setMinQty,
-                ),
-              ),
-            ],
-          ),
+        if (state.publishOnline) ...[
           const SizedBox(height: 16),
-
           AppInput(
-            controller: _lowStockCtrl,
-            label: 'Low Stock Warning',
-            hint: 'Alert when below this quantity',
-            prefixIcon: Icons.warning_amber_outlined,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: ctrl.setLowStockWarning,
+            controller: _weightCtrl,
+            label: 'Weight (kg)',
+            hint: '0.5',
+            prefixIcon: Icons.scale_outlined,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: ctrl.setWeight,
           ),
-
-          const SizedBox(height: 24),
-
-          if (remoteConfig.ffProductVariantsEditor) ...[
-            if (widget.existingItem != null) ...[
-              _buildVariantsCard(widget.existingItem!),
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: DesignTokens.grayLight.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: DesignTokens.grayLight),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.layers_outlined,
-                      color: DesignTokens.grayMedium,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Variants are available after you save the product.',
-                        style: DesignTokens.textSmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
         ],
-      ),
-    );
-  }
 
-  Widget _buildVariantsCard(Item item) {
-    final db = ref.read(appDatabaseProvider);
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductVariantsScreen(itemId: item.id),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: DesignTokens.grayLight),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.layers_outlined, color: DesignTokens.brandPrimary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Variants', style: DesignTokens.textBodyBold),
-                  const SizedBox(height: 4),
-                  StreamBuilder<List<ItemStock>>(
-                    stream: db.watchItemStocksForItem(item.id),
-                    builder: (context, snapshot) {
-                      final stocks = snapshot.data ?? const <ItemStock>[];
-                      final variants = stocks
-                          .where((s) => s.variant.trim().isNotEmpty)
-                          .length;
-                      final label = variants == 0
-                          ? 'No variants yet'
-                          : '$variants variants configured';
-                      return Text(label, style: DesignTokens.textSmall);
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagesTab(ProductFormState state, ProductFormController ctrl) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Product Images', style: DesignTokens.textTitle),
+        // Gallery strip (if any gallery photos)
+        if (state.galleryUrls.isNotEmpty || state.galleryFiles.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Text('Gallery Photos', style: DesignTokens.textSmallBold),
           const SizedBox(height: 8),
-          Text(
-            'Add a thumbnail and gallery images to showcase your product',
-            style: DesignTokens.textSmall.copyWith(
-              color: DesignTokens.grayMedium,
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Thumbnail
-          Text('Thumbnail (Main Image)', style: DesignTokens.textBodyBold),
-          const SizedBox(height: 12),
-          _buildThumbnailPicker(state, ctrl),
-
-          const SizedBox(height: 32),
-
-          // Gallery
-          Text('Gallery Images', style: DesignTokens.textBodyBold),
-          const SizedBox(height: 12),
-          _buildGalleryPicker(state, ctrl),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThumbnailPicker(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
-    final hasFile = state.thumbnailFile != null;
-    final url = state.thumbnailUrl?.trim();
-    final hasUrl = url != null && url.isNotEmpty;
-
-    if (hasFile || hasUrl) {
-      final image = hasFile
-          ? Image.file(
-              state.thumbnailFile!,
-              width: double.infinity,
-              height: 200,
-              fit: BoxFit.cover,
-            )
-          : (url!.startsWith('http')
-                ? OfflineCachedImage(
-                    imageUrl: url,
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                    errorWidget: const SizedBox(height: 200),
-                  )
-                : Image.file(
-                    File(url),
-                    width: double.infinity,
-                    height: 200,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(height: 200),
-                  ));
-
-      return Stack(
-        children: [
-          ClipRRect(borderRadius: BorderRadius.circular(12), child: image),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: IconButton.filled(
-              onPressed: ctrl.removeThumbnail,
-              icon: const Icon(Icons.close),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.black54,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        color: DesignTokens.grayLight.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: DesignTokens.grayLight,
-          style: BorderStyle.solid,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.add_photo_alternate_outlined,
-            size: 48,
-            color: DesignTokens.grayMedium,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
-                onPressed: ctrl.pickThumbnail,
-                icon: const Icon(Icons.photo_library),
-                label: const Text('Gallery'),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: ctrl.takeThumbnailPhoto,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Camera'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGalleryPicker(
-    ProductFormState state,
-    ProductFormController ctrl,
-  ) {
-    final total = state.galleryUrls.length + state.galleryFiles.length;
-    return Column(
-      children: [
-        // Add button
-        InkWell(
-          onTap: ctrl.pickGalleryImages,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: DesignTokens.brandPrimary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: DesignTokens.brandPrimary.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.add_photo_alternate,
-                  size: 32,
-                  color: DesignTokens.brandPrimary,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add Gallery Images',
-                  style: DesignTokens.textBody.copyWith(
-                    color: DesignTokens.brandPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        if (total > 0) ...[
+          _buildGalleryStrip(state, ctrl),
+        ] else if (state.publishOnline) ...[
           const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: total,
-            itemBuilder: (_, i) {
-              final isRemote = i < state.galleryUrls.length;
-              return Stack(
+          GestureDetector(
+            onTap: ctrl.pickGalleryImages,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: DesignTokens.brandPrimary.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: DesignTokens.brandPrimary.withValues(alpha: 0.2),
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: isRemote
-                        ? OfflineCachedImage(
-                            imageUrl: state.galleryUrls[i],
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                            errorWidget: const SizedBox(),
-                          )
-                        : Image.file(
-                            state.galleryFiles[i - state.galleryUrls.length],
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () => isRemote
-                          ? ctrl.removeExistingGalleryImage(i)
-                          : ctrl.removeGalleryImage(
-                              i - state.galleryUrls.length,
-                            ),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
+                  Icon(Icons.add_photo_alternate_outlined,
+                      color: DesignTokens.brandPrimary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Add gallery photos',
+                            style: DesignTokens.textBody
+                                .copyWith(color: DesignTokens.brandPrimary, fontWeight: FontWeight.w600)),
+                        Text('Show more angles to attract buyers',
+                            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+                      ],
                     ),
                   ),
+                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
                 ],
-              );
-            },
+              ),
+            ),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildDetailsTab(ProductFormState state, ProductFormController ctrl) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Description & Details', style: DesignTokens.textTitle),
-          const SizedBox(height: 16),
-
-          AppInput(
-            controller: _descriptionCtrl,
-            label: 'Product Description',
-            hint: 'Describe your product in detail...',
-            maxLines: 6,
-            onChanged: ctrl.setDescription,
-          ),
-          const SizedBox(height: 16),
-
-          AppInput(
-            controller: _tagsCtrl,
-            label: 'Tags (comma-separated)',
-            hint: 'smartphone, apple, electronics',
-            prefixIcon: Icons.tag,
-            onChanged: ctrl.setTags,
-          ),
-          const SizedBox(height: 24),
-
-          // Shipping section
-          Text('Shipping & Options', style: DesignTokens.textTitle),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: AppInput(
-                  controller: _shippingDaysCtrl,
-                  label: 'Shipping Days',
-                  hint: '3',
-                  prefixIcon: Icons.local_shipping_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: ctrl.setShippingDays,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppInput(
-                  controller: _shippingFeeCtrl,
-                  label: 'Shipping Fee (UGX)',
-                  hint: '5000',
-                  prefixIcon: Icons.payments_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: ctrl.setShippingFee,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          _buildSwitchTile(
-            title: 'Refundable',
-            subtitle: 'Allow customers to request refunds',
-            value: state.refundable,
-            onChanged: ctrl.setRefundable,
-            icon: Icons.refresh,
-          ),
-          const SizedBox(height: 12),
-          _buildSwitchTile(
-            title: 'Cash on Delivery',
-            subtitle: 'Accept payment on delivery',
-            value: state.cashOnDelivery,
-            onChanged: ctrl.setCashOnDelivery,
-            icon: Icons.payments,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShippingTab(ProductFormState state, ProductFormController ctrl) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Additional Options', style: DesignTokens.textTitle),
-          const SizedBox(height: 16),
-
-          Container(
-            padding: const EdgeInsets.all(16),
+  Widget _buildCategorySelector(ProductFormState state, ProductFormController ctrl) {
+    final hasError = state.categoryId == null && state.publishOnline;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Category *', style: DesignTokens.textSmallBold),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _showCategoryPicker(state, ctrl),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: DesignTokens.info.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: hasError
+                  ? DesignTokens.error.withValues(alpha: 0.04)
+                  : DesignTokens.surfaceGrouped,
+              border: Border.all(
+                color: hasError ? DesignTokens.error : DesignTokens.grayLight,
+                width: hasError ? 1.5 : 1,
+              ),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: DesignTokens.info),
-                const SizedBox(width: 12),
+                Icon(
+                  Icons.category_outlined,
+                  color: state.categoryId != null ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Shipping and advanced options are available when you enable "Marketplace Listing".',
-                    style: DesignTokens.textBody,
+                    state.categoryName ?? 'Select category',
+                    style: DesignTokens.textBody.copyWith(
+                      color: state.categoryName != null ? DesignTokens.textPrimary : DesignTokens.grayMedium,
+                    ),
+                  ),
+                ),
+                if (state.isLoadingCategories)
+                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium, size: 20),
+              ],
+            ),
+          ),
+        ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              'Choose a category to list online',
+              style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBrandSelector(ProductFormState state, ProductFormController ctrl) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Brand (optional)', style: DesignTokens.textSmallBold),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _showBrandPicker(state, ctrl),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: DesignTokens.surfaceGrouped,
+              border: Border.all(color: DesignTokens.grayLight),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.branding_watermark_outlined,
+                  color: state.brandId != null ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    state.brandName ?? 'Select brand',
+                    style: DesignTokens.textBody.copyWith(
+                      color: state.brandName != null ? DesignTokens.textPrimary : DesignTokens.grayMedium,
+                    ),
+                  ),
+                ),
+                if (state.brandId != null)
+                  GestureDetector(
+                    onTap: () => ctrl.setBrand(null, null),
+                    child: const Icon(Icons.clear, size: 18, color: DesignTokens.grayMedium),
+                  )
+                else if (state.isLoadingBrands)
+                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Pricing Fields ────────────────────────────────────────────────────────
+
+  Widget _buildPricingFields(ProductFormState state, ProductFormController ctrl) {
+    final remoteConfig = ref.read(remoteConfigProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Price — hero field
+        AppInput(
+          controller: _priceCtrl,
+          label: 'Selling Price (UGX) *',
+          hint: '50,000',
+          prefixIcon: Icons.attach_money,
+          keyboardType: TextInputType.number,
+          inputFormatters: const [CommaNumberFormatter()],
+          onChanged: ctrl.setPrice,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: AppInput(
+                controller: _costCtrl,
+                label: 'Buying Price (UGX)',
+                hint: '30,000',
+                prefixIcon: Icons.shopping_bag_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setCost,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AppInput(
+                controller: _stockCtrl,
+                label: 'Stock Qty *',
+                hint: '10',
+                prefixIcon: Icons.inventory,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setStock,
+              ),
+            ),
+          ],
+        ),
+
+        if (state.publishOnline) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: AppInput(
+                  controller: _discountCtrl,
+                  label: 'Discount',
+                  hint: '0',
+                  prefixIcon: Icons.discount_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                  onChanged: ctrl.setDiscount,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Type', style: DesignTokens.textSmallBold),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'flat', label: Text('UGX')),
+                      ButtonSegment(value: 'percent', label: Text('%')),
+                    ],
+                    selected: {state.discountType},
+                    onSelectionChanged: (v) => ctrl.setDiscountType(v.first),
+                    style: SegmentedButton.styleFrom(
+                      selectedBackgroundColor: DesignTokens.brandPrimary,
+                      selectedForegroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: AppInput(
+                controller: _skuCtrl,
+                label: 'SKU',
+                hint: 'AUTO',
+                prefixIcon: Icons.qr_code,
+                onChanged: ctrl.setSku,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AppInput(
+                controller: _minQtyCtrl,
+                label: 'Min Order Qty',
+                hint: '1',
+                prefixIcon: Icons.add_shopping_cart_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setMinQty,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        AppInput(
+          controller: _lowStockCtrl,
+          label: 'Low stock alert when below',
+          hint: 'e.g. 5',
+          prefixIcon: Icons.warning_amber_outlined,
+          keyboardType: TextInputType.number,
+          inputFormatters: const [CommaNumberFormatter()],
+          onChanged: ctrl.setLowStockWarning,
+        ),
+
+        if (remoteConfig.ffProductVariantsEditor && widget.existingItem == null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: DesignTokens.surfaceGrouped,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.layers_outlined, color: DesignTokens.grayMedium, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Variants can be added after saving the product',
+                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
+      ],
+    );
+  }
+
+  // ─── Marketplace Fields ────────────────────────────────────────────────────
+
+  Widget _buildMarketplaceFields(ProductFormState state, ProductFormController ctrl) {
+    final plainDesc = state.description.plainText.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Product Description *',
+            style: DesignTokens.textBodyBold.copyWith(fontSize: 14),
+          ),
+        ),
+        const SizedBox(height: 6),
+        HtmlEditor(
+          initialHtml: _descriptionCtrl.text,
+          placeholder: 'Tell buyers what makes this product great…',
+          onChanged: ctrl.setDescription,
+        ),
+        const SizedBox(height: 4),
+        if (plainDesc.isNotEmpty && plainDesc.length < 10)
+          Text(
+            'Needs at least 10 characters (${plainDesc.length}/10)',
+            style: DesignTokens.textSmall.copyWith(color: DesignTokens.warning),
+          ),
+        const SizedBox(height: 16),
+        AppInput(
+          controller: _tagsCtrl,
+          label: 'Tags',
+          hint: 'electronics, apple, smartphone',
+          prefixIcon: Icons.tag,
+          onChanged: ctrl.setTags,
+        ),
+        const SizedBox(height: 20),
+        Text('Delivery', style: DesignTokens.textBodyBold),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: AppInput(
+                controller: _shippingDaysCtrl,
+                label: 'Delivery days *',
+                hint: '3',
+                prefixIcon: Icons.local_shipping_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setShippingDays,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AppInput(
+                controller: _shippingFeeCtrl,
+                label: 'Fee (UGX) *',
+                hint: '0 = free',
+                prefixIcon: Icons.payments_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setShippingFee,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildSwitchTile(
+          icon: Icons.refresh_outlined,
+          title: 'Refundable',
+          subtitle: 'Customers can request refunds',
+          value: state.refundable,
+          onChanged: ctrl.setRefundable,
+        ),
+        const SizedBox(height: 10),
+        _buildSwitchTile(
+          icon: Icons.payments_rounded,
+          title: 'Cash on Delivery',
+          subtitle: 'Accept payment on delivery',
+          value: state.cashOnDelivery,
+          onChanged: ctrl.setCashOnDelivery,
+        ),
+      ],
     );
   }
 
   Widget _buildSwitchTile({
+    required IconData icon,
     required String title,
     required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
-    required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: DesignTokens.grayLight),
+        color: value ? DesignTokens.brandAccent.withValues(alpha: 0.06) : DesignTokens.surfaceGrouped,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: value ? DesignTokens.brandAccent.withValues(alpha: 0.3) : DesignTokens.grayLight,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: DesignTokens.grayMedium),
+          Icon(icon, size: 20, color: value ? DesignTokens.brandAccent : DesignTokens.grayMedium),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: DesignTokens.textBodyBold),
-                Text(subtitle, style: DesignTokens.textSmall),
+                Text(title, style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600)),
+                Text(subtitle, style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged),
+          Switch.adaptive(
+            value: value,
+            onChanged: onChanged,
+            activeColor: DesignTokens.brandAccent,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomBar(ProductFormState state) {
+  // ─── Variants Section ─────────────────────────────────────────────────────
+
+  Widget _buildVariantsSection(Item item) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        boxShadow: DesignTokens.shadowSm,
+        color: DesignTokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: DesignTokens.dividerSolid.withValues(alpha: 0.5)),
+      ),
+      child: ListTile(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ProductVariantsScreen(itemId: item.id)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.layers_outlined, color: DesignTokens.brandPrimary, size: 20),
+        ),
+        title: const Text('Variants', style: TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: const Text('Sizes, colors, and other options'),
+        trailing: const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+      ),
+    );
+  }
+
+  // ─── Error Banner ──────────────────────────────────────────────────────────
+
+  Widget _buildErrorBanner(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DesignTokens.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: DesignTokens.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline, color: DesignTokens.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message, style: DesignTokens.textSmall.copyWith(color: DesignTokens.error)),
+          ),
+          GestureDetector(
+            onTap: () => ref.read(productFormProvider.notifier).clearError(),
+            child: const Icon(Icons.close, size: 16, color: DesignTokens.error),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Bottom Save Bar ───────────────────────────────────────────────────────
+
+  Widget _buildSaveBar(ProductFormState state) {
+    final hint = _getValidationHint(state);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceRaised,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Validation status
-            if (!state.canSubmit)
-              Expanded(
+            if (hint != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: DesignTokens.warning,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.info_outline, size: 16, color: DesignTokens.warning),
+                    const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        _getValidationMessage(state),
-                        style: DesignTokens.textSmall.copyWith(
-                          color: DesignTokens.warning,
-                        ),
+                        hint,
+                        style: DesignTokens.textSmall.copyWith(color: DesignTokens.warning),
                       ),
                     ),
                   ],
                 ),
-              )
-            else
-              const Spacer(),
-
-            const SizedBox(width: 12),
-
+              ),
             AppButton(
-              label: widget.existingItem == null ? 'Create Product' : 'Save',
+              label: widget.existingItem == null ? 'Save Product' : 'Update Product',
               onPressed: state.canSubmit ? _saveProduct : null,
               isLoading: state.isSubmitting,
-              expand: false,
+              expand: true,
             ),
           ],
         ),
@@ -1313,28 +1669,26 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  String _getValidationMessage(ProductFormState state) {
-    if (!state.isBasicInfoValid) return 'Enter product name';
-    if (!state.isCategoryValid) return 'Select a category';
-    if (!state.isPricingValid) return 'Enter a valid price and stock';
+  String? _getValidationHint(ProductFormState state) {
+    if (state.name.trim().isEmpty) return 'Enter a product name to continue';
+    if (!state.isCategoryValid) return 'Select a category for marketplace listing';
+    if (!state.isPricingValid) return 'Enter a valid selling price and stock quantity';
     if (!state.isDiscountValid) {
       return state.discountType == 'percent'
           ? 'Discount must be less than 100%'
-          : 'Discount must be less than price';
+          : 'Discount must be less than the selling price';
     }
     if (!state.isExtrasValid) return 'Check min qty / shipping fields';
     if (state.publishOnline && !state.isOnlineDetailsValid) {
-      if (state.description.trim().isEmpty ||
-          state.description.trim().length < 10) {
-        return 'Add a good description (10+ chars)';
-      }
-      if (state.shippingDaysValue == null) return 'Set shipping days (e.g. 3)';
-      if (state.shippingFeeValue == null) return 'Set shipping fee (0 if free)';
-      return 'Complete marketplace details';
+      if (state.description.trim().length < 10) return 'Write a description (at least 10 characters)';
+      if (state.shippingDaysValue == null) return 'Set delivery days (e.g. 3)';
+      if (state.shippingFeeValue == null) return 'Set delivery fee (0 for free)';
     }
-    if (!state.isImagesValid) return 'Add a product photo';
-    return '';
+    if (!state.isImagesValid) return 'Add a product photo for marketplace listing';
+    return null;
   }
+
+  // ─── Pickers ───────────────────────────────────────────────────────────────
 
   void _showCategoryPicker(ProductFormState state, ProductFormController ctrl) {
     showModalBottomSheet(
@@ -1342,55 +1696,48 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
+        initialChildSize: 0.65,
+        minChildSize: 0.45,
         maxChildSize: 0.9,
-        builder: (_, scrollController) => Container(
+        builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+              _buildSheetHandle(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  children: [
+                    Text('Select Category', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
+                    const Spacer(),
+                    if (state.isLoadingCategories)
+                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Select Category', style: DesignTokens.textTitle),
-              ),
+              const Divider(height: 1),
               Expanded(
                 child: state.categories.isEmpty
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.builder(
-                        controller: scrollController,
+                        controller: scrollCtrl,
                         itemCount: state.categories.length,
                         itemBuilder: (_, i) {
                           final cat = state.categories[i];
-                          final isSelected =
-                              cat['id']?.toString() == state.categoryId;
+                          final isSelected = cat['id']?.toString() == state.categoryId;
                           return ListTile(
                             leading: Icon(
-                              isSelected
-                                  ? Icons.check_circle
-                                  : Icons.category_outlined,
-                              color: isSelected
-                                  ? DesignTokens.brandPrimary
-                                  : null,
+                              isSelected ? Icons.check_circle_rounded : Icons.category_outlined,
+                              color: isSelected ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
                             ),
                             title: Text(cat['name']?.toString() ?? ''),
                             selected: isSelected,
+                            selectedTileColor: DesignTokens.brandPrimary.withValues(alpha: 0.05),
                             onTap: () {
-                              ctrl.setCategory(
-                                cat['id']?.toString(),
-                                cat['name']?.toString(),
-                              );
+                              ctrl.setCategory(cat['id']?.toString(), cat['name']?.toString());
                               Navigator.pop(ctx);
                             },
                           );
@@ -1410,55 +1757,41 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
+        initialChildSize: 0.65,
+        minChildSize: 0.45,
         maxChildSize: 0.9,
-        builder: (_, scrollController) => Container(
+        builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              _buildSheetHandle(),
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Select Brand', style: DesignTokens.textTitle),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Text('Select Brand', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
               ),
+              const Divider(height: 1),
               Expanded(
                 child: state.brands.isEmpty
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.builder(
-                        controller: scrollController,
+                        controller: scrollCtrl,
                         itemCount: state.brands.length,
                         itemBuilder: (_, i) {
                           final brand = state.brands[i];
-                          final isSelected =
-                              brand['id']?.toString() == state.brandId;
+                          final isSelected = brand['id']?.toString() == state.brandId;
                           return ListTile(
                             leading: Icon(
-                              isSelected
-                                  ? Icons.check_circle
-                                  : Icons.branding_watermark_outlined,
-                              color: isSelected
-                                  ? DesignTokens.brandPrimary
-                                  : null,
+                              isSelected ? Icons.check_circle_rounded : Icons.branding_watermark_outlined,
+                              color: isSelected ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
                             ),
                             title: Text(brand['name']?.toString() ?? ''),
                             selected: isSelected,
+                            selectedTileColor: DesignTokens.brandPrimary.withValues(alpha: 0.05),
                             onTap: () {
-                              ctrl.setBrand(
-                                brand['id']?.toString(),
-                                brand['name']?.toString(),
-                              );
+                              ctrl.setBrand(brand['id']?.toString(), brand['name']?.toString());
                               Navigator.pop(ctx);
                             },
                           );
@@ -1472,216 +1805,37 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Future<void> _saveProduct() async {
-    final state = ref.read(productFormProvider);
-    final ctrl = ref.read(productFormProvider.notifier);
-
-    if (!state.canSubmit) return;
-
-    // Auto-generate SKU if empty
-    String finalSku = state.sku.trim();
-    if (finalSku.isEmpty) {
-      await ctrl.autoGenerateSKU();
-      final updatedState = ref.read(productFormProvider);
-      finalSku = updatedState.sku;
-    } else {
-      // Validate SKU for duplicates
-      final skuError = await ctrl.validateSKU(
-        editingItemId: widget.existingItem?.id,
-      );
-      if (skuError != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(skuError),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Auto-fix',
-              textColor: Colors.white,
-              onPressed: () async {
-                await ctrl.autoGenerateSKU();
-              },
-            ),
-          ),
-        );
-        return;
-      }
-    }
-
-    ctrl.setSubmitting(true);
-
-    try {
-      final db = ref.read(appDatabaseProvider);
-      final sync = ref.read(syncServiceProvider);
-
-      final id = widget.existingItem?.id ?? _uuid.v4();
-      final existing = widget.existingItem;
-
-      final thumbPathOrUrl = state.thumbnailFile?.path ?? state.thumbnailUrl;
-      final thumbUploadId = state.thumbnailFile != null
-          ? null
-          : state.thumbnailUploadId;
-
-      final pendingGalleryPaths = state.galleryFiles
-          .map((f) => f.path)
-          .toList();
-      final combinedGalleryUrls = [
-        ...state.galleryUrls,
-        ...pendingGalleryPaths,
-      ];
-
-      final existingGalleryUrls = _decodeStringList(existing?.galleryUrls);
-      final existingGalleryIds = _decodeIntList(existing?.galleryUploadIds);
-      final existingRemoteCount =
-          existingGalleryIds.length < existingGalleryUrls.length
-          ? existingGalleryIds.length
-          : existingGalleryUrls.length;
-      final existingHasGallery =
-          existingRemoteCount > 0 ||
-          existingGalleryUrls.skip(existingRemoteCount).isNotEmpty;
-      final currentHasGallery = combinedGalleryUrls.isNotEmpty;
-      final shouldClearGallery = existingHasGallery && !currentHasGallery;
-
-      final companion = ItemsCompanion(
-        id: Value(id),
-        name: Value(state.name.trim()),
-        price: Value(double.tryParse(state.price) ?? 0),
-        stockQty: Value(int.tryParse(state.stock) ?? 0),
-        sku: Value(state.sku.isNotEmpty ? state.sku : null),
-        imageUrl: Value(thumbPathOrUrl),
-        publishedOnline: Value(state.publishOnline),
-        categoryId: Value(state.categoryId),
-        categoryName: Value(state.categoryName),
-        brandId: Value(state.brandId),
-        brandName: Value(state.brandName),
-        unit: Value(state.unit),
-        weight: Value(double.tryParse(state.weight)),
-        minPurchaseQty: Value(int.tryParse(state.minQty) ?? 1),
-        tags: Value(state.tags.isNotEmpty ? state.tags : null),
-        description: Value(
-          state.description.isNotEmpty ? state.description : null,
-        ),
-        thumbnailUrl: Value(thumbPathOrUrl),
-        thumbnailUploadId: Value(thumbUploadId),
-        galleryUrls: currentHasGallery || shouldClearGallery
-            ? Value(
-                jsonEncode(
-                  currentHasGallery ? combinedGalleryUrls : const <String>[],
-                ),
-              )
-            : const Value.absent(),
-        galleryUploadIds: currentHasGallery || shouldClearGallery
-            ? Value(
-                jsonEncode(
-                  currentHasGallery ? state.galleryUploadIds : const <int>[],
-                ),
-              )
-            : const Value.absent(),
-        discount: Value(double.tryParse(state.discount)),
-        discountType: Value(state.discountType),
-        shippingDays: Value(int.tryParse(state.shippingDays)),
-        shippingFee: Value(double.tryParse(state.shippingFee)),
-        refundable: Value(state.refundable),
-        cashOnDelivery: Value(state.cashOnDelivery),
-        lowStockWarning: Value(int.tryParse(state.lowStockWarning)),
-        synced: const Value(false),
-      );
-
-      await db.upsertItem(companion);
-
-      // Enqueue sync
-      final opType = widget.existingItem == null
-          ? 'item_create'
-          : 'item_update';
-      final catId = int.tryParse(state.categoryId ?? '');
-      await sync.enqueue(opType, {
-        'local_id': id,
-        if (widget.existingItem?.remoteId != null)
-          'remote_id': widget.existingItem!.remoteId,
-        'name': state.name.trim(),
-        'unit_price': double.tryParse(state.price) ?? 0,
-        'current_stock': int.tryParse(state.stock) ?? 0,
-        'published': state.publishOnline ? 1 : 0,
-        if (catId != null) 'category_ids': [catId],
-        if (catId != null) 'category_id': catId,
-        if (state.brandId != null) 'brand_id': int.tryParse(state.brandId!),
-        'unit': state.unit.isNotEmpty ? state.unit : 'pc',
-        if (state.weight.isNotEmpty) 'weight': double.tryParse(state.weight),
-        'min_qty': int.tryParse(state.minQty) ?? 1,
-        if (state.tags.isNotEmpty)
-          'tags': state.tags
-              .split(',')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList(),
-        if (state.description.isNotEmpty) 'description': state.description,
-        'discount': double.tryParse(state.discount) ?? 0,
-        'discount_type': state.discountType == 'flat' ? 'amount' : 'percent',
-        if (state.shippingDays.isNotEmpty)
-          'est_shipping_days': int.tryParse(state.shippingDays),
-        if (state.shippingFee.isNotEmpty)
-          'shipping_cost': double.tryParse(state.shippingFee),
-        'refundable': state.refundable ? 1 : 0,
-        'cash_on_delivery': state.cashOnDelivery ? 1 : 0,
-        if (state.lowStockWarning.isNotEmpty)
-          'low_stock_quantity': int.tryParse(state.lowStockWarning),
-        if (state.sku.isNotEmpty) 'sku': state.sku,
-      });
-      unawaited(sync.syncNow());
-
-      if (mounted) {
-        ctrl.reset();
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.existingItem == null
-                  ? 'Product created!'
-                  : 'Product updated!',
-            ),
-            backgroundColor: DesignTokens.brandAccent,
-          ),
-        );
-      }
-    } catch (e) {
-      ctrl.setSubmitting(false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: DesignTokens.error,
-          ),
-        );
-      }
-    }
+  Widget _buildSheetHandle() {
+    return Container(
+      width: 36,
+      height: 4,
+      margin: const EdgeInsets.only(top: 12, bottom: 8),
+      decoration: BoxDecoration(
+        color: DesignTokens.grayLight,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
   }
 
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
   List<String> _decodeStringList(String? raw) {
-    if (raw == null) return const [];
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return const [];
+    if (raw == null || raw.trim().isEmpty) return const [];
     try {
-      final decoded = jsonDecode(trimmed);
+      final decoded = jsonDecode(raw.trim());
       if (decoded is List) {
-        return decoded
-            .map((e) => e?.toString() ?? '')
-            .where((e) => e.trim().isNotEmpty)
-            .toList();
+        return decoded.map((e) => e?.toString() ?? '').where((e) => e.trim().isNotEmpty).toList();
       }
     } catch (_) {}
     return const [];
   }
 
   List<int> _decodeIntList(String? raw) {
-    if (raw == null) return const [];
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return const [];
+    if (raw == null || raw.trim().isEmpty) return const [];
     try {
-      final decoded = jsonDecode(trimmed);
+      final decoded = jsonDecode(raw.trim());
       if (decoded is List) {
-        return decoded
-            .map((e) => int.tryParse(e?.toString() ?? ''))
-            .whereType<int>()
-            .toList();
+        return decoded.map((e) => int.tryParse(e?.toString() ?? '')).whereType<int>().toList();
       }
     } catch (_) {}
     return const [];

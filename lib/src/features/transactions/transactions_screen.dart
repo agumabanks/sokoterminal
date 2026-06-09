@@ -11,6 +11,8 @@ import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../invoices/invoice_providers.dart';
+import '../orders/marketplace_order.dart';
+import '../orders/order_details_screen.dart';
 import '../receipts/receipt_providers.dart';
 import '../receipts/receipt_details_sheet.dart';
 import '../orders/orders_controller.dart';
@@ -55,6 +57,9 @@ class TransactionsScreenState {
     this.source = TransactionSource.all,
     this.customStart,
     this.customEnd,
+    this.onlineQuery = '',
+    this.onlineDeliveryStatus = '',
+    this.onlinePaymentStatus = '',
     this.loading = false,
     this.syncing = false,
   });
@@ -63,6 +68,9 @@ class TransactionsScreenState {
   final TransactionSource source;
   final DateTime? customStart;
   final DateTime? customEnd;
+  final String onlineQuery;
+  final String onlineDeliveryStatus;
+  final String onlinePaymentStatus;
   final bool loading;
   final bool syncing;
 
@@ -71,6 +79,9 @@ class TransactionsScreenState {
     TransactionSource? source,
     DateTime? customStart,
     DateTime? customEnd,
+    String? onlineQuery,
+    String? onlineDeliveryStatus,
+    String? onlinePaymentStatus,
     bool? loading,
     bool? syncing,
   }) => TransactionsScreenState(
@@ -78,6 +89,9 @@ class TransactionsScreenState {
     source: source ?? this.source,
     customStart: customStart ?? this.customStart,
     customEnd: customEnd ?? this.customEnd,
+    onlineQuery: onlineQuery ?? this.onlineQuery,
+    onlineDeliveryStatus: onlineDeliveryStatus ?? this.onlineDeliveryStatus,
+    onlinePaymentStatus: onlinePaymentStatus ?? this.onlinePaymentStatus,
     loading: loading ?? this.loading,
     syncing: syncing ?? this.syncing,
   );
@@ -111,6 +125,18 @@ class TransactionsScreenController
       customStart: start,
       customEnd: end,
     );
+  }
+
+  void setOnlineQuery(String value) {
+    state = state.copyWith(onlineQuery: value);
+  }
+
+  void setOnlineDeliveryStatus(String? value) {
+    state = state.copyWith(onlineDeliveryStatus: value ?? '');
+  }
+
+  void setOnlinePaymentStatus(String? value) {
+    state = state.copyWith(onlinePaymentStatus: value ?? '');
   }
 
   Future<void> syncAll() async {
@@ -331,31 +357,29 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       context: context,
       title: 'Filter Transactions',
       subtitle: 'Choose time period',
-      child: RadioGroup<DateFilter>(
-        groupValue: state.dateFilter,
-        onChanged: (v) {
-          if (v == null) return;
-          if (v == DateFilter.custom) {
-            Navigator.pop(context);
-            _pickCustomRange(context, controller);
-            return;
-          }
-          controller.setDateFilter(v);
-          Navigator.pop(context);
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ...DateFilter.values.map(
-              (filter) => RadioListTile<DateFilter>(
-                title: Text(_dateFilterLabel(filter, state)),
-                value: filter,
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...DateFilter.values.map(
+            (filter) => RadioListTile<DateFilter>(
+              title: Text(_dateFilterLabel(filter, state)),
+              value: filter,
+              groupValue: state.dateFilter,
+              onChanged: (v) {
+                if (v == null) return;
+                if (v == DateFilter.custom) {
+                  Navigator.pop(context);
+                  _pickCustomRange(context, controller);
+                  return;
+                }
+                controller.setDateFilter(v);
+                Navigator.pop(context);
+              },
             ),
-            const SizedBox(height: DesignTokens.spaceMd),
-          ],
-        ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+        ],
       ),
     );
   }
@@ -616,6 +640,8 @@ class _OnlineOrdersList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final screenState = ref.watch(transactionsScreenProvider);
+    final controller = ref.read(transactionsScreenProvider.notifier);
     final state = ref.watch(ordersControllerProvider);
 
     if (state.loading && state.orders.isEmpty) {
@@ -639,10 +665,7 @@ class _OnlineOrdersList extends ConsumerWidget {
     var orders = state.orders;
     if (dateFilter != DateFilter.all) {
       orders = orders.where((order) {
-        final dateStr =
-            order['created_at']?.toString() ?? order['date']?.toString();
-        if (dateStr == null) return true;
-        final date = DateTime.tryParse(dateStr);
+        final date = order.orderedAt;
         if (date == null) return true;
 
         final now = DateTime.now();
@@ -667,41 +690,130 @@ class _OnlineOrdersList extends ConsumerWidget {
       }).toList();
     }
 
+    final query = screenState.onlineQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      orders = orders.where((order) {
+        final haystack = [
+          order.displayCode,
+          order.displayCustomer,
+          order.displayPaymentMethod,
+          order.customerPhone ?? '',
+          order.shippingAddress?['phone']?.toString() ?? '',
+        ].join(' ').toLowerCase();
+        return haystack.contains(query);
+      }).toList();
+    }
+
+    if (screenState.onlineDeliveryStatus.isNotEmpty) {
+      orders = orders.where((order) {
+        return order.normalizedDeliveryStatus ==
+            screenState.onlineDeliveryStatus;
+      }).toList();
+    }
+
+    if (screenState.onlinePaymentStatus.isNotEmpty) {
+      orders = orders.where((order) {
+        return order.normalizedPaymentStatus == screenState.onlinePaymentStatus;
+      }).toList();
+    }
+
     if (orders.isEmpty) {
-      return _EmptyState(
-        icon: Icons.shopping_bag_outlined,
-        title: 'No online orders',
-        subtitle: 'Orders from your marketplace will appear here',
+      return Column(
+        children: [
+          _OnlineOrdersFilterPanel(
+            state: screenState,
+            onQueryChanged: controller.setOnlineQuery,
+            onDeliveryChanged: controller.setOnlineDeliveryStatus,
+            onPaymentChanged: controller.setOnlinePaymentStatus,
+          ),
+          const Expanded(
+            child: _EmptyState(
+              icon: Icons.shopping_bag_outlined,
+              title: 'No online orders',
+              subtitle: 'Orders from your marketplace will appear here',
+            ),
+          ),
+        ],
       );
     }
 
     // Calculate summary
-    final totalRevenue = orders.fold<double>(0, (sum, order) {
-      return sum +
-          (double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0);
-    });
+    final totalRevenue = orders.fold<double>(
+      0,
+      (sum, order) => sum + order.displayTotal,
+    );
+    final paidCount = orders
+        .where((order) => order.normalizedPaymentStatus == 'paid')
+        .length;
+    final attentionCount = orders.where((order) {
+      return order.normalizedDeliveryStatus == 'pending' ||
+          order.normalizedPaymentStatus != 'paid';
+    }).length;
 
     return Column(
       children: [
-        // Summary bar
-        Container(
-          width: double.infinity,
-          padding: DesignTokens.paddingMd,
-          color: DesignTokens.brandPrimary.withValues(alpha: 0.05),
+        _OnlineOrdersFilterPanel(
+          state: screenState,
+          onQueryChanged: controller.setOnlineQuery,
+          onDeliveryChanged: controller.setOnlineDeliveryStatus,
+          onPaymentChanged: controller.setOnlinePaymentStatus,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            DesignTokens.spaceMd,
+            0,
+            DesignTokens.spaceMd,
+            DesignTokens.spaceMd,
+          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _SummaryItem(label: 'Orders', value: '${orders.length}'),
-              _SummaryItem(label: 'Revenue', value: totalRevenue.toUgx()),
+              Expanded(
+                child: _InsightCard(
+                  label: 'Orders',
+                  value: '${orders.length}',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
+              Expanded(
+                child: _InsightCard(
+                  label: 'Paid',
+                  value: '$paidCount',
+                  icon: Icons.verified_outlined,
+                  tone: DesignTokens.success,
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
+              Expanded(
+                child: _InsightCard(
+                  label: 'Revenue',
+                  value: totalRevenue.toUgx(),
+                  icon: Icons.account_balance_wallet_outlined,
+                  tone: DesignTokens.info,
+                ),
+              ),
+              const SizedBox(width: DesignTokens.spaceSm),
+              Expanded(
+                child: _InsightCard(
+                  label: 'Attention',
+                  value: '$attentionCount',
+                  icon: Icons.priority_high_outlined,
+                  tone: DesignTokens.warning,
+                ),
+              ),
             ],
           ),
         ),
-        // Orders list
         Expanded(
           child: RefreshIndicator(
             onRefresh: () => ref.read(ordersControllerProvider.notifier).load(),
             child: ListView.builder(
-              padding: DesignTokens.paddingScreen,
+              padding: const EdgeInsets.fromLTRB(
+                DesignTokens.spaceMd,
+                0,
+                DesignTokens.spaceMd,
+                DesignTokens.spaceLg,
+              ),
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];
@@ -715,19 +827,199 @@ class _OnlineOrdersList extends ConsumerWidget {
   }
 }
 
-class _SummaryItem extends StatelessWidget {
-  const _SummaryItem({required this.label, required this.value});
+class _InsightCard extends StatelessWidget {
+  const _InsightCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.tone = DesignTokens.brandPrimary,
+  });
+
   final String label;
   final String value;
+  final IconData icon;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: DesignTokens.textBodyBold),
-        const SizedBox(height: 2),
-        Text(label, style: DesignTokens.textSmall),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(DesignTokens.spaceMd),
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceWhite,
+        borderRadius: DesignTokens.borderRadiusMd,
+        boxShadow: DesignTokens.shadowSm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: tone.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: tone),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+          Text(value, style: DesignTokens.textBodyBold),
+          const SizedBox(height: DesignTokens.spaceXs),
+          Text(label, style: DesignTokens.textSmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlineOrdersFilterPanel extends StatelessWidget {
+  const _OnlineOrdersFilterPanel({
+    required this.state,
+    required this.onQueryChanged,
+    required this.onDeliveryChanged,
+    required this.onPaymentChanged,
+  });
+
+  final TransactionsScreenState state;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String?> onDeliveryChanged;
+  final ValueChanged<String?> onPaymentChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DesignTokens.spaceMd,
+        DesignTokens.spaceMd,
+        DesignTokens.spaceMd,
+        DesignTokens.spaceMd,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(DesignTokens.spaceMd),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceWhite,
+          borderRadius: DesignTokens.borderRadiusLg,
+          boxShadow: DesignTokens.shadowSm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              initialValue: state.onlineQuery,
+              onChanged: onQueryChanged,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Search by order code, customer, phone, or payment',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                  borderSide: const BorderSide(color: DesignTokens.grayMedium),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                  borderSide: const BorderSide(color: DesignTokens.grayLight),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                  borderSide: const BorderSide(
+                    color: DesignTokens.brandPrimary,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+            Text('Delivery status', style: DesignTokens.textSmallBold),
+            const SizedBox(height: DesignTokens.spaceSm),
+            Wrap(
+              spacing: DesignTokens.spaceSm,
+              runSpacing: DesignTokens.spaceSm,
+              children: const [
+                ('', 'All'),
+                ('pending', 'Pending'),
+                ('confirmed', 'Confirmed'),
+                ('on_the_way', 'On the way'),
+                ('delivered', 'Delivered'),
+                ('cancelled', 'Cancelled'),
+              ].map((entry) {
+                final value = entry.$1;
+                final label = entry.$2;
+                return _InlineFilterChip(
+                  label: label,
+                  selected: state.onlineDeliveryStatus == value,
+                  onTap: () => onDeliveryChanged(value),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: DesignTokens.spaceMd),
+            Text('Payment status', style: DesignTokens.textSmallBold),
+            const SizedBox(height: DesignTokens.spaceSm),
+            Wrap(
+              spacing: DesignTokens.spaceSm,
+              runSpacing: DesignTokens.spaceSm,
+              children: const [
+                ('', 'All'),
+                ('paid', 'Paid'),
+                ('unpaid', 'Unpaid'),
+              ].map((entry) {
+                final value = entry.$1;
+                final label = entry.$2;
+                return _InlineFilterChip(
+                  label: label,
+                  selected: state.onlinePaymentStatus == value,
+                  onTap: () => onPaymentChanged(value),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineFilterChip extends StatelessWidget {
+  const _InlineFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: DesignTokens.durationNormal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignTokens.spaceMd,
+          vertical: DesignTokens.spaceSm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? DesignTokens.brandPrimary : DesignTokens.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? DesignTokens.brandPrimary
+                : DesignTokens.grayLight,
+          ),
+        ),
+        child: Text(
+          label,
+          style: DesignTokens.textSmall.copyWith(
+            color: selected ? Colors.white : DesignTokens.grayDark,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -735,15 +1027,19 @@ class _SummaryItem extends StatelessWidget {
 /// Single online order tile
 class _OnlineOrderTile extends ConsumerWidget {
   const _OnlineOrderTile({required this.order});
-  final Map<String, dynamic> order;
+  final MarketplaceOrder order;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = order['code']?.toString() ?? order['id']?.toString() ?? 'N/A';
-    final customer = order['customer_name']?.toString() ?? 'Customer';
-    final status = order['delivery_status']?.toString() ?? 'pending';
-    final paymentStatus = order['payment_status']?.toString() ?? 'unpaid';
-    final total = double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0;
+    final id = order.displayCode;
+    final customer = order.displayCustomer;
+    final status = order.normalizedDeliveryStatus;
+    final paymentStatus = order.normalizedPaymentStatus;
+    final total = order.displayTotal;
+    final itemCount = order.lineItemCount;
+    final orderedAt = order.orderedAt;
+    final paymentMethod = order.displayPaymentMethod;
+    final hasPendingSync = order.pendingSync;
 
     final statusColor = _getStatusColor(status);
     final paymentColor = paymentStatus == 'paid'
@@ -754,67 +1050,167 @@ class _OnlineOrderTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
       decoration: BoxDecoration(
         color: DesignTokens.surfaceWhite,
-        borderRadius: DesignTokens.borderRadiusMd,
+        borderRadius: DesignTokens.borderRadiusLg,
         boxShadow: DesignTokens.shadowSm,
       ),
-      child: ListTile(
-        leading: Container(
-          padding: DesignTokens.paddingSm,
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.12),
-            borderRadius: DesignTokens.borderRadiusSm,
+      child: InkWell(
+        borderRadius: DesignTokens.borderRadiusLg,
+        onTap: () => _openOrderDetails(context, order),
+        child: Padding(
+          padding: const EdgeInsets.all(DesignTokens.spaceMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: DesignTokens.paddingSm,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: statusColor,
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceMd),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(id, style: DesignTokens.textBodyBold),
+                            ),
+                            Text(
+                              total.toUgx(),
+                              style: DesignTokens.textBodyBold,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: DesignTokens.spaceXs),
+                        Text(
+                          customer,
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: DesignTokens.spaceXs),
+                        Text(
+                          orderedAt == null
+                              ? 'Date unavailable'
+                              : DateFormat(
+                                  'MMM d, y • HH:mm',
+                                ).format(orderedAt.toLocal()),
+                          style: DesignTokens.textSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              Wrap(
+                spacing: DesignTokens.spaceSm,
+                runSpacing: DesignTokens.spaceSm,
+                children: [
+                  _OrderMetaChip(
+                    label: _humanizeStatus(status),
+                    color: statusColor,
+                  ),
+                  _OrderMetaChip(
+                    label: paymentStatus.toUpperCase(),
+                    color: paymentColor,
+                  ),
+                  _OrderMetaChip(
+                    label: '$itemCount item${itemCount == 1 ? '' : 's'}',
+                    color: DesignTokens.info,
+                  ),
+                  if (paymentMethod.isNotEmpty)
+                    _OrderMetaChip(
+                      label: paymentMethod,
+                      color: DesignTokens.grayMedium,
+                    ),
+                  if (hasPendingSync)
+                    const _OrderMetaChip(
+                      label: 'Pending sync',
+                      color: DesignTokens.warning,
+                    ),
+                ],
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              Container(
+                padding: const EdgeInsets.all(DesignTokens.spaceMd),
+                decoration: BoxDecoration(
+                  color: DesignTokens.surface,
+                  borderRadius: DesignTokens.borderRadiusMd,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _InfoPair(
+                        label: 'Customer phone',
+                        value: order.displayPhone,
+                      ),
+                    ),
+                    const SizedBox(width: DesignTokens.spaceMd),
+                    Expanded(
+                      child: _InfoPair(
+                        label: 'Order source',
+                        value: order.displaySource,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              Row(
+                children: [
+                  Expanded(
+                    child: _OrderActionButton(
+                      label: 'Details',
+                      icon: Icons.visibility_outlined,
+                      onPressed: () => _openOrderDetails(context, order),
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: _OrderActionButton(
+                      label: 'Invoice',
+                      icon: Icons.picture_as_pdf_outlined,
+                      onPressed: () async {
+                        try {
+                          await ref
+                              .read(invoiceServiceProvider)
+                              .shareOrderInvoicePdf(order.toJson());
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Invoice export failed: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: _OrderActionButton(
+                      label: 'Status',
+                      icon: Icons.edit_outlined,
+                      filled: true,
+                      onPressed: () => _updateOrderStatus(context, ref, order),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          child: Icon(Icons.shopping_bag_outlined, color: statusColor),
         ),
-        title: Row(
-          children: [
-            Text(id, style: DesignTokens.textBodyBold),
-            const SizedBox(width: DesignTokens.spaceSm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                status.toUpperCase(),
-                style: DesignTokens.textSmall.copyWith(
-                  color: statusColor,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Text(
-          customer,
-          style: DesignTokens.textSmall,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(total.toUgx(), style: DesignTokens.textBodyBold),
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: paymentColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                paymentStatus.toUpperCase(),
-                style: DesignTokens.textSmall.copyWith(
-                  color: paymentColor,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
-        onTap: () => _showOrderDetails(context, ref, order),
       ),
     );
   }
@@ -826,6 +1222,9 @@ class _OnlineOrderTile extends ConsumerWidget {
         return DesignTokens.success;
       case 'processing':
       case 'shipped':
+      case 'confirmed':
+      case 'picked_up':
+      case 'on_the_way':
         return DesignTokens.info;
       case 'cancelled':
         return DesignTokens.error;
@@ -834,182 +1233,14 @@ class _OnlineOrderTile extends ConsumerWidget {
     }
   }
 
-  void _showOrderDetails(
-    BuildContext context,
-    WidgetRef ref,
-    Map<String, dynamic> order,
-  ) {
-    final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
-    final items = order['items'] as List<dynamic>? ?? [];
-
-    BottomSheetModal.show(
-      context: context,
-      title: 'Order #${order['code'] ?? orderId}',
-      subtitle: order['customer_name']?.toString() ?? 'Customer',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Order info
-          Container(
-            padding: DesignTokens.paddingMd,
-            decoration: BoxDecoration(
-              color: DesignTokens.grayLight.withValues(alpha: 0.25),
-              borderRadius: DesignTokens.borderRadiusMd,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text('Delivery: ', style: DesignTokens.textSmall),
-                    Text(
-                      (order['delivery_status'] ?? 'pending')
-                          .toString()
-                          .toUpperCase(),
-                      style: DesignTokens.textSmallBold,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DesignTokens.spaceXs),
-                Row(
-                  children: [
-                    Text('Payment: ', style: DesignTokens.textSmall),
-                    Text(
-                      (order['payment_status'] ?? 'unpaid')
-                          .toString()
-                          .toUpperCase(),
-                      style: DesignTokens.textSmallBold,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceMd),
-
-          // Items list
-          if (items.isNotEmpty) ...[
-            Text('Items', style: DesignTokens.textSmallBold),
-            const SizedBox(height: DesignTokens.spaceSm),
-            ...items.map((item) {
-              final i = item as Map<String, dynamic>;
-              final name =
-                  i['name']?.toString() ??
-                  i['product_name']?.toString() ??
-                  'Item';
-              final qty = int.tryParse(i['quantity']?.toString() ?? '1') ?? 1;
-              final price =
-                  double.tryParse(
-                    i['price']?.toString() ?? i['total']?.toString() ?? '0',
-                  ) ??
-                  0;
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: DesignTokens.spaceXs,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('$name x$qty', style: DesignTokens.textBody),
-                    ),
-                    Text(price.toUgx(), style: DesignTokens.textBodyBold),
-                  ],
-                ),
-              );
-            }),
-          ] else
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: ref
-                  .read(ordersControllerProvider.notifier)
-                  .loadItems(orderId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final loadedItems = snapshot.data ?? [];
-                if (loadedItems.isEmpty) {
-                  return Text('No items', style: DesignTokens.textSmall);
-                }
-                return Column(
-                  children: loadedItems.map((i) {
-                    final name =
-                        i['name']?.toString() ??
-                        i['product_name']?.toString() ??
-                        'Item';
-                    final qty =
-                        int.tryParse(i['quantity']?.toString() ?? '1') ?? 1;
-                    final unitPrice = i['unit_price'] is num
-                        ? (i['unit_price'] as num).toDouble()
-                        : double.tryParse(i['unit_price']?.toString() ?? '') ??
-                              0;
-                    final lineTotal = i['total'] is num
-                        ? (i['total'] as num).toDouble()
-                        : (unitPrice * qty);
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: DesignTokens.spaceXs,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '$name x$qty',
-                              style: DesignTokens.textBody,
-                            ),
-                          ),
-                          Text(
-                            lineTotal.toUgx(),
-                            style: DesignTokens.textBodyBold,
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-
-          const Divider(height: DesignTokens.spaceLg),
-          Row(
-            children: [
-              Expanded(child: Text('Total', style: DesignTokens.textBodyBold)),
-              Text(
-                (double.tryParse(order['grand_total']?.toString() ?? '0') ?? 0)
-                    .toUgx(),
-                style: DesignTokens.textBodyBold,
-              ),
-            ],
-          ),
-          const SizedBox(height: DesignTokens.spaceLg),
-
-          // Actions
-          OutlinedButton.icon(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await ref
-                    .read(invoiceServiceProvider)
-                    .shareOrderInvoicePdf(order);
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Invoice export failed: $e')),
-                );
-              }
-            },
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('Invoice PDF'),
-          ),
-          const SizedBox(height: DesignTokens.spaceSm),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _updateOrderStatus(context, ref, order);
-            },
-            icon: const Icon(Icons.edit),
-            label: const Text('Update Status'),
-          ),
-        ],
+  void _openOrderDetails(BuildContext context, MarketplaceOrder order) {
+    if (order.id == 0) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderDetailsScreen(
+          orderId: order.id,
+          initialData: order,
+        ),
       ),
     );
   }
@@ -1017,7 +1248,7 @@ class _OnlineOrderTile extends ConsumerWidget {
   void _updateOrderStatus(
     BuildContext context,
     WidgetRef ref,
-    Map<String, dynamic> order,
+    MarketplaceOrder order,
   ) {
     final statuses = [
       'pending',
@@ -1027,14 +1258,9 @@ class _OnlineOrderTile extends ConsumerWidget {
       'delivered',
       'cancelled',
     ];
-    String delivery =
-        (order['delivery_status_raw'] ?? order['delivery_status'] ?? 'pending')
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replaceAll(' ', '_');
-    String payment = order['payment_status']?.toString() ?? 'unpaid';
-    final orderId = int.tryParse(order['id']?.toString() ?? '') ?? 0;
+    String delivery = order.normalizedDeliveryStatus;
+    String payment = order.normalizedPaymentStatus;
+    final orderId = order.id;
 
     showModalBottomSheet(
       context: context,
@@ -1096,6 +1322,88 @@ class _OnlineOrderTile extends ConsumerWidget {
   }
 }
 
+class _OrderActionButton extends StatelessWidget {
+  const _OrderActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: DesignTokens.spaceXs),
+        Flexible(child: Text(label)),
+      ],
+    );
+    if (filled) {
+      return ElevatedButton(onPressed: onPressed, child: child);
+    }
+    return OutlinedButton(onPressed: onPressed, child: child);
+  }
+}
+
+class _OrderMetaChip extends StatelessWidget {
+  const _OrderMetaChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: DesignTokens.textSmall.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoPair extends StatelessWidget {
+  const _InfoPair({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: DesignTokens.textSmall),
+        const SizedBox(height: DesignTokens.spaceXs),
+        Text(
+          value,
+          style: DesignTokens.textSmallBold.copyWith(
+            color: DesignTokens.grayDark,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
 /// Empty state widget
 class _EmptyState extends StatelessWidget {
   const _EmptyState({
@@ -1136,4 +1444,13 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+String _humanizeStatus(String value) {
+  return value
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
 }

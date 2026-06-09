@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_providers.dart';
 import '../../core/auth/pos_session_controller.dart';
 import '../../core/auth/pos_staff_prefs.dart';
+import '../../core/db/app_database.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/storage/secure_storage.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
@@ -33,7 +36,7 @@ class StaffMember {
   final DateTime? createdAt;
 
   factory StaffMember.fromJson(Map<String, dynamic> json) => StaffMember(
-    id: (json['id'] as num).toInt(),
+    id: (json['id'] as num?)?.toInt() ?? 0,
     name: json['name']?.toString() ?? '',
     role: json['role']?.toString() ?? 'cashier',
     active: json['active'] == true || json['active'] == 1,
@@ -74,21 +77,26 @@ final staffControllerProvider =
     StateNotifierProvider<StaffController, StaffState>((ref) {
       final api = ref.watch(sellerApiProvider);
       final prefs = ref.watch(sharedPreferencesProvider);
-      return StaffController(api, prefs)..load();
+      final db = ref.watch(appDatabaseProvider);
+      final storage = ref.watch(secureStorageProvider);
+      return StaffController(api, prefs, db, storage)..load();
     });
 
 class StaffController extends StateNotifier<StaffState> {
-  StaffController(this._api, this._prefs) : super(const StaffState());
+  StaffController(this._api, this._prefs, this._db, this._storage)
+    : super(const StaffState());
 
   final SellerApi _api;
   final SharedPreferences _prefs;
+  final AppDatabase _db;
+  final SecureStorage _storage;
 
   Future<void> load() async {
     state = state.copyWith(loading: true, error: null);
     try {
       final res = await _api.fetchStaff();
       final data = res.data;
-      final List<dynamic> list = (data is Map && data['data'] != null)
+      final List<dynamic> list = (data is Map && data['data'] is List)
           ? data['data'] as List
           : [];
       final staff = list
@@ -109,10 +117,28 @@ class StaffController extends StateNotifier<StaffState> {
   Future<bool> bootstrap({required String pin, String? name}) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      await _api.bootstrapStaff({
+      final res = await _api.bootstrapStaff({
         'pin': pin,
         if (name != null && name.isNotEmpty) 'name': name,
       });
+      final data = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : null;
+      final staffId = data?['id'] as int?;
+      final staffName = data?['name']?.toString() ?? name ?? 'Owner';
+      final staffRole = data?['role']?.toString() ?? 'manager';
+      if (staffId != null) {
+        await _db.upsertStaff(
+          StaffCompanion.insert(
+            id: drift.Value(staffId.toString()),
+            name: staffName,
+            pin: drift.Value(pin),
+            active: const drift.Value(true),
+            updatedAt: drift.Value(DateTime.now().toUtc()),
+          ),
+        );
+        await _storage.writePosStaffRole(staffId, staffRole);
+      }
       await load();
       return true;
     } catch (e) {
@@ -128,7 +154,23 @@ class StaffController extends StateNotifier<StaffState> {
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      await _api.createStaff({'name': name, 'role': role, 'pin': pin});
+      final res = await _api.createStaff({'name': name, 'role': role, 'pin': pin});
+      final data = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : null;
+      final staffId = data?['id'] as int?;
+      if (staffId != null) {
+        await _db.upsertStaff(
+          StaffCompanion.insert(
+            id: drift.Value(staffId.toString()),
+            name: name,
+            pin: drift.Value(pin),
+            active: const drift.Value(true),
+            updatedAt: drift.Value(DateTime.now().toUtc()),
+          ),
+        );
+        await _storage.writePosStaffRole(staffId, role);
+      }
       await load();
       return true;
     } catch (e) {
@@ -152,6 +194,18 @@ class StaffController extends StateNotifier<StaffState> {
         if (active != null) 'active': active,
         if (pin != null) 'pin': pin,
       });
+      await _db.upsertStaff(
+        StaffCompanion.insert(
+          id: drift.Value(id.toString()),
+          name: name ?? '',
+          pin: pin == null ? const drift.Value.absent() : drift.Value(pin),
+          active: active == null ? const drift.Value.absent() : drift.Value(active),
+          updatedAt: drift.Value(DateTime.now().toUtc()),
+        ),
+      );
+      if (role != null) {
+        await _storage.writePosStaffRole(id, role);
+      }
       await load();
       return true;
     } catch (e) {
@@ -287,9 +341,9 @@ class StaffManagementScreen extends ConsumerWidget {
       );
       if (result != null) {
         final ok = await controller.create(
-          name: result['name'] as String,
-          role: result['role'] as String,
-          pin: result['pin'] as String,
+          name: result['name']?.toString() ?? '',
+          role: result['role']?.toString() ?? 'cashier',
+          pin: result['pin']?.toString() ?? '',
         );
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

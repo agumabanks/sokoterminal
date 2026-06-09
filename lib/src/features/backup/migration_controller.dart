@@ -43,6 +43,13 @@ class MigrationController extends StateNotifier<MigrationState> {
   Future<void> checkForBackups() async {
     state = state.copyWith(checking: true, error: null);
     try {
+      final storage = ref.read(secureStorageProvider);
+      final posToken = await storage.readPosSessionToken();
+      if (posToken == null || posToken.trim().isEmpty) {
+        state = state.copyWith(checking: false, pendingBackup: null);
+        return;
+      }
+
       final client = ref.read(apiClientProvider);
       final response = await client.get<Map<String, dynamic>>(
         '/v2/seller/backups/latest',

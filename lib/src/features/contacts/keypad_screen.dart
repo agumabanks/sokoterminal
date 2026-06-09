@@ -36,8 +36,10 @@ class _KeypadScreenState extends ConsumerState<KeypadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
+    return Container(
+      color: DesignTokens.surface,
+      child: Column(
+        children: [
         const SizedBox(height: 40),
         SizedBox(
           height: 80,
@@ -53,7 +55,30 @@ class _KeypadScreenState extends ConsumerState<KeypadScreen> {
         if (_digits.isNotEmpty)
           TextButton.icon(
             onPressed: () {
-              // TODO: Open Add Contact modal
+              // Open a simple save-contact bottom sheet
+              showModalBottomSheet(
+                context: context,
+                builder: (context) => Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Save \$_digits', style: DesignTokens.textTitle),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Use your device contacts app to save this number.',
+                        style: DesignTokens.textBody,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Got it'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             },
             icon: const Icon(Icons.person_add_outlined),
             label: const Text('Add to Contacts'),
@@ -64,6 +89,7 @@ class _KeypadScreenState extends ConsumerState<KeypadScreen> {
         _buildActions(),
         const SizedBox(height: 40),
       ],
+      ),
     );
   }
 

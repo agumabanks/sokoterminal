@@ -431,8 +431,10 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
 
       // Get current position
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      ).timeout(const Duration(seconds: 10));
 
       setState(() {
         _selectedLocation = LatLng(position.latitude, position.longitude);

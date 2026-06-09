@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -76,14 +77,48 @@ class Services extends Table {
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
   TextColumn get imageUrl => text().nullable()();
+  IntColumn get coverUploadId => integer().nullable()();
+  TextColumn get galleryUrls => text().nullable()(); // JSON array
+  TextColumn get galleryUploadIds => text().nullable()(); // JSON array of ints
   RealColumn get price => real()();
+  RealColumn get cost => real().nullable()();
   IntColumn get durationMinutes => integer().nullable()();
   BoolColumn get publishedOnline =>
       boolean().withDefault(const Constant(false))();
+  IntColumn get categoryId => integer().nullable()();
+  TextColumn get summary => text().nullable()();
+  TextColumn get serviceType => text().nullable()();
+  TextColumn get deliveryTimeframe => text().nullable()();
+  TextColumn get moderationStatus => text().nullable()();
+  TextColumn get slug => text().nullable()();
+  TextColumn get pricingPackages => text().nullable()(); // JSON array of tiers
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   TextColumn get category => text().nullable()();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class ServiceJobSessions extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  IntColumn get remoteId => integer().nullable()();
+  TextColumn get bookingId => text().nullable()();
+  TextColumn get serviceId => text().references(Services, #id)();
+  TextColumn get clientName => text().nullable()();
+  TextColumn get clientPhone => text().nullable()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime().nullable()();
+  IntColumn get durationMinutes => integer().nullable()();
+  TextColumn get description => text().nullable()();
+  RealColumn get materialsCost => real().withDefault(const Constant(0))();
+  RealColumn get laborCharge => real().withDefault(const Constant(0))();
+  RealColumn get finalCharge => real().withDefault(const Constant(0))();
+  TextColumn get photosJson => text().nullable()();
+  TextColumn get pipelineStage => text().withDefault(const Constant('booked'))();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
   Set<Column<Object>>? get primaryKey => {id};
 }
@@ -233,6 +268,7 @@ class CachedServiceBookings extends Table {
 class InventoryLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get itemId => text().references(Items, #id)();
+  TextColumn get variant => text().withDefault(const Constant(''))();
   IntColumn get delta => integer()();
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt =>
@@ -327,6 +363,7 @@ class BusinessProfiles extends Table {
   TextColumn get paybillNumber => text().nullable()();
   TextColumn get receiptPaymentMethodsJson => text().nullable()();
   TextColumn get deliveryProfileJson => text().nullable()();
+  IntColumn get verificationStatus => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(true))();
@@ -616,11 +653,34 @@ class ExpenseCategories extends Table {
       dateTime().clientDefault(() => DateTime.now().toUtc())();
 }
 
+class AvailabilitySchedules extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get dayOfWeek => integer()(); // 0=Sun … 6=Sat
+  TextColumn get startTime => text()(); // HH:MM
+  TextColumn get endTime => text()(); // HH:MM
+  BoolColumn get isAvailable => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+}
+
+class AvailabilityExceptions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get remoteId => integer().nullable()();
+  TextColumn get date => text()(); // YYYY-MM-DD
+  BoolColumn get isAvailable => boolean().withDefault(const Constant(false))();
+  TextColumn get startTime => text().nullable()(); // HH:MM
+  TextColumn get endTime => text().nullable()(); // HH:MM
+  TextColumn get reason => text().nullable()();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+}
+
 @DriftDatabase(
   tables: [
     Items,
     ItemStocks,
     Services,
+    ServiceJobSessions,
     Customers,
     DeviceContacts,
     Suppliers,
@@ -657,6 +717,9 @@ class ExpenseCategories extends Table {
     PackageRedemptions,
     CustomerMemberships,
     ExpenseCategories,
+    AvailabilitySchedules,
+    AvailabilityExceptions,
+    ParkedSales,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -668,13 +731,28 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase._internal(NativeDatabase.createInBackground(file));
   }
 
+  /// Creates an in-memory database for testing.
+  factory AppDatabase.forTesting(QueryExecutor executor) = AppDatabase._internal;
+
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 36;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) => migrator.createAll(),
     onUpgrade: (migrator, from, to) async {
+      try {
+        await _runSchemaUpgrade(migrator, from, to);
+      } catch (e, st) {
+        debugPrint(
+          '[AppDatabase] Migration failed upgrading from v$from to v$to: $e\n$st',
+        );
+        rethrow;
+      }
+    },
+  );
+
+  Future<void> _runSchemaUpgrade(Migrator migrator, int from, int to) async {
       if (from < 2) {
         await migrator.createTable(roles);
         await migrator.createTable(staff);
@@ -809,8 +887,32 @@ class AppDatabase extends _$AppDatabase {
       if (from < 31) {
         await migrator.createTable(appSettings);
       }
-    },
-  );
+      if (from < 32) {
+        await migrator.createTable(availabilitySchedules);
+        await migrator.createTable(availabilityExceptions);
+      }
+      if (from < 33) {
+        await migrator.createTable(parkedSales);
+      }
+      if (from < 34) {
+        await migrator.addColumn(services, services.coverUploadId);
+        await migrator.addColumn(services, services.galleryUrls);
+        await migrator.addColumn(services, services.galleryUploadIds);
+      }
+      if (from < 35) {
+        await migrator.addColumn(services, services.categoryId);
+        await migrator.addColumn(services, services.summary);
+        await migrator.addColumn(services, services.serviceType);
+        await migrator.addColumn(services, services.deliveryTimeframe);
+        await migrator.addColumn(services, services.moderationStatus);
+        await migrator.addColumn(services, services.slug);
+        await migrator.addColumn(services, services.pricingPackages);
+      }
+      if (from < 36) {
+        await migrator.addColumn(parkedSales, parkedSales.label);
+        await migrator.addColumn(parkedSales, parkedSales.saleKind);
+      }
+  }
 
   // Expense Categories
   Future<List<ExpenseCategory>> getAllExpenseCategories() =>
@@ -829,6 +931,19 @@ class AppDatabase extends _$AppDatabase {
     ExpenseCategoriesCompanion companion,
   ) async {
     await into(expenseCategories).insertOnConflictUpdate(companion);
+  }
+
+  /// Seeds built-in expense categories if the table is empty.
+  /// Safe to call on every boot — no-ops if categories already exist.
+  Future<void> seedExpenseCategoriesIfEmpty() async {
+    final count = await (select(expenseCategories)).get();
+    if (count.isNotEmpty) return;
+    const seeds = _expenseCategorySeeds;
+    for (int i = 0; i < seeds.length; i++) {
+      await into(expenseCategories).insertOnConflictUpdate(
+        ExpenseCategoriesCompanion.insert(name: seeds[i]),
+      );
+    }
   }
 
   Future<void> deleteLocalTemporaryCategory(String name) async {
@@ -850,6 +965,18 @@ class AppDatabase extends _$AppDatabase {
       (select(items)..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
   Future<void> upsertItem(ItemsCompanion companion) async {
     await into(items).insertOnConflictUpdate(companion);
+  }
+
+  /// Save item and enqueue sync atomically.
+  Future<void> saveItemAndEnqueueSync({
+    required ItemsCompanion item,
+    required Map<String, dynamic> syncPayload,
+    required String opType,
+  }) async {
+    await transaction(() async {
+      await into(items).insertOnConflictUpdate(item);
+      await enqueueSync(opType, jsonEncode(syncPayload));
+    });
   }
 
   Future<void> updateItemFields(String id, ItemsCompanion companion) async {
@@ -913,6 +1040,10 @@ class AppDatabase extends _$AppDatabase {
     await into(services).insertOnConflictUpdate(companion);
   }
 
+  Future<void> updateServiceFields(String id, ServicesCompanion companion) async {
+    await (update(services)..where((tbl) => tbl.id.equals(id))).write(companion);
+  }
+
   Future<void> markServiceSynced(String id) async {
     await (update(services)..where((tbl) => tbl.id.equals(id))).write(
       ServicesCompanion(
@@ -936,6 +1067,88 @@ class AppDatabase extends _$AppDatabase {
     await (delete(services)..where((t) => t.id.equals(id))).go();
   }
 
+  Future<void> pruneSyncedRemoteServicesNotIn(Iterable<String> keepIds) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(services)
+              ..where((t) => t.remoteId.isNotNull() & t.synced.equals(true)))
+            .get();
+
+    for (final service in candidates) {
+      if (keep.contains(service.id)) continue;
+      final bookings = await (select(
+        localBookings,
+      )..where((t) => t.serviceId.equals(service.id))).get();
+
+      if (bookings.isEmpty) {
+        await transaction(() async {
+          await (update(transactionLines)
+                ..where((t) => t.serviceId.equals(service.id)))
+              .write(const TransactionLinesCompanion(serviceId: Value(null)));
+          await (update(ledgerLines)
+                ..where((t) => t.serviceId.equals(service.id)))
+              .write(const LedgerLinesCompanion(serviceId: Value(null)));
+          await (update(servicePackages)
+                ..where((t) => t.serviceId.equals(service.id)))
+              .write(const ServicePackagesCompanion(serviceId: Value(null)));
+          await (delete(services)..where((t) => t.id.equals(service.id))).go();
+        });
+        continue;
+      }
+
+      await (update(services)..where((t) => t.id.equals(service.id))).write(
+        ServicesCompanion(
+          publishedOnline: const Value(false),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
+    }
+  }
+
+  // Service Job Sessions
+  Stream<List<ServiceJobSession>> watchJobSessions() => (select(
+    serviceJobSessions,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+
+  Future<List<ServiceJobSession>> getAllJobSessions() =>
+      (select(serviceJobSessions)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<List<ServiceJobSession>> getJobSessionsForService(String serviceId) =>
+      (select(serviceJobSessions)
+            ..where((t) => t.serviceId.equals(serviceId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<ServiceJobSession?> getActiveJobSession() =>
+      (select(serviceJobSessions)
+            ..where((t) => t.endedAt.isNull())
+            ..orderBy([(t) => OrderingTerm.desc(t.startedAt)])
+            ..limit(1))
+          .getSingleOrNull();
+
+  Future<void> upsertJobSession(ServiceJobSessionsCompanion companion) async {
+    await into(serviceJobSessions).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> deleteJobSession(String id) async {
+    await (delete(serviceJobSessions)..where((t) => t.id.equals(id))).go();
+  }
+
+  // Inventory Logs (read)
+  Future<List<InventoryLog>> getInventoryLogsForItem(String itemId) =>
+      (select(inventoryLogs)
+            ..where((t) => t.itemId.equals(itemId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Stream<List<InventoryLog>> watchInventoryLogsForItem(String itemId) =>
+      (select(inventoryLogs)
+            ..where((t) => t.itemId.equals(itemId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .watch();
+
   // Service Variants
   Stream<List<ServiceVariant>> watchServiceVariants(String serviceId) =>
       (select(serviceVariants)
@@ -949,6 +1162,18 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteServiceVariant(String id) async {
     await (delete(serviceVariants)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> pruneSyncedServiceVariantsNotIn(Iterable<String> keepIds) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(serviceVariants)
+              ..where((t) => t.synced.equals(true)))
+            .get();
+    for (final variant in candidates) {
+      if (keep.contains(variant.id)) continue;
+      await (delete(serviceVariants)..where((t) => t.id.equals(variant.id))).go();
+    }
   }
 
   Future<void> unsetDefaultVariants(String serviceId) async {
@@ -1031,6 +1256,52 @@ class AppDatabase extends _$AppDatabase {
     ReceiptTemplatesCompanion companion,
   ) async {
     await into(receiptTemplates).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> pruneSyncedServicePackagesNotIn(
+    Iterable<String> keepIds,
+  ) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(servicePackages)
+              ..where((t) => t.synced.equals(true)))
+            .get();
+    for (final package in candidates) {
+      if (keep.contains(package.id)) continue;
+      await (delete(servicePackages)..where((t) => t.id.equals(package.id))).go();
+    }
+  }
+
+  Future<void> pruneSyncedCustomerPackagesNotIn(
+    Iterable<String> keepIds,
+  ) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(customerPackages)
+              ..where((t) => t.synced.equals(true)))
+            .get();
+    for (final customerPackage in candidates) {
+      if (keep.contains(customerPackage.id)) continue;
+      await (delete(
+        customerPackages,
+      )..where((t) => t.id.equals(customerPackage.id))).go();
+    }
+  }
+
+  Future<void> pruneSyncedPackageRedemptionsNotIn(
+    Iterable<String> keepIds,
+  ) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(packageRedemptions)
+              ..where((t) => t.synced.equals(true)))
+            .get();
+    for (final redemption in candidates) {
+      if (keep.contains(redemption.id)) continue;
+      await (delete(
+        packageRedemptions,
+      )..where((t) => t.id.equals(redemption.id))).go();
+    }
   }
 
   Future<ReceiptTemplate?> getLatestReceiptTemplate() async {
@@ -1334,6 +1605,20 @@ class AppDatabase extends _$AppDatabase {
     await into(staff).insertOnConflictUpdate(companion);
   }
 
+  Future<StaffData?> getStaffByPin(String pin) async {
+    return (select(staff)
+          ..where((t) => t.pin.equals(pin) & t.active.equals(true)))
+        .getSingleOrNull();
+  }
+
+  Future<StaffData?> getStaffById(String id) async {
+    return (select(staff)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<int> deleteAllStaff() async {
+    return delete(staff).go();
+  }
+
   Future<void> upsertOutlet(OutletsCompanion companion) async {
     await into(outlets).insertOnConflictUpdate(companion);
   }
@@ -1406,6 +1691,96 @@ class AppDatabase extends _$AppDatabase {
       for (final pay in payments) {
         await into(this.payments).insert(pay);
       }
+    });
+  }
+
+  /// Atomic sale checkout: validates stock, saves ledger, and decrements stock
+  /// all inside a single Drift transaction. No race conditions between validation
+  /// and write.
+  Future<int> checkoutSale({
+    required LedgerEntriesCompanion entry,
+    required List<LedgerLinesCompanion> lines,
+    required List<PaymentsCompanion> payments,
+    required List<({String itemId, int quantity, String? variant})> stockDeltas,
+  }) async {
+    return await transaction(() async {
+      // 1. Re-read and validate stock inside the transaction
+      final shortages = <String>[];
+      for (final delta in stockDeltas) {
+        final item = await (select(items)
+              ..where((tbl) => tbl.id.equals(delta.itemId)))
+            .getSingleOrNull();
+        if (item == null || !item.stockEnabled) continue;
+
+        final variant = (delta.variant ?? '').trim();
+        var available = variant.isEmpty ? item.stockQty : 0;
+        final stockRow = await (select(itemStocks)
+              ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
+            .getSingleOrNull();
+        if (stockRow != null) {
+          available = stockRow.stockQty;
+        }
+        if (available < delta.quantity) {
+          final label = variant.isEmpty ? item.name : '${item.name} • $variant';
+          shortages.add('$label (stock $available, requested ${delta.quantity})');
+        }
+      }
+      if (shortages.isNotEmpty) {
+        throw StateError('Insufficient stock: ${shortages.join(', ')}');
+      }
+
+      // 2. Save ledger entry
+      await into(ledgerEntries).insert(entry);
+      for (final line in lines) {
+        await into(ledgerLines).insert(line);
+      }
+      for (final pay in payments) {
+        await into(this.payments).insert(pay);
+      }
+
+      // 3. Decrement stock inside the same transaction
+      final now = DateTime.now().toUtc();
+      for (final delta in stockDeltas) {
+        final item = await (select(items)
+              ..where((tbl) => tbl.id.equals(delta.itemId)))
+            .getSingleOrNull();
+        if (item == null || !item.stockEnabled) continue;
+
+        await into(inventoryLogs).insert(
+          InventoryLogsCompanion.insert(
+            itemId: delta.itemId,
+            delta: -delta.quantity,
+            note: const Value('sale'),
+          ),
+        );
+
+        final updatedQty = item.stockQty - delta.quantity;
+        await (update(items)
+              ..where((tbl) => tbl.id.equals(delta.itemId)))
+            .write(
+          ItemsCompanion(stockQty: Value(updatedQty), updatedAt: Value(now)),
+        );
+
+        final variant = (delta.variant ?? '').trim();
+        if (variant.isNotEmpty) {
+          final row = await (select(itemStocks)
+                ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
+              .getSingleOrNull();
+          if (row != null) {
+            final nextVariantQty = row.stockQty - delta.quantity;
+            await (update(itemStocks)
+                  ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
+                .write(
+              ItemStocksCompanion(
+                stockQty: Value(nextVariantQty),
+                updatedAt: Value(now),
+              ),
+            );
+          }
+        }
+      }
+
+      return entry.receiptNumber.value ?? 0;
     });
   }
 
@@ -1520,11 +1895,15 @@ class AppDatabase extends _$AppDatabase {
     ).insert(SyncOpsCompanion.insert(opType: type, payload: payloadJson));
   }
 
-  Future<List<SyncOp>> pendingSyncOps() =>
-      (select(syncOps)
-            ..where((tbl) => tbl.status.equals('pending'))
-            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-          .get();
+  Future<List<SyncOp>> pendingSyncOps({int? limit}) {
+    final query = select(syncOps)
+      ..where((tbl) => tbl.status.equals('pending'))
+      ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]);
+    if (limit != null && limit > 0) {
+      query.limit(limit);
+    }
+    return query.get();
+  }
 
   Stream<int> watchPendingSyncOpsCount() {
     final count = syncOps.id.count();
@@ -1535,11 +1914,39 @@ class AppDatabase extends _$AppDatabase {
         .map((row) => row.read(count) ?? 0);
   }
 
+  Stream<int> watchBlockedSyncOpsCount() {
+    final count = syncOps.id.count();
+    return (selectOnly(syncOps)
+          ..addColumns([count])
+          ..where(syncOps.status.equals('blocked')))
+        .watchSingle()
+        .map((row) => row.read(count) ?? 0);
+  }
+
+  Stream<AppSetting?> watchAppSetting(String key) {
+    return (select(appSettings)
+          ..where((t) => t.key.equals(key))
+          ..limit(1))
+        .watchSingleOrNull();
+  }
+
   Future<List<SyncOp>> blockedSyncOps() =>
       (select(syncOps)
             ..where((tbl) => tbl.status.equals('blocked'))
             ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
           .get();
+
+  /// Watch the most recent sync op for a given local_id.
+  /// Used to show per-item/service sync status badges.
+  Stream<SyncOp?> watchSyncOpForLocalId(String localId) {
+    return (select(syncOps)
+          ..where(
+            (tbl) => tbl.payload.like('%"local_id":"$localId"%'),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .watchSingleOrNull();
+  }
 
   Future<void> markSynced(int id) async {
     final now = DateTime.now().toUtc();
@@ -1607,6 +2014,29 @@ class AppDatabase extends _$AppDatabase {
     final updated =
         await (update(syncOps)..where(
               (t) => t.status.equals('pending') | t.status.equals('blocked'),
+            ))
+            .write(
+              const SyncOpsCompanion(
+                status: Value('pending'),
+                retryCount: Value(0),
+                lastTriedAt: Value(null),
+                lastError: Value(null),
+              ),
+            );
+    return updated;
+  }
+
+  /// Reset only stale pending/blocked sync ops — those that have never been tried
+  /// or whose last try is older than [minAge]. This preserves exponential backoff
+  /// for ops that recently failed (e.g. HTTP 429) while still allowing long-stuck
+  /// ops to retry when the user explicitly requests a sync.
+  Future<int> resetStalePendingSyncOps(Duration minAge) async {
+    final threshold = DateTime.now().toUtc().subtract(minAge);
+    final updated =
+        await (update(syncOps)..where(
+              (t) =>
+                  (t.status.equals('pending') | t.status.equals('blocked')) &
+                  (t.lastTriedAt.isNull() | t.lastTriedAt.isSmallerThanValue(threshold)),
             ))
             .write(
               const SyncOpsCompanion(
@@ -1845,11 +2275,51 @@ class AppDatabase extends _$AppDatabase {
           .write(const TransactionLinesCompanion(itemId: Value(null)));
       await (update(ledgerLines)..where((tbl) => tbl.itemId.equals(itemId)))
           .write(const LedgerLinesCompanion(itemId: Value(null)));
+      await (delete(itemStocks)..where((tbl) => tbl.itemId.equals(itemId))).go();
+      await (delete(stockAlerts)..where((tbl) => tbl.itemId.equals(itemId))).go();
       await (delete(
         inventoryLogs,
       )..where((tbl) => tbl.itemId.equals(itemId))).go();
       await (delete(items)..where((tbl) => tbl.id.equals(itemId))).go();
     });
+  }
+
+  Future<void> pruneSyncedRemoteItemsNotIn(Iterable<String> keepIds) async {
+    final keep = keepIds.toSet();
+    final candidates =
+        await (select(items)
+              ..where((t) => t.remoteId.isNotNull() & t.synced.equals(true)))
+            .get();
+    for (final item in candidates) {
+      if (keep.contains(item.id)) continue;
+      await deleteItemAndDetach(item.id);
+    }
+  }
+
+  Future<void> deletePendingServiceOps(String localServiceId) async {
+    final ops = await pendingSyncOps();
+    for (final op in ops) {
+      if (op.opType != 'service_create' &&
+          op.opType != 'service_update' &&
+          op.opType != 'service_variant_push' &&
+          op.opType != 'service_variant_create' &&
+          op.opType != 'service_variant_update' &&
+          op.opType != 'service_variant_delete') {
+        continue;
+      }
+      try {
+        final payload = jsonDecode(op.payload);
+        if (payload is! Map<String, dynamic>) continue;
+        final localId = payload['local_id']?.toString();
+        final serviceId =
+            payload['service_id']?.toString() ?? payload['serviceId']?.toString();
+        if (localId == localServiceId || serviceId == localServiceId) {
+          await (delete(syncOps)..where((tbl) => tbl.id.equals(op.id))).go();
+        }
+      } catch (_) {
+        // Ignore malformed payloads.
+      }
+    }
   }
 
   Future<void> deletePendingItemOps(String localItemId) async {
@@ -2054,10 +2524,14 @@ class AppDatabase extends _$AppDatabase {
     await enqueueSync(
       'expense_push',
       jsonEncode({
-        'expense_id': expenseId,
+        // Backend stores this as client_expense_id for idempotent reconciliation.
+        'client_expense_id': expenseId,
+        'expense_id': expenseId, // legacy alias kept for older backend versions
         'amount': amount,
         'method': method.trim(),
         'category': category.trim(),
+        if (outletId != null) 'outlet_id': outletId,
+        if (staffId != null) 'staff_id': staffId,
         if (supplierId != null) 'supplier_id': supplierId,
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
         'occurred_at': occurred.toIso8601String(),
@@ -2134,6 +2608,10 @@ class AppDatabase extends _$AppDatabase {
     cachedOrders,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
 
+  Future<CachedOrder?> getCachedOrder(int orderId) => (select(
+    cachedOrders,
+  )..where((t) => t.orderId.equals(orderId))).getSingleOrNull();
+
   Stream<List<CachedOrder>> watchCachedOrders() => (select(
     cachedOrders,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
@@ -2159,6 +2637,49 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<CachedServiceBooking>> watchCachedServiceBookings() => (select(
     cachedServiceBookings,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
+
+  // Availability schedules
+  Future<List<AvailabilitySchedule>> getAllAvailabilitySchedules() => (select(
+    availabilitySchedules,
+  )..orderBy([(t) => OrderingTerm.asc(t.dayOfWeek)])).get();
+
+  Stream<List<AvailabilitySchedule>> watchAvailabilitySchedules() => (select(
+    availabilitySchedules,
+  )..orderBy([(t) => OrderingTerm.asc(t.dayOfWeek)])).watch();
+
+  Future<void> upsertAvailabilitySchedule(
+    AvailabilitySchedulesCompanion companion,
+  ) async {
+    await into(availabilitySchedules).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> deleteAllAvailabilitySchedules() async {
+    await delete(availabilitySchedules).go();
+  }
+
+  // Availability exceptions
+  Future<List<AvailabilityException>> getAllAvailabilityExceptions() => (select(
+    availabilityExceptions,
+  )..orderBy([(t) => OrderingTerm.asc(t.date)])).get();
+
+  Stream<List<AvailabilityException>> watchAvailabilityExceptions() => (select(
+    availabilityExceptions,
+  )..orderBy([(t) => OrderingTerm.asc(t.date)])).watch();
+
+  Future<void> upsertAvailabilityException(
+    AvailabilityExceptionsCompanion companion,
+  ) async {
+    await into(availabilityExceptions).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> deleteAvailabilityException(int id) async {
+    await (delete(availabilityExceptions)
+      ..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteAllAvailabilityExceptions() async {
+    await delete(availabilityExceptions).go();
+  }
 
   // Print queue
   Future<int> enqueueReceiptPrintJob(String entryId) async {
@@ -2249,6 +2770,115 @@ class AppDatabase extends _$AppDatabase {
     return (select(customers)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// Compute local POS stats for a walk-in/offline customer by their local DB id.
+  /// Returns a record with totalOrders, totalRevenue, and avgOrderValue
+  /// derived entirely from [LedgerEntries] rows where customerId matches.
+  Future<({int totalOrders, double totalRevenue, double avgOrderValue, DateTime? lastPurchaseAt})>
+      getLocalCustomerStats(String customerId) async {
+    final rows = await (select(ledgerEntries)
+          ..where(
+            (e) => e.customerId.equals(customerId) & e.type.equals('sale'),
+          ))
+        .get();
+
+    final totalOrders = rows.length;
+    final totalRevenue = rows.fold<double>(0, (sum, e) => sum + e.total);
+    final avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0.0;
+    final lastPurchaseAt = rows.isNotEmpty
+        ? rows.map((e) => e.createdAt).reduce((a, b) => a.isAfter(b) ? a : b)
+        : null;
+
+    return (
+      totalOrders: totalOrders,
+      totalRevenue: totalRevenue,
+      avgOrderValue: avgOrderValue,
+      lastPurchaseAt: lastPurchaseAt,
+    );
+  }
+
+  // ── Atomic DB + Sync operations (WhatsApp-grade durability) ──
+
+  /// Adjust stock, mark item unsynced, and enqueue sync atomically.
+  /// Crash between DB write and sync enqueue = orphan data. This prevents that.
+  Future<void> adjustStockAndEnqueueSync({
+    required String itemId,
+    required int delta,
+    String? note,
+    String? variant,
+    required Map<String, dynamic> syncPayload,
+  }) async {
+    await transaction(() async {
+      await recordInventoryMovement(
+        itemId: itemId,
+        delta: delta,
+        note: note,
+        variant: variant,
+      );
+      await updateItemFields(
+        itemId,
+        const ItemsCompanion(synced: Value(false)),
+      );
+      await enqueueSync('stock_adjust', jsonEncode(syncPayload));
+    });
+  }
+
+  /// Delete item and enqueue remote delete atomically.
+  Future<void> deleteItemAndEnqueueSync({
+    required String itemId,
+    int? remoteId,
+  }) async {
+    await transaction(() async {
+      await deletePendingItemOps(itemId);
+      await deleteItemAndDetach(itemId);
+      if (remoteId != null) {
+        await enqueueSync(
+          'item_delete',
+          jsonEncode({'remote_id': remoteId}),
+        );
+      }
+    });
+  }
+
+  /// Save service and enqueue sync atomically.
+  Future<void> saveServiceAndEnqueueSync({
+    required ServicesCompanion service,
+    required Map<String, dynamic> syncPayload,
+    required String opType,
+  }) async {
+    await transaction(() async {
+      await into(services).insertOnConflictUpdate(service);
+      await enqueueSync(opType, jsonEncode(syncPayload));
+    });
+  }
+
+  /// Delete service and enqueue remote delete atomically.
+  Future<void> deleteServiceAndEnqueueSync({
+    required String serviceId,
+    int? remoteId,
+  }) async {
+    await transaction(() async {
+      await deletePendingServiceOps(serviceId);
+      await deleteService(serviceId);
+      if (remoteId != null) {
+        await enqueueSync(
+          'service_delete',
+          jsonEncode({'local_id': serviceId, 'remote_id': remoteId}),
+        );
+      }
+    });
+  }
+
+  /// Save booking and enqueue sync atomically.
+  Future<void> saveBookingAndEnqueueSync({
+    required LocalBookingsCompanion booking,
+    required Map<String, dynamic> syncPayload,
+  }) async {
+    await transaction(() async {
+      await into(localBookings).insertOnConflictUpdate(booking);
+      await enqueueSync('booking_create', jsonEncode(syncPayload));
+    });
+  }
+
   /// Clears ALL data from the database.
   /// This is called on logout to ensure complete data isolation between
   /// different sellers using the same device.
@@ -2294,6 +2924,7 @@ class AppDatabase extends _$AppDatabase {
       await delete(expenseCategories).go();
       await delete(receiptTemplates).go();
       await delete(quotationTemplates).go();
+      await delete(parkedSales).go();
     });
   }
 
@@ -2314,6 +2945,75 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<Item>> allProducts() => select(items).get();
+
+  // ── Parked Sales (active cart + named parked sales) ──
+  static const activeCartSaleId = 'active-cart';
+  static const activeCartSaleKind = 'active_cart';
+  static const namedParkedSaleKind = 'parked';
+
+  Future<void> saveParkedSale(ParkedSalesCompanion companion) async {
+    await into(parkedSales).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> clearParkedSales() async {
+    await delete(parkedSales).go();
+  }
+
+  Future<void> clearActiveCartSale() async {
+    await (delete(parkedSales)..where(
+          (t) => t.id.equals(activeCartSaleId) | t.saleKind.equals(activeCartSaleKind),
+        ))
+        .go();
+  }
+
+  Future<ParkedSale?> getLatestParkedSale() async {
+    return (select(parkedSales)
+          ..where(
+            (t) =>
+                t.id.equals(activeCartSaleId) |
+                t.saleKind.equals(activeCartSaleKind),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<List<ParkedSale>> getNamedParkedSales() {
+    return (select(parkedSales)
+          ..where((t) => t.saleKind.equals(namedParkedSaleKind))
+          ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .get();
+  }
+
+  Future<void> saveNamedParkedSale({
+    required String id,
+    required String label,
+    required String linesJson,
+    String? notes,
+    String? customerId,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) async {
+    await into(parkedSales).insertOnConflictUpdate(
+      ParkedSalesCompanion.insert(
+        id: Value(id),
+        label: Value(label),
+        saleKind: const Value(namedParkedSaleKind),
+        linesJson: linesJson,
+        notes: Value(notes),
+        customerId: Value(customerId),
+        createdAt: Value(createdAt),
+        updatedAt: Value(updatedAt),
+      ),
+    );
+  }
+
+  Future<void> deleteNamedParkedSale(String id) async {
+    await (delete(parkedSales)..where(
+          (t) => t.id.equals(id) & t.saleKind.equals(namedParkedSaleKind),
+        ))
+        .go();
+  }
 
   /// Comprehensive data import for multi-device migration.
   /// Overwrites current local data with the provided backup map.
@@ -2414,3 +3114,74 @@ class StockAlertWithItem {
   final StockAlert alert;
   final Item item;
 }
+
+class ParkedSales extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get linesJson => text()(); // JSON array of CartLine
+  TextColumn get notes => text().nullable()();
+  TextColumn get customerId => text().nullable()();
+  TextColumn get label => text().nullable()();
+  TextColumn get saleKind =>
+      text().withDefault(const Constant('parked'))(); // active_cart | parked
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+
+// ─── Built-in expense category seeds ──────────────────────────────────────────
+const _expenseCategorySeeds = <String>[
+  'Shop Rent', 'Office Rent', 'Electricity Bill', 'Water Bill', 'Internet / WiFi',
+  'Phone Bill', 'Generator Fuel', 'Generator Maintenance', 'Cleaning & Sanitation',
+  'Waste Disposal', 'Security Guard', 'CCTV / Alarm Service', 'Premises Insurance',
+  'Property Taxes', 'Repairs & Maintenance', 'Plumbing Repairs', 'Electrical Repairs',
+  'Pest Control', 'Air Conditioning Service', 'Fire Extinguisher Refill',
+  'Staff Salaries', 'Staff Wages (Daily)', 'Casual Labour', 'Staff Overtime',
+  'Staff Bonuses', 'Staff Commission', 'Staff Allowances', 'Staff Transport',
+  'Staff Uniforms', 'Staff Meals / Lunch', 'Staff Training', 'Staff Medical',
+  'Staff Loan Advance', 'NSSF Contributions', 'PAYE Tax', 'Recruitment Costs',
+  'Stock Purchase', 'Raw Materials', 'Packaging Materials', 'Bags & Wrapping',
+  'Labels & Stickers', 'Spoilage / Wastage', 'Stock Insurance', 'Cold Storage',
+  'Fumigation',
+  'Fuel', 'Vehicle Hire', 'Boda Boda / Taxi', 'Bus Fare', 'Delivery Costs',
+  'Courier Fees', 'Customs & Import Duties', 'Clearing Charges', 'Freight / Shipping',
+  'Vehicle Maintenance', 'Vehicle Insurance', 'Car Wash', 'Parking Fees', 'Toll Fees',
+  'Loading / Offloading',
+  'Advertising (Online)', 'Facebook / Instagram Ads', 'Google Ads', 'TikTok Ads',
+  'Radio Advertising', 'TV Advertising', 'Newspaper Adverts', 'Flyers & Brochures',
+  'Banners & Signage', 'Business Cards', 'Branded T-Shirts', 'Promotional Items',
+  'Sponsorships', 'Event Costs', 'Photography & Videography', 'Content Creation',
+  'Social Media Management', 'Website / App Costs', 'Domain & Hosting',
+  'SMS Marketing', 'WhatsApp Marketing',
+  'Equipment Purchase', 'Equipment Hire / Rental', 'Equipment Maintenance',
+  'Computer / Laptop', 'Printer', 'Printer Ink & Toner', 'POS Machine',
+  'POS Machine Maintenance', 'Software Subscription', 'Accounting Software',
+  'Phone / Tablet Purchase', 'UPS / Inverter', 'Cloud Storage',
+  'Bank Charges', 'Mobile Money Charges', 'ATM Withdrawal Fees', 'Loan Repayment',
+  'Loan Interest', 'Credit Card Fees', 'Payment Gateway Fees', 'Insurance Premium',
+  'Business License', 'Trade License', 'Health License', 'URA Tax Payment',
+  'VAT Filing Costs', 'KCCA Fees', 'Local Council Fees', 'Accountant / Audit Fees',
+  'Legal Fees', 'Company Registration',
+  'Office Supplies', 'Pens & Stationery', 'Books & Notebooks', 'Printing (Office)',
+  'Photocopying', 'Postage / Courier',
+  'Client Entertainment', 'Client Gifts', 'Tea & Coffee (Office)', 'Staff Refreshments',
+  'Business Lunch', 'Business Dinner', 'Hotel Accommodation', 'Travel Expenses', 'Airfare',
+  'Medical Expenses', 'First Aid Supplies', 'Safety Equipment', 'Protective Gear (PPE)',
+  'Medical Insurance',
+  'Cooking Gas / LPG', 'Cooking Oil', 'Charcoal', 'Firewood', 'Food Ingredients',
+  'Disposable Plates & Cups', 'Food Containers', 'Market Fees', 'Health Inspection Fee',
+  'Beauty Products Stock', 'Hair Extensions', 'Wigs & Weaves', 'Nail Products',
+  'Salon Equipment',
+  'Building Materials', 'Cement & Bricks', 'Iron Sheets', 'Sand & Gravel',
+  'Paint & Varnish', 'Labour (Construction)', 'Scaffold Hire', 'Machinery Hire',
+  'Seeds', 'Fertiliser', 'Pesticides', 'Farm Labour', 'Land Hire', 'Veterinary Costs',
+  'Animal Feed', 'Livestock Purchase', 'Farm Equipment',
+  'Motorcycle Service', 'Tyre Replacement', 'Road Licence Renewal',
+  'Third Party Insurance',
+  'Petty Cash', 'Miscellaneous', 'Fines / Penalties', 'Donations / Charity',
+  'Association Dues', 'Trade Fair Costs', 'Consultancy Fees', 'Subscription Services',
+  'Bad Debts Written Off', 'Other Expenses',
+];

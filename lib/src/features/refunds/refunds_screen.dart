@@ -78,6 +78,9 @@ class RefundsController extends StateNotifier<RefundsState> {
     if (e is DioException) {
       final status = e.response?.statusCode;
       final data = e.response?.data;
+      if (status != null && status >= 500) {
+        return 'Refund service is temporarily unavailable. Please try again later.';
+      }
       if (data is Map && data['message'] != null) {
         return '${data['message']}${status == null ? '' : ' ($status)'}';
       }

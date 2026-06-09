@@ -51,7 +51,17 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                     backgroundColor: DesignTokens.brandPrimary.withValues(
                       alpha: 0.1,
                     ),
-                    child: Icon(Icons.person, color: DesignTokens.brandPrimary),
+                    child: _selectedCustomer != null
+                        ? Text(
+                            _selectedCustomer!.name.isNotEmpty
+                                ? _selectedCustomer!.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: DesignTokens.brandPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : Icon(Icons.person, color: DesignTokens.brandPrimary),
                   ),
                   title: Text(_selectedCustomer?.name ?? 'Select Customer'),
                   subtitle: _selectedCustomer != null
@@ -79,10 +89,23 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                     (entry) => _buildLineItem(entry.key, entry.value),
                   ),
 
-                AppButton(
-                  label: 'Add Item',
-                  variant: AppButtonVariant.outline,
-                  onPressed: _addLineItem,
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: '+ Products / Services',
+                        onPressed: _pickFromProducts,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: AppButton(
+                        label: '+ Custom Item',
+                        variant: AppButtonVariant.outline,
+                        onPressed: _addLineItem,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: DesignTokens.spaceLg),
 
@@ -114,7 +137,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
             padding: DesignTokens.paddingScreen,
             decoration: BoxDecoration(
               color: DesignTokens.surfaceWhite,
-              boxShadow: DesignTokens.shadowSm, // Fixed: shadowUp -> shadowSm
+              boxShadow: DesignTokens.shadowSm,
             ),
             child: SafeArea(
               child: Column(
@@ -156,39 +179,541 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   }
 
   Widget _buildLineItem(int index, QuotationLineItem line) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
-      child: ListTile(
-        title: Text(line.description),
-        subtitle: Text('${line.quantity} x ${line.unitPrice.toUgx()}'),
-        trailing: IconButton(
-          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-          onPressed: () => setState(() => _lines.removeAt(index)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: DesignTokens.surfaceWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(line.description,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text('${line.unitPrice.toUgx()} each',
+                    style: DesignTokens.textSmall),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (line.quantity > 1) {
+                    setState(() => _lines[index] = QuotationLineItem(
+                      description: line.description,
+                      quantity: line.quantity - 1,
+                      unitPrice: line.unitPrice,
+                    ));
+                  }
+                },
+                child: Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.remove, size: 16),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text('${line.quantity}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _lines[index] = QuotationLineItem(
+                  description: line.description,
+                  quantity: line.quantity + 1,
+                  unitPrice: line.unitPrice,
+                )),
+                child: Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0EBE7E).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add, size: 16, color: Color(0xFF0EBE7E)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text((line.unitPrice * line.quantity).toUgx(),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => setState(() => _lines.removeAt(index)),
+            child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Product + Services picker (tabbed)
+  // -------------------------------------------------------------------------
+
+  Future<void> _pickFromProducts() async {
+    final db = ref.read(appDatabaseProvider);
+    final allItems = await db.getAllItems();
+    final allServices = await db.getAllServices();
+    if (!mounted) return;
+
+    String query = '';
+    // 0 = Products, 1 = Services
+    int tabIndex = 0;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) {
+          final filteredItems = query.isEmpty
+              ? allItems
+              : allItems.where((i) =>
+                  i.name.toLowerCase().contains(query.toLowerCase()) ||
+                  (i.categoryName?.toLowerCase().contains(query.toLowerCase()) ?? false))
+                .toList();
+
+          final filteredServices = query.isEmpty
+              ? allServices
+              : allServices.where((s) =>
+                  s.title.toLowerCase().contains(query.toLowerCase()) ||
+                  (s.category?.toLowerCase().contains(query.toLowerCase()) ?? false))
+                .toList();
+
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.80,
+            decoration: BoxDecoration(
+              color: DesignTokens.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Tab toggle: Products | Services
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      _pickerTab(
+                        label: 'Products (${allItems.length})',
+                        selected: tabIndex == 0,
+                        onTap: () => setModal(() {
+                          tabIndex = 0;
+                          query = '';
+                        }),
+                      ),
+                      const SizedBox(width: 8),
+                      _pickerTab(
+                        label: 'Services (${allServices.length})',
+                        selected: tabIndex == 1,
+                        onTap: () => setModal(() {
+                          tabIndex = 1;
+                          query = '';
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Search field
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: TextField(
+                    key: ValueKey('search_$tabIndex'),
+                    autofocus: false,
+                    onChanged: (v) => setModal(() => query = v),
+                    decoration: InputDecoration(
+                      hintText: tabIndex == 0
+                          ? 'Search products…'
+                          : 'Search services…',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                // List
+                Expanded(
+                  child: tabIndex == 0
+                      ? _buildProductList(ctx, filteredItems)
+                      : _buildServiceList(ctx, filteredServices),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pickerTab({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? DesignTokens.brandPrimary
+                : DesignTokens.brandPrimary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: selected ? Colors.white : DesignTokens.brandPrimary,
+            ),
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildProductList(BuildContext ctx, List<Item> filtered) {
+    if (filtered.isEmpty) {
+      return const Center(child: Text('No products found'));
+    }
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (_, i) {
+        final item = filtered[i];
+        return ListTile(
+          leading: item.imageUrl != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    item.imageUrl!,
+                    width: 40, height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.inventory_2_rounded),
+                  ),
+                )
+              : const Icon(Icons.inventory_2_rounded),
+          title: Text(item.name,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            '${item.categoryName ?? 'General'} · ${item.price.toUgx()}',
+            style: DesignTokens.textSmall,
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.add_circle_rounded,
+                color: Color(0xFF0EBE7E)),
+            onPressed: () {
+              setState(() {
+                _lines.add(QuotationLineItem(
+                  description: item.name,
+                  quantity: 1,
+                  unitPrice: item.price,
+                ));
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${item.name} added')),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildServiceList(BuildContext ctx, List<Service> filtered) {
+    if (filtered.isEmpty) {
+      return const Center(child: Text('No services found'));
+    }
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (_, i) {
+        final svc = filtered[i];
+        return ListTile(
+          leading: svc.imageUrl != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    svc.imageUrl!,
+                    width: 40, height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.room_service_rounded),
+                  ),
+                )
+              : const Icon(Icons.room_service_rounded),
+          title: Text(svc.title,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            '${svc.category ?? 'Service'} · ${svc.price.toUgx()}',
+            style: DesignTokens.textSmall,
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.add_circle_rounded,
+                color: Color(0xFF0EBE7E)),
+            onPressed: () {
+              setState(() {
+                _lines.add(QuotationLineItem(
+                  description: svc.title,
+                  quantity: 1,
+                  unitPrice: svc.price,
+                ));
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${svc.title} added')),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Searchable customer picker with inline quick-add
+  // -------------------------------------------------------------------------
+
   Future<void> _selectCustomer() async {
-    final customers = await ref
-        .read(appDatabaseProvider)
-        .select(ref.read(appDatabaseProvider).customers)
+    final db = ref.read(appDatabaseProvider);
+    final customers = await db
+        .select(db.customers)
         .get();
     if (!mounted) return;
 
+    String query = '';
+    bool showAddForm = false;
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+
     await showModalBottomSheet(
       context: context,
-      builder: (ctx) => ListView.builder(
-        itemCount: customers.length,
-        itemBuilder: (ctx, i) {
-          final c = customers[i];
-          return ListTile(
-            title: Text(c.name),
-            subtitle: Text(c.phone ?? ''),
-            onTap: () {
-              setState(() => _selectedCustomer = c);
-              Navigator.pop(ctx);
-            },
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) {
+          final filtered = query.isEmpty
+              ? customers
+              : customers.where((c) =>
+                  c.name.toLowerCase().contains(query.toLowerCase()) ||
+                  (c.phone?.toLowerCase().contains(query.toLowerCase()) ?? false))
+                .toList();
+
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.75,
+            decoration: BoxDecoration(
+              color: DesignTokens.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Select Customer',
+                          style: DesignTokens.textBodyBold,
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.person_add_alt_1, size: 18),
+                        label: const Text('Quick Add'),
+                        onPressed: () => setModal(() {
+                          showAddForm = !showAddForm;
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+                // Inline quick-add form
+                if (showAddForm)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: DesignTokens.brandPrimary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: DesignTokens.brandPrimary.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('New Contact',
+                              style: DesignTokens.textBodyBold.copyWith(fontSize: 13)),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: nameCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Name',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(
+                              labelText: 'Phone',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final name = nameCtrl.text.trim();
+                              if (name.isEmpty) return;
+                              final phone = phoneCtrl.text.trim();
+                              final newId = const Uuid().v4();
+                              await db.upsertCustomer(
+                                CustomersCompanion.insert(
+                                  id: Value(newId),
+                                  name: name,
+                                  phone: phone.isEmpty
+                                      ? const Value.absent()
+                                      : Value(phone),
+                                  synced: const Value(false),
+                                ),
+                              );
+                              final newCustomer =
+                                  await db.getCustomerById(newId);
+                              if (newCustomer != null && mounted) {
+                                setState(
+                                  () => _selectedCustomer = newCustomer,
+                                );
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('$name added')),
+                                );
+                              }
+                            },
+                            child: const Text('Save & Select'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Search field
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: TextField(
+                    onChanged: (v) => setModal(() => query = v),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or phone…',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                // Customer list
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.people_outline,
+                                  size: 48, color: DesignTokens.grayMedium),
+                              const SizedBox(height: 12),
+                              Text(
+                                customers.isEmpty
+                                    ? 'No customers yet — add one above'
+                                    : 'No results',
+                                style: DesignTokens.textSmall.copyWith(
+                                  color: DesignTokens.grayMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (ctx, i) {
+                            final c = filtered[i];
+                            final initials = c.name.trim().isNotEmpty
+                                ? c.name.trim()[0].toUpperCase()
+                                : '?';
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: DesignTokens.brandPrimary
+                                    .withValues(alpha: 0.12),
+                                child: Text(
+                                  initials,
+                                  style: TextStyle(
+                                    color: DesignTokens.brandPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(c.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              subtitle: c.phone?.isNotEmpty == true
+                                  ? Text(c.phone!)
+                                  : null,
+                              onTap: () {
+                                setState(() => _selectedCustomer = c);
+                                Navigator.pop(ctx);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           );
         },
       ),

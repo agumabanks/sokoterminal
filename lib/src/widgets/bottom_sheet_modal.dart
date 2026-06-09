@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/design_tokens.dart';
+import '../core/util/haptics.dart';
 
 /// A premium bottom sheet modal with glassmorphism effect.
 ///
@@ -51,7 +52,7 @@ class BottomSheetModal extends StatelessWidget {
     EdgeInsets? padding,
     double? maxHeight,
   }) {
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
@@ -77,94 +78,102 @@ class BottomSheetModal extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     final effectiveMaxHeight = maxHeight ?? screenHeight * 0.85;
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite.withValues(alpha: 0.92),
-        borderRadius: DesignTokens.borderRadiusBottomSheet,
-      ),
-      child: ClipRRect(
-        borderRadius: DesignTokens.borderRadiusBottomSheet,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+    return TweenAnimationBuilder<Offset>(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutBack,
+      tween: Tween<Offset>(begin: const Offset(0, 40), end: Offset.zero),
+      builder: (context, offset, child) {
+        return Transform.translate(
+          offset: offset,
+          child: child,
+        );
+      },
+      child: Container(
+        constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: DesignTokens.borderRadiusBottomSheet,
+        ),
+        child: ClipRRect(
+          borderRadius: DesignTokens.borderRadiusBottomSheet,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              if (showHandle) ...[
-                const SizedBox(height: DesignTokens.spaceSm),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: DesignTokens.grayLight,
-                    borderRadius: BorderRadius.circular(2),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                if (showHandle) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: DesignTokens.grayLight,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
-                ),
-                const SizedBox(height: DesignTokens.spaceSm),
-              ],
+                  const SizedBox(height: 12),
+                ],
 
-              // Header with title
-              if (title != null || showCloseButton)
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: DesignTokens.spaceMd,
-                    right: showCloseButton
-                        ? DesignTokens.spaceXs
-                        : DesignTokens.spaceMd,
-                    top: showHandle ? 0 : DesignTokens.spaceMd,
-                    bottom: DesignTokens.spaceSm,
-                  ),
-                  child: Row(
-                    children: [
-                      if (title != null)
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(title!, style: DesignTokens.textTitle),
-                              if (subtitle != null) ...[
-                                const SizedBox(height: DesignTokens.spaceXs),
-                                Text(subtitle!, style: DesignTokens.textSmall),
+                // Header with title
+                if (title != null || showCloseButton)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: DesignTokens.spaceMd,
+                      right: showCloseButton
+                          ? DesignTokens.spaceXs
+                          : DesignTokens.spaceMd,
+                      top: showHandle ? 0 : DesignTokens.spaceMd,
+                      bottom: DesignTokens.spaceSm,
+                    ),
+                    child: Row(
+                      children: [
+                        if (title != null)
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(title!, style: DesignTokens.textTitle),
+                                if (subtitle != null) ...[
+                                  const SizedBox(height: DesignTokens.spaceXs),
+                                  Text(subtitle!, style: DesignTokens.textSmall),
+                                ],
                               ],
-                            ],
-                          ),
-                        )
-                      else
-                        const Spacer(),
-                      if (showCloseButton)
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close),
-                          color: DesignTokens.grayMedium,
-                          style: IconButton.styleFrom(
-                            backgroundColor: DesignTokens.grayLight.withValues(
-                              alpha: 0.5,
+                            ),
+                          )
+                        else
+                          const Spacer(),
+                        if (showCloseButton)
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close),
+                            color: DesignTokens.grayMedium,
+                            style: IconButton.styleFrom(
+                              backgroundColor: DesignTokens.grayLight.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-              // Content
-              Flexible(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    left: padding?.left ?? DesignTokens.spaceMd,
-                    right: padding?.right ?? DesignTokens.spaceMd,
-                    top: padding?.top ?? 0,
-                    bottom:
-                        bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
+                // Content
+                Flexible(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: padding?.left ?? DesignTokens.spaceMd,
+                      right: padding?.right ?? DesignTokens.spaceMd,
+                      top: padding?.top ?? 0,
+                      bottom:
+                          bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
+                    ),
+                    child: child,
                   ),
-                  child: child,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -194,7 +203,7 @@ class ScrollableBottomSheetModal extends StatelessWidget {
     bool showCloseButton = true,
     bool isDismissible = true,
   }) {
-    HapticFeedback.mediumImpact();
+    Haptics.impact();
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
@@ -283,7 +292,7 @@ class _ActionTile extends StatelessWidget {
         : DesignTokens.brandPrimary;
     return InkWell(
       onTap: () {
-        HapticFeedback.selectionClick();
+        Haptics.selection();
         Navigator.of(context).pop();
         action.onTap?.call();
       },

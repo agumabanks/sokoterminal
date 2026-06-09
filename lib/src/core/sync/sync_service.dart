@@ -16,19 +16,31 @@ import '../db/app_database.dart';
 import '../media/offline_media_cache.dart';
 import '../network/pos_dtos.dart';
 import '../settings/business_profile_cache.dart';
+import '../../features/orders/marketplace_order.dart';
+import '../util/ledger_sync_utils.dart';
 import '../util/phone_normalizer.dart';
+import '../util/service_publish_utils.dart';
+import '../util/service_pricing_utils.dart';
 import '../network/seller_api.dart';
+import '../telemetry/bug_logger.dart';
+import '../telemetry/bug_report_sync.dart';
 import '../telemetry/telemetry.dart';
+import '../network/dio_auth_utils.dart';
 import '../storage/secure_storage.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final api = ref.watch(sellerApiProvider);
   final secureStorage = ref.watch(secureStorageProvider);
-  return SyncService(db: db, sellerApi: api, secureStorage: secureStorage);
+  final service = SyncService(db: db, sellerApi: api, secureStorage: secureStorage);
+  ref.onDispose(() => unawaited(service.dispose()));
+  return service;
 });
 
 const _uuid = Uuid();
+
+/// Result of an immediate catalog sync attempt.
+enum CatalogSyncOutcome { synced, queuedOffline, skippedBusy }
 
 class SyncService {
   SyncService({
@@ -45,49 +57,195 @@ class SyncService {
   Stream<String> get syncStatusStream => _syncStatusController.stream;
   StreamSubscription<dynamic>? _connectivitySub;
   Timer? _retryTimer;
+  Timer? _foregroundTimer;
   bool _isPumping = false;
   bool _pumpQueued = false;
+  bool _bookingsRouteAvailable = true;
+  bool _wasOffline = false;
+  bool _isDisposed = false;
   Future<void>? _pullInFlight;
+  DateTime? _lastCatalogMutationAt;
+
+  void _safeAddStatus(String status) {
+    if (!_isDisposed && !_syncStatusController.isClosed) {
+      _syncStatusController.add(status);
+    }
+  }
   static const _contactsSyncKey = 'device_contacts_synced_at';
   static const _contactsOptInKey = 'device_contacts_opt_in';
-  static const _contactsSyncInterval = Duration(hours: 12);
+  static const _contactsSyncInterval = Duration(hours: 4); // reduced from 12h
+  static const _contactsCountKey = 'device_contacts_last_count';
+  static const _lastCrmContactsPullKey = 'last_crm_contacts_pull_at';
+  static const _maxCatalogSyncAge = Duration(days: 4);
+  static const List<String> _pullCursorKeys = [
+    'products',
+    'services',
+    'customers',
+    'business_profile',
+    'config',
+    'service_variants',
+    'service_packages',
+    'customer_packages',
+    'package_redemptions',
+    'suppliers',
+    'expenses',
+    'quotations',
+    'shifts',
+    'cash_movements',
+    'settings',
+    'receipt_templates',
+    'quotation_templates',
+    'ledger_entries',
+  ];
+
+  static const _catalogOpTypes = <String>{
+    'item_create',
+    'item_update',
+    'item_delete',
+    'service_create',
+    'service_update',
+    'service_delete',
+    'service_variant_push',
+    'service_variant_create',
+    'service_variant_update',
+    'service_variant_delete',
+  };
 
   void start() {
     _connectivitySub ??= Connectivity().onConnectivityChanged.listen(
-      (_) => _pump(),
+      (results) async {
+        final online = results.any((r) => r != ConnectivityResult.none);
+        if (online) {
+          if (_wasOffline) {
+            if (kDebugMode) {
+              debugPrint(
+                '[SyncService] Back online — prioritizing catalog sync',
+              );
+            }
+            unawaited(syncCatalogImmediately(notify: true));
+          } else {
+            _pump();
+          }
+        }
+        _wasOffline = !online;
+      },
     );
     _retryTimer ??= Timer.periodic(const Duration(minutes: 5), (_) => _pump());
+    // Aggressive foreground polling for near-real-time multi-device sync.
+    // The OS naturally throttles this timer when the app is backgrounded.
+    _foregroundTimer ??= Timer.periodic(const Duration(seconds: 15), (_) => _pump());
 
-    // Check if we need initial data - if no items, do full resync from epoch
+    // Reconcile any ledger entries that were created offline but never got
+    // a corresponding sync op enqueued (e.g., due to app crash).
+    unawaited(_reconcileUnsyncedLedgerEntries());
+
+    // Every launch should reconcile local POS data with the seller's cloud
+    // account. If the catalog is stale, bootstrap again from epoch.
     unawaited(_ensureInitialDataLoaded());
   }
 
-  Future<void> _ensureInitialDataLoaded() async {
-    final items = await db.getAllItems();
-    if (items.isEmpty) {
-      if (kDebugMode) {
+  Future<void> _reconcileUnsyncedLedgerEntries() async {
+    try {
+      final unsynced = await db.pendingLedgerEntries();
+      if (unsynced.isEmpty) return;
+
+      final allOps = await db.select(db.syncOps).get();
+      final needingPush = ledgerEntriesNeedingPush(
+        unsynced: unsynced,
+        syncOps: allOps,
+      );
+
+      var enqueued = 0;
+      for (final entry in needingPush) {
+        final bundle = await db.fetchLedgerEntryBundle(entry.id);
+        if (bundle == null) continue;
+
+        await db.enqueueSync(
+          'ledger_push',
+          jsonEncode(buildLedgerPushPayload(bundle)),
+        );
+        enqueued++;
+      }
+
+      if (kDebugMode && enqueued > 0) {
         debugPrint(
-          '[SyncService] No items in DB - triggering full resync from epoch...',
+          '[SyncService] Reconciled $enqueued orphaned ledger entries',
         );
       }
-      await forceFullResync();
-    } else {
+    } catch (e) {
       if (kDebugMode) {
-        debugPrint(
-          '[SyncService] Have ${items.length} items in DB - normal sync',
-        );
+        debugPrint('[SyncService] Ledger reconciliation failed: $e');
       }
-      await _pump();
     }
   }
 
-  Future<void> syncNow() async {
-    // Reset any failed/blocked sync operations to force immediate retry
+  Future<void> _ensureInitialDataLoaded() async {
     try {
-      final resetCount = await db.resetAllPendingSyncOps();
+      final items = await db.getAllItems();
+      final services = await db.getAllServices();
+      final lastCatalogSync = await _oldestLastPulledAt(_pullCursorKeys);
+      final now = DateTime.now().toUtc();
+      final catalogStale =
+          lastCatalogSync == null ||
+          now.difference(lastCatalogSync.toUtc()) > _maxCatalogSyncAge;
+      final needsBootstrap = items.isEmpty && services.isEmpty;
+
+      if (needsBootstrap || catalogStale) {
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Triggering full catalog sync (needsBootstrap: $needsBootstrap, catalogStale: $catalogStale, items: ${items.length}, services: ${services.length})',
+          );
+        }
+        await forceFullResync();
+      } else {
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Catalog warm start (${items.length} items, ${services.length} services) - running delta sync',
+          );
+        }
+        await _pump();
+      }
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (DioAuthUtils.isAuthStatus(status)) {
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Auth required before initial catalog load; '
+            'deferring sync until login.',
+          );
+        }
+        DioAuthUtils.notifySyncDeferred();
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  Future<DateTime?> _oldestLastPulledAt(Iterable<String> keys) async {
+    DateTime? oldest;
+    for (final key in keys) {
+      final value = await db.getLastPulledAt(key);
+      if (value == null) return null;
+      oldest = oldest == null || value.isBefore(oldest) ? value : oldest;
+    }
+    return oldest;
+  }
+
+  /// Test hook: dispatches one sync op without connectivity/rate-limit guards.
+  Future<void> dispatchSyncOpForTest(SyncOp op) async {
+    await _dispatch(op);
+  }
+
+  Future<void> syncNow() async {
+    // Reset only stale failed/blocked sync operations — preserve backoff for
+    // ops that recently failed (e.g. HTTP 429) so we don't hammer the server.
+    try {
+      final resetCount = await db.resetStalePendingSyncOps(
+        const Duration(seconds: 30),
+      );
       if (kDebugMode && resetCount > 0) {
         debugPrint(
-          '[SyncService] Reset $resetCount failed sync operations for immediate retry',
+          '[SyncService] Reset $resetCount stale sync operations for retry',
         );
       }
     } catch (e) {
@@ -96,6 +254,104 @@ class SyncService {
       }
     }
     await _pump();
+  }
+
+  /// Push catalog changes (products, services, variants) immediately.
+  /// When offline, ops remain queued and fire on reconnect.
+  Future<CatalogSyncOutcome> syncCatalogImmediately({bool notify = false}) async {
+    final list = await Connectivity().checkConnectivity();
+    final online = list.any((r) => r != ConnectivityResult.none);
+    if (!online) {
+      _safeAddStatus('Offline — catalog queued');
+      if (notify) DioAuthUtils.notifyCatalogQueued();
+      return CatalogSyncOutcome.queuedOffline;
+    }
+
+    if (_isPumping) {
+      _pumpQueued = true;
+      return CatalogSyncOutcome.skippedBusy;
+    }
+
+    try {
+      await db.resetStalePendingSyncOps(const Duration(seconds: 5));
+    } catch (_) {}
+
+    await unblockRetriableCatalogOps();
+    await _deduplicatePendingCatalogOps();
+    await _pushCatalogOpsOnly();
+
+    try {
+      await pullPosDelta();
+    } catch (e) {
+      if (e is DioException && DioAuthUtils.isAuthError(e)) {
+        DioAuthUtils.notifySyncDeferred();
+      }
+    }
+
+    if (notify) DioAuthUtils.notifyCatalogSynced();
+    return CatalogSyncOutcome.synced;
+  }
+
+  Future<void> _pushCatalogOpsOnly() async {
+    if (_isDisposed) return;
+
+    _isPumping = true;
+    try {
+      _safeAddStatus('Syncing catalog...');
+      final queue = await db.pendingSyncOps(limit: 200);
+      final catalogQueue =
+          queue.where((op) => _catalogOpTypes.contains(op.opType)).toList();
+
+      if (kDebugMode) {
+        debugPrint(
+          '[SyncService] Catalog priority push: ${catalogQueue.length} ops',
+        );
+      }
+
+      for (final op in catalogQueue) {
+        if (!_isDue(op)) continue;
+        try {
+          _safeAddStatus('Pushing ${op.opType.replaceAll('_', ' ')}...');
+          await _dispatch(op);
+          await db.markSynced(op.id);
+          await Future.delayed(const Duration(milliseconds: 200));
+        } on DioException catch (e) {
+          if (DioAuthUtils.isAuthError(e)) {
+            DioAuthUtils.notifySyncDeferred();
+            return;
+          }
+          final errorMsg = _formatSyncError(e);
+          final nextRetry = op.retryCount + 1;
+          if (_shouldBlock(e)) {
+            await db.markSyncBlocked(
+              op.id,
+              retryCount: nextRetry,
+              lastError: errorMsg,
+            );
+          } else {
+            await db.markSyncFailed(
+              op.id,
+              retryCount: nextRetry,
+              lastError: errorMsg,
+            );
+          }
+        } catch (e) {
+          final errorMsg = _formatSyncError(e);
+          await db.markSyncFailed(
+            op.id,
+            retryCount: op.retryCount + 1,
+            lastError: errorMsg,
+          );
+        }
+      }
+    } finally {
+      _isPumping = false;
+      _safeAddStatus('Idle');
+      if (_pumpQueued) {
+        _pumpQueued = false;
+        unawaited(_pump());
+      }
+    }
   }
 
   /// Force a complete resync by clearing all sync cursors and pulling from epoch.
@@ -128,6 +384,13 @@ class SyncService {
 
   Future<void> enqueue(String type, Map<String, dynamic> payload) async {
     await db.enqueueSync(type, jsonEncode(payload));
+    // Trigger immediate pump for sub-second multi-device visibility.
+    // If already pumping, the queued flag ensures a follow-up cycle.
+    if (!_isPumping) {
+      unawaited(_pump());
+    } else {
+      _pumpQueued = true;
+    }
   }
 
   Future<bool> isDeviceContactsOptedIn() async {
@@ -142,21 +405,48 @@ class SyncService {
     );
   }
 
+  Future<DateTime?> lastCrmContactsPullAt() async {
+    final raw = await secureStorage.read(key: _lastCrmContactsPullKey);
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  Future<void> setLastCrmContactsPullAt(DateTime? time) async {
+    if (time == null) {
+      await secureStorage.delete(key: _lastCrmContactsPullKey);
+    } else {
+      await secureStorage.write(
+        key: _lastCrmContactsPullKey,
+        value: time.toUtc().toIso8601String(),
+      );
+    }
+  }
+
   Future<void> _pump() async {
-    if (_isPumping) {
+    if (_isDisposed || _isPumping) {
       _pumpQueued = true;
       return;
     }
 
     _isPumping = true;
-    _syncStatusController.add('Syncing data...');
     try {
+      _safeAddStatus('Syncing data...');
       final List<ConnectivityResult> list = await Connectivity()
           .checkConnectivity();
       final online = list.any((r) => r != ConnectivityResult.none);
       if (!online) return;
 
-      final queue = await db.pendingSyncOps();
+      // Automatically retry blocked catalog ops that may have failed due to
+      // transient issues (duplicate SKU, temporary validation errors, etc.).
+      // This prevents products from being stuck local-only forever.
+      await unblockRetriableCatalogOps();
+
+      // Deduplicate: if the same item/service has multiple pending ops,
+      // keep only the newest one and discard the older redundant ops.
+      await _deduplicatePendingCatalogOps();
+
+      const batchSize = 100;
+      final queue = await db.pendingSyncOps(limit: batchSize);
       if (kDebugMode) {
         debugPrint(
           '[SyncService] Sync queue: ${queue.length} pending operations',
@@ -170,7 +460,9 @@ class SyncService {
         }
       }
 
+      var processedInBatch = 0;
       for (final op in queue) {
+        if (processedInBatch >= batchSize) break;
         if (!_isDue(op)) {
           if (kDebugMode) {
             debugPrint(
@@ -187,17 +479,54 @@ class SyncService {
         }
 
         try {
-          _syncStatusController.add(
+          _safeAddStatus(
             'Pushing ${op.opType.replaceAll('_', ' ')}...',
           );
           await _dispatch(op);
           await db.markSynced(op.id);
+          processedInBatch++;
           if (kDebugMode) {
             debugPrint('[SyncService] ✅ ${op.opType} synced successfully');
+          }
+          // Small delay between ops to avoid request bursts that trigger
+          // server-side rate limiting (seller-write throttle = 120/min).
+          if (processedInBatch < queue.length) {
+            await Future.delayed(const Duration(milliseconds: 300));
           }
         } catch (e) {
           final errorMsg = _formatSyncError(e);
           final nextRetryCount = op.retryCount + 1;
+          const maxRetryCount = 20;
+
+          if (nextRetryCount > maxRetryCount) {
+            final permanentError =
+                'Permanently blocked after $maxRetryCount retries: $errorMsg';
+            await db.markSyncBlocked(
+              op.id,
+              retryCount: nextRetryCount,
+              lastError: permanentError,
+            );
+            if (kDebugMode) {
+              debugPrint(
+                '[SyncService] 🚫 ${op.opType} permanently blocked after $maxRetryCount retries',
+              );
+            }
+            final telemetry = Telemetry.instance;
+            if (telemetry != null) {
+              unawaited(
+                telemetry.event(
+                  'sync_op_permanently_blocked',
+                  props: {
+                    'op_type': op.opType,
+                    'retry_count': nextRetryCount,
+                    'error': errorMsg,
+                  },
+                ),
+              );
+            }
+            continue;
+          }
+
           final blocked = _shouldBlock(e);
 
           if (kDebugMode) {
@@ -233,7 +562,27 @@ class SyncService {
               ),
             );
           }
+          int? statusCode;
+          String? endpoint;
+          if (e is DioException) {
+            statusCode = e.response?.statusCode;
+            endpoint = e.requestOptions.path;
+          }
+          unawaited(
+            BugLogger.instance.logSyncError(
+              operation: op.opType,
+              endpoint: endpoint ?? op.opType,
+              error: e,
+              statusCode: statusCode,
+              retryCount: nextRetryCount,
+            ),
+          );
         }
+      }
+
+      // If we hit the batch limit, queue another pump immediately.
+      if (queue.length >= batchSize) {
+        _pumpQueued = true;
       }
 
       // After pushing, pull server deltas for reconciliation.
@@ -247,8 +596,18 @@ class SyncService {
       try {
         await pullMarketplaceOrders();
       } catch (_) {}
+      if (_bookingsRouteAvailable) {
+        try {
+          await pullServiceBookings();
+        } catch (_) {}
+      }
+
       try {
-        await pullServiceBookings();
+        await pullAvailability();
+      } catch (_) {}
+
+      try {
+        await pullAvailabilityExceptions();
       } catch (_) {}
 
       try {
@@ -262,6 +621,18 @@ class SyncService {
       } catch (_) {
         // Best effort: contacts sync should not block POS sync.
       }
+
+      try {
+        await pullCrmContacts();
+      } catch (_) {
+        // Best effort: CRM pull should not block POS sync.
+      }
+
+      try {
+        await BugReportSync.uploadPending(sellerApi);
+      } catch (_) {
+        // Best effort: feedback upload should not block POS sync.
+      }
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -269,7 +640,7 @@ class SyncService {
       }
     } finally {
       _isPumping = false;
-      _syncStatusController.add('Idle');
+      _safeAddStatus('Idle');
     }
 
     if (_pumpQueued) {
@@ -291,6 +662,130 @@ class SyncService {
     final multiplier = 1 << retryCount.clamp(0, 16);
     final delay = Duration(seconds: base.inSeconds * multiplier);
     return delay > max ? max : delay;
+  }
+
+  /// Enforce a minimum gap between catalog mutations to avoid triggering
+  /// the server's `seller-write` rate limit (120/min).
+  static const _minCatalogMutationGap = Duration(milliseconds: 500);
+
+  Future<void> _enforceCatalogRateLimit() async {
+    final last = _lastCatalogMutationAt;
+    if (last != null) {
+      final elapsed = DateTime.now().toUtc().difference(last);
+      if (elapsed < _minCatalogMutationGap) {
+        final wait = _minCatalogMutationGap - elapsed;
+        await Future.delayed(wait);
+      }
+    }
+    _lastCatalogMutationAt = DateTime.now().toUtc();
+  }
+
+  /// If the same item or service has multiple pending ops in the queue,
+  /// keep only the most recent one and delete the older duplicates.
+  /// This prevents redundant network traffic (e.g. item_update after
+  /// item_create for the same product) and reduces rate-limit pressure.
+  Future<void> _deduplicatePendingCatalogOps() async {
+    const catalogOps = {
+      'item_create',
+      'item_update',
+      'service_create',
+      'service_update',
+    };
+
+    try {
+      final pending = await db.pendingSyncOps();
+      final byLocalId = <String, List<SyncOp>>{};
+
+      for (final op in pending) {
+        if (!catalogOps.contains(op.opType)) continue;
+        try {
+          final payload = jsonDecode(op.payload) as Map<String, dynamic>;
+          final localId = payload['local_id']?.toString();
+          if (localId != null && localId.isNotEmpty) {
+            byLocalId.putIfAbsent('$localId:${op.opType}', () => []).add(op);
+          }
+        } catch (_) {
+          // Malformed payload — skip deduplication for this op.
+        }
+      }
+
+      var deleted = 0;
+      for (final ops in byLocalId.values) {
+        if (ops.length <= 1) continue;
+        // Sort by createdAt ascending; keep the newest.
+        ops.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        for (final old in ops.take(ops.length - 1)) {
+          await db.deleteSyncOp(old.id);
+          deleted++;
+        }
+      }
+
+      if (kDebugMode && deleted > 0) {
+        debugPrint(
+          '[SyncService] Deduplicated $deleted redundant catalog sync ops',
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Catalog deduplication failed: $e');
+      }
+    }
+  }
+
+  /// Reset blocked catalog ops (item_create, item_update, service_create,
+  /// service_update) back to pending so they can be retried automatically.
+  /// Ops are only unblocked if they have not exceeded [maxRetries] and are
+  /// older than [minAgeSinceLastTry]. This prevents hammering the server
+  /// with permanently bad payloads while fixing transient failures.
+  /// Unblocks catalog sync ops that failed transiently so they can be retried
+  /// automatically during the periodic sync pump.
+  /// [maxRetries] and [minAgeSinceLastTry] are overridable for testing.
+  Future<void> unblockRetriableCatalogOps({
+    int maxRetries = 20,
+    Duration minAgeSinceLastTry = const Duration(hours: 1),
+  }) async {
+    const catalogOps = {
+      'item_create',
+      'item_update',
+      'service_create',
+      'service_update',
+    };
+
+    try {
+      final blocked = await db.blockedSyncOps();
+      final now = DateTime.now().toUtc();
+      var unblockedCount = 0;
+
+      for (final op in blocked) {
+        if (!catalogOps.contains(op.opType)) continue;
+        if (op.retryCount >= maxRetries) continue;
+
+        final lastTried = op.lastTriedAt;
+        if (lastTried != null &&
+            now.difference(lastTried) < minAgeSinceLastTry) {
+          continue;
+        }
+
+        await db.setSyncOpPending(op.id);
+        unblockedCount++;
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] ▶️ Unblocked ${op.opType} '
+            '(id: ${op.id}, retry: ${op.retryCount}) for retry',
+          );
+        }
+      }
+
+      if (kDebugMode && unblockedCount > 0) {
+        debugPrint(
+          '[SyncService] Unblocked $unblockedCount catalog ops for retry',
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[SyncService] Failed to unblock catalog ops: $e');
+      }
+    }
   }
 
   Future<void> _pushTemplates() async {
@@ -396,7 +891,10 @@ class SyncService {
     final status = error.response?.statusCode;
     if (status == null) return false;
     if (status >= 500) return false;
+    if (status == 401) return false; // Auth handled by interceptor; allow retry after re-auth.
+    if (status == 404) return false; // Server-side delete or missing resource; don't block forever.
     if (status == 408) return false;
+    if (status == 429) return false; // Rate-limiting is transient; retry with backoff.
     if (status == 409) {
       final data = error.response?.data;
       final msg = (data is Map ? data['message']?.toString() : null) ?? '';
@@ -418,6 +916,21 @@ class SyncService {
     return true;
   }
 
+  bool _isRetryableUploadError(DioException e) {
+    final status = e.response?.statusCode;
+    if (status == 429) return true;
+    if (status != null && status >= 500) return true;
+    if (status == null) return true;
+    final type = e.type;
+    if (type == DioExceptionType.connectionTimeout ||
+        type == DioExceptionType.sendTimeout ||
+        type == DioExceptionType.receiveTimeout ||
+        type == DioExceptionType.connectionError) {
+      return true;
+    }
+    return false;
+  }
+
   Future<int?> _resolveRemoteProductId(dynamic raw) async {
     if (raw == null) return null;
     final asInt = _asNullableInt(raw);
@@ -425,7 +938,49 @@ class SyncService {
     final id = raw.toString().trim();
     if (id.isEmpty) return null;
     final item = await db.getItemById(id);
-    return item?.remoteId ?? _asNullableInt(id);
+    final remoteId = item?.remoteId ?? _asNullableInt(id);
+    if (remoteId != null || item == null) {
+      return remoteId;
+    }
+
+    // Self-heal wedged ledger entries by pushing missing local catalog rows
+    // before retrying the sale.
+    await _enforceCatalogRateLimit();
+    final res = await sellerApi.upsertPosCatalogProduct(
+      _buildDeferredItemCreatePayload(item),
+      idempotencyKey: item.id,
+    );
+    if (res.data is! Map<String, dynamic>) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Invalid product upsert response shape',
+      );
+    }
+    final productId = _asNullableInt(
+      (res.data as Map<String, dynamic>)['product_id'],
+    );
+    if (productId == null) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Missing product_id in product upsert response',
+      );
+    }
+    await db.markItemSyncedWithRemoteId(item.id, productId);
+    await _pushItemVariantStocks(item.id, productId);
+    return productId;
+  }
+
+  Future<int?> _resolveRemoteProductIdByName(String rawName) async {
+    final name = rawName.trim().toLowerCase();
+    if (name.isEmpty) return null;
+    final items = await db.getAllItems();
+    for (final item in items) {
+      if (item.name.trim().toLowerCase() != name) continue;
+      if (item.remoteId != null) return item.remoteId;
+      final resolved = await _resolveRemoteProductId(item.id);
+      if (resolved != null) return resolved;
+    }
+    return null;
   }
 
   Future<int?> _resolveRemoteServiceId(dynamic raw) async {
@@ -435,7 +990,161 @@ class SyncService {
     final id = raw.toString().trim();
     if (id.isEmpty) return null;
     final service = await db.getServiceById(id);
-    return service?.remoteId ?? _asNullableInt(id);
+    final remoteId = service?.remoteId ?? _asNullableInt(id);
+    if (remoteId != null || service == null) {
+      return remoteId;
+    }
+
+    await _enforceCatalogRateLimit();
+    final res = await sellerApi.createService(
+      _buildDeferredServiceCreatePayload(service),
+      idempotencyKey: service.id,
+    );
+    if (res.data is! Map) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Invalid service create response shape',
+      );
+    }
+    final body = Map<String, dynamic>.from(res.data as Map);
+    final data = body['data'];
+    final serviceId = data is Map
+        ? _asNullableInt(data['id'])
+        : _asNullableInt(body['id']);
+    if (serviceId == null) {
+      throw DioException(
+        requestOptions: res.requestOptions,
+        error: 'Missing service id in create response',
+      );
+    }
+    await db.markServiceSyncedWithRemoteId(service.id, serviceId);
+    return serviceId;
+  }
+
+  Future<int?> _resolveRemoteServiceIdByTitle(String rawTitle) async {
+    final title = rawTitle.trim().toLowerCase();
+    if (title.isEmpty) return null;
+    final services = await db.getAllServices();
+    for (final service in services) {
+      if (service.title.trim().toLowerCase() != title) continue;
+      if (service.remoteId != null) return service.remoteId;
+      final resolved = await _resolveRemoteServiceId(service.id);
+      if (resolved != null) return resolved;
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _buildDeferredItemCreatePayload(Item item) {
+    final payload = <String, dynamic>{
+      'name': item.name,
+      'unit_price': item.price,
+      if (item.cost != null) 'purchase_price': item.cost,
+      'current_stock': item.stockQty,
+      'published': item.publishedOnline,
+      'unit': (item.unit ?? '').trim().isEmpty ? 'pc' : item.unit,
+      'min_qty': item.minPurchaseQty,
+      'refundable': item.refundable,
+      'cash_on_delivery': item.cashOnDelivery,
+    };
+    if (item.categoryId != null) {
+      payload['category_id'] = item.categoryId;
+    }
+    if (item.brandId != null) {
+      payload['brand_id'] = item.brandId;
+    }
+    if (item.weight != null) {
+      payload['weight'] = item.weight;
+    }
+    if ((item.description ?? '').trim().isNotEmpty) {
+      payload['description'] = item.description!.trim();
+    }
+    if ((item.sku ?? '').trim().isNotEmpty) {
+      payload['sku'] = item.sku!.trim();
+    }
+    if ((item.barcode ?? '').trim().isNotEmpty) {
+      payload['barcode'] = item.barcode!.trim();
+    }
+    if (item.discount != null) {
+      payload['discount'] = item.discount;
+      payload['discount_type'] = item.discountType == 'flat'
+          ? 'amount'
+          : 'percent';
+    }
+    if (item.shippingDays != null) {
+      payload['est_shipping_days'] = item.shippingDays;
+    }
+    if (item.shippingFee != null) {
+      payload['shipping_cost'] = item.shippingFee;
+    }
+    if (item.lowStockWarning != null) {
+      payload['low_stock_quantity'] = item.lowStockWarning;
+    }
+    return payload;
+  }
+
+  Map<String, dynamic> _buildDeferredServiceCreatePayload(Service service) {
+    final packages = _servicePackagesPayload(service);
+    return {
+      'title': service.title,
+      if ((service.summary ?? '').trim().isNotEmpty)
+        'summary': service.summary!.trim(),
+      if ((service.description ?? '').trim().isNotEmpty)
+        'description': service.description!.trim(),
+      'base_price': service.price,
+      if (service.cost != null) 'purchase_price': service.cost,
+      if (service.categoryId != null) 'category_id': service.categoryId,
+      if ((service.serviceType ?? '').trim().isNotEmpty)
+        'service_type': service.serviceType!.trim(),
+      if ((service.deliveryTimeframe ?? '').trim().isNotEmpty)
+        'delivery_timeframe': service.deliveryTimeframe!.trim(),
+      if (service.durationMinutes != null)
+        'duration_minutes': service.durationMinutes,
+      if (packages.isNotEmpty) 'packages': packages,
+      'is_published': service.publishedOnline,
+    };
+  }
+
+  Future<void> _applyServiceApiResponse(
+    String localId,
+    Map<String, dynamic> body,
+  ) async {
+    final data = body['data'];
+    if (data is! Map) return;
+
+    final dataMap = Map<String, dynamic>.from(data);
+    final update = parseServiceModerationFromApiResponse(body);
+
+    await db.updateServiceFields(
+      localId,
+      ServicesCompanion(
+        moderationStatus: update.moderationStatus != null
+            ? drift.Value(update.moderationStatus)
+            : const drift.Value.absent(),
+        publishedOnline: update.publishedOnline != null
+            ? drift.Value(update.publishedOnline!)
+            : const drift.Value.absent(),
+        slug: dataMap['slug'] != null
+            ? drift.Value(dataMap['slug'].toString())
+            : const drift.Value.absent(),
+        updatedAt: drift.Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _servicePackagesPayload(Service service) {
+    if ((service.pricingPackages ?? '').trim().isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(service.pricingPackages!.trim());
+      if (decoded is! List) return const {};
+      final tiers = decoded
+          .whereType<Map>()
+          .map((e) => ServicePricingTier.fromJson(Map<String, dynamic>.from(e)))
+          .where((t) => t.tier.isNotEmpty)
+          .toList();
+      return pricingPackagesForApi(tiers);
+    } catch (_) {
+      return const {};
+    }
   }
 
   String? _toApiDiscountType(dynamic raw) {
@@ -463,30 +1172,62 @@ class SyncService {
       );
     }
 
-    final res = await sellerApi.uploadSellerFile(file);
-    if (res.data is! Map<String, dynamic>) {
-      throw DioException(
-        requestOptions: res.requestOptions,
-        error: 'Invalid upload response shape',
-      );
+    const maxUploadRetries = 3;
+    for (var attempt = 0; attempt <= maxUploadRetries; attempt++) {
+      try {
+        final res = await sellerApi.uploadSellerFile(file);
+        if (res.data is! Map<String, dynamic>) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Invalid upload response shape',
+          );
+        }
+        final data = res.data as Map<String, dynamic>;
+        final ok = _asBool(data['result']);
+        if (!ok) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: data['message']?.toString() ?? 'Upload failed',
+          );
+        }
+        final id = _asNullableInt(data['id']);
+        final url = data['url']?.toString();
+        if (id == null || url == null || url.trim().isEmpty) {
+          throw DioException(
+            requestOptions: res.requestOptions,
+            error: 'Upload succeeded but missing id/url',
+          );
+        }
+        return {'id': id, 'url': url};
+      } on DioException catch (e) {
+        final status = e.response?.statusCode;
+        final isRateLimited = status == 429;
+        final isServerError = status != null && status >= 500;
+        final isNetworkError = status == null ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError;
+        final shouldRetry = isRateLimited || isServerError || isNetworkError;
+        if (shouldRetry && attempt < maxUploadRetries) {
+          final delay = Duration(seconds: 2 * (attempt + 1));
+          if (kDebugMode) {
+            debugPrint(
+              '[SyncService] Image upload rate-limited (attempt ${attempt + 1}/'
+              '${maxUploadRetries + 1}), retrying in ${delay.inSeconds}s...',
+            );
+          }
+          await Future.delayed(delay);
+          continue;
+        }
+        rethrow;
+      }
     }
-    final data = res.data as Map<String, dynamic>;
-    final ok = _asBool(data['result']);
-    if (!ok) {
-      throw DioException(
-        requestOptions: res.requestOptions,
-        error: data['message']?.toString() ?? 'Upload failed',
-      );
-    }
-    final id = _asNullableInt(data['id']);
-    final url = data['url']?.toString();
-    if (id == null || url == null || url.trim().isEmpty) {
-      throw DioException(
-        requestOptions: res.requestOptions,
-        error: 'Upload succeeded but missing id/url',
-      );
-    }
-    return {'id': id, 'url': url};
+    // Should never reach here; all retries exhausted.
+    throw DioException(
+      requestOptions: RequestOptions(path: 'file/upload'),
+      error: 'Image upload failed after $maxUploadRetries retries',
+    );
   }
 
   List<String> _decodeStringList(String? raw) {
@@ -535,6 +1276,8 @@ class SyncService {
     for (final s in variants) {
       final variant = s.variant.trim();
       if (variant.isEmpty) continue;
+
+      await _enforceCatalogRateLimit();
 
       int? uploadId = s.imageUploadId;
       final imagePathOrUrl = (s.imageUrl ?? '').trim();
@@ -630,10 +1373,10 @@ class SyncService {
             ? listRaw.first
             : null;
         if (first is Map) {
-          await db.upsertCachedOrder(
-            orderId,
-            jsonEncode(Map<String, dynamic>.from(first)),
+          final details = MarketplaceOrder.fromJson(
+            Map<String, dynamic>.from(first),
           );
+          await _upsertMergedCachedOrder(details);
         }
       } catch (_) {}
       return;
@@ -704,6 +1447,10 @@ class SyncService {
           if (remoteId != null) 'product_id': remoteId,
           'name': (payload['name'] ?? item?.name ?? '').toString(),
           'unit_price': _asDouble(payload['unit_price'] ?? item?.price ?? 0),
+          if (payload['purchase_price'] != null || item?.cost != null)
+            'purchase_price': _asDouble(
+              payload['purchase_price'] ?? item?.cost ?? 0,
+            ),
           'current_stock': _asInt(
             payload['current_stock'] ?? item?.stockQty ?? 0,
           ),
@@ -788,19 +1535,36 @@ class SyncService {
                   thumbPathOrUrl.startsWith('https://'))) {
             final file = File(thumbPathOrUrl);
             if (file.existsSync()) {
-              final uploaded = await _uploadImageFile(thumbPathOrUrl);
-              thumbUploadId = uploaded['id'] as int;
-              final url = uploaded['url'] as String;
-              await db.updateItemFields(
-                localId,
-                ItemsCompanion(
-                  thumbnailUploadId: drift.Value(thumbUploadId),
-                  thumbnailUrl: drift.Value(url),
-                  imageUrl: drift.Value(url),
-                ),
-              );
+              try {
+                final uploaded = await _uploadImageFile(thumbPathOrUrl);
+                thumbUploadId = uploaded['id'] as int;
+                final url = uploaded['url'] as String;
+                await db.updateItemFields(
+                  localId,
+                  ItemsCompanion(
+                    thumbnailUploadId: drift.Value(thumbUploadId),
+                    thumbnailUrl: drift.Value(url),
+                    imageUrl: drift.Value(url),
+                  ),
+                );
+              } on DioException catch (e) {
+                if (_isRetryableUploadError(e)) {
+                  rethrow;
+                }
+                // Non-retryable upload error (e.g. 4xx validation failure).
+                // Preserve the local path so the next sync cycle can retry
+                // the upload; only proceed without the image this cycle.
+                debugPrint(
+                  '[SyncService] Thumbnail upload failed for $localId '
+                  '(status ${e.response?.statusCode}): ${e.error}. '
+                  'Local path preserved — will retry on next sync.',
+                );
+              }
             } else {
-              // Drop missing local file to avoid a stuck sync loop.
+              // File was deleted externally — clear it to unblock sync.
+              debugPrint(
+                '[SyncService] Thumbnail file missing for $localId, clearing path.',
+              );
               await db.updateItemFields(
                 localId,
                 ItemsCompanion(
@@ -856,8 +1620,16 @@ class SyncService {
                     galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
                   ),
                 );
-              } catch (_) {
-                // Keep for retry.
+              } on DioException catch (e) {
+                if (_isRetryableUploadError(e)) {
+                  rethrow; // Let outer retry handle it
+                }
+                // Non-retryable: keep path in queue so the next sync can
+                // retry (e.g. after a backend fix or reconnect).
+                debugPrint(
+                  '[SyncService] Gallery upload failed for $localId path=$path '
+                  '(status ${e.response?.statusCode}): ${e.error}. Keeping for retry.',
+                );
               }
             }
             if (mutated) {
@@ -932,6 +1704,7 @@ class SyncService {
         break;
       case 'service_create':
       case 'service_update':
+        await _enforceCatalogRateLimit();
         final localId = payload['local_id']?.toString().trim();
         if (localId == null || localId.isEmpty) {
           throw DioException(
@@ -961,11 +1734,25 @@ class SyncService {
             payload['base_price'] ?? payload['price'] ?? 0,
           );
         }
+        if (payload.containsKey('purchase_price')) {
+          mappedPayload['purchase_price'] = _asDouble(
+            payload['purchase_price'],
+          );
+        }
         if (payload['currency'] != null) {
           mappedPayload['currency'] = payload['currency'];
         }
         if (payload['category_id'] != null) {
           mappedPayload['category_id'] = payload['category_id'];
+        }
+        if (payload['service_type'] != null) {
+          mappedPayload['service_type'] = payload['service_type'];
+        }
+        if (payload['delivery_timeframe'] != null) {
+          mappedPayload['delivery_timeframe'] = payload['delivery_timeframe'];
+        }
+        if (payload['packages'] is Map) {
+          mappedPayload['packages'] = payload['packages'];
         }
 
         final durationRaw = payload['duration_minutes'] ?? payload['duration'];
@@ -978,6 +1765,121 @@ class SyncService {
           mappedPayload['is_published'] = _asBool(
             payload['is_published'] ?? payload['published'],
           );
+        }
+
+        // Upload service cover + gallery images if present and local.
+        final svc = await db.getServiceById(localId);
+        if (svc != null) {
+          var coverUploadId = svc.coverUploadId;
+          final imagePath =
+              (svc.imageUrl ?? payload['image_url']?.toString())?.trim();
+          if (imagePath != null &&
+              imagePath.isNotEmpty &&
+              !imagePath.startsWith('http')) {
+            final file = File(imagePath);
+            if (file.existsSync()) {
+              _safeAddStatus('Uploading service photo…');
+              try {
+                final uploaded = await _uploadImageFile(imagePath);
+                coverUploadId = uploaded['id'] as int;
+                final remoteUrl = uploaded['url'] as String;
+                mappedPayload['cover_image_id'] = coverUploadId;
+                await db.updateServiceFields(
+                  localId,
+                  ServicesCompanion(
+                    imageUrl: drift.Value(remoteUrl),
+                    coverUploadId: drift.Value(coverUploadId),
+                  ),
+                );
+              } on DioException catch (e) {
+                if (_isRetryableUploadError(e)) {
+                  rethrow;
+                }
+                debugPrint(
+                  '[SyncService] Service image upload failed for $localId '
+                  '(status ${e.response?.statusCode}): ${e.error}. '
+                  'Local path preserved — will retry on next sync.',
+                );
+              }
+            }
+          } else if (coverUploadId != null) {
+            mappedPayload['cover_image_id'] = coverUploadId;
+          }
+
+          final urlsAll = _decodeStringList(svc.galleryUrls);
+          final idsAll = _decodeIntList(svc.galleryUploadIds);
+          final remoteCount = idsAll.length < urlsAll.length
+              ? idsAll.length
+              : urlsAll.length;
+          final remoteUrls = urlsAll.take(remoteCount).toList();
+          final remoteIds = idsAll.take(remoteCount).toList();
+          final pending = urlsAll
+              .skip(remoteCount)
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+
+          if (pending.isNotEmpty) {
+            final pendingQueue = List<String>.from(pending);
+            var mutated = false;
+            for (final path in List<String>.from(pendingQueue)) {
+              if (path.startsWith('http://') || path.startsWith('https://')) {
+                continue;
+              }
+              final file = File(path);
+              if (!file.existsSync()) {
+                pendingQueue.remove(path);
+                mutated = true;
+                continue;
+              }
+              try {
+                final uploaded = await _uploadImageFile(path);
+                remoteIds.add(uploaded['id'] as int);
+                remoteUrls.add(uploaded['url'] as String);
+                pendingQueue.remove(path);
+                mutated = true;
+                await db.updateServiceFields(
+                  localId,
+                  ServicesCompanion(
+                    galleryUrls: drift.Value(
+                      jsonEncode([...remoteUrls, ...pendingQueue]),
+                    ),
+                    galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
+                  ),
+                );
+              } on DioException catch (e) {
+                if (_isRetryableUploadError(e)) {
+                  rethrow;
+                }
+                debugPrint(
+                  '[SyncService] Service gallery upload failed for $localId '
+                  '(status ${e.response?.statusCode}): ${e.error}.',
+                );
+              }
+            }
+            if (mutated) {
+              final refreshed = await db.getServiceById(localId);
+              if (refreshed != null) {
+                final refreshedUrls = _decodeStringList(refreshed.galleryUrls);
+                final refreshedIds = _decodeIntList(refreshed.galleryUploadIds);
+                final refreshedCount = refreshedIds.length < refreshedUrls.length
+                    ? refreshedIds.length
+                    : refreshedUrls.length;
+                remoteUrls
+                  ..clear()
+                  ..addAll(refreshedUrls.take(refreshedCount));
+                remoteIds
+                  ..clear()
+                  ..addAll(refreshedIds.take(refreshedCount));
+              }
+            }
+          }
+
+          final hasGallery =
+              svc.galleryUrls != null || svc.galleryUploadIds != null;
+          if (remoteIds.isNotEmpty || hasGallery) {
+            mappedPayload['gallery_media'] = remoteIds;
+          }
         }
 
         if (op.opType == 'service_create') {
@@ -1006,6 +1908,7 @@ class SyncService {
             );
           }
           await db.markServiceSyncedWithRemoteId(localId, remoteId);
+          await _applyServiceApiResponse(localId, body);
         } else {
           final remoteId =
               _asNullableInt(payload['remote_id']) ??
@@ -1016,8 +1919,17 @@ class SyncService {
               error: 'Service not synced yet for service_update',
             );
           }
-          await sellerApi.updateService(remoteId.toString(), mappedPayload);
+          final res = await sellerApi.updateService(
+            remoteId.toString(),
+            mappedPayload,
+          );
           await db.markServiceSynced(localId);
+          if (res.data is Map) {
+            await _applyServiceApiResponse(
+              localId,
+              Map<String, dynamic>.from(res.data as Map),
+            );
+          }
         }
         break;
       case 'service_delete':
@@ -1083,7 +1995,11 @@ class SyncService {
 
             final productRaw = line['product_id'];
             if (productRaw != null && productRaw.toString().trim().isNotEmpty) {
-              final resolved = await _resolveRemoteProductId(productRaw);
+              final resolved =
+                  await _resolveRemoteProductId(productRaw) ??
+                  await _resolveRemoteProductIdByName(
+                    (line['name'] ?? line['title'] ?? '').toString(),
+                  );
               if (resolved == null) {
                 throw DioException(
                   requestOptions: RequestOptions(path: op.opType),
@@ -1097,7 +2013,11 @@ class SyncService {
 
             final serviceRaw = line['service_id'];
             if (serviceRaw != null && serviceRaw.toString().trim().isNotEmpty) {
-              final resolved = await _resolveRemoteServiceId(serviceRaw);
+              final resolved =
+                  await _resolveRemoteServiceId(serviceRaw) ??
+                  await _resolveRemoteServiceIdByTitle(
+                    (line['name'] ?? line['title'] ?? '').toString(),
+                  );
               if (resolved == null) {
                 throw DioException(
                   requestOptions: RequestOptions(path: op.opType),
@@ -1112,61 +2032,6 @@ class SyncService {
             updated.add(line);
           }
           body['lines'] = updated;
-        }
-
-        if (type == 'sale') {
-          final saleBody = {
-            'terminal_transaction_id': body['entry_id'],
-            'receipt_number':
-                body['receipt_number'], // Only if available in payload, otherwise backend handles null
-            'sale_date': body['occurred_at'],
-            'subtotal': body['subtotal'],
-            'discount': body['discount'],
-            'tax': body['tax'],
-            'total': body['total'],
-            'payment_method':
-                (body['payments'] as List?)?.firstOrNull?['method'] ?? 'cash',
-            'status': 'paid',
-            'customer_name':
-                body['customer_name'], // Check validity if available
-            'notes': body['note'],
-            'items': (body['lines'] as List)
-                .map(
-                  (l) => <String, dynamic>{
-                    if (l['product_id'] != null)
-                      'product_id': l['product_id'].toString(),
-                    if (l['service_id'] != null)
-                      'service_id': l['service_id'].toString(),
-                    'title': l['name'],
-                    if (l['variation'] != null) 'variation': l['variation'],
-                    'quantity': l['quantity'],
-                    'price': l['price'],
-                    'total': l['subtotal'],
-                  },
-                )
-                .toList(),
-          };
-
-          try {
-            final res = await sellerApi.createPosTransaction(saleBody);
-            final remoteId = (res.data is Map) ? res.data['id'] : null;
-
-            final entryId = payload['entry_id']?.toString();
-            if (entryId != null) {
-              await db.markLedgerSynced(
-                entryId,
-                jsonEncode({
-                  'server_entry_id': remoteId,
-                  'idempotency_key': key,
-                  'received_at': DateTime.now().toIso8601String(),
-                }),
-              );
-            }
-            break;
-          } catch (e) {
-            // If specific error, handle it. Otherwise rethrow to retry later.
-            rethrow;
-          }
         }
 
         final res = await sellerApi.pushLedgerEntry(body, idempotencyKey: key);
@@ -1745,17 +2610,25 @@ class SyncService {
             payload['id'] ?? payload['variant_id'] ?? payload['local_id'];
         final serviceIdRaw = payload['service_id'] ?? payload['serviceId'];
         final variantId = variantIdRaw?.toString().trim() ?? '';
-        final serviceId = serviceIdRaw?.toString().trim() ?? '';
-        if (variantId.isEmpty || serviceId.isEmpty) {
+        final localServiceId = serviceIdRaw?.toString().trim() ?? '';
+        if (variantId.isEmpty || localServiceId.isEmpty) {
           throw DioException(
             requestOptions: RequestOptions(path: op.opType),
             error: 'Missing id/service_id for service variant push',
           );
         }
 
+        final remoteServiceId = await _resolveRemoteServiceId(localServiceId);
+        if (remoteServiceId == null) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Service not synced yet for service variant push',
+          );
+        }
+
         final mapped = <String, dynamic>{
           'id': variantId,
-          'service_id': serviceId,
+          'service_id': remoteServiceId,
           'name': payload['name'],
           'price': payload['price'],
           'unit': payload['unit'],
@@ -1930,8 +2803,7 @@ class SyncService {
             error: 'Missing idempotency_key for shift',
           );
         }
-        final body = Map<String, dynamic>.from(payload)
-          ..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload);
         await sellerApi.pushShift(body, idempotencyKey: key);
         final shiftId =
             payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
@@ -1951,8 +2823,7 @@ class SyncService {
             error: 'Missing idempotency_key for shift close',
           );
         }
-        final body = Map<String, dynamic>.from(payload)
-          ..remove('idempotency_key');
+        final body = Map<String, dynamic>.from(payload);
         await sellerApi.closeShift(body, idempotencyKey: key);
         final shiftId =
             payload['shift_id']?.toString() ?? payload['id']?.toString() ?? '';
@@ -2032,6 +2903,48 @@ class SyncService {
           ..remove('idempotency_key');
         await sellerApi.pushPackageRedemption(body, idempotencyKey: key);
         break;
+      case 'job_session_complete':
+        await sellerApi.createServiceTimeLog(Map<String, dynamic>.from(payload));
+        break;
+      case 'booking_create':
+        await sellerApi.createServiceBooking(Map<String, dynamic>.from(payload));
+        break;
+      case 'booking_reschedule':
+        final bookingId = payload['booking_id'] as int?;
+        if (bookingId == null) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing booking_id for reschedule',
+          );
+        }
+        final body = Map<String, dynamic>.from(payload)..remove('booking_id');
+        await sellerApi.rescheduleServiceBooking(bookingId, body);
+        break;
+      case 'availability_update':
+        final schedules = payload['schedules'];
+        if (schedules is! List) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing schedules for availability_update',
+          );
+        }
+        await sellerApi.updateAvailability(
+          List<Map<String, dynamic>>.from(schedules),
+        );
+        break;
+      case 'availability_exception_create':
+        await sellerApi.addAvailabilityException(Map<String, dynamic>.from(payload));
+        break;
+      case 'availability_exception_delete':
+        final remoteId = payload['remote_id'] as int?;
+        if (remoteId == null) {
+          throw DioException(
+            requestOptions: RequestOptions(path: op.opType),
+            error: 'Missing remote_id for availability_exception_delete',
+          );
+        }
+        await sellerApi.deleteAvailabilityException(remoteId);
+        break;
       default:
         throw DioException(
           requestOptions: RequestOptions(path: op.opType),
@@ -2047,20 +2960,13 @@ class SyncService {
     return _pullInFlight!;
   }
 
-  Future<void> _pullPosDeltaInternal() async {
+  Future<void> _pullPosDeltaInternal({bool allowCatalogRepair = true}) async {
     try {
-      final productsSince = await db.getLastPulledAt('products');
-      final servicesSince = await db.getLastPulledAt('services');
-      final customersSince = await db.getLastPulledAt('customers');
-      final configSince = await db.getLastPulledAt('config');
-
       DateTime since = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-      final cursors = [
-        productsSince,
-        servicesSince,
-        customersSince,
-        configSince,
-      ];
+      final cursors = <DateTime?>[];
+      for (final key in _pullCursorKeys) {
+        cursors.add(await db.getLastPulledAt(key));
+      }
       if (cursors.every((c) => c != null)) {
         since = cursors.cast<DateTime>().reduce(
           (a, b) => a.isBefore(b) ? a : b,
@@ -2113,7 +3019,7 @@ class SyncService {
         );
       }
 
-      _syncStatusController.add('Syncing products...');
+      _safeAddStatus('Syncing products...');
       if (pull.products.isEmpty) {
         if (kDebugMode) {
           debugPrint('[SyncService] WARNING: No products in sync response!');
@@ -2144,6 +3050,9 @@ class SyncService {
                 : const drift.Value.absent(),
             name: p.name.isEmpty ? 'Product' : p.name,
             price: displayPrice,
+            cost: p.purchasePrice != null
+                ? drift.Value(p.purchasePrice)
+                : const drift.Value.absent(),
             stockQty: drift.Value(displayStock),
             imageUrl: drift.Value(p.imageUrl),
             thumbnailUrl: (p.thumbnailUrl ?? p.imageUrl) != null
@@ -2262,6 +3171,25 @@ class SyncService {
             ? await db.getServiceByRemoteId(remoteId)
             : null;
         final localId = existing?.id ?? s.id;
+        final pricingPackagesJson = s.pricingPackages.isNotEmpty
+            ? jsonEncode(
+                s.pricingPackages
+                    .map(
+                      (pkg) => {
+                        'tier': pkg['tier'],
+                        'remote_id': pkg['id'],
+                        'price': pkg['price'],
+                        if (pkg['delivery_days'] != null)
+                          'delivery_days': pkg['delivery_days'],
+                        if (pkg['revisions'] != null) 'revisions': pkg['revisions'],
+                        if (pkg['description'] != null)
+                          'description': pkg['description'],
+                      },
+                    )
+                    .toList(),
+              )
+            : null;
+
         await db.upsertService(
           ServicesCompanion.insert(
             id: drift.Value(localId),
@@ -2270,9 +3198,32 @@ class SyncService {
                 : const drift.Value.absent(),
             title: s.title.isEmpty ? 'Service' : s.title,
             price: s.price,
+            cost: s.purchasePrice != null
+                ? drift.Value(s.purchasePrice)
+                : const drift.Value.absent(),
             description: drift.Value(s.description),
             imageUrl: drift.Value(s.imageUrl),
+            coverUploadId: s.coverUploadId != null
+                ? drift.Value(s.coverUploadId)
+                : const drift.Value.absent(),
+            galleryUrls: s.galleryUrls.isNotEmpty
+                ? drift.Value(jsonEncode(s.galleryUrls))
+                : const drift.Value.absent(),
+            galleryUploadIds: s.photoUploadIds.isNotEmpty
+                ? drift.Value(jsonEncode(s.photoUploadIds))
+                : const drift.Value.absent(),
             durationMinutes: drift.Value(s.durationMinutes),
+            categoryId: s.categoryId != null
+                ? drift.Value(s.categoryId)
+                : const drift.Value.absent(),
+            summary: drift.Value(s.summary),
+            serviceType: drift.Value(s.serviceType),
+            deliveryTimeframe: drift.Value(s.deliveryTimeframe),
+            moderationStatus: drift.Value(s.moderationStatus),
+            slug: drift.Value(s.slug),
+            pricingPackages: pricingPackagesJson != null
+                ? drift.Value(pricingPackagesJson)
+                : const drift.Value.absent(),
             category: drift.Value(s.category),
             publishedOnline: drift.Value(s.published),
             updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
@@ -2318,7 +3269,7 @@ class SyncService {
             );
       }
 
-      _syncStatusController.add('Syncing customers...');
+      _safeAddStatus('Syncing customers...');
       for (final c in pull.customers) {
         if (c.id.isEmpty) continue;
         final existingById = await db.getCustomerById(c.id);
@@ -2340,7 +3291,7 @@ class SyncService {
         );
       }
 
-      _syncStatusController.add('Syncing suppliers...');
+      _safeAddStatus('Syncing suppliers...');
       for (final s in pull.suppliers) {
         if (s.id <= 0) continue;
         await db.upsertSupplier(
@@ -2358,32 +3309,35 @@ class SyncService {
         );
       }
 
-      _syncStatusController.add('Syncing expenses...');
+      _safeAddStatus('Syncing expenses...');
       // Sync expense categories if receiving full snapshot or if relevant
       try {
-        final categoriesRes = await sellerApi.fetchExpenseCategories();
-        final categoriesData = categoriesRes.data;
-        final categoriesList =
-            (categoriesData is Map ? categoriesData['data'] : categoriesData)
-                as List?;
+        final posToken = await secureStorage.readPosSessionToken();
+        if (posToken != null && posToken.trim().isNotEmpty) {
+          final categoriesRes = await sellerApi.fetchExpenseCategories();
+          final categoriesData = categoriesRes.data;
+          final categoriesList =
+              (categoriesData is Map ? categoriesData['data'] : categoriesData)
+                  as List?;
 
-        if (categoriesList != null) {
-          _syncStatusController.add('Syncing expense categories...');
-          for (final c in categoriesList) {
-            if (c is! Map) continue;
-            final name = c['name']?.toString() ?? '';
-            if (name.isNotEmpty) {
-              await db.deleteLocalTemporaryCategory(name);
+          if (categoriesList != null) {
+            _safeAddStatus('Syncing expense categories...');
+            for (final c in categoriesList) {
+              if (c is! Map) continue;
+              final name = c['name']?.toString() ?? '';
+              if (name.isNotEmpty) {
+                await db.deleteLocalTemporaryCategory(name);
+              }
+              await db.upsertExpenseCategory(
+                ExpenseCategoriesCompanion(
+                  id: drift.Value(_asInt(c['id'])),
+                  name: drift.Value(name),
+                  type: drift.Value(c['type']?.toString() ?? 'expense'),
+                  isActive: drift.Value(_asBool(c['is_active'])),
+                  updatedAt: drift.Value(DateTime.now().toUtc()),
+                ),
+              );
             }
-            await db.upsertExpenseCategory(
-              ExpenseCategoriesCompanion(
-                id: drift.Value(_asInt(c['id'])),
-                name: drift.Value(name),
-                type: drift.Value(c['type']?.toString() ?? 'expense'),
-                isActive: drift.Value(_asBool(c['is_active'])),
-                updatedAt: drift.Value(DateTime.now().toUtc()),
-              ),
-            );
           }
         }
       } catch (e) {
@@ -2431,7 +3385,7 @@ class SyncService {
       }
 
       // Sync quotations (pulled from server)
-      _syncStatusController.add('Syncing quotations...');
+      _safeAddStatus('Syncing quotations...');
       for (final q in pull.quotations) {
         if (q.id.isEmpty) continue;
 
@@ -2454,14 +3408,14 @@ class SyncService {
       }
 
       // Sync customer packages
-      _syncStatusController.add('Syncing packages...');
+      _safeAddStatus('Syncing packages...');
       for (final p in pull.customerPackages) {
-        if (p.id <= 0) continue;
+        if (p.id.isEmpty) continue;
         await db
             .into(db.customerPackages)
             .insertOnConflictUpdate(
               CustomerPackagesCompanion(
-                id: drift.Value(p.id.toString()),
+                id: drift.Value(p.id),
                 packageId: drift.Value(p.packageId),
                 customerId: drift.Value(p.customerId),
                 remainingSessions: drift.Value(p.remainingSessions),
@@ -2473,13 +3427,13 @@ class SyncService {
 
       // Sync redemptions
       for (final r in pull.packageRedemptions) {
-        if (r.id <= 0) continue;
+        if (r.id.isEmpty) continue;
         await db
             .into(db.packageRedemptions)
             .insertOnConflictUpdate(
               PackageRedemptionsCompanion(
-                id: drift.Value(r.id.toString()),
-                customerPackageId: drift.Value(r.customerPackageId.toString()),
+                id: drift.Value(r.id),
+                customerPackageId: drift.Value(r.customerPackageId),
                 sessionsUsed: drift.Value(r.sessionsUsed),
                 note: drift.Value(r.note),
                 synced: const drift.Value(true),
@@ -2488,7 +3442,7 @@ class SyncService {
       }
 
       // Sync shifts (pulled from server)
-      _syncStatusController.add('Syncing shifts...');
+      _safeAddStatus('Syncing shifts...');
       for (final s in pull.shifts) {
         if (s.id.isEmpty) continue;
 
@@ -2509,7 +3463,7 @@ class SyncService {
       }
 
       // Sync cash movements (pulled from server)
-      _syncStatusController.add('Syncing cash movements...');
+      _safeAddStatus('Syncing cash movements...');
       for (final m in pull.cashMovements) {
         if (m.id <= 0) continue;
         final key = m.idempotencyKey.trim();
@@ -2580,7 +3534,7 @@ class SyncService {
             );
       }
 
-      _syncStatusController.add('Syncing settings...');
+      _safeAddStatus('Syncing settings...');
       for (final setting in pull.settings) {
         if (setting.key.isEmpty) continue;
         await db.upsertAppSetting(
@@ -2607,7 +3561,7 @@ class SyncService {
 
       final businessProfile = pull.businessProfile;
       if (businessProfile != null && businessProfile.shopName.isNotEmpty) {
-        _syncStatusController.add('Syncing business profile...');
+        _safeAddStatus('Syncing business profile...');
         await db.upsertBusinessProfile(
           BusinessProfilesCompanion.insert(
             id: kPrimaryBusinessProfileId,
@@ -2671,6 +3625,17 @@ class SyncService {
             synced: const drift.Value(true),
           ),
         );
+        // Cache verification status separately for easy UI access
+        if (businessProfile.verificationStatus != null) {
+          await db.upsertAppSetting(
+            AppSettingsCompanion(
+              key: const drift.Value('shop_verification_status'),
+              valueJson: drift.Value(
+                businessProfile.verificationStatus.toString(),
+              ),
+            ),
+          );
+        }
       }
 
       for (final t in pull.receiptTemplates) {
@@ -2713,7 +3678,7 @@ class SyncService {
             );
       }
 
-      _syncStatusController.add('Syncing transactions...');
+      _safeAddStatus('Syncing transactions...');
       for (final e in pull.ledgerEntries) {
         if (e.clientEntryId.isEmpty) continue;
 
@@ -2769,7 +3734,7 @@ class SyncService {
       }
 
       if (pull.sellerProfile != null) {
-        _syncStatusController.add('Syncing profile...');
+        _safeAddStatus('Syncing profile...');
         await secureStorage.write(
           key: 'seller_profile',
           value: jsonEncode({
@@ -2782,23 +3747,88 @@ class SyncService {
         );
       }
 
-      await Future.wait([
-        db.setLastPulledAt('products', pull.receivedAt),
-        db.setLastPulledAt('services', pull.receivedAt),
-        db.setLastPulledAt('customers', pull.receivedAt),
-        db.setLastPulledAt('business_profile', pull.receivedAt),
-        db.setLastPulledAt('config', pull.receivedAt),
-      ]);
+      // Update cursors BEFORE pruning so that a crash during pruning
+      // leaves cursors intact. On next restart the sync will resume
+      // from a known cursor rather than doing a delta on stale cursors
+      // and permanently losing items that were pruned.
+      await Future.wait(
+        _pullCursorKeys.map((key) => db.setLastPulledAt(key, pull.receivedAt)),
+      );
+
+      if (pull.isFullSnapshot) {
+        await _applyFullSnapshotPruning(pull);
+      }
 
       // Debug: Log total items in DB after sync
       final allItems = await db.getAllItems();
       final allServices = await db.getAllServices();
       if (kDebugMode) {
         debugPrint(
-          '[SyncService] After sync: ${allItems.length} total items in local DB',
+          '[SyncService] After sync: ${allItems.length} total items and ${allServices.length} total services in local DB',
         );
       }
-      unawaited(_primeOfflineMediaCache(allItems, allServices));
+
+      final shouldRepairCatalog =
+          allowCatalogRepair &&
+          since.millisecondsSinceEpoch != 0 &&
+          _needsCatalogRepair(
+            pull: pull,
+            items: allItems,
+            services: allServices,
+          );
+      if (shouldRepairCatalog) {
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Local catalog is incomplete compared to cloud metadata - forcing full resync',
+          );
+        }
+        _safeAddStatus('Refreshing full catalog snapshot...');
+        await db.delete(db.syncCursors).go();
+        await _pullPosDeltaInternal(allowCatalogRepair: false);
+        return;
+      }
+
+      try {
+        _safeAddStatus('Caching media for offline use...');
+        final allVariantStocks = await (db.select(db.itemStocks)).get();
+        await _primeOfflineMediaCache(
+          allItems,
+          allServices,
+          variantStocks: allVariantStocks,
+          businessLogoUrl: businessProfile?.logoUrl,
+        );
+      } catch (e, st) {
+        final telemetry = Telemetry.instance;
+        if (telemetry != null) {
+          unawaited(
+            telemetry.recordError(e, st, hint: 'primeOfflineMediaCache'),
+          );
+        }
+        if (kDebugMode) {
+          debugPrint('[SyncService] Failed to cache media offline: $e');
+        }
+      }
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (DioAuthUtils.isAuthStatus(status)) {
+        if (kDebugMode) {
+          debugPrint(
+            '[SyncService] Auth expired during sync pull; '
+            'stopping sync until re-authenticated.',
+          );
+        }
+        DioAuthUtils.notifySyncDeferred();
+        return;
+      }
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, e.stackTrace, hint: 'pullPosDelta'));
+      }
+      if (kDebugMode) {
+        debugPrint('[SyncService] ERROR in _pullPosDeltaInternal: $e');
+        debugPrint(e.stackTrace.toString());
+      }
+      rethrow;
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -2814,8 +3844,10 @@ class SyncService {
 
   Future<void> _primeOfflineMediaCache(
     List<Item> items,
-    List<Service> services,
-  ) async {
+    List<Service> services, {
+    List<ItemStock> variantStocks = const [],
+    String? businessLogoUrl,
+  }) async {
     final urls = <String>{};
     for (final item in items) {
       if (_isNetworkUrl(item.imageUrl)) {
@@ -2830,13 +3862,37 @@ class SyncService {
         }
       }
     }
+    for (final stock in variantStocks) {
+      if (_isNetworkUrl(stock.imageUrl)) {
+        urls.add(stock.imageUrl!.trim());
+      }
+    }
     for (final service in services) {
       if (_isNetworkUrl(service.imageUrl)) {
         urls.add(service.imageUrl!.trim());
       }
     }
+    if (_isNetworkUrl(businessLogoUrl)) {
+      urls.add(businessLogoUrl!.trim());
+    }
     if (urls.isEmpty) return;
+    if (kDebugMode) {
+      debugPrint(
+        '[SyncService] Priming offline media cache for ${urls.length} assets',
+      );
+    }
     await OfflineMediaCache.instance.prefetchAll(urls);
+  }
+
+  Future<void> _applyFullSnapshotPruning(PosSyncPullResponse pull) async {
+    await db.pruneSyncedRemoteItemsNotIn(pull.snapshotProductIds);
+    await db.pruneSyncedRemoteServicesNotIn(pull.snapshotServiceIds);
+    await db.pruneSyncedServiceVariantsNotIn(pull.snapshotServiceVariantIds);
+    await db.pruneSyncedServicePackagesNotIn(pull.snapshotServicePackageIds);
+    await db.pruneSyncedCustomerPackagesNotIn(pull.snapshotCustomerPackageIds);
+    await db.pruneSyncedPackageRedemptionsNotIn(
+      pull.snapshotPackageRedemptionIds,
+    );
   }
 
   bool _isNetworkUrl(String? value) {
@@ -2855,6 +3911,29 @@ class SyncService {
     await pullPosDelta();
   }
 
+  bool _needsCatalogRepair({
+    required PosSyncPullResponse pull,
+    required List<Item> items,
+    required List<Service> services,
+  }) {
+    final localProductImageCount = items
+        .where(
+          (item) =>
+              item.imageUrl?.trim().isNotEmpty == true ||
+              item.thumbnailUrl?.trim().isNotEmpty == true ||
+              _decodeStringList(item.galleryUrls).isNotEmpty,
+        )
+        .length;
+    final localServiceImageCount = services
+        .where((service) => service.imageUrl?.trim().isNotEmpty == true)
+        .length;
+
+    return items.length < pull.catalogProductCount ||
+        services.length < pull.catalogServiceCount ||
+        localProductImageCount < pull.catalogProductImageCount ||
+        localServiceImageCount < pull.catalogServiceImageCount;
+  }
+
   Future<void> pullCustomers() async {
     await pullPosDelta();
   }
@@ -2869,21 +3948,78 @@ class SyncService {
     final listRaw = data is Map<String, dynamic>
         ? (data['data'] ?? const [])
         : data;
-    final list = List<Map<String, dynamic>>.from(
-      (listRaw as Iterable).whereType<Map>().map(
-        (e) => Map<String, dynamic>.from(e),
-      ),
-    );
+    final list = MarketplaceOrder.listFromJson(listRaw as Iterable);
     for (final order in list) {
-      final id = int.tryParse(order['id']?.toString() ?? '');
-      if (id == null) continue;
-      await db.upsertCachedOrder(id, jsonEncode(order));
+      await _upsertMergedCachedOrder(order);
+    }
+  }
+
+  Future<MarketplaceOrder?> pullMarketplaceOrderDetail(int orderId) async {
+    if (orderId <= 0) return null;
+
+    MarketplaceOrder? cached;
+    final row = await db.getCachedOrder(orderId);
+    if (row != null) {
+      try {
+        cached = MarketplaceOrder.fromJson(
+          Map<String, dynamic>.from(jsonDecode(row.payloadJson) as Map),
+        );
+      } catch (_) {
+        cached = null;
+      }
+    }
+
+    try {
+      final res = await sellerApi.fetchOrderDetails(orderId);
+      final raw = res.data;
+      final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
+      final first = (listRaw is List && listRaw.isNotEmpty)
+          ? listRaw.first
+          : null;
+      if (first is! Map) {
+        return cached;
+      }
+
+      final details = MarketplaceOrder.fromJson(Map<String, dynamic>.from(first));
+      final merged = cached == null ? details : cached.merge(details);
+      await db.upsertCachedOrder(orderId, jsonEncode(merged.toJson()));
+      return merged;
+    } catch (_) {
+      return cached;
+    }
+  }
+
+  Future<void> _upsertMergedCachedOrder(MarketplaceOrder order) async {
+    if (order.id <= 0) return;
+    final row = await db.getCachedOrder(order.id);
+    if (row == null) {
+      await db.upsertCachedOrder(order.id, jsonEncode(order.toJson()));
+      return;
+    }
+
+    try {
+      final cached = MarketplaceOrder.fromJson(
+        Map<String, dynamic>.from(jsonDecode(row.payloadJson) as Map),
+      );
+      final merged = cached.merge(order);
+      await db.upsertCachedOrder(order.id, jsonEncode(merged.toJson()));
+    } catch (_) {
+      await db.upsertCachedOrder(order.id, jsonEncode(order.toJson()));
     }
   }
 
   Future<void> pullServiceBookings() async {
     final res = await sellerApi.fetchServiceBookings();
     final data = res.data;
+
+    // Detect missing backend route and suppress future calls.
+    if (data is Map<String, dynamic> &&
+        data['success'] == false &&
+        (data['status'] == 404 || data['message'] == 'Invalid Route')) {
+      _bookingsRouteAvailable = false;
+      return;
+    }
+
     final listRaw = data is Map<String, dynamic>
         ? (data['data'] ?? const [])
         : data;
@@ -2896,6 +4032,50 @@ class SyncService {
       final id = int.tryParse(booking['id']?.toString() ?? '');
       if (id == null) continue;
       await db.upsertCachedServiceBooking(id, jsonEncode(booking));
+    }
+  }
+
+  Future<void> pullAvailability() async {
+    final res = await sellerApi.fetchAvailability();
+    final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
+    final listRaw = data['data'] ?? const [];
+    final list = List<Map<String, dynamic>>.from(
+      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+    );
+
+    await db.deleteAllAvailabilitySchedules();
+    for (final s in list) {
+      await db.upsertAvailabilitySchedule(
+        AvailabilitySchedulesCompanion.insert(
+          dayOfWeek: s['day_of_week'] as int,
+          startTime: s['start_time'] as String,
+          endTime: s['end_time'] as String,
+          isAvailable: drift.Value(s['is_available'] as bool? ?? true),
+        ),
+      );
+    }
+  }
+
+  Future<void> pullAvailabilityExceptions() async {
+    final res = await sellerApi.fetchAvailabilityExceptions();
+    final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
+    final listRaw = data['data'] ?? const [];
+    final list = List<Map<String, dynamic>>.from(
+      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+    );
+
+    await db.deleteAllAvailabilityExceptions();
+    for (final e in list) {
+      await db.upsertAvailabilityException(
+        AvailabilityExceptionsCompanion.insert(
+          remoteId: e['id'] != null ? drift.Value(e['id'] as int) : const drift.Value.absent(),
+          date: e['date'] as String,
+          isAvailable: drift.Value(e['is_available'] as bool? ?? false),
+          startTime: e['start_time'] != null ? drift.Value(e['start_time'] as String) : const drift.Value.absent(),
+          endTime: e['end_time'] != null ? drift.Value(e['end_time'] as String) : const drift.Value.absent(),
+          reason: e['reason'] != null ? drift.Value(e['reason'] as String) : const drift.Value.absent(),
+        ),
+      );
     }
   }
 
@@ -2914,9 +4094,18 @@ class SyncService {
       if (lastSyncRaw != null) {
         final lastSync = DateTime.tryParse(lastSyncRaw)?.toUtc();
         if (lastSync != null &&
-            DateTime.now().toUtc().difference(lastSync) <
-                _contactsSyncInterval) {
-          return;
+            DateTime.now().toUtc().difference(lastSync) < _contactsSyncInterval) {
+          // Skip interval check only when contact count changed — new contacts
+          // should sync immediately even if the interval hasn't elapsed.
+          final lastCountRaw = await secureStorage.read(key: _contactsCountKey);
+          final lastCount = int.tryParse(lastCountRaw ?? '') ?? -1;
+          if (lastCount >= 0) {
+            final quickCount = await FlutterContacts.getContacts();
+            if (quickCount.length == lastCount) return; // nothing new
+            // Contact count changed — fall through to full sync below.
+          } else {
+            return;
+          }
         }
       }
     }
@@ -2933,7 +4122,7 @@ class SyncService {
         return;
       }
 
-      _syncStatusController.add('Syncing contacts...');
+      _safeAddStatus('Syncing contacts...');
       await importDeviceContacts(deviceContacts);
       final payloads = _buildContactPayloads(deviceContacts);
       if (payloads.isEmpty) return;
@@ -3028,6 +4217,10 @@ class SyncService {
         key: _contactsSyncKey,
         value: DateTime.now().toUtc().toIso8601String(),
       );
+      await secureStorage.write(
+        key: _contactsCountKey,
+        value: deviceContacts.length.toString(),
+      );
 
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -3055,6 +4248,122 @@ class SyncService {
           ),
         );
         unawaited(telemetry.recordError(e, st, hint: 'contacts_sync'));
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> pullCrmContacts() async {
+    final lastPull = await lastCrmContactsPullAt();
+    final updatedSince = lastPull?.toIso8601String();
+
+    _safeAddStatus('Pulling CRM contacts...');
+    final sw = Stopwatch()..start();
+
+    try {
+      int page = 1;
+      while (true) {
+        final res = await sellerApi.fetchCrmContacts(
+          updatedSince: updatedSince,
+          perPage: 100,
+          page: page,
+        );
+        final body = res.data;
+        if (body is! Map<String, dynamic>) break;
+
+        final data = body['data'];
+        if (data is! Map<String, dynamic>) break;
+
+        final listRaw = data['data'];
+        if (listRaw is! List) break;
+
+        if (listRaw.isEmpty) break;
+
+        for (final item in listRaw) {
+          if (item is! Map<String, dynamic>) continue;
+          final contactId = item['id']?.toString();
+          if (contactId == null || contactId.isEmpty) continue;
+
+          final displayName = item['display_name']?.toString() ?? 'Contact';
+          final updatedAtRaw = item['updated_at']?.toString();
+          final updatedAt = updatedAtRaw != null
+              ? DateTime.tryParse(updatedAtRaw)?.toUtc()
+              : null;
+
+          String? primaryPhone;
+          String? primaryEmail;
+          final channelsRaw = item['channels'];
+          if (channelsRaw is List) {
+            for (final ch in channelsRaw) {
+              if (ch is! Map<String, dynamic>) continue;
+              final type = ch['type']?.toString();
+              final value = ch['value_raw']?.toString();
+              final isPrimary = ch['is_primary'] == true || ch['is_primary'] == 1;
+              if (value == null || value.isEmpty) continue;
+              if (type == 'phone' && (primaryPhone == null || isPrimary)) {
+                primaryPhone = value;
+              }
+              if (type == 'email' && (primaryEmail == null || isPrimary)) {
+                primaryEmail = value;
+              }
+            }
+          }
+
+          Customer? existing;
+          existing = await db.getCustomerByRemoteId(contactId);
+          existing ??= primaryPhone != null && primaryPhone.isNotEmpty
+              ? await db.getCustomerByPhoneE164(primaryPhone)
+              : null;
+          existing ??= primaryEmail != null && primaryEmail.isNotEmpty
+              ? await db.getCustomerByEmail(primaryEmail)
+              : null;
+
+          final localId = existing?.id ?? _uuid.v4();
+          await db.upsertCustomer(
+            CustomersCompanion.insert(
+              id: drift.Value(localId),
+              remoteId: drift.Value(contactId),
+              name: displayName,
+              phone: drift.Value(primaryPhone),
+              email: drift.Value(primaryEmail),
+              synced: const drift.Value(true),
+              updatedAt: drift.Value(updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
+
+        final currentPage = data['current_page'];
+        final lastPage = data['last_page'];
+        if (currentPage is int && lastPage is int) {
+          if (currentPage >= lastPage) break;
+        }
+        page++;
+      }
+
+      await setLastCrmContactsPullAt(DateTime.now().toUtc());
+
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'crm_contacts_pull_success',
+            props: {'duration_ms': sw.elapsedMilliseconds},
+          ),
+        );
+      }
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(
+          telemetry.event(
+            'crm_contacts_pull_fail',
+            props: {
+              'duration_ms': sw.elapsedMilliseconds,
+              'error': e.toString(),
+            },
+          ),
+        );
+        unawaited(telemetry.recordError(e, st, hint: 'crm_contacts_pull'));
       }
       rethrow;
     }
@@ -3100,8 +4409,13 @@ class SyncService {
   }
 
   Future<void> dispose() async {
+    _isDisposed = true;
     await _connectivitySub?.cancel();
+    _connectivitySub = null;
     _retryTimer?.cancel();
+    _retryTimer = null;
+    _foregroundTimer?.cancel();
+    _foregroundTimer = null;
     await _syncStatusController.close();
   }
 

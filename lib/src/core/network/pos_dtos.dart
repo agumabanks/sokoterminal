@@ -31,6 +31,17 @@ class PosSyncPullResponse {
     required this.receivedAt,
     required this.since,
     required this.outletId,
+    required this.isFullSnapshot,
+    required this.snapshotProductIds,
+    required this.snapshotServiceIds,
+    required this.snapshotServiceVariantIds,
+    required this.snapshotServicePackageIds,
+    required this.snapshotCustomerPackageIds,
+    required this.snapshotPackageRedemptionIds,
+    required this.catalogProductCount,
+    required this.catalogProductImageCount,
+    required this.catalogServiceCount,
+    required this.catalogServiceImageCount,
     required this.products,
     required this.services,
     required this.serviceVariants,
@@ -55,6 +66,17 @@ class PosSyncPullResponse {
   final DateTime receivedAt;
   final DateTime since;
   final String outletId;
+  final bool isFullSnapshot;
+  final List<String> snapshotProductIds;
+  final List<String> snapshotServiceIds;
+  final List<String> snapshotServiceVariantIds;
+  final List<String> snapshotServicePackageIds;
+  final List<String> snapshotCustomerPackageIds;
+  final List<String> snapshotPackageRedemptionIds;
+  final int catalogProductCount;
+  final int catalogProductImageCount;
+  final int catalogServiceCount;
+  final int catalogServiceImageCount;
   final List<PosSyncProduct> products;
   final List<PosSyncService> services;
   final List<PosSyncServiceVariant> serviceVariants;
@@ -84,6 +106,12 @@ class PosSyncPullResponse {
     }
 
     final outletId = (json['outlet_id'] ?? '').toString();
+    final catalogCounts = json['catalog_counts'] is Map
+        ? Map<String, dynamic>.from(json['catalog_counts'] as Map)
+        : const <String, dynamic>{};
+    final snapshot = json['snapshot'] is Map
+        ? Map<String, dynamic>.from(json['snapshot'] as Map)
+        : const <String, dynamic>{};
 
     final productsRaw = json['products'];
     final servicesRaw = json['services'];
@@ -111,6 +139,19 @@ class PosSyncPullResponse {
       receivedAt: DateTime.parse(receivedAtRaw.toString()).toUtc(),
       since: DateTime.parse(sinceRaw.toString()).toUtc(),
       outletId: outletId,
+      isFullSnapshot: _asBool(snapshot['full']),
+      snapshotProductIds: _parseStringList(snapshot['product_ids']),
+      snapshotServiceIds: _parseStringList(snapshot['service_ids']),
+      snapshotServiceVariantIds: _parseStringList(snapshot['service_variant_ids']),
+      snapshotServicePackageIds: _parseStringList(snapshot['service_package_ids']),
+      snapshotCustomerPackageIds: _parseStringList(snapshot['customer_package_ids']),
+      snapshotPackageRedemptionIds: _parseStringList(
+        snapshot['package_redemption_ids'],
+      ),
+      catalogProductCount: _asInt(catalogCounts['products']),
+      catalogProductImageCount: _asInt(catalogCounts['products_with_images']),
+      catalogServiceCount: _asInt(catalogCounts['services']),
+      catalogServiceImageCount: _asInt(catalogCounts['services_with_images']),
       products: _parseList(productsRaw, PosSyncProduct.fromJson),
       services: _parseList(servicesRaw, PosSyncService.fromJson),
       serviceVariants: _parseList(
@@ -217,6 +258,7 @@ class PosSyncProduct {
     this.weight,
     this.minQty,
     this.lowStockQuantity,
+    this.purchasePrice,
     this.discount,
     this.discountType,
     this.shippingCost,
@@ -246,6 +288,7 @@ class PosSyncProduct {
   final double? weight;
   final int? minQty;
   final int? lowStockQuantity;
+  final double? purchasePrice;
   final double? discount;
   final String? discountType;
   final double? shippingCost;
@@ -276,6 +319,7 @@ class PosSyncProduct {
       weight: _asNullableDouble(json['weight']),
       minQty: _asNullableInt(json['min_qty']),
       lowStockQuantity: _asNullableInt(json['low_stock_quantity']),
+      purchasePrice: _asNullableDouble(json['purchase_price']),
       discount: _asNullableDouble(json['discount']),
       discountType: json['discount_type']?.toString(),
       shippingCost: _asNullableDouble(json['shipping_cost']),
@@ -359,7 +403,18 @@ class PosSyncService {
     required this.category,
     required this.published,
     required this.updatedAt,
+    this.purchasePrice,
     this.imageUrl,
+    this.coverUploadId,
+    this.photoUploadIds = const [],
+    this.galleryUrls = const [],
+    this.summary,
+    this.categoryId,
+    this.serviceType,
+    this.deliveryTimeframe,
+    this.moderationStatus,
+    this.slug,
+    this.pricingPackages = const [],
   });
 
   final String id;
@@ -370,7 +425,18 @@ class PosSyncService {
   final String? category;
   final bool published;
   final DateTime? updatedAt;
+  final double? purchasePrice;
   final String? imageUrl;
+  final int? coverUploadId;
+  final List<int> photoUploadIds;
+  final List<String> galleryUrls;
+  final String? summary;
+  final int? categoryId;
+  final String? serviceType;
+  final String? deliveryTimeframe;
+  final String? moderationStatus;
+  final String? slug;
+  final List<Map<String, dynamic>> pricingPackages;
 
   factory PosSyncService.fromJson(Map<String, dynamic> json) {
     return PosSyncService(
@@ -382,7 +448,33 @@ class PosSyncService {
       category: json['category']?.toString(),
       published: _asBool(json['published']),
       updatedAt: _asDateTime(json['updated_at']),
+      purchasePrice: _asNullableDouble(json['purchase_price']),
       imageUrl: json['image_url']?.toString(),
+      coverUploadId: _asNullableInt(json['cover_upload_id']),
+      photoUploadIds: (json['photo_upload_ids'] is List)
+          ? (json['photo_upload_ids'] as List)
+                .map((e) => _asNullableInt(e))
+                .whereType<int>()
+                .toList()
+          : const [],
+      galleryUrls: (json['gallery_urls'] is List)
+          ? (json['gallery_urls'] as List)
+                .map((e) => e?.toString() ?? '')
+                .where((e) => e.trim().isNotEmpty)
+                .toList()
+          : const [],
+      summary: json['summary']?.toString(),
+      categoryId: _asNullableInt(json['category_id']),
+      serviceType: json['service_type']?.toString(),
+      deliveryTimeframe: json['delivery_timeframe']?.toString(),
+      moderationStatus: json['moderation_status']?.toString(),
+      slug: json['slug']?.toString(),
+      pricingPackages: (json['pricing_packages'] is List)
+          ? (json['pricing_packages'] as List)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : const [],
     );
   }
 }
@@ -682,6 +774,7 @@ class PosSyncBusinessProfile {
     this.receiptPaymentMethods = const {},
     this.deliveryProfile = const {},
     this.updatedAt,
+    this.verificationStatus,
   });
 
   final String sellerId;
@@ -715,6 +808,7 @@ class PosSyncBusinessProfile {
   final Map<String, dynamic> receiptPaymentMethods;
   final Map<String, dynamic> deliveryProfile;
   final DateTime? updatedAt;
+  final int? verificationStatus;
 
   factory PosSyncBusinessProfile.fromJson(Map<String, dynamic> json) {
     final seller = json['seller'] is Map
@@ -777,6 +871,7 @@ class PosSyncBusinessProfile {
       receiptPaymentMethods: receiptPaymentMethods,
       deliveryProfile: deliveryProfile,
       updatedAt: _asDateTime(shop['updated_at']),
+      verificationStatus: _asNullableInt(shop['verification_status']),
     );
   }
 }
@@ -1138,7 +1233,7 @@ class PosSyncCustomerPackage {
     this.updatedAt,
   });
 
-  final int id;
+  final String id;
   final String packageId;
   final String customerId;
   final String idempotencyKey;
@@ -1148,10 +1243,11 @@ class PosSyncCustomerPackage {
 
   factory PosSyncCustomerPackage.fromJson(Map<String, dynamic> json) {
     return PosSyncCustomerPackage(
-      id: _asInt(json['id']),
+      id: (json['id'] ?? '').toString(),
       packageId: (json['package_id'] ?? '').toString(),
       customerId: (json['customer_id'] ?? '').toString(),
-      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      idempotencyKey:
+          (json['idempotency_key'] ?? json['id'] ?? '').toString(),
       remainingSessions: _asInt(json['remaining_sessions']),
       expiresAt: _asDateTime(json['expires_at']),
       updatedAt: _asDateTime(json['updated_at']),
@@ -1169,8 +1265,8 @@ class PosSyncPackageRedemption {
     this.updatedAt,
   });
 
-  final int id;
-  final int customerPackageId;
+  final String id;
+  final String customerPackageId;
   final String idempotencyKey;
   final int sessionsUsed;
   final String? note;
@@ -1178,12 +1274,21 @@ class PosSyncPackageRedemption {
 
   factory PosSyncPackageRedemption.fromJson(Map<String, dynamic> json) {
     return PosSyncPackageRedemption(
-      id: _asInt(json['id']),
-      customerPackageId: _asInt(json['customer_package_id']),
-      idempotencyKey: (json['idempotency_key'] ?? '').toString(),
+      id: (json['id'] ?? '').toString(),
+      customerPackageId: (json['customer_package_id'] ?? '').toString(),
+      idempotencyKey:
+          (json['idempotency_key'] ?? json['id'] ?? '').toString(),
       sessionsUsed: _asInt(json['sessions_used']),
       note: json['note']?.toString(),
       updatedAt: _asDateTime(json['updated_at']),
     );
   }
+}
+
+List<String> _parseStringList(dynamic raw) {
+  if (raw is! List) return const [];
+  return raw
+      .map((value) => value?.toString() ?? '')
+      .where((value) => value.trim().isNotEmpty)
+      .toList();
 }

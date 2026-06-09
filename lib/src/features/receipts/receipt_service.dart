@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -493,7 +492,10 @@ class ReceiptService {
       if (data == null) return;
       final pdfData = await buildPdf(data);
       await Printing.sharePdf(bytes: pdfData, filename: 'receipt-$entryId.pdf');
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('sharePdf failed: $e');
+      rethrow;
+    }
   }
 
   Future<void> shareWhatsapp(String entryId, {String? phone}) async {
@@ -525,7 +527,8 @@ class ReceiptService {
       } else {
         await Share.share(text, subject: 'Receipt ${bundle.entry.id}');
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('shareWhatsapp launch failed: $e');
       await Share.share(text, subject: 'Receipt ${bundle.entry.id}');
     }
   }

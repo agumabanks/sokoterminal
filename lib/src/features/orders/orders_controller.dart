@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -9,6 +10,7 @@ import '../../core/db/app_database.dart';
 import '../../core/network/seller_api.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
+import 'marketplace_order.dart';
 
 final ordersControllerProvider =
     StateNotifierProvider<OrdersController, OrdersState>((ref) {
@@ -21,7 +23,7 @@ final ordersControllerProvider =
 class OrdersState {
   const OrdersState({this.loading = false, this.orders = const [], this.error});
   final bool loading;
-  final List<Map<String, dynamic>> orders;
+  final List<MarketplaceOrder> orders;
   final String? error;
 }
 
@@ -32,32 +34,39 @@ class OrdersController extends StateNotifier<OrdersState> {
   final SyncService sync;
   static const _uuid = Uuid();
 
+  Future<MarketplaceOrder?> _readCachedOrder(int orderId) async {
+    final row = await db.getCachedOrder(orderId);
+    if (row == null) return null;
+    try {
+      return MarketplaceOrder.fromJson(
+        Map<String, dynamic>.from(jsonDecode(row.payloadJson) as Map),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> load() async {
     state = OrdersState(loading: true, orders: state.orders);
     try {
-      final res = await api.fetchOrders();
-      final data = res.data;
-      final listRaw = data is Map<String, dynamic>
-          ? (data['data'] ?? const [])
-          : data;
-      final list = List<Map<String, dynamic>>.from(
-        (listRaw as Iterable).map((e) => Map<String, dynamic>.from(e as Map)),
-      );
-
-      for (final order in list) {
-        final id = int.tryParse(order['id']?.toString() ?? '');
-        if (id == null) continue;
-        await db.upsertCachedOrder(id, jsonEncode(order));
-      }
-
+      await sync.pullMarketplaceOrders();
+      final cachedRows = await db.getCachedOrders();
+      final list = cachedRows
+          .map(
+            (r) => MarketplaceOrder.fromJson(
+              Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+            ),
+          )
+          .toList();
       state = OrdersState(orders: list);
     } catch (e) {
       final cachedRows = await db.getCachedOrders();
       if (cachedRows.isNotEmpty) {
         final list = cachedRows
             .map(
-              (r) =>
-                  Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+              (r) => MarketplaceOrder.fromJson(
+                Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+              ),
             )
             .toList();
         state = OrdersState(error: e.toString(), orders: list);
@@ -84,33 +93,38 @@ class OrdersController extends StateNotifier<OrdersState> {
     } catch (e) {
       // Offline-first: enqueue and optimistically update cache/UI.
       final opType = 'order_status_update:$orderId';
-      await sync.enqueue(opType, {
-        'order_id': orderId,
-        'delivery_status': delivery,
-        'payment_status': payment,
-        'idempotency_key': _uuid.v4(),
-      });
+      try {
+        await sync.enqueue(opType, {
+          'order_id': orderId,
+          'delivery_status': delivery,
+          'payment_status': payment,
+          'idempotency_key': _uuid.v4(),
+        });
+      } catch (e) {
+        debugPrint('[Orders] Sync enqueue failed: $e');
+      }
 
       final updatedOrders = [
-        for (final o in state.orders)
-          if (o['id']?.toString() == orderId.toString())
-            {
-              ...o,
-              'delivery_status': delivery,
-              'delivery_status_raw': delivery,
-              if (payment.trim().isNotEmpty) 'payment_status': payment,
-              'pending_sync': true,
-            }
+        for (final order in state.orders)
+          if (order.id == orderId)
+            order.copyWith(
+              deliveryStatus: delivery,
+              deliveryStatusRaw: delivery,
+              paymentStatus: payment.trim().isNotEmpty
+                  ? payment
+                  : order.paymentStatus,
+              pendingSync: true,
+            )
           else
-            o,
+            order,
       ];
 
-      final existing = updatedOrders.cast<Map<String, dynamic>?>().firstWhere(
-        (o) => o?['id']?.toString() == orderId.toString(),
+      final existing = updatedOrders.cast<MarketplaceOrder?>().firstWhere(
+        (order) => order?.id == orderId,
         orElse: () => null,
       );
       if (existing != null) {
-        await db.upsertCachedOrder(orderId, jsonEncode(existing));
+        await db.upsertCachedOrder(orderId, jsonEncode(existing.toJson()));
       }
 
       final telemetry = Telemetry.instance;
@@ -135,58 +149,57 @@ class OrdersController extends StateNotifier<OrdersState> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> loadItems(int orderId) async {
+  Future<List<OrderLine>> loadItems(int orderId) async {
+    final cached = await _readCachedOrder(orderId);
+    if (cached != null && cached.orderItems.isNotEmpty) {
+      return cached.orderItems;
+    }
+
     try {
       final res = await api.fetchOrderItems(orderId);
       final data = res.data;
       final list = data is Map<String, dynamic>
           ? data['data'] ?? data['items'] ?? []
           : data;
-      return List<Map<String, dynamic>>.from(list as Iterable);
+      return (list as Iterable)
+          .whereType<Map>()
+          .map((entry) => OrderLine.fromJson(Map<String, dynamic>.from(entry)))
+          .toList();
     } catch (_) {
-      return [];
+      return cached?.orderItems ?? const [];
     }
   }
 
-  Future<Map<String, dynamic>?> loadOrderDetails(int orderId) async {
+  Future<MarketplaceOrder?> loadOrderDetails(int orderId) async {
+    final cached = await _readCachedOrder(orderId);
+    final inState = state.orders.cast<MarketplaceOrder?>().firstWhere(
+      (order) => order?.id == orderId,
+      orElse: () => null,
+    );
+    final seed = cached ?? inState;
+
     try {
-      final existing = state.orders.cast<Map<String, dynamic>?>().firstWhere(
-        (o) => o?['id']?.toString() == orderId.toString(),
-        orElse: () => null,
-      );
-
-      final res = await api.fetchOrderDetails(orderId);
-      final raw = res.data;
-      final listRaw = raw is Map<String, dynamic> ? raw['data'] : raw;
-      final first = (listRaw is List && listRaw.isNotEmpty)
-          ? listRaw.first
-          : null;
-      if (first is! Map) {
-        throw const FormatException('Invalid order details response shape');
+      final merged = await sync.pullMarketplaceOrderDetail(orderId);
+      if (merged != null) {
+        _upsertOrderInState(merged);
+        return merged;
       }
-
-      final details = Map<String, dynamic>.from(first);
-
-      // Normalize items key for UI/invoice consumers.
-      if (details['items'] == null && details['order_items'] is List) {
-        details['items'] = details['order_items'];
-      }
-      if (details['order_items'] == null && details['items'] is List) {
-        details['order_items'] = details['items'];
-      }
-
-      // Merge list payload fields (customer name/phone) when detail is sparse.
-      final merged = existing == null ? details : {...existing, ...details};
-
-      await db.upsertCachedOrder(orderId, jsonEncode(merged));
-      return merged;
     } catch (e) {
-      // Fallback to local state if API fails
-      return state.orders.cast<Map<String, dynamic>?>().firstWhere(
-        (o) => o?['id']?.toString() == orderId.toString(),
-        orElse: () => null,
-      );
+      debugPrint('[Orders] Order detail pull failed: $e');
     }
+
+    return seed;
+  }
+
+  void _upsertOrderInState(MarketplaceOrder order) {
+    final updated = [
+      for (final existing in state.orders)
+        if (existing.id == order.id) order else existing,
+    ];
+    if (!updated.any((o) => o.id == order.id)) {
+      updated.insert(0, order);
+    }
+    state = OrdersState(orders: updated, loading: state.loading, error: state.error);
   }
 
   Future<String> requestSokoDelivery(int orderId) async {
@@ -202,7 +215,11 @@ class OrdersController extends StateNotifier<OrdersState> {
     final cachedRows = await db.getCachedOrders();
     if (cachedRows.isEmpty) return;
     final list = cachedRows
-        .map((r) => Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map))
+        .map(
+          (r) => MarketplaceOrder.fromJson(
+            Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+          ),
+        )
         .toList();
     state = OrdersState(orders: list, loading: false);
   }

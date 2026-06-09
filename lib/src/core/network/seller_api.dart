@@ -109,12 +109,17 @@ class SellerApi {
     return client.get('/v2/seller/products/categories');
   }
 
+  Future<Response<dynamic>> createCategory(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/products/categories', data: payload);
+  }
+
   Future<Response<dynamic>> fetchBrands() {
     return client.get('/v2/seller/products/brands');
   }
 
   Future<Response<dynamic>> deleteProduct(String productId) {
-    return client.get('/v2/seller/product/delete/$productId');
+    // Use staff-friendly POS catalog endpoint (works with staff:pos tokens).
+    return client.delete('/v2/seller/pos/catalog/products/$productId');
   }
 
   Future<Response<dynamic>> fetchProducts({int page = 1}) {
@@ -126,6 +131,18 @@ class SellerApi {
   }
 
   // Uploads
+  Future<Response<dynamic>> fetchSellerFiles({
+    String? type,
+    String sort = 'newest',
+    int page = 1,
+    String? search,
+  }) {
+    final q = <String, dynamic>{'sort': sort, 'page': page};
+    if (type != null) q['type'] = type;
+    if (search != null && search.isNotEmpty) q['search'] = search;
+    return client.get('/v2/seller/file/all', query: q);
+  }
+
   Future<Response<dynamic>> uploadSellerFile(File file) async {
     final form = FormData.fromMap({
       'aiz_file': await MultipartFile.fromFile(
@@ -176,6 +193,10 @@ class SellerApi {
     return client.get('/v2/service-provider/my/offerings');
   }
 
+  Future<Response<dynamic>> fetchServiceCategories() {
+    return client.get('/v2/service-provider/catalog/categories');
+  }
+
   Future<Response<dynamic>> fetchServiceBookings() {
     return client.get('/v2/service-provider/provider/bookings');
   }
@@ -199,6 +220,82 @@ class SellerApi {
     return client.post(
       '/v2/service-provider/provider/bookings/$bookingId/cancel',
       data: {if (reason != null) 'reason': reason},
+    );
+  }
+
+  Future<Response<dynamic>> createServiceBooking(Map<String, dynamic> data) {
+    return client.post('/v2/service-provider/provider/bookings', data: data);
+  }
+
+  Future<Response<dynamic>> rescheduleServiceBooking(int id, Map<String, dynamic> data) {
+    return client.post('/v2/service-provider/provider/bookings/$id/reschedule', data: data);
+  }
+
+  // Time Logs
+  Future<Response<dynamic>> fetchServiceTimeLogs() {
+    return client.get('/v2/service-provider/provider/time-logs');
+  }
+
+  Future<Response<dynamic>> createServiceTimeLog(Map<String, dynamic> data) {
+    return client.post('/v2/service-provider/provider/time-logs', data: data);
+  }
+
+  // Clients
+  Future<Response<dynamic>> fetchServiceClients({String? search}) {
+    return client.get(
+      '/v2/service-provider/provider/clients',
+      query: {if (search != null && search.isNotEmpty) 'search': search},
+    );
+  }
+
+  Future<Response<dynamic>> fetchServiceClientDetail(int clientId) {
+    return client.get('/v2/service-provider/provider/clients/$clientId');
+  }
+
+  Future<Response<dynamic>> fetchServiceClientHistory(int clientId) {
+    return client.get('/v2/service-provider/provider/clients/$clientId/history');
+  }
+
+  Future<Response<dynamic>> updateServiceClientNotes(int clientId, String notes) {
+    return client.post(
+      '/v2/service-provider/provider/clients/$clientId/notes',
+      data: {'notes': notes},
+    );
+  }
+
+  // Availability
+  Future<Response<dynamic>> fetchAvailability() {
+    return client.get('/v2/service-provider/provider/availability');
+  }
+
+  Future<Response<dynamic>> updateAvailability(List<Map<String, dynamic>> schedules) {
+    return client.post('/v2/service-provider/provider/availability', data: {'schedules': schedules});
+  }
+
+  Future<Response<dynamic>> fetchAvailabilityExceptions() {
+    return client.get('/v2/service-provider/provider/availability/exceptions');
+  }
+
+  Future<Response<dynamic>> addAvailabilityException(Map<String, dynamic> data) {
+    return client.post('/v2/service-provider/provider/availability/exceptions', data: data);
+  }
+
+  Future<Response<dynamic>> deleteAvailabilityException(int id) {
+    return client.delete('/v2/service-provider/provider/availability/exceptions/$id');
+  }
+
+  Future<Response<dynamic>> fetchAvailableSlots({
+    required int offeringId,
+    required String date,
+    String? timezone,
+  }) {
+    return client.get(
+      '/v2/service-provider/provider/available-slots',
+      query: {
+        'offering_id': offeringId,
+        'date': date,
+        if (timezone != null) 'timezone': timezone,
+      },
     );
   }
 
@@ -230,6 +327,16 @@ class SellerApi {
       '/v2/seller/pos/catalog/products',
       data: payload,
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+  }
+
+  /// Upload terminal bug / crash reports captured offline.
+  Future<Response<dynamic>> submitTerminalFeedbackBatch(
+    List<Map<String, dynamic>> reports,
+  ) {
+    return client.post(
+      '/v2/seller/pos/feedback/batch',
+      data: {'reports': reports},
     );
   }
 
@@ -848,6 +955,57 @@ class SellerApi {
     );
   }
 
+  Future<Response<dynamic>> fetchCrmContacts({
+    String? updatedSince,
+    String? q,
+    int perPage = 100,
+    int page = 1,
+  }) {
+    return client.get(
+      // Fixed: was /v2/crm/contacts (missing /seller prefix), now routed correctly
+      '/v2/seller/crm/contacts',
+      query: {
+        if (updatedSince != null) 'updated_since': updatedSince,
+        if (q != null && q.isNotEmpty) 'q': q,
+        'per_page': perPage,
+        'page': page,
+      },
+    );
+  }
+
+  // CRM Contact Notes
+  Future<Response<dynamic>> fetchContactNotes(String contactId) {
+    return client.get('/v2/seller/crm/contacts/$contactId/notes');
+  }
+
+  Future<Response<dynamic>> createContactNote(
+    String contactId, {
+    required String body,
+    String type = 'note',
+    Map<String, dynamic>? meta,
+    bool isPinned = false,
+    String? clientNoteId,
+  }) {
+    return client.post(
+      '/v2/seller/crm/contacts/$contactId/notes',
+      data: {
+        'body': body,
+        'type': type,
+        if (meta != null) 'meta': meta,
+        'is_pinned': isPinned,
+        if (clientNoteId != null) 'client_note_id': clientNoteId,
+      },
+    );
+  }
+
+  Future<Response<dynamic>> deleteContactNote(String contactId, String noteId) {
+    return client.delete('/v2/seller/crm/contacts/$contactId/notes/$noteId');
+  }
+
+  Future<Response<dynamic>> toggleContactNotePin(String contactId, String noteId) {
+    return client.patch('/v2/seller/crm/contacts/$contactId/notes/$noteId/pin', data: {});
+  }
+
   // CRM Marketing
   Future<Response<dynamic>> createCrmCampaign(Map<String, dynamic> payload) {
     return client.post('/v2/seller/crm/campaigns', data: payload);
@@ -1161,6 +1319,31 @@ class SellerApi {
 
   // ─── Soko Studio (AI Ad Generation) ───────────────────────────
 
+  Future<Response<dynamic>> studioRemoveBackground({
+    required String imageUrl,
+    bool edgeSmoothing = true,
+  }) {
+    return client.post('/v2/seller/studio/remove-bg', data: {
+      'image_url': imageUrl,
+      'edge_smoothing': edgeSmoothing,
+    });
+  }
+
+  Future<Response<dynamic>> studioWebEntry({
+    int? productId,
+    int? serviceId,
+    String editorMode = 'design',
+    String openPanel = 'smart-ads',
+  }) {
+    final q = <String, dynamic>{
+      'editor_mode': editorMode,
+      'open_panel': openPanel,
+    };
+    if (productId != null) q['product_id'] = productId;
+    if (serviceId != null) q['service_id'] = serviceId;
+    return client.get('/v2/seller/studio/web-entry', query: q);
+  }
+
   Future<Response<dynamic>> studioStyles() {
     return client.get('/v2/seller/studio/styles');
   }
@@ -1203,6 +1386,46 @@ class SellerApi {
 
   Future<Response<dynamic>> studioDeleteAd(int id) {
     return client.delete('/v2/seller/studio/ads/$id');
+  }
+
+  Future<Response<dynamic>> studioGenerateCaption(int adId) {
+    return client.post('/v2/seller/studio/ads/$adId/caption');
+  }
+
+  // ── Brand Kit sync ────────────────────────────────────────────────────────
+
+  Future<Response<dynamic>> fetchBrandKit() {
+    return client.get('/v2/seller/studio/brand-kit');
+  }
+
+  Future<Response<dynamic>> saveBrandKit(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/studio/brand-kit', data: payload);
+  }
+
+  Future<Response<dynamic>> fetchStudioSavedTemplates() {
+    return client.get('/v2/seller/studio/saved-templates');
+  }
+
+  Future<Response<dynamic>> saveStudioTemplate(Map<String, dynamic> payload) {
+    return client.post('/v2/seller/studio/saved-templates', data: payload);
+  }
+
+  Future<Response<dynamic>> deleteStudioTemplate(String id) {
+    return client.delete('/v2/seller/studio/saved-templates/$id');
+  }
+
+  Future<Response<dynamic>> fetchStudioCatalog() {
+    return client.get('/v2/seller/studio/catalog');
+  }
+
+  Future<Response<dynamic>> recordStudioTemplateUse(String templateId) {
+    return client.post('/v2/seller/studio/template-use', data: {
+      'template_id': templateId,
+    });
+  }
+
+  Future<Response<dynamic>> fetchStudioCloudStorage() {
+    return client.get('/v2/seller/studio/cloud-storage');
   }
 
   static String _extractErrorMessage(dynamic data) {

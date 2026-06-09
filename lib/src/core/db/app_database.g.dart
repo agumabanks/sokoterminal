@@ -2420,6 +2420,39 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _coverUploadIdMeta = const VerificationMeta(
+    'coverUploadId',
+  );
+  @override
+  late final GeneratedColumn<int> coverUploadId = GeneratedColumn<int>(
+    'cover_upload_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _galleryUrlsMeta = const VerificationMeta(
+    'galleryUrls',
+  );
+  @override
+  late final GeneratedColumn<String> galleryUrls = GeneratedColumn<String>(
+    'gallery_urls',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _galleryUploadIdsMeta = const VerificationMeta(
+    'galleryUploadIds',
+  );
+  @override
+  late final GeneratedColumn<String> galleryUploadIds = GeneratedColumn<String>(
+    'gallery_upload_ids',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _priceMeta = const VerificationMeta('price');
   @override
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
@@ -2428,6 +2461,15 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     false,
     type: DriftSqlType.double,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _costMeta = const VerificationMeta('cost');
+  @override
+  late final GeneratedColumn<double> cost = GeneratedColumn<double>(
+    'cost',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _durationMinutesMeta = const VerificationMeta(
     'durationMinutes',
@@ -2454,6 +2496,82 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
       'CHECK ("published_online" IN (0, 1))',
     ),
     defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+    'category_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serviceTypeMeta = const VerificationMeta(
+    'serviceType',
+  );
+  @override
+  late final GeneratedColumn<String> serviceType = GeneratedColumn<String>(
+    'service_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deliveryTimeframeMeta = const VerificationMeta(
+    'deliveryTimeframe',
+  );
+  @override
+  late final GeneratedColumn<String> deliveryTimeframe =
+      GeneratedColumn<String>(
+        'delivery_timeframe',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _moderationStatusMeta = const VerificationMeta(
+    'moderationStatus',
+  );
+  @override
+  late final GeneratedColumn<String> moderationStatus = GeneratedColumn<String>(
+    'moderation_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _slugMeta = const VerificationMeta('slug');
+  @override
+  late final GeneratedColumn<String> slug = GeneratedColumn<String>(
+    'slug',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pricingPackagesMeta = const VerificationMeta(
+    'pricingPackages',
+  );
+  @override
+  late final GeneratedColumn<String> pricingPackages = GeneratedColumn<String>(
+    'pricing_packages',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
@@ -2498,9 +2616,20 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     title,
     description,
     imageUrl,
+    coverUploadId,
+    galleryUrls,
+    galleryUploadIds,
     price,
+    cost,
     durationMinutes,
     publishedOnline,
+    categoryId,
+    summary,
+    serviceType,
+    deliveryTimeframe,
+    moderationStatus,
+    slug,
+    pricingPackages,
     updatedAt,
     synced,
     category,
@@ -2549,6 +2678,33 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
       );
     }
+    if (data.containsKey('cover_upload_id')) {
+      context.handle(
+        _coverUploadIdMeta,
+        coverUploadId.isAcceptableOrUnknown(
+          data['cover_upload_id']!,
+          _coverUploadIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('gallery_urls')) {
+      context.handle(
+        _galleryUrlsMeta,
+        galleryUrls.isAcceptableOrUnknown(
+          data['gallery_urls']!,
+          _galleryUrlsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('gallery_upload_ids')) {
+      context.handle(
+        _galleryUploadIdsMeta,
+        galleryUploadIds.isAcceptableOrUnknown(
+          data['gallery_upload_ids']!,
+          _galleryUploadIdsMeta,
+        ),
+      );
+    }
     if (data.containsKey('price')) {
       context.handle(
         _priceMeta,
@@ -2556,6 +2712,12 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
       );
     } else if (isInserting) {
       context.missing(_priceMeta);
+    }
+    if (data.containsKey('cost')) {
+      context.handle(
+        _costMeta,
+        cost.isAcceptableOrUnknown(data['cost']!, _costMeta),
+      );
     }
     if (data.containsKey('duration_minutes')) {
       context.handle(
@@ -2572,6 +2734,60 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         publishedOnline.isAcceptableOrUnknown(
           data['published_online']!,
           _publishedOnlineMeta,
+        ),
+      );
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    }
+    if (data.containsKey('service_type')) {
+      context.handle(
+        _serviceTypeMeta,
+        serviceType.isAcceptableOrUnknown(
+          data['service_type']!,
+          _serviceTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivery_timeframe')) {
+      context.handle(
+        _deliveryTimeframeMeta,
+        deliveryTimeframe.isAcceptableOrUnknown(
+          data['delivery_timeframe']!,
+          _deliveryTimeframeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('moderation_status')) {
+      context.handle(
+        _moderationStatusMeta,
+        moderationStatus.isAcceptableOrUnknown(
+          data['moderation_status']!,
+          _moderationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('slug')) {
+      context.handle(
+        _slugMeta,
+        slug.isAcceptableOrUnknown(data['slug']!, _slugMeta),
+      );
+    }
+    if (data.containsKey('pricing_packages')) {
+      context.handle(
+        _pricingPackagesMeta,
+        pricingPackages.isAcceptableOrUnknown(
+          data['pricing_packages']!,
+          _pricingPackagesMeta,
         ),
       );
     }
@@ -2622,10 +2838,26 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         DriftSqlType.string,
         data['${effectivePrefix}image_url'],
       ),
+      coverUploadId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cover_upload_id'],
+      ),
+      galleryUrls: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}gallery_urls'],
+      ),
+      galleryUploadIds: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}gallery_upload_ids'],
+      ),
       price: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}price'],
       )!,
+      cost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cost'],
+      ),
       durationMinutes: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}duration_minutes'],
@@ -2634,6 +2866,34 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         DriftSqlType.bool,
         data['${effectivePrefix}published_online'],
       )!,
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}category_id'],
+      ),
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      ),
+      serviceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_type'],
+      ),
+      deliveryTimeframe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}delivery_timeframe'],
+      ),
+      moderationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}moderation_status'],
+      ),
+      slug: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slug'],
+      ),
+      pricingPackages: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pricing_packages'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -2661,9 +2921,20 @@ class Service extends DataClass implements Insertable<Service> {
   final String title;
   final String? description;
   final String? imageUrl;
+  final int? coverUploadId;
+  final String? galleryUrls;
+  final String? galleryUploadIds;
   final double price;
+  final double? cost;
   final int? durationMinutes;
   final bool publishedOnline;
+  final int? categoryId;
+  final String? summary;
+  final String? serviceType;
+  final String? deliveryTimeframe;
+  final String? moderationStatus;
+  final String? slug;
+  final String? pricingPackages;
   final DateTime updatedAt;
   final bool synced;
   final String? category;
@@ -2673,9 +2944,20 @@ class Service extends DataClass implements Insertable<Service> {
     required this.title,
     this.description,
     this.imageUrl,
+    this.coverUploadId,
+    this.galleryUrls,
+    this.galleryUploadIds,
     required this.price,
+    this.cost,
     this.durationMinutes,
     required this.publishedOnline,
+    this.categoryId,
+    this.summary,
+    this.serviceType,
+    this.deliveryTimeframe,
+    this.moderationStatus,
+    this.slug,
+    this.pricingPackages,
     required this.updatedAt,
     required this.synced,
     this.category,
@@ -2694,11 +2976,44 @@ class Service extends DataClass implements Insertable<Service> {
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
     }
+    if (!nullToAbsent || coverUploadId != null) {
+      map['cover_upload_id'] = Variable<int>(coverUploadId);
+    }
+    if (!nullToAbsent || galleryUrls != null) {
+      map['gallery_urls'] = Variable<String>(galleryUrls);
+    }
+    if (!nullToAbsent || galleryUploadIds != null) {
+      map['gallery_upload_ids'] = Variable<String>(galleryUploadIds);
+    }
     map['price'] = Variable<double>(price);
+    if (!nullToAbsent || cost != null) {
+      map['cost'] = Variable<double>(cost);
+    }
     if (!nullToAbsent || durationMinutes != null) {
       map['duration_minutes'] = Variable<int>(durationMinutes);
     }
     map['published_online'] = Variable<bool>(publishedOnline);
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<int>(categoryId);
+    }
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
+    if (!nullToAbsent || serviceType != null) {
+      map['service_type'] = Variable<String>(serviceType);
+    }
+    if (!nullToAbsent || deliveryTimeframe != null) {
+      map['delivery_timeframe'] = Variable<String>(deliveryTimeframe);
+    }
+    if (!nullToAbsent || moderationStatus != null) {
+      map['moderation_status'] = Variable<String>(moderationStatus);
+    }
+    if (!nullToAbsent || slug != null) {
+      map['slug'] = Variable<String>(slug);
+    }
+    if (!nullToAbsent || pricingPackages != null) {
+      map['pricing_packages'] = Variable<String>(pricingPackages);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['synced'] = Variable<bool>(synced);
     if (!nullToAbsent || category != null) {
@@ -2720,11 +3035,40 @@ class Service extends DataClass implements Insertable<Service> {
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(imageUrl),
+      coverUploadId: coverUploadId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverUploadId),
+      galleryUrls: galleryUrls == null && nullToAbsent
+          ? const Value.absent()
+          : Value(galleryUrls),
+      galleryUploadIds: galleryUploadIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(galleryUploadIds),
       price: Value(price),
+      cost: cost == null && nullToAbsent ? const Value.absent() : Value(cost),
       durationMinutes: durationMinutes == null && nullToAbsent
           ? const Value.absent()
           : Value(durationMinutes),
       publishedOnline: Value(publishedOnline),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
+      serviceType: serviceType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serviceType),
+      deliveryTimeframe: deliveryTimeframe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveryTimeframe),
+      moderationStatus: moderationStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(moderationStatus),
+      slug: slug == null && nullToAbsent ? const Value.absent() : Value(slug),
+      pricingPackages: pricingPackages == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pricingPackages),
       updatedAt: Value(updatedAt),
       synced: Value(synced),
       category: category == null && nullToAbsent
@@ -2744,9 +3088,22 @@ class Service extends DataClass implements Insertable<Service> {
       title: serializer.fromJson<String>(json['title']),
       description: serializer.fromJson<String?>(json['description']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
+      coverUploadId: serializer.fromJson<int?>(json['coverUploadId']),
+      galleryUrls: serializer.fromJson<String?>(json['galleryUrls']),
+      galleryUploadIds: serializer.fromJson<String?>(json['galleryUploadIds']),
       price: serializer.fromJson<double>(json['price']),
+      cost: serializer.fromJson<double?>(json['cost']),
       durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
       publishedOnline: serializer.fromJson<bool>(json['publishedOnline']),
+      categoryId: serializer.fromJson<int?>(json['categoryId']),
+      summary: serializer.fromJson<String?>(json['summary']),
+      serviceType: serializer.fromJson<String?>(json['serviceType']),
+      deliveryTimeframe: serializer.fromJson<String?>(
+        json['deliveryTimeframe'],
+      ),
+      moderationStatus: serializer.fromJson<String?>(json['moderationStatus']),
+      slug: serializer.fromJson<String?>(json['slug']),
+      pricingPackages: serializer.fromJson<String?>(json['pricingPackages']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       synced: serializer.fromJson<bool>(json['synced']),
       category: serializer.fromJson<String?>(json['category']),
@@ -2761,9 +3118,20 @@ class Service extends DataClass implements Insertable<Service> {
       'title': serializer.toJson<String>(title),
       'description': serializer.toJson<String?>(description),
       'imageUrl': serializer.toJson<String?>(imageUrl),
+      'coverUploadId': serializer.toJson<int?>(coverUploadId),
+      'galleryUrls': serializer.toJson<String?>(galleryUrls),
+      'galleryUploadIds': serializer.toJson<String?>(galleryUploadIds),
       'price': serializer.toJson<double>(price),
+      'cost': serializer.toJson<double?>(cost),
       'durationMinutes': serializer.toJson<int?>(durationMinutes),
       'publishedOnline': serializer.toJson<bool>(publishedOnline),
+      'categoryId': serializer.toJson<int?>(categoryId),
+      'summary': serializer.toJson<String?>(summary),
+      'serviceType': serializer.toJson<String?>(serviceType),
+      'deliveryTimeframe': serializer.toJson<String?>(deliveryTimeframe),
+      'moderationStatus': serializer.toJson<String?>(moderationStatus),
+      'slug': serializer.toJson<String?>(slug),
+      'pricingPackages': serializer.toJson<String?>(pricingPackages),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'synced': serializer.toJson<bool>(synced),
       'category': serializer.toJson<String?>(category),
@@ -2776,9 +3144,20 @@ class Service extends DataClass implements Insertable<Service> {
     String? title,
     Value<String?> description = const Value.absent(),
     Value<String?> imageUrl = const Value.absent(),
+    Value<int?> coverUploadId = const Value.absent(),
+    Value<String?> galleryUrls = const Value.absent(),
+    Value<String?> galleryUploadIds = const Value.absent(),
     double? price,
+    Value<double?> cost = const Value.absent(),
     Value<int?> durationMinutes = const Value.absent(),
     bool? publishedOnline,
+    Value<int?> categoryId = const Value.absent(),
+    Value<String?> summary = const Value.absent(),
+    Value<String?> serviceType = const Value.absent(),
+    Value<String?> deliveryTimeframe = const Value.absent(),
+    Value<String?> moderationStatus = const Value.absent(),
+    Value<String?> slug = const Value.absent(),
+    Value<String?> pricingPackages = const Value.absent(),
     DateTime? updatedAt,
     bool? synced,
     Value<String?> category = const Value.absent(),
@@ -2788,11 +3167,32 @@ class Service extends DataClass implements Insertable<Service> {
     title: title ?? this.title,
     description: description.present ? description.value : this.description,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+    coverUploadId: coverUploadId.present
+        ? coverUploadId.value
+        : this.coverUploadId,
+    galleryUrls: galleryUrls.present ? galleryUrls.value : this.galleryUrls,
+    galleryUploadIds: galleryUploadIds.present
+        ? galleryUploadIds.value
+        : this.galleryUploadIds,
     price: price ?? this.price,
+    cost: cost.present ? cost.value : this.cost,
     durationMinutes: durationMinutes.present
         ? durationMinutes.value
         : this.durationMinutes,
     publishedOnline: publishedOnline ?? this.publishedOnline,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    summary: summary.present ? summary.value : this.summary,
+    serviceType: serviceType.present ? serviceType.value : this.serviceType,
+    deliveryTimeframe: deliveryTimeframe.present
+        ? deliveryTimeframe.value
+        : this.deliveryTimeframe,
+    moderationStatus: moderationStatus.present
+        ? moderationStatus.value
+        : this.moderationStatus,
+    slug: slug.present ? slug.value : this.slug,
+    pricingPackages: pricingPackages.present
+        ? pricingPackages.value
+        : this.pricingPackages,
     updatedAt: updatedAt ?? this.updatedAt,
     synced: synced ?? this.synced,
     category: category.present ? category.value : this.category,
@@ -2806,13 +3206,40 @@ class Service extends DataClass implements Insertable<Service> {
           ? data.description.value
           : this.description,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
+      coverUploadId: data.coverUploadId.present
+          ? data.coverUploadId.value
+          : this.coverUploadId,
+      galleryUrls: data.galleryUrls.present
+          ? data.galleryUrls.value
+          : this.galleryUrls,
+      galleryUploadIds: data.galleryUploadIds.present
+          ? data.galleryUploadIds.value
+          : this.galleryUploadIds,
       price: data.price.present ? data.price.value : this.price,
+      cost: data.cost.present ? data.cost.value : this.cost,
       durationMinutes: data.durationMinutes.present
           ? data.durationMinutes.value
           : this.durationMinutes,
       publishedOnline: data.publishedOnline.present
           ? data.publishedOnline.value
           : this.publishedOnline,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      serviceType: data.serviceType.present
+          ? data.serviceType.value
+          : this.serviceType,
+      deliveryTimeframe: data.deliveryTimeframe.present
+          ? data.deliveryTimeframe.value
+          : this.deliveryTimeframe,
+      moderationStatus: data.moderationStatus.present
+          ? data.moderationStatus.value
+          : this.moderationStatus,
+      slug: data.slug.present ? data.slug.value : this.slug,
+      pricingPackages: data.pricingPackages.present
+          ? data.pricingPackages.value
+          : this.pricingPackages,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       synced: data.synced.present ? data.synced.value : this.synced,
       category: data.category.present ? data.category.value : this.category,
@@ -2827,9 +3254,20 @@ class Service extends DataClass implements Insertable<Service> {
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('coverUploadId: $coverUploadId, ')
+          ..write('galleryUrls: $galleryUrls, ')
+          ..write('galleryUploadIds: $galleryUploadIds, ')
           ..write('price: $price, ')
+          ..write('cost: $cost, ')
           ..write('durationMinutes: $durationMinutes, ')
           ..write('publishedOnline: $publishedOnline, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('summary: $summary, ')
+          ..write('serviceType: $serviceType, ')
+          ..write('deliveryTimeframe: $deliveryTimeframe, ')
+          ..write('moderationStatus: $moderationStatus, ')
+          ..write('slug: $slug, ')
+          ..write('pricingPackages: $pricingPackages, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced, ')
           ..write('category: $category')
@@ -2838,19 +3276,30 @@ class Service extends DataClass implements Insertable<Service> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     remoteId,
     title,
     description,
     imageUrl,
+    coverUploadId,
+    galleryUrls,
+    galleryUploadIds,
     price,
+    cost,
     durationMinutes,
     publishedOnline,
+    categoryId,
+    summary,
+    serviceType,
+    deliveryTimeframe,
+    moderationStatus,
+    slug,
+    pricingPackages,
     updatedAt,
     synced,
     category,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2860,9 +3309,20 @@ class Service extends DataClass implements Insertable<Service> {
           other.title == this.title &&
           other.description == this.description &&
           other.imageUrl == this.imageUrl &&
+          other.coverUploadId == this.coverUploadId &&
+          other.galleryUrls == this.galleryUrls &&
+          other.galleryUploadIds == this.galleryUploadIds &&
           other.price == this.price &&
+          other.cost == this.cost &&
           other.durationMinutes == this.durationMinutes &&
           other.publishedOnline == this.publishedOnline &&
+          other.categoryId == this.categoryId &&
+          other.summary == this.summary &&
+          other.serviceType == this.serviceType &&
+          other.deliveryTimeframe == this.deliveryTimeframe &&
+          other.moderationStatus == this.moderationStatus &&
+          other.slug == this.slug &&
+          other.pricingPackages == this.pricingPackages &&
           other.updatedAt == this.updatedAt &&
           other.synced == this.synced &&
           other.category == this.category);
@@ -2874,9 +3334,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
   final Value<String> title;
   final Value<String?> description;
   final Value<String?> imageUrl;
+  final Value<int?> coverUploadId;
+  final Value<String?> galleryUrls;
+  final Value<String?> galleryUploadIds;
   final Value<double> price;
+  final Value<double?> cost;
   final Value<int?> durationMinutes;
   final Value<bool> publishedOnline;
+  final Value<int?> categoryId;
+  final Value<String?> summary;
+  final Value<String?> serviceType;
+  final Value<String?> deliveryTimeframe;
+  final Value<String?> moderationStatus;
+  final Value<String?> slug;
+  final Value<String?> pricingPackages;
   final Value<DateTime> updatedAt;
   final Value<bool> synced;
   final Value<String?> category;
@@ -2887,9 +3358,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.title = const Value.absent(),
     this.description = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.coverUploadId = const Value.absent(),
+    this.galleryUrls = const Value.absent(),
+    this.galleryUploadIds = const Value.absent(),
     this.price = const Value.absent(),
+    this.cost = const Value.absent(),
     this.durationMinutes = const Value.absent(),
     this.publishedOnline = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.serviceType = const Value.absent(),
+    this.deliveryTimeframe = const Value.absent(),
+    this.moderationStatus = const Value.absent(),
+    this.slug = const Value.absent(),
+    this.pricingPackages = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.category = const Value.absent(),
@@ -2901,9 +3383,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     required String title,
     this.description = const Value.absent(),
     this.imageUrl = const Value.absent(),
+    this.coverUploadId = const Value.absent(),
+    this.galleryUrls = const Value.absent(),
+    this.galleryUploadIds = const Value.absent(),
     required double price,
+    this.cost = const Value.absent(),
     this.durationMinutes = const Value.absent(),
     this.publishedOnline = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.serviceType = const Value.absent(),
+    this.deliveryTimeframe = const Value.absent(),
+    this.moderationStatus = const Value.absent(),
+    this.slug = const Value.absent(),
+    this.pricingPackages = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.category = const Value.absent(),
@@ -2916,9 +3409,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Expression<String>? title,
     Expression<String>? description,
     Expression<String>? imageUrl,
+    Expression<int>? coverUploadId,
+    Expression<String>? galleryUrls,
+    Expression<String>? galleryUploadIds,
     Expression<double>? price,
+    Expression<double>? cost,
     Expression<int>? durationMinutes,
     Expression<bool>? publishedOnline,
+    Expression<int>? categoryId,
+    Expression<String>? summary,
+    Expression<String>? serviceType,
+    Expression<String>? deliveryTimeframe,
+    Expression<String>? moderationStatus,
+    Expression<String>? slug,
+    Expression<String>? pricingPackages,
     Expression<DateTime>? updatedAt,
     Expression<bool>? synced,
     Expression<String>? category,
@@ -2930,9 +3434,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       if (title != null) 'title': title,
       if (description != null) 'description': description,
       if (imageUrl != null) 'image_url': imageUrl,
+      if (coverUploadId != null) 'cover_upload_id': coverUploadId,
+      if (galleryUrls != null) 'gallery_urls': galleryUrls,
+      if (galleryUploadIds != null) 'gallery_upload_ids': galleryUploadIds,
       if (price != null) 'price': price,
+      if (cost != null) 'cost': cost,
       if (durationMinutes != null) 'duration_minutes': durationMinutes,
       if (publishedOnline != null) 'published_online': publishedOnline,
+      if (categoryId != null) 'category_id': categoryId,
+      if (summary != null) 'summary': summary,
+      if (serviceType != null) 'service_type': serviceType,
+      if (deliveryTimeframe != null) 'delivery_timeframe': deliveryTimeframe,
+      if (moderationStatus != null) 'moderation_status': moderationStatus,
+      if (slug != null) 'slug': slug,
+      if (pricingPackages != null) 'pricing_packages': pricingPackages,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (synced != null) 'synced': synced,
       if (category != null) 'category': category,
@@ -2946,9 +3461,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Value<String>? title,
     Value<String?>? description,
     Value<String?>? imageUrl,
+    Value<int?>? coverUploadId,
+    Value<String?>? galleryUrls,
+    Value<String?>? galleryUploadIds,
     Value<double>? price,
+    Value<double?>? cost,
     Value<int?>? durationMinutes,
     Value<bool>? publishedOnline,
+    Value<int?>? categoryId,
+    Value<String?>? summary,
+    Value<String?>? serviceType,
+    Value<String?>? deliveryTimeframe,
+    Value<String?>? moderationStatus,
+    Value<String?>? slug,
+    Value<String?>? pricingPackages,
     Value<DateTime>? updatedAt,
     Value<bool>? synced,
     Value<String?>? category,
@@ -2960,9 +3486,20 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       title: title ?? this.title,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
+      coverUploadId: coverUploadId ?? this.coverUploadId,
+      galleryUrls: galleryUrls ?? this.galleryUrls,
+      galleryUploadIds: galleryUploadIds ?? this.galleryUploadIds,
       price: price ?? this.price,
+      cost: cost ?? this.cost,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       publishedOnline: publishedOnline ?? this.publishedOnline,
+      categoryId: categoryId ?? this.categoryId,
+      summary: summary ?? this.summary,
+      serviceType: serviceType ?? this.serviceType,
+      deliveryTimeframe: deliveryTimeframe ?? this.deliveryTimeframe,
+      moderationStatus: moderationStatus ?? this.moderationStatus,
+      slug: slug ?? this.slug,
+      pricingPackages: pricingPackages ?? this.pricingPackages,
       updatedAt: updatedAt ?? this.updatedAt,
       synced: synced ?? this.synced,
       category: category ?? this.category,
@@ -2988,14 +3525,47 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
     }
+    if (coverUploadId.present) {
+      map['cover_upload_id'] = Variable<int>(coverUploadId.value);
+    }
+    if (galleryUrls.present) {
+      map['gallery_urls'] = Variable<String>(galleryUrls.value);
+    }
+    if (galleryUploadIds.present) {
+      map['gallery_upload_ids'] = Variable<String>(galleryUploadIds.value);
+    }
     if (price.present) {
       map['price'] = Variable<double>(price.value);
+    }
+    if (cost.present) {
+      map['cost'] = Variable<double>(cost.value);
     }
     if (durationMinutes.present) {
       map['duration_minutes'] = Variable<int>(durationMinutes.value);
     }
     if (publishedOnline.present) {
       map['published_online'] = Variable<bool>(publishedOnline.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (serviceType.present) {
+      map['service_type'] = Variable<String>(serviceType.value);
+    }
+    if (deliveryTimeframe.present) {
+      map['delivery_timeframe'] = Variable<String>(deliveryTimeframe.value);
+    }
+    if (moderationStatus.present) {
+      map['moderation_status'] = Variable<String>(moderationStatus.value);
+    }
+    if (slug.present) {
+      map['slug'] = Variable<String>(slug.value);
+    }
+    if (pricingPackages.present) {
+      map['pricing_packages'] = Variable<String>(pricingPackages.value);
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
@@ -3020,12 +3590,1007 @@ class ServicesCompanion extends UpdateCompanion<Service> {
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('imageUrl: $imageUrl, ')
+          ..write('coverUploadId: $coverUploadId, ')
+          ..write('galleryUrls: $galleryUrls, ')
+          ..write('galleryUploadIds: $galleryUploadIds, ')
           ..write('price: $price, ')
+          ..write('cost: $cost, ')
           ..write('durationMinutes: $durationMinutes, ')
           ..write('publishedOnline: $publishedOnline, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('summary: $summary, ')
+          ..write('serviceType: $serviceType, ')
+          ..write('deliveryTimeframe: $deliveryTimeframe, ')
+          ..write('moderationStatus: $moderationStatus, ')
+          ..write('slug: $slug, ')
+          ..write('pricingPackages: $pricingPackages, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced, ')
           ..write('category: $category, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ServiceJobSessionsTable extends ServiceJobSessions
+    with TableInfo<$ServiceJobSessionsTable, ServiceJobSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceJobSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => _uuid.v4(),
+  );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<int> remoteId = GeneratedColumn<int>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bookingIdMeta = const VerificationMeta(
+    'bookingId',
+  );
+  @override
+  late final GeneratedColumn<String> bookingId = GeneratedColumn<String>(
+    'booking_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _serviceIdMeta = const VerificationMeta(
+    'serviceId',
+  );
+  @override
+  late final GeneratedColumn<String> serviceId = GeneratedColumn<String>(
+    'service_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES services (id)',
+    ),
+  );
+  static const VerificationMeta _clientNameMeta = const VerificationMeta(
+    'clientName',
+  );
+  @override
+  late final GeneratedColumn<String> clientName = GeneratedColumn<String>(
+    'client_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientPhoneMeta = const VerificationMeta(
+    'clientPhone',
+  );
+  @override
+  late final GeneratedColumn<String> clientPhone = GeneratedColumn<String>(
+    'client_phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startedAt = GeneratedColumn<DateTime>(
+    'started_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endedAtMeta = const VerificationMeta(
+    'endedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> endedAt = GeneratedColumn<DateTime>(
+    'ended_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationMinutesMeta = const VerificationMeta(
+    'durationMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> durationMinutes = GeneratedColumn<int>(
+    'duration_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _materialsCostMeta = const VerificationMeta(
+    'materialsCost',
+  );
+  @override
+  late final GeneratedColumn<double> materialsCost = GeneratedColumn<double>(
+    'materials_cost',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _laborChargeMeta = const VerificationMeta(
+    'laborCharge',
+  );
+  @override
+  late final GeneratedColumn<double> laborCharge = GeneratedColumn<double>(
+    'labor_charge',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _finalChargeMeta = const VerificationMeta(
+    'finalCharge',
+  );
+  @override
+  late final GeneratedColumn<double> finalCharge = GeneratedColumn<double>(
+    'final_charge',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _photosJsonMeta = const VerificationMeta(
+    'photosJson',
+  );
+  @override
+  late final GeneratedColumn<String> photosJson = GeneratedColumn<String>(
+    'photos_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pipelineStageMeta = const VerificationMeta(
+    'pipelineStage',
+  );
+  @override
+  late final GeneratedColumn<String> pipelineStage = GeneratedColumn<String>(
+    'pipeline_stage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('booked'),
+  );
+  static const VerificationMeta _syncedMeta = const VerificationMeta('synced');
+  @override
+  late final GeneratedColumn<bool> synced = GeneratedColumn<bool>(
+    'synced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("synced" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    remoteId,
+    bookingId,
+    serviceId,
+    clientName,
+    clientPhone,
+    startedAt,
+    endedAt,
+    durationMinutes,
+    description,
+    materialsCost,
+    laborCharge,
+    finalCharge,
+    photosJson,
+    pipelineStage,
+    synced,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_job_sessions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ServiceJobSession> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('booking_id')) {
+      context.handle(
+        _bookingIdMeta,
+        bookingId.isAcceptableOrUnknown(data['booking_id']!, _bookingIdMeta),
+      );
+    }
+    if (data.containsKey('service_id')) {
+      context.handle(
+        _serviceIdMeta,
+        serviceId.isAcceptableOrUnknown(data['service_id']!, _serviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serviceIdMeta);
+    }
+    if (data.containsKey('client_name')) {
+      context.handle(
+        _clientNameMeta,
+        clientName.isAcceptableOrUnknown(data['client_name']!, _clientNameMeta),
+      );
+    }
+    if (data.containsKey('client_phone')) {
+      context.handle(
+        _clientPhoneMeta,
+        clientPhone.isAcceptableOrUnknown(
+          data['client_phone']!,
+          _clientPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startedAtMeta);
+    }
+    if (data.containsKey('ended_at')) {
+      context.handle(
+        _endedAtMeta,
+        endedAt.isAcceptableOrUnknown(data['ended_at']!, _endedAtMeta),
+      );
+    }
+    if (data.containsKey('duration_minutes')) {
+      context.handle(
+        _durationMinutesMeta,
+        durationMinutes.isAcceptableOrUnknown(
+          data['duration_minutes']!,
+          _durationMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('materials_cost')) {
+      context.handle(
+        _materialsCostMeta,
+        materialsCost.isAcceptableOrUnknown(
+          data['materials_cost']!,
+          _materialsCostMeta,
+        ),
+      );
+    }
+    if (data.containsKey('labor_charge')) {
+      context.handle(
+        _laborChargeMeta,
+        laborCharge.isAcceptableOrUnknown(
+          data['labor_charge']!,
+          _laborChargeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('final_charge')) {
+      context.handle(
+        _finalChargeMeta,
+        finalCharge.isAcceptableOrUnknown(
+          data['final_charge']!,
+          _finalChargeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('photos_json')) {
+      context.handle(
+        _photosJsonMeta,
+        photosJson.isAcceptableOrUnknown(data['photos_json']!, _photosJsonMeta),
+      );
+    }
+    if (data.containsKey('pipeline_stage')) {
+      context.handle(
+        _pipelineStageMeta,
+        pipelineStage.isAcceptableOrUnknown(
+          data['pipeline_stage']!,
+          _pipelineStageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('synced')) {
+      context.handle(
+        _syncedMeta,
+        synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ServiceJobSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceJobSession(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}remote_id'],
+      ),
+      bookingId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}booking_id'],
+      ),
+      serviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_id'],
+      )!,
+      clientName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_name'],
+      ),
+      clientPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_phone'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}started_at'],
+      )!,
+      endedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}ended_at'],
+      ),
+      durationMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_minutes'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      materialsCost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}materials_cost'],
+      )!,
+      laborCharge: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}labor_charge'],
+      )!,
+      finalCharge: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}final_charge'],
+      )!,
+      photosJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photos_json'],
+      ),
+      pipelineStage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pipeline_stage'],
+      )!,
+      synced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}synced'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ServiceJobSessionsTable createAlias(String alias) {
+    return $ServiceJobSessionsTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceJobSession extends DataClass
+    implements Insertable<ServiceJobSession> {
+  final String id;
+  final int? remoteId;
+  final String? bookingId;
+  final String serviceId;
+  final String? clientName;
+  final String? clientPhone;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final int? durationMinutes;
+  final String? description;
+  final double materialsCost;
+  final double laborCharge;
+  final double finalCharge;
+  final String? photosJson;
+  final String pipelineStage;
+  final bool synced;
+  final DateTime createdAt;
+  const ServiceJobSession({
+    required this.id,
+    this.remoteId,
+    this.bookingId,
+    required this.serviceId,
+    this.clientName,
+    this.clientPhone,
+    required this.startedAt,
+    this.endedAt,
+    this.durationMinutes,
+    this.description,
+    required this.materialsCost,
+    required this.laborCharge,
+    required this.finalCharge,
+    this.photosJson,
+    required this.pipelineStage,
+    required this.synced,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<int>(remoteId);
+    }
+    if (!nullToAbsent || bookingId != null) {
+      map['booking_id'] = Variable<String>(bookingId);
+    }
+    map['service_id'] = Variable<String>(serviceId);
+    if (!nullToAbsent || clientName != null) {
+      map['client_name'] = Variable<String>(clientName);
+    }
+    if (!nullToAbsent || clientPhone != null) {
+      map['client_phone'] = Variable<String>(clientPhone);
+    }
+    map['started_at'] = Variable<DateTime>(startedAt);
+    if (!nullToAbsent || endedAt != null) {
+      map['ended_at'] = Variable<DateTime>(endedAt);
+    }
+    if (!nullToAbsent || durationMinutes != null) {
+      map['duration_minutes'] = Variable<int>(durationMinutes);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['materials_cost'] = Variable<double>(materialsCost);
+    map['labor_charge'] = Variable<double>(laborCharge);
+    map['final_charge'] = Variable<double>(finalCharge);
+    if (!nullToAbsent || photosJson != null) {
+      map['photos_json'] = Variable<String>(photosJson);
+    }
+    map['pipeline_stage'] = Variable<String>(pipelineStage);
+    map['synced'] = Variable<bool>(synced);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ServiceJobSessionsCompanion toCompanion(bool nullToAbsent) {
+    return ServiceJobSessionsCompanion(
+      id: Value(id),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      bookingId: bookingId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bookingId),
+      serviceId: Value(serviceId),
+      clientName: clientName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientName),
+      clientPhone: clientPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientPhone),
+      startedAt: Value(startedAt),
+      endedAt: endedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endedAt),
+      durationMinutes: durationMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationMinutes),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      materialsCost: Value(materialsCost),
+      laborCharge: Value(laborCharge),
+      finalCharge: Value(finalCharge),
+      photosJson: photosJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(photosJson),
+      pipelineStage: Value(pipelineStage),
+      synced: Value(synced),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ServiceJobSession.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceJobSession(
+      id: serializer.fromJson<String>(json['id']),
+      remoteId: serializer.fromJson<int?>(json['remoteId']),
+      bookingId: serializer.fromJson<String?>(json['bookingId']),
+      serviceId: serializer.fromJson<String>(json['serviceId']),
+      clientName: serializer.fromJson<String?>(json['clientName']),
+      clientPhone: serializer.fromJson<String?>(json['clientPhone']),
+      startedAt: serializer.fromJson<DateTime>(json['startedAt']),
+      endedAt: serializer.fromJson<DateTime?>(json['endedAt']),
+      durationMinutes: serializer.fromJson<int?>(json['durationMinutes']),
+      description: serializer.fromJson<String?>(json['description']),
+      materialsCost: serializer.fromJson<double>(json['materialsCost']),
+      laborCharge: serializer.fromJson<double>(json['laborCharge']),
+      finalCharge: serializer.fromJson<double>(json['finalCharge']),
+      photosJson: serializer.fromJson<String?>(json['photosJson']),
+      pipelineStage: serializer.fromJson<String>(json['pipelineStage']),
+      synced: serializer.fromJson<bool>(json['synced']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'remoteId': serializer.toJson<int?>(remoteId),
+      'bookingId': serializer.toJson<String?>(bookingId),
+      'serviceId': serializer.toJson<String>(serviceId),
+      'clientName': serializer.toJson<String?>(clientName),
+      'clientPhone': serializer.toJson<String?>(clientPhone),
+      'startedAt': serializer.toJson<DateTime>(startedAt),
+      'endedAt': serializer.toJson<DateTime?>(endedAt),
+      'durationMinutes': serializer.toJson<int?>(durationMinutes),
+      'description': serializer.toJson<String?>(description),
+      'materialsCost': serializer.toJson<double>(materialsCost),
+      'laborCharge': serializer.toJson<double>(laborCharge),
+      'finalCharge': serializer.toJson<double>(finalCharge),
+      'photosJson': serializer.toJson<String?>(photosJson),
+      'pipelineStage': serializer.toJson<String>(pipelineStage),
+      'synced': serializer.toJson<bool>(synced),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ServiceJobSession copyWith({
+    String? id,
+    Value<int?> remoteId = const Value.absent(),
+    Value<String?> bookingId = const Value.absent(),
+    String? serviceId,
+    Value<String?> clientName = const Value.absent(),
+    Value<String?> clientPhone = const Value.absent(),
+    DateTime? startedAt,
+    Value<DateTime?> endedAt = const Value.absent(),
+    Value<int?> durationMinutes = const Value.absent(),
+    Value<String?> description = const Value.absent(),
+    double? materialsCost,
+    double? laborCharge,
+    double? finalCharge,
+    Value<String?> photosJson = const Value.absent(),
+    String? pipelineStage,
+    bool? synced,
+    DateTime? createdAt,
+  }) => ServiceJobSession(
+    id: id ?? this.id,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    bookingId: bookingId.present ? bookingId.value : this.bookingId,
+    serviceId: serviceId ?? this.serviceId,
+    clientName: clientName.present ? clientName.value : this.clientName,
+    clientPhone: clientPhone.present ? clientPhone.value : this.clientPhone,
+    startedAt: startedAt ?? this.startedAt,
+    endedAt: endedAt.present ? endedAt.value : this.endedAt,
+    durationMinutes: durationMinutes.present
+        ? durationMinutes.value
+        : this.durationMinutes,
+    description: description.present ? description.value : this.description,
+    materialsCost: materialsCost ?? this.materialsCost,
+    laborCharge: laborCharge ?? this.laborCharge,
+    finalCharge: finalCharge ?? this.finalCharge,
+    photosJson: photosJson.present ? photosJson.value : this.photosJson,
+    pipelineStage: pipelineStage ?? this.pipelineStage,
+    synced: synced ?? this.synced,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  ServiceJobSession copyWithCompanion(ServiceJobSessionsCompanion data) {
+    return ServiceJobSession(
+      id: data.id.present ? data.id.value : this.id,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      bookingId: data.bookingId.present ? data.bookingId.value : this.bookingId,
+      serviceId: data.serviceId.present ? data.serviceId.value : this.serviceId,
+      clientName: data.clientName.present
+          ? data.clientName.value
+          : this.clientName,
+      clientPhone: data.clientPhone.present
+          ? data.clientPhone.value
+          : this.clientPhone,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
+      durationMinutes: data.durationMinutes.present
+          ? data.durationMinutes.value
+          : this.durationMinutes,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      materialsCost: data.materialsCost.present
+          ? data.materialsCost.value
+          : this.materialsCost,
+      laborCharge: data.laborCharge.present
+          ? data.laborCharge.value
+          : this.laborCharge,
+      finalCharge: data.finalCharge.present
+          ? data.finalCharge.value
+          : this.finalCharge,
+      photosJson: data.photosJson.present
+          ? data.photosJson.value
+          : this.photosJson,
+      pipelineStage: data.pipelineStage.present
+          ? data.pipelineStage.value
+          : this.pipelineStage,
+      synced: data.synced.present ? data.synced.value : this.synced,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceJobSession(')
+          ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('bookingId: $bookingId, ')
+          ..write('serviceId: $serviceId, ')
+          ..write('clientName: $clientName, ')
+          ..write('clientPhone: $clientPhone, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('description: $description, ')
+          ..write('materialsCost: $materialsCost, ')
+          ..write('laborCharge: $laborCharge, ')
+          ..write('finalCharge: $finalCharge, ')
+          ..write('photosJson: $photosJson, ')
+          ..write('pipelineStage: $pipelineStage, ')
+          ..write('synced: $synced, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    remoteId,
+    bookingId,
+    serviceId,
+    clientName,
+    clientPhone,
+    startedAt,
+    endedAt,
+    durationMinutes,
+    description,
+    materialsCost,
+    laborCharge,
+    finalCharge,
+    photosJson,
+    pipelineStage,
+    synced,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceJobSession &&
+          other.id == this.id &&
+          other.remoteId == this.remoteId &&
+          other.bookingId == this.bookingId &&
+          other.serviceId == this.serviceId &&
+          other.clientName == this.clientName &&
+          other.clientPhone == this.clientPhone &&
+          other.startedAt == this.startedAt &&
+          other.endedAt == this.endedAt &&
+          other.durationMinutes == this.durationMinutes &&
+          other.description == this.description &&
+          other.materialsCost == this.materialsCost &&
+          other.laborCharge == this.laborCharge &&
+          other.finalCharge == this.finalCharge &&
+          other.photosJson == this.photosJson &&
+          other.pipelineStage == this.pipelineStage &&
+          other.synced == this.synced &&
+          other.createdAt == this.createdAt);
+}
+
+class ServiceJobSessionsCompanion extends UpdateCompanion<ServiceJobSession> {
+  final Value<String> id;
+  final Value<int?> remoteId;
+  final Value<String?> bookingId;
+  final Value<String> serviceId;
+  final Value<String?> clientName;
+  final Value<String?> clientPhone;
+  final Value<DateTime> startedAt;
+  final Value<DateTime?> endedAt;
+  final Value<int?> durationMinutes;
+  final Value<String?> description;
+  final Value<double> materialsCost;
+  final Value<double> laborCharge;
+  final Value<double> finalCharge;
+  final Value<String?> photosJson;
+  final Value<String> pipelineStage;
+  final Value<bool> synced;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const ServiceJobSessionsCompanion({
+    this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.bookingId = const Value.absent(),
+    this.serviceId = const Value.absent(),
+    this.clientName = const Value.absent(),
+    this.clientPhone = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.endedAt = const Value.absent(),
+    this.durationMinutes = const Value.absent(),
+    this.description = const Value.absent(),
+    this.materialsCost = const Value.absent(),
+    this.laborCharge = const Value.absent(),
+    this.finalCharge = const Value.absent(),
+    this.photosJson = const Value.absent(),
+    this.pipelineStage = const Value.absent(),
+    this.synced = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ServiceJobSessionsCompanion.insert({
+    this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.bookingId = const Value.absent(),
+    required String serviceId,
+    this.clientName = const Value.absent(),
+    this.clientPhone = const Value.absent(),
+    required DateTime startedAt,
+    this.endedAt = const Value.absent(),
+    this.durationMinutes = const Value.absent(),
+    this.description = const Value.absent(),
+    this.materialsCost = const Value.absent(),
+    this.laborCharge = const Value.absent(),
+    this.finalCharge = const Value.absent(),
+    this.photosJson = const Value.absent(),
+    this.pipelineStage = const Value.absent(),
+    this.synced = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : serviceId = Value(serviceId),
+       startedAt = Value(startedAt);
+  static Insertable<ServiceJobSession> custom({
+    Expression<String>? id,
+    Expression<int>? remoteId,
+    Expression<String>? bookingId,
+    Expression<String>? serviceId,
+    Expression<String>? clientName,
+    Expression<String>? clientPhone,
+    Expression<DateTime>? startedAt,
+    Expression<DateTime>? endedAt,
+    Expression<int>? durationMinutes,
+    Expression<String>? description,
+    Expression<double>? materialsCost,
+    Expression<double>? laborCharge,
+    Expression<double>? finalCharge,
+    Expression<String>? photosJson,
+    Expression<String>? pipelineStage,
+    Expression<bool>? synced,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (bookingId != null) 'booking_id': bookingId,
+      if (serviceId != null) 'service_id': serviceId,
+      if (clientName != null) 'client_name': clientName,
+      if (clientPhone != null) 'client_phone': clientPhone,
+      if (startedAt != null) 'started_at': startedAt,
+      if (endedAt != null) 'ended_at': endedAt,
+      if (durationMinutes != null) 'duration_minutes': durationMinutes,
+      if (description != null) 'description': description,
+      if (materialsCost != null) 'materials_cost': materialsCost,
+      if (laborCharge != null) 'labor_charge': laborCharge,
+      if (finalCharge != null) 'final_charge': finalCharge,
+      if (photosJson != null) 'photos_json': photosJson,
+      if (pipelineStage != null) 'pipeline_stage': pipelineStage,
+      if (synced != null) 'synced': synced,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ServiceJobSessionsCompanion copyWith({
+    Value<String>? id,
+    Value<int?>? remoteId,
+    Value<String?>? bookingId,
+    Value<String>? serviceId,
+    Value<String?>? clientName,
+    Value<String?>? clientPhone,
+    Value<DateTime>? startedAt,
+    Value<DateTime?>? endedAt,
+    Value<int?>? durationMinutes,
+    Value<String?>? description,
+    Value<double>? materialsCost,
+    Value<double>? laborCharge,
+    Value<double>? finalCharge,
+    Value<String?>? photosJson,
+    Value<String>? pipelineStage,
+    Value<bool>? synced,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return ServiceJobSessionsCompanion(
+      id: id ?? this.id,
+      remoteId: remoteId ?? this.remoteId,
+      bookingId: bookingId ?? this.bookingId,
+      serviceId: serviceId ?? this.serviceId,
+      clientName: clientName ?? this.clientName,
+      clientPhone: clientPhone ?? this.clientPhone,
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      description: description ?? this.description,
+      materialsCost: materialsCost ?? this.materialsCost,
+      laborCharge: laborCharge ?? this.laborCharge,
+      finalCharge: finalCharge ?? this.finalCharge,
+      photosJson: photosJson ?? this.photosJson,
+      pipelineStage: pipelineStage ?? this.pipelineStage,
+      synced: synced ?? this.synced,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<int>(remoteId.value);
+    }
+    if (bookingId.present) {
+      map['booking_id'] = Variable<String>(bookingId.value);
+    }
+    if (serviceId.present) {
+      map['service_id'] = Variable<String>(serviceId.value);
+    }
+    if (clientName.present) {
+      map['client_name'] = Variable<String>(clientName.value);
+    }
+    if (clientPhone.present) {
+      map['client_phone'] = Variable<String>(clientPhone.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<DateTime>(startedAt.value);
+    }
+    if (endedAt.present) {
+      map['ended_at'] = Variable<DateTime>(endedAt.value);
+    }
+    if (durationMinutes.present) {
+      map['duration_minutes'] = Variable<int>(durationMinutes.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (materialsCost.present) {
+      map['materials_cost'] = Variable<double>(materialsCost.value);
+    }
+    if (laborCharge.present) {
+      map['labor_charge'] = Variable<double>(laborCharge.value);
+    }
+    if (finalCharge.present) {
+      map['final_charge'] = Variable<double>(finalCharge.value);
+    }
+    if (photosJson.present) {
+      map['photos_json'] = Variable<String>(photosJson.value);
+    }
+    if (pipelineStage.present) {
+      map['pipeline_stage'] = Variable<String>(pipelineStage.value);
+    }
+    if (synced.present) {
+      map['synced'] = Variable<bool>(synced.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceJobSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('bookingId: $bookingId, ')
+          ..write('serviceId: $serviceId, ')
+          ..write('clientName: $clientName, ')
+          ..write('clientPhone: $clientPhone, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('endedAt: $endedAt, ')
+          ..write('durationMinutes: $durationMinutes, ')
+          ..write('description: $description, ')
+          ..write('materialsCost: $materialsCost, ')
+          ..write('laborCharge: $laborCharge, ')
+          ..write('finalCharge: $finalCharge, ')
+          ..write('photosJson: $photosJson, ')
+          ..write('pipelineStage: $pipelineStage, ')
+          ..write('synced: $synced, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8085,6 +9650,18 @@ class $InventoryLogsTable extends InventoryLogs
       'REFERENCES items (id)',
     ),
   );
+  static const VerificationMeta _variantMeta = const VerificationMeta(
+    'variant',
+  );
+  @override
+  late final GeneratedColumn<String> variant = GeneratedColumn<String>(
+    'variant',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _deltaMeta = const VerificationMeta('delta');
   @override
   late final GeneratedColumn<int> delta = GeneratedColumn<int>(
@@ -8116,7 +9693,14 @@ class $InventoryLogsTable extends InventoryLogs
     clientDefault: () => DateTime.now().toUtc(),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, itemId, delta, note, createdAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    itemId,
+    variant,
+    delta,
+    note,
+    createdAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -8139,6 +9723,12 @@ class $InventoryLogsTable extends InventoryLogs
       );
     } else if (isInserting) {
       context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('variant')) {
+      context.handle(
+        _variantMeta,
+        variant.isAcceptableOrUnknown(data['variant']!, _variantMeta),
+      );
     }
     if (data.containsKey('delta')) {
       context.handle(
@@ -8177,6 +9767,10 @@ class $InventoryLogsTable extends InventoryLogs
         DriftSqlType.string,
         data['${effectivePrefix}item_id'],
       )!,
+      variant: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}variant'],
+      )!,
       delta: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}delta'],
@@ -8201,12 +9795,14 @@ class $InventoryLogsTable extends InventoryLogs
 class InventoryLog extends DataClass implements Insertable<InventoryLog> {
   final int id;
   final String itemId;
+  final String variant;
   final int delta;
   final String? note;
   final DateTime createdAt;
   const InventoryLog({
     required this.id,
     required this.itemId,
+    required this.variant,
     required this.delta,
     this.note,
     required this.createdAt,
@@ -8216,6 +9812,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['item_id'] = Variable<String>(itemId);
+    map['variant'] = Variable<String>(variant);
     map['delta'] = Variable<int>(delta);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -8228,6 +9825,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     return InventoryLogsCompanion(
       id: Value(id),
       itemId: Value(itemId),
+      variant: Value(variant),
       delta: Value(delta),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       createdAt: Value(createdAt),
@@ -8242,6 +9840,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     return InventoryLog(
       id: serializer.fromJson<int>(json['id']),
       itemId: serializer.fromJson<String>(json['itemId']),
+      variant: serializer.fromJson<String>(json['variant']),
       delta: serializer.fromJson<int>(json['delta']),
       note: serializer.fromJson<String?>(json['note']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -8253,6 +9852,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'itemId': serializer.toJson<String>(itemId),
+      'variant': serializer.toJson<String>(variant),
       'delta': serializer.toJson<int>(delta),
       'note': serializer.toJson<String?>(note),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -8262,12 +9862,14 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
   InventoryLog copyWith({
     int? id,
     String? itemId,
+    String? variant,
     int? delta,
     Value<String?> note = const Value.absent(),
     DateTime? createdAt,
   }) => InventoryLog(
     id: id ?? this.id,
     itemId: itemId ?? this.itemId,
+    variant: variant ?? this.variant,
     delta: delta ?? this.delta,
     note: note.present ? note.value : this.note,
     createdAt: createdAt ?? this.createdAt,
@@ -8276,6 +9878,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     return InventoryLog(
       id: data.id.present ? data.id.value : this.id,
       itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      variant: data.variant.present ? data.variant.value : this.variant,
       delta: data.delta.present ? data.delta.value : this.delta,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -8287,6 +9890,7 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
     return (StringBuffer('InventoryLog(')
           ..write('id: $id, ')
           ..write('itemId: $itemId, ')
+          ..write('variant: $variant, ')
           ..write('delta: $delta, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt')
@@ -8295,13 +9899,14 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
   }
 
   @override
-  int get hashCode => Object.hash(id, itemId, delta, note, createdAt);
+  int get hashCode => Object.hash(id, itemId, variant, delta, note, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is InventoryLog &&
           other.id == this.id &&
           other.itemId == this.itemId &&
+          other.variant == this.variant &&
           other.delta == this.delta &&
           other.note == this.note &&
           other.createdAt == this.createdAt);
@@ -8310,12 +9915,14 @@ class InventoryLog extends DataClass implements Insertable<InventoryLog> {
 class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
   final Value<int> id;
   final Value<String> itemId;
+  final Value<String> variant;
   final Value<int> delta;
   final Value<String?> note;
   final Value<DateTime> createdAt;
   const InventoryLogsCompanion({
     this.id = const Value.absent(),
     this.itemId = const Value.absent(),
+    this.variant = const Value.absent(),
     this.delta = const Value.absent(),
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8323,6 +9930,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
   InventoryLogsCompanion.insert({
     this.id = const Value.absent(),
     required String itemId,
+    this.variant = const Value.absent(),
     required int delta,
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8331,6 +9939,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
   static Insertable<InventoryLog> custom({
     Expression<int>? id,
     Expression<String>? itemId,
+    Expression<String>? variant,
     Expression<int>? delta,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
@@ -8338,6 +9947,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (itemId != null) 'item_id': itemId,
+      if (variant != null) 'variant': variant,
       if (delta != null) 'delta': delta,
       if (note != null) 'note': note,
       if (createdAt != null) 'created_at': createdAt,
@@ -8347,6 +9957,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
   InventoryLogsCompanion copyWith({
     Value<int>? id,
     Value<String>? itemId,
+    Value<String>? variant,
     Value<int>? delta,
     Value<String?>? note,
     Value<DateTime>? createdAt,
@@ -8354,6 +9965,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
     return InventoryLogsCompanion(
       id: id ?? this.id,
       itemId: itemId ?? this.itemId,
+      variant: variant ?? this.variant,
       delta: delta ?? this.delta,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
@@ -8368,6 +9980,9 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
     }
     if (itemId.present) {
       map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (variant.present) {
+      map['variant'] = Variable<String>(variant.value);
     }
     if (delta.present) {
       map['delta'] = Variable<int>(delta.value);
@@ -8386,6 +10001,7 @@ class InventoryLogsCompanion extends UpdateCompanion<InventoryLog> {
     return (StringBuffer('InventoryLogsCompanion(')
           ..write('id: $id, ')
           ..write('itemId: $itemId, ')
+          ..write('variant: $variant, ')
           ..write('delta: $delta, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt')
@@ -10489,6 +12105,17 @@ class $BusinessProfilesTable extends BusinessProfiles
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<int> verificationStatus = GeneratedColumn<int>(
+    'verification_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -10547,6 +12174,7 @@ class $BusinessProfilesTable extends BusinessProfiles
     paybillNumber,
     receiptPaymentMethodsJson,
     deliveryProfileJson,
+    verificationStatus,
     updatedAt,
     synced,
   ];
@@ -10812,6 +12440,15 @@ class $BusinessProfilesTable extends BusinessProfiles
         ),
       );
     }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -10957,6 +12594,10 @@ class $BusinessProfilesTable extends BusinessProfiles
         DriftSqlType.string,
         data['${effectivePrefix}delivery_profile_json'],
       ),
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}verification_status'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -11006,6 +12647,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
   final String? paybillNumber;
   final String? receiptPaymentMethodsJson;
   final String? deliveryProfileJson;
+  final int verificationStatus;
   final DateTime updatedAt;
   final bool synced;
   const BusinessProfile({
@@ -11040,6 +12682,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     this.paybillNumber,
     this.receiptPaymentMethodsJson,
     this.deliveryProfileJson,
+    required this.verificationStatus,
     required this.updatedAt,
     required this.synced,
   });
@@ -11133,6 +12776,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     if (!nullToAbsent || deliveryProfileJson != null) {
       map['delivery_profile_json'] = Variable<String>(deliveryProfileJson);
     }
+    map['verification_status'] = Variable<int>(verificationStatus);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['synced'] = Variable<bool>(synced);
     return map;
@@ -11222,6 +12866,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       deliveryProfileJson: deliveryProfileJson == null && nullToAbsent
           ? const Value.absent()
           : Value(deliveryProfileJson),
+      verificationStatus: Value(verificationStatus),
       updatedAt: Value(updatedAt),
       synced: Value(synced),
     );
@@ -11278,6 +12923,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       deliveryProfileJson: serializer.fromJson<String?>(
         json['deliveryProfileJson'],
       ),
+      verificationStatus: serializer.fromJson<int>(json['verificationStatus']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       synced: serializer.fromJson<bool>(json['synced']),
     );
@@ -11323,6 +12969,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
         receiptPaymentMethodsJson,
       ),
       'deliveryProfileJson': serializer.toJson<String?>(deliveryProfileJson),
+      'verificationStatus': serializer.toJson<int>(verificationStatus),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'synced': serializer.toJson<bool>(synced),
     };
@@ -11360,6 +13007,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     Value<String?> paybillNumber = const Value.absent(),
     Value<String?> receiptPaymentMethodsJson = const Value.absent(),
     Value<String?> deliveryProfileJson = const Value.absent(),
+    int? verificationStatus,
     DateTime? updatedAt,
     bool? synced,
   }) => BusinessProfile(
@@ -11416,6 +13064,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     deliveryProfileJson: deliveryProfileJson.present
         ? deliveryProfileJson.value
         : this.deliveryProfileJson,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
     updatedAt: updatedAt ?? this.updatedAt,
     synced: synced ?? this.synced,
   );
@@ -11496,6 +13145,9 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       deliveryProfileJson: data.deliveryProfileJson.present
           ? data.deliveryProfileJson.value
           : this.deliveryProfileJson,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       synced: data.synced.present ? data.synced.value : this.synced,
     );
@@ -11535,6 +13187,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
           ..write('paybillNumber: $paybillNumber, ')
           ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
           ..write('deliveryProfileJson: $deliveryProfileJson, ')
+          ..write('verificationStatus: $verificationStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced')
           ..write(')'))
@@ -11574,6 +13227,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     paybillNumber,
     receiptPaymentMethodsJson,
     deliveryProfileJson,
+    verificationStatus,
     updatedAt,
     synced,
   ]);
@@ -11612,6 +13266,7 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
           other.paybillNumber == this.paybillNumber &&
           other.receiptPaymentMethodsJson == this.receiptPaymentMethodsJson &&
           other.deliveryProfileJson == this.deliveryProfileJson &&
+          other.verificationStatus == this.verificationStatus &&
           other.updatedAt == this.updatedAt &&
           other.synced == this.synced);
 }
@@ -11648,6 +13303,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
   final Value<String?> paybillNumber;
   final Value<String?> receiptPaymentMethodsJson;
   final Value<String?> deliveryProfileJson;
+  final Value<int> verificationStatus;
   final Value<DateTime> updatedAt;
   final Value<bool> synced;
   final Value<int> rowid;
@@ -11683,6 +13339,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     this.paybillNumber = const Value.absent(),
     this.receiptPaymentMethodsJson = const Value.absent(),
     this.deliveryProfileJson = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11719,6 +13376,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     this.paybillNumber = const Value.absent(),
     this.receiptPaymentMethodsJson = const Value.absent(),
     this.deliveryProfileJson = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11756,6 +13414,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     Expression<String>? paybillNumber,
     Expression<String>? receiptPaymentMethodsJson,
     Expression<String>? deliveryProfileJson,
+    Expression<int>? verificationStatus,
     Expression<DateTime>? updatedAt,
     Expression<bool>? synced,
     Expression<int>? rowid,
@@ -11802,6 +13461,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
         'receipt_payment_methods_json': receiptPaymentMethodsJson,
       if (deliveryProfileJson != null)
         'delivery_profile_json': deliveryProfileJson,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (synced != null) 'synced': synced,
       if (rowid != null) 'rowid': rowid,
@@ -11840,6 +13500,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     Value<String?>? paybillNumber,
     Value<String?>? receiptPaymentMethodsJson,
     Value<String?>? deliveryProfileJson,
+    Value<int>? verificationStatus,
     Value<DateTime>? updatedAt,
     Value<bool>? synced,
     Value<int>? rowid,
@@ -11880,6 +13541,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
       receiptPaymentMethodsJson:
           receiptPaymentMethodsJson ?? this.receiptPaymentMethodsJson,
       deliveryProfileJson: deliveryProfileJson ?? this.deliveryProfileJson,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
       updatedAt: updatedAt ?? this.updatedAt,
       synced: synced ?? this.synced,
       rowid: rowid ?? this.rowid,
@@ -11992,6 +13654,9 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
         deliveryProfileJson.value,
       );
     }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<int>(verificationStatus.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -12038,6 +13703,7 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
           ..write('paybillNumber: $paybillNumber, ')
           ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
           ..write('deliveryProfileJson: $deliveryProfileJson, ')
+          ..write('verificationStatus: $verificationStatus, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced, ')
           ..write('rowid: $rowid')
@@ -22364,12 +24030,1435 @@ class ExpenseCategoriesCompanion extends UpdateCompanion<ExpenseCategory> {
   }
 }
 
+class $AvailabilitySchedulesTable extends AvailabilitySchedules
+    with TableInfo<$AvailabilitySchedulesTable, AvailabilitySchedule> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AvailabilitySchedulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _dayOfWeekMeta = const VerificationMeta(
+    'dayOfWeek',
+  );
+  @override
+  late final GeneratedColumn<int> dayOfWeek = GeneratedColumn<int>(
+    'day_of_week',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<String> startTime = GeneratedColumn<String>(
+    'start_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<String> endTime = GeneratedColumn<String>(
+    'end_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isAvailableMeta = const VerificationMeta(
+    'isAvailable',
+  );
+  @override
+  late final GeneratedColumn<bool> isAvailable = GeneratedColumn<bool>(
+    'is_available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    dayOfWeek,
+    startTime,
+    endTime,
+    isAvailable,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'availability_schedules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AvailabilitySchedule> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('day_of_week')) {
+      context.handle(
+        _dayOfWeekMeta,
+        dayOfWeek.isAcceptableOrUnknown(data['day_of_week']!, _dayOfWeekMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dayOfWeekMeta);
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startTimeMeta);
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_endTimeMeta);
+    }
+    if (data.containsKey('is_available')) {
+      context.handle(
+        _isAvailableMeta,
+        isAvailable.isAcceptableOrUnknown(
+          data['is_available']!,
+          _isAvailableMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AvailabilitySchedule map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AvailabilitySchedule(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      dayOfWeek: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day_of_week'],
+      )!,
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_time'],
+      )!,
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_time'],
+      )!,
+      isAvailable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_available'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AvailabilitySchedulesTable createAlias(String alias) {
+    return $AvailabilitySchedulesTable(attachedDatabase, alias);
+  }
+}
+
+class AvailabilitySchedule extends DataClass
+    implements Insertable<AvailabilitySchedule> {
+  final int id;
+  final int dayOfWeek;
+  final String startTime;
+  final String endTime;
+  final bool isAvailable;
+  final DateTime updatedAt;
+  const AvailabilitySchedule({
+    required this.id,
+    required this.dayOfWeek,
+    required this.startTime,
+    required this.endTime,
+    required this.isAvailable,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['day_of_week'] = Variable<int>(dayOfWeek);
+    map['start_time'] = Variable<String>(startTime);
+    map['end_time'] = Variable<String>(endTime);
+    map['is_available'] = Variable<bool>(isAvailable);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AvailabilitySchedulesCompanion toCompanion(bool nullToAbsent) {
+    return AvailabilitySchedulesCompanion(
+      id: Value(id),
+      dayOfWeek: Value(dayOfWeek),
+      startTime: Value(startTime),
+      endTime: Value(endTime),
+      isAvailable: Value(isAvailable),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AvailabilitySchedule.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AvailabilitySchedule(
+      id: serializer.fromJson<int>(json['id']),
+      dayOfWeek: serializer.fromJson<int>(json['dayOfWeek']),
+      startTime: serializer.fromJson<String>(json['startTime']),
+      endTime: serializer.fromJson<String>(json['endTime']),
+      isAvailable: serializer.fromJson<bool>(json['isAvailable']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'dayOfWeek': serializer.toJson<int>(dayOfWeek),
+      'startTime': serializer.toJson<String>(startTime),
+      'endTime': serializer.toJson<String>(endTime),
+      'isAvailable': serializer.toJson<bool>(isAvailable),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AvailabilitySchedule copyWith({
+    int? id,
+    int? dayOfWeek,
+    String? startTime,
+    String? endTime,
+    bool? isAvailable,
+    DateTime? updatedAt,
+  }) => AvailabilitySchedule(
+    id: id ?? this.id,
+    dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+    startTime: startTime ?? this.startTime,
+    endTime: endTime ?? this.endTime,
+    isAvailable: isAvailable ?? this.isAvailable,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AvailabilitySchedule copyWithCompanion(AvailabilitySchedulesCompanion data) {
+    return AvailabilitySchedule(
+      id: data.id.present ? data.id.value : this.id,
+      dayOfWeek: data.dayOfWeek.present ? data.dayOfWeek.value : this.dayOfWeek,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      isAvailable: data.isAvailable.present
+          ? data.isAvailable.value
+          : this.isAvailable,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvailabilitySchedule(')
+          ..write('id: $id, ')
+          ..write('dayOfWeek: $dayOfWeek, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('isAvailable: $isAvailable, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, dayOfWeek, startTime, endTime, isAvailable, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AvailabilitySchedule &&
+          other.id == this.id &&
+          other.dayOfWeek == this.dayOfWeek &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.isAvailable == this.isAvailable &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AvailabilitySchedulesCompanion
+    extends UpdateCompanion<AvailabilitySchedule> {
+  final Value<int> id;
+  final Value<int> dayOfWeek;
+  final Value<String> startTime;
+  final Value<String> endTime;
+  final Value<bool> isAvailable;
+  final Value<DateTime> updatedAt;
+  const AvailabilitySchedulesCompanion({
+    this.id = const Value.absent(),
+    this.dayOfWeek = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.isAvailable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  AvailabilitySchedulesCompanion.insert({
+    this.id = const Value.absent(),
+    required int dayOfWeek,
+    required String startTime,
+    required String endTime,
+    this.isAvailable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : dayOfWeek = Value(dayOfWeek),
+       startTime = Value(startTime),
+       endTime = Value(endTime);
+  static Insertable<AvailabilitySchedule> custom({
+    Expression<int>? id,
+    Expression<int>? dayOfWeek,
+    Expression<String>? startTime,
+    Expression<String>? endTime,
+    Expression<bool>? isAvailable,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (dayOfWeek != null) 'day_of_week': dayOfWeek,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (isAvailable != null) 'is_available': isAvailable,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  AvailabilitySchedulesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? dayOfWeek,
+    Value<String>? startTime,
+    Value<String>? endTime,
+    Value<bool>? isAvailable,
+    Value<DateTime>? updatedAt,
+  }) {
+    return AvailabilitySchedulesCompanion(
+      id: id ?? this.id,
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      isAvailable: isAvailable ?? this.isAvailable,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (dayOfWeek.present) {
+      map['day_of_week'] = Variable<int>(dayOfWeek.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<String>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<String>(endTime.value);
+    }
+    if (isAvailable.present) {
+      map['is_available'] = Variable<bool>(isAvailable.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvailabilitySchedulesCompanion(')
+          ..write('id: $id, ')
+          ..write('dayOfWeek: $dayOfWeek, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('isAvailable: $isAvailable, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AvailabilityExceptionsTable extends AvailabilityExceptions
+    with TableInfo<$AvailabilityExceptionsTable, AvailabilityException> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AvailabilityExceptionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<int> remoteId = GeneratedColumn<int>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isAvailableMeta = const VerificationMeta(
+    'isAvailable',
+  );
+  @override
+  late final GeneratedColumn<bool> isAvailable = GeneratedColumn<bool>(
+    'is_available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<String> startTime = GeneratedColumn<String>(
+    'start_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<String> endTime = GeneratedColumn<String>(
+    'end_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    remoteId,
+    date,
+    isAvailable,
+    startTime,
+    endTime,
+    reason,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'availability_exceptions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AvailabilityException> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('is_available')) {
+      context.handle(
+        _isAvailableMeta,
+        isAvailable.isAcceptableOrUnknown(
+          data['is_available']!,
+          _isAvailableMeta,
+        ),
+      );
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AvailabilityException map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AvailabilityException(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}remote_id'],
+      ),
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date'],
+      )!,
+      isAvailable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_available'],
+      )!,
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_time'],
+      ),
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_time'],
+      ),
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AvailabilityExceptionsTable createAlias(String alias) {
+    return $AvailabilityExceptionsTable(attachedDatabase, alias);
+  }
+}
+
+class AvailabilityException extends DataClass
+    implements Insertable<AvailabilityException> {
+  final int id;
+  final int? remoteId;
+  final String date;
+  final bool isAvailable;
+  final String? startTime;
+  final String? endTime;
+  final String? reason;
+  final DateTime updatedAt;
+  const AvailabilityException({
+    required this.id,
+    this.remoteId,
+    required this.date,
+    required this.isAvailable,
+    this.startTime,
+    this.endTime,
+    this.reason,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<int>(remoteId);
+    }
+    map['date'] = Variable<String>(date);
+    map['is_available'] = Variable<bool>(isAvailable);
+    if (!nullToAbsent || startTime != null) {
+      map['start_time'] = Variable<String>(startTime);
+    }
+    if (!nullToAbsent || endTime != null) {
+      map['end_time'] = Variable<String>(endTime);
+    }
+    if (!nullToAbsent || reason != null) {
+      map['reason'] = Variable<String>(reason);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AvailabilityExceptionsCompanion toCompanion(bool nullToAbsent) {
+    return AvailabilityExceptionsCompanion(
+      id: Value(id),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      date: Value(date),
+      isAvailable: Value(isAvailable),
+      startTime: startTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startTime),
+      endTime: endTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endTime),
+      reason: reason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reason),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AvailabilityException.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AvailabilityException(
+      id: serializer.fromJson<int>(json['id']),
+      remoteId: serializer.fromJson<int?>(json['remoteId']),
+      date: serializer.fromJson<String>(json['date']),
+      isAvailable: serializer.fromJson<bool>(json['isAvailable']),
+      startTime: serializer.fromJson<String?>(json['startTime']),
+      endTime: serializer.fromJson<String?>(json['endTime']),
+      reason: serializer.fromJson<String?>(json['reason']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'remoteId': serializer.toJson<int?>(remoteId),
+      'date': serializer.toJson<String>(date),
+      'isAvailable': serializer.toJson<bool>(isAvailable),
+      'startTime': serializer.toJson<String?>(startTime),
+      'endTime': serializer.toJson<String?>(endTime),
+      'reason': serializer.toJson<String?>(reason),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AvailabilityException copyWith({
+    int? id,
+    Value<int?> remoteId = const Value.absent(),
+    String? date,
+    bool? isAvailable,
+    Value<String?> startTime = const Value.absent(),
+    Value<String?> endTime = const Value.absent(),
+    Value<String?> reason = const Value.absent(),
+    DateTime? updatedAt,
+  }) => AvailabilityException(
+    id: id ?? this.id,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
+    date: date ?? this.date,
+    isAvailable: isAvailable ?? this.isAvailable,
+    startTime: startTime.present ? startTime.value : this.startTime,
+    endTime: endTime.present ? endTime.value : this.endTime,
+    reason: reason.present ? reason.value : this.reason,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AvailabilityException copyWithCompanion(
+    AvailabilityExceptionsCompanion data,
+  ) {
+    return AvailabilityException(
+      id: data.id.present ? data.id.value : this.id,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      date: data.date.present ? data.date.value : this.date,
+      isAvailable: data.isAvailable.present
+          ? data.isAvailable.value
+          : this.isAvailable,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvailabilityException(')
+          ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('date: $date, ')
+          ..write('isAvailable: $isAvailable, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('reason: $reason, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    remoteId,
+    date,
+    isAvailable,
+    startTime,
+    endTime,
+    reason,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AvailabilityException &&
+          other.id == this.id &&
+          other.remoteId == this.remoteId &&
+          other.date == this.date &&
+          other.isAvailable == this.isAvailable &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.reason == this.reason &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AvailabilityExceptionsCompanion
+    extends UpdateCompanion<AvailabilityException> {
+  final Value<int> id;
+  final Value<int?> remoteId;
+  final Value<String> date;
+  final Value<bool> isAvailable;
+  final Value<String?> startTime;
+  final Value<String?> endTime;
+  final Value<String?> reason;
+  final Value<DateTime> updatedAt;
+  const AvailabilityExceptionsCompanion({
+    this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.isAvailable = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  AvailabilityExceptionsCompanion.insert({
+    this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    required String date,
+    this.isAvailable = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : date = Value(date);
+  static Insertable<AvailabilityException> custom({
+    Expression<int>? id,
+    Expression<int>? remoteId,
+    Expression<String>? date,
+    Expression<bool>? isAvailable,
+    Expression<String>? startTime,
+    Expression<String>? endTime,
+    Expression<String>? reason,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (date != null) 'date': date,
+      if (isAvailable != null) 'is_available': isAvailable,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (reason != null) 'reason': reason,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  AvailabilityExceptionsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? remoteId,
+    Value<String>? date,
+    Value<bool>? isAvailable,
+    Value<String?>? startTime,
+    Value<String?>? endTime,
+    Value<String?>? reason,
+    Value<DateTime>? updatedAt,
+  }) {
+    return AvailabilityExceptionsCompanion(
+      id: id ?? this.id,
+      remoteId: remoteId ?? this.remoteId,
+      date: date ?? this.date,
+      isAvailable: isAvailable ?? this.isAvailable,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      reason: reason ?? this.reason,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<int>(remoteId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
+    }
+    if (isAvailable.present) {
+      map['is_available'] = Variable<bool>(isAvailable.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<String>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<String>(endTime.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AvailabilityExceptionsCompanion(')
+          ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('date: $date, ')
+          ..write('isAvailable: $isAvailable, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('reason: $reason, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ParkedSalesTable extends ParkedSales
+    with TableInfo<$ParkedSalesTable, ParkedSale> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ParkedSalesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => _uuid.v4(),
+  );
+  static const VerificationMeta _linesJsonMeta = const VerificationMeta(
+    'linesJson',
+  );
+  @override
+  late final GeneratedColumn<String> linesJson = GeneratedColumn<String>(
+    'lines_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _customerIdMeta = const VerificationMeta(
+    'customerId',
+  );
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+    'customer_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _saleKindMeta = const VerificationMeta(
+    'saleKind',
+  );
+  @override
+  late final GeneratedColumn<String> saleKind = GeneratedColumn<String>(
+    'sale_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('parked'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    linesJson,
+    notes,
+    customerId,
+    label,
+    saleKind,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'parked_sales';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ParkedSale> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('lines_json')) {
+      context.handle(
+        _linesJsonMeta,
+        linesJson.isAcceptableOrUnknown(data['lines_json']!, _linesJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_linesJsonMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+        _customerIdMeta,
+        customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
+      );
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('sale_kind')) {
+      context.handle(
+        _saleKindMeta,
+        saleKind.isAcceptableOrUnknown(data['sale_kind']!, _saleKindMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ParkedSale map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ParkedSale(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      linesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lines_json'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      customerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_id'],
+      ),
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      saleKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sale_kind'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ParkedSalesTable createAlias(String alias) {
+    return $ParkedSalesTable(attachedDatabase, alias);
+  }
+}
+
+class ParkedSale extends DataClass implements Insertable<ParkedSale> {
+  final String id;
+  final String linesJson;
+  final String? notes;
+  final String? customerId;
+  final String? label;
+  final String saleKind;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const ParkedSale({
+    required this.id,
+    required this.linesJson,
+    this.notes,
+    this.customerId,
+    this.label,
+    required this.saleKind,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['lines_json'] = Variable<String>(linesJson);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || customerId != null) {
+      map['customer_id'] = Variable<String>(customerId);
+    }
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    map['sale_kind'] = Variable<String>(saleKind);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ParkedSalesCompanion toCompanion(bool nullToAbsent) {
+    return ParkedSalesCompanion(
+      id: Value(id),
+      linesJson: Value(linesJson),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      customerId: customerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerId),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      saleKind: Value(saleKind),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ParkedSale.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ParkedSale(
+      id: serializer.fromJson<String>(json['id']),
+      linesJson: serializer.fromJson<String>(json['linesJson']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      customerId: serializer.fromJson<String?>(json['customerId']),
+      label: serializer.fromJson<String?>(json['label']),
+      saleKind: serializer.fromJson<String>(json['saleKind']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'linesJson': serializer.toJson<String>(linesJson),
+      'notes': serializer.toJson<String?>(notes),
+      'customerId': serializer.toJson<String?>(customerId),
+      'label': serializer.toJson<String?>(label),
+      'saleKind': serializer.toJson<String>(saleKind),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ParkedSale copyWith({
+    String? id,
+    String? linesJson,
+    Value<String?> notes = const Value.absent(),
+    Value<String?> customerId = const Value.absent(),
+    Value<String?> label = const Value.absent(),
+    String? saleKind,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => ParkedSale(
+    id: id ?? this.id,
+    linesJson: linesJson ?? this.linesJson,
+    notes: notes.present ? notes.value : this.notes,
+    customerId: customerId.present ? customerId.value : this.customerId,
+    label: label.present ? label.value : this.label,
+    saleKind: saleKind ?? this.saleKind,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ParkedSale copyWithCompanion(ParkedSalesCompanion data) {
+    return ParkedSale(
+      id: data.id.present ? data.id.value : this.id,
+      linesJson: data.linesJson.present ? data.linesJson.value : this.linesJson,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      customerId: data.customerId.present
+          ? data.customerId.value
+          : this.customerId,
+      label: data.label.present ? data.label.value : this.label,
+      saleKind: data.saleKind.present ? data.saleKind.value : this.saleKind,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParkedSale(')
+          ..write('id: $id, ')
+          ..write('linesJson: $linesJson, ')
+          ..write('notes: $notes, ')
+          ..write('customerId: $customerId, ')
+          ..write('label: $label, ')
+          ..write('saleKind: $saleKind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    linesJson,
+    notes,
+    customerId,
+    label,
+    saleKind,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ParkedSale &&
+          other.id == this.id &&
+          other.linesJson == this.linesJson &&
+          other.notes == this.notes &&
+          other.customerId == this.customerId &&
+          other.label == this.label &&
+          other.saleKind == this.saleKind &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ParkedSalesCompanion extends UpdateCompanion<ParkedSale> {
+  final Value<String> id;
+  final Value<String> linesJson;
+  final Value<String?> notes;
+  final Value<String?> customerId;
+  final Value<String?> label;
+  final Value<String> saleKind;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ParkedSalesCompanion({
+    this.id = const Value.absent(),
+    this.linesJson = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.saleKind = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ParkedSalesCompanion.insert({
+    this.id = const Value.absent(),
+    required String linesJson,
+    this.notes = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.saleKind = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : linesJson = Value(linesJson);
+  static Insertable<ParkedSale> custom({
+    Expression<String>? id,
+    Expression<String>? linesJson,
+    Expression<String>? notes,
+    Expression<String>? customerId,
+    Expression<String>? label,
+    Expression<String>? saleKind,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (linesJson != null) 'lines_json': linesJson,
+      if (notes != null) 'notes': notes,
+      if (customerId != null) 'customer_id': customerId,
+      if (label != null) 'label': label,
+      if (saleKind != null) 'sale_kind': saleKind,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ParkedSalesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? linesJson,
+    Value<String?>? notes,
+    Value<String?>? customerId,
+    Value<String?>? label,
+    Value<String>? saleKind,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ParkedSalesCompanion(
+      id: id ?? this.id,
+      linesJson: linesJson ?? this.linesJson,
+      notes: notes ?? this.notes,
+      customerId: customerId ?? this.customerId,
+      label: label ?? this.label,
+      saleKind: saleKind ?? this.saleKind,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (linesJson.present) {
+      map['lines_json'] = Variable<String>(linesJson.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (saleKind.present) {
+      map['sale_kind'] = Variable<String>(saleKind.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ParkedSalesCompanion(')
+          ..write('id: $id, ')
+          ..write('linesJson: $linesJson, ')
+          ..write('notes: $notes, ')
+          ..write('customerId: $customerId, ')
+          ..write('label: $label, ')
+          ..write('saleKind: $saleKind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ItemsTable items = $ItemsTable(this);
   late final $ItemStocksTable itemStocks = $ItemStocksTable(this);
   late final $ServicesTable services = $ServicesTable(this);
+  late final $ServiceJobSessionsTable serviceJobSessions =
+      $ServiceJobSessionsTable(this);
   late final $CustomersTable customers = $CustomersTable(this);
   late final $DeviceContactsTable deviceContacts = $DeviceContactsTable(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
@@ -22423,6 +25512,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CustomerMembershipsTable(this);
   late final $ExpenseCategoriesTable expenseCategories =
       $ExpenseCategoriesTable(this);
+  late final $AvailabilitySchedulesTable availabilitySchedules =
+      $AvailabilitySchedulesTable(this);
+  late final $AvailabilityExceptionsTable availabilityExceptions =
+      $AvailabilityExceptionsTable(this);
+  late final $ParkedSalesTable parkedSales = $ParkedSalesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -22431,6 +25525,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     items,
     itemStocks,
     services,
+    serviceJobSessions,
     customers,
     deviceContacts,
     suppliers,
@@ -22467,6 +25562,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     packageRedemptions,
     customerMemberships,
     expenseCategories,
+    availabilitySchedules,
+    availabilityExceptions,
+    parkedSales,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -24177,9 +27275,20 @@ typedef $$ServicesTableCreateCompanionBuilder =
       required String title,
       Value<String?> description,
       Value<String?> imageUrl,
+      Value<int?> coverUploadId,
+      Value<String?> galleryUrls,
+      Value<String?> galleryUploadIds,
       required double price,
+      Value<double?> cost,
       Value<int?> durationMinutes,
       Value<bool> publishedOnline,
+      Value<int?> categoryId,
+      Value<String?> summary,
+      Value<String?> serviceType,
+      Value<String?> deliveryTimeframe,
+      Value<String?> moderationStatus,
+      Value<String?> slug,
+      Value<String?> pricingPackages,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<String?> category,
@@ -24192,9 +27301,20 @@ typedef $$ServicesTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String?> description,
       Value<String?> imageUrl,
+      Value<int?> coverUploadId,
+      Value<String?> galleryUrls,
+      Value<String?> galleryUploadIds,
       Value<double> price,
+      Value<double?> cost,
       Value<int?> durationMinutes,
       Value<bool> publishedOnline,
+      Value<int?> categoryId,
+      Value<String?> summary,
+      Value<String?> serviceType,
+      Value<String?> deliveryTimeframe,
+      Value<String?> moderationStatus,
+      Value<String?> slug,
+      Value<String?> pricingPackages,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<String?> category,
@@ -24204,6 +27324,30 @@ typedef $$ServicesTableUpdateCompanionBuilder =
 final class $$ServicesTableReferences
     extends BaseReferences<_$AppDatabase, $ServicesTable, Service> {
   $$ServicesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$ServiceJobSessionsTable, List<ServiceJobSession>>
+  _serviceJobSessionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.serviceJobSessions,
+        aliasName: $_aliasNameGenerator(
+          db.services.id,
+          db.serviceJobSessions.serviceId,
+        ),
+      );
+
+  $$ServiceJobSessionsTableProcessedTableManager get serviceJobSessionsRefs {
+    final manager = $$ServiceJobSessionsTableTableManager(
+      $_db,
+      $_db.serviceJobSessions,
+    ).filter((f) => f.serviceId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _serviceJobSessionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 
   static MultiTypedResultKey<$TransactionLinesTable, List<TransactionLine>>
   _transactionLinesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -24345,8 +27489,28 @@ class $$ServicesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get coverUploadId => $composableBuilder(
+    column: $table.coverUploadId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get galleryUrls => $composableBuilder(
+    column: $table.galleryUrls,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get galleryUploadIds => $composableBuilder(
+    column: $table.galleryUploadIds,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get price => $composableBuilder(
     column: $table.price,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cost => $composableBuilder(
+    column: $table.cost,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -24357,6 +27521,41 @@ class $$ServicesTableFilterComposer
 
   ColumnFilters<bool> get publishedOnline => $composableBuilder(
     column: $table.publishedOnline,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deliveryTimeframe => $composableBuilder(
+    column: $table.deliveryTimeframe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get moderationStatus => $composableBuilder(
+    column: $table.moderationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pricingPackages => $composableBuilder(
+    column: $table.pricingPackages,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -24374,6 +27573,31 @@ class $$ServicesTableFilterComposer
     column: $table.category,
     builder: (column) => ColumnFilters(column),
   );
+
+  Expression<bool> serviceJobSessionsRefs(
+    Expression<bool> Function($$ServiceJobSessionsTableFilterComposer f) f,
+  ) {
+    final $$ServiceJobSessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.serviceJobSessions,
+      getReferencedColumn: (t) => t.serviceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServiceJobSessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.serviceJobSessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<bool> transactionLinesRefs(
     Expression<bool> Function($$TransactionLinesTableFilterComposer f) f,
@@ -24535,8 +27759,28 @@ class $$ServicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get coverUploadId => $composableBuilder(
+    column: $table.coverUploadId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get galleryUrls => $composableBuilder(
+    column: $table.galleryUrls,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get galleryUploadIds => $composableBuilder(
+    column: $table.galleryUploadIds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get price => $composableBuilder(
     column: $table.price,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cost => $composableBuilder(
+    column: $table.cost,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -24547,6 +27791,41 @@ class $$ServicesTableOrderingComposer
 
   ColumnOrderings<bool> get publishedOnline => $composableBuilder(
     column: $table.publishedOnline,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deliveryTimeframe => $composableBuilder(
+    column: $table.deliveryTimeframe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get moderationStatus => $composableBuilder(
+    column: $table.moderationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pricingPackages => $composableBuilder(
+    column: $table.pricingPackages,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -24592,8 +27871,26 @@ class $$ServicesTableAnnotationComposer
   GeneratedColumn<String> get imageUrl =>
       $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
+  GeneratedColumn<int> get coverUploadId => $composableBuilder(
+    column: $table.coverUploadId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get galleryUrls => $composableBuilder(
+    column: $table.galleryUrls,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get galleryUploadIds => $composableBuilder(
+    column: $table.galleryUploadIds,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
+
+  GeneratedColumn<double> get cost =>
+      $composableBuilder(column: $table.cost, builder: (column) => column);
 
   GeneratedColumn<int> get durationMinutes => $composableBuilder(
     column: $table.durationMinutes,
@@ -24605,6 +27902,37 @@ class $$ServicesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceType => $composableBuilder(
+    column: $table.serviceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get deliveryTimeframe => $composableBuilder(
+    column: $table.deliveryTimeframe,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get moderationStatus => $composableBuilder(
+    column: $table.moderationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get slug =>
+      $composableBuilder(column: $table.slug, builder: (column) => column);
+
+  GeneratedColumn<String> get pricingPackages => $composableBuilder(
+    column: $table.pricingPackages,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -24613,6 +27941,32 @@ class $$ServicesTableAnnotationComposer
 
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
+
+  Expression<T> serviceJobSessionsRefs<T extends Object>(
+    Expression<T> Function($$ServiceJobSessionsTableAnnotationComposer a) f,
+  ) {
+    final $$ServiceJobSessionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.serviceJobSessions,
+          getReferencedColumn: (t) => t.serviceId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ServiceJobSessionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.serviceJobSessions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 
   Expression<T> transactionLinesRefs<T extends Object>(
     Expression<T> Function($$TransactionLinesTableAnnotationComposer a) f,
@@ -24754,6 +28108,7 @@ class $$ServicesTableTableManager
           (Service, $$ServicesTableReferences),
           Service,
           PrefetchHooks Function({
+            bool serviceJobSessionsRefs,
             bool transactionLinesRefs,
             bool ledgerLinesRefs,
             bool serviceVariantsRefs,
@@ -24779,9 +28134,20 @@ class $$ServicesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
+                Value<int?> coverUploadId = const Value.absent(),
+                Value<String?> galleryUrls = const Value.absent(),
+                Value<String?> galleryUploadIds = const Value.absent(),
                 Value<double> price = const Value.absent(),
+                Value<double?> cost = const Value.absent(),
                 Value<int?> durationMinutes = const Value.absent(),
                 Value<bool> publishedOnline = const Value.absent(),
+                Value<int?> categoryId = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<String?> serviceType = const Value.absent(),
+                Value<String?> deliveryTimeframe = const Value.absent(),
+                Value<String?> moderationStatus = const Value.absent(),
+                Value<String?> slug = const Value.absent(),
+                Value<String?> pricingPackages = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<String?> category = const Value.absent(),
@@ -24792,9 +28158,20 @@ class $$ServicesTableTableManager
                 title: title,
                 description: description,
                 imageUrl: imageUrl,
+                coverUploadId: coverUploadId,
+                galleryUrls: galleryUrls,
+                galleryUploadIds: galleryUploadIds,
                 price: price,
+                cost: cost,
                 durationMinutes: durationMinutes,
                 publishedOnline: publishedOnline,
+                categoryId: categoryId,
+                summary: summary,
+                serviceType: serviceType,
+                deliveryTimeframe: deliveryTimeframe,
+                moderationStatus: moderationStatus,
+                slug: slug,
+                pricingPackages: pricingPackages,
                 updatedAt: updatedAt,
                 synced: synced,
                 category: category,
@@ -24807,9 +28184,20 @@ class $$ServicesTableTableManager
                 required String title,
                 Value<String?> description = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
+                Value<int?> coverUploadId = const Value.absent(),
+                Value<String?> galleryUrls = const Value.absent(),
+                Value<String?> galleryUploadIds = const Value.absent(),
                 required double price,
+                Value<double?> cost = const Value.absent(),
                 Value<int?> durationMinutes = const Value.absent(),
                 Value<bool> publishedOnline = const Value.absent(),
+                Value<int?> categoryId = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<String?> serviceType = const Value.absent(),
+                Value<String?> deliveryTimeframe = const Value.absent(),
+                Value<String?> moderationStatus = const Value.absent(),
+                Value<String?> slug = const Value.absent(),
+                Value<String?> pricingPackages = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<String?> category = const Value.absent(),
@@ -24820,9 +28208,20 @@ class $$ServicesTableTableManager
                 title: title,
                 description: description,
                 imageUrl: imageUrl,
+                coverUploadId: coverUploadId,
+                galleryUrls: galleryUrls,
+                galleryUploadIds: galleryUploadIds,
                 price: price,
+                cost: cost,
                 durationMinutes: durationMinutes,
                 publishedOnline: publishedOnline,
+                categoryId: categoryId,
+                summary: summary,
+                serviceType: serviceType,
+                deliveryTimeframe: deliveryTimeframe,
+                moderationStatus: moderationStatus,
+                slug: slug,
+                pricingPackages: pricingPackages,
                 updatedAt: updatedAt,
                 synced: synced,
                 category: category,
@@ -24838,6 +28237,7 @@ class $$ServicesTableTableManager
               .toList(),
           prefetchHooksCallback:
               ({
+                serviceJobSessionsRefs = false,
                 transactionLinesRefs = false,
                 ledgerLinesRefs = false,
                 serviceVariantsRefs = false,
@@ -24847,6 +28247,7 @@ class $$ServicesTableTableManager
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (serviceJobSessionsRefs) db.serviceJobSessions,
                     if (transactionLinesRefs) db.transactionLines,
                     if (ledgerLinesRefs) db.ledgerLines,
                     if (serviceVariantsRefs) db.serviceVariants,
@@ -24856,6 +28257,27 @@ class $$ServicesTableTableManager
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (serviceJobSessionsRefs)
+                        await $_getPrefetchedData<
+                          Service,
+                          $ServicesTable,
+                          ServiceJobSession
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ServicesTableReferences
+                              ._serviceJobSessionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ServicesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).serviceJobSessionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.serviceId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (transactionLinesRefs)
                         await $_getPrefetchedData<
                           Service,
@@ -24982,12 +28404,594 @@ typedef $$ServicesTableProcessedTableManager =
       (Service, $$ServicesTableReferences),
       Service,
       PrefetchHooks Function({
+        bool serviceJobSessionsRefs,
         bool transactionLinesRefs,
         bool ledgerLinesRefs,
         bool serviceVariantsRefs,
         bool localBookingsRefs,
         bool servicePackagesRefs,
       })
+    >;
+typedef $$ServiceJobSessionsTableCreateCompanionBuilder =
+    ServiceJobSessionsCompanion Function({
+      Value<String> id,
+      Value<int?> remoteId,
+      Value<String?> bookingId,
+      required String serviceId,
+      Value<String?> clientName,
+      Value<String?> clientPhone,
+      required DateTime startedAt,
+      Value<DateTime?> endedAt,
+      Value<int?> durationMinutes,
+      Value<String?> description,
+      Value<double> materialsCost,
+      Value<double> laborCharge,
+      Value<double> finalCharge,
+      Value<String?> photosJson,
+      Value<String> pipelineStage,
+      Value<bool> synced,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+typedef $$ServiceJobSessionsTableUpdateCompanionBuilder =
+    ServiceJobSessionsCompanion Function({
+      Value<String> id,
+      Value<int?> remoteId,
+      Value<String?> bookingId,
+      Value<String> serviceId,
+      Value<String?> clientName,
+      Value<String?> clientPhone,
+      Value<DateTime> startedAt,
+      Value<DateTime?> endedAt,
+      Value<int?> durationMinutes,
+      Value<String?> description,
+      Value<double> materialsCost,
+      Value<double> laborCharge,
+      Value<double> finalCharge,
+      Value<String?> photosJson,
+      Value<String> pipelineStage,
+      Value<bool> synced,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$ServiceJobSessionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ServiceJobSessionsTable,
+          ServiceJobSession
+        > {
+  $$ServiceJobSessionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ServicesTable _serviceIdTable(_$AppDatabase db) =>
+      db.services.createAlias(
+        $_aliasNameGenerator(db.serviceJobSessions.serviceId, db.services.id),
+      );
+
+  $$ServicesTableProcessedTableManager get serviceId {
+    final $_column = $_itemColumn<String>('service_id')!;
+
+    final manager = $$ServicesTableTableManager(
+      $_db,
+      $_db.services,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_serviceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ServiceJobSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $ServiceJobSessionsTable> {
+  $$ServiceJobSessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bookingId => $composableBuilder(
+    column: $table.bookingId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientPhone => $composableBuilder(
+    column: $table.clientPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get endedAt => $composableBuilder(
+    column: $table.endedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get materialsCost => $composableBuilder(
+    column: $table.materialsCost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get laborCharge => $composableBuilder(
+    column: $table.laborCharge,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get finalCharge => $composableBuilder(
+    column: $table.finalCharge,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pipelineStage => $composableBuilder(
+    column: $table.pipelineStage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ServicesTableFilterComposer get serviceId {
+    final $$ServicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.serviceId,
+      referencedTable: $db.services,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServicesTableFilterComposer(
+            $db: $db,
+            $table: $db.services,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ServiceJobSessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ServiceJobSessionsTable> {
+  $$ServiceJobSessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bookingId => $composableBuilder(
+    column: $table.bookingId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientPhone => $composableBuilder(
+    column: $table.clientPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get endedAt => $composableBuilder(
+    column: $table.endedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get materialsCost => $composableBuilder(
+    column: $table.materialsCost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get laborCharge => $composableBuilder(
+    column: $table.laborCharge,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get finalCharge => $composableBuilder(
+    column: $table.finalCharge,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pipelineStage => $composableBuilder(
+    column: $table.pipelineStage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ServicesTableOrderingComposer get serviceId {
+    final $$ServicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.serviceId,
+      referencedTable: $db.services,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.services,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ServiceJobSessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ServiceJobSessionsTable> {
+  $$ServiceJobSessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get bookingId =>
+      $composableBuilder(column: $table.bookingId, builder: (column) => column);
+
+  GeneratedColumn<String> get clientName => $composableBuilder(
+    column: $table.clientName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get clientPhone => $composableBuilder(
+    column: $table.clientPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endedAt =>
+      $composableBuilder(column: $table.endedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMinutes => $composableBuilder(
+    column: $table.durationMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get materialsCost => $composableBuilder(
+    column: $table.materialsCost,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get laborCharge => $composableBuilder(
+    column: $table.laborCharge,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get finalCharge => $composableBuilder(
+    column: $table.finalCharge,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get photosJson => $composableBuilder(
+    column: $table.photosJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pipelineStage => $composableBuilder(
+    column: $table.pipelineStage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get synced =>
+      $composableBuilder(column: $table.synced, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ServicesTableAnnotationComposer get serviceId {
+    final $$ServicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.serviceId,
+      referencedTable: $db.services,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.services,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ServiceJobSessionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ServiceJobSessionsTable,
+          ServiceJobSession,
+          $$ServiceJobSessionsTableFilterComposer,
+          $$ServiceJobSessionsTableOrderingComposer,
+          $$ServiceJobSessionsTableAnnotationComposer,
+          $$ServiceJobSessionsTableCreateCompanionBuilder,
+          $$ServiceJobSessionsTableUpdateCompanionBuilder,
+          (ServiceJobSession, $$ServiceJobSessionsTableReferences),
+          ServiceJobSession,
+          PrefetchHooks Function({bool serviceId})
+        > {
+  $$ServiceJobSessionsTableTableManager(
+    _$AppDatabase db,
+    $ServiceJobSessionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceJobSessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceJobSessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServiceJobSessionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                Value<String?> bookingId = const Value.absent(),
+                Value<String> serviceId = const Value.absent(),
+                Value<String?> clientName = const Value.absent(),
+                Value<String?> clientPhone = const Value.absent(),
+                Value<DateTime> startedAt = const Value.absent(),
+                Value<DateTime?> endedAt = const Value.absent(),
+                Value<int?> durationMinutes = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<double> materialsCost = const Value.absent(),
+                Value<double> laborCharge = const Value.absent(),
+                Value<double> finalCharge = const Value.absent(),
+                Value<String?> photosJson = const Value.absent(),
+                Value<String> pipelineStage = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceJobSessionsCompanion(
+                id: id,
+                remoteId: remoteId,
+                bookingId: bookingId,
+                serviceId: serviceId,
+                clientName: clientName,
+                clientPhone: clientPhone,
+                startedAt: startedAt,
+                endedAt: endedAt,
+                durationMinutes: durationMinutes,
+                description: description,
+                materialsCost: materialsCost,
+                laborCharge: laborCharge,
+                finalCharge: finalCharge,
+                photosJson: photosJson,
+                pipelineStage: pipelineStage,
+                synced: synced,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                Value<String?> bookingId = const Value.absent(),
+                required String serviceId,
+                Value<String?> clientName = const Value.absent(),
+                Value<String?> clientPhone = const Value.absent(),
+                required DateTime startedAt,
+                Value<DateTime?> endedAt = const Value.absent(),
+                Value<int?> durationMinutes = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<double> materialsCost = const Value.absent(),
+                Value<double> laborCharge = const Value.absent(),
+                Value<double> finalCharge = const Value.absent(),
+                Value<String?> photosJson = const Value.absent(),
+                Value<String> pipelineStage = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceJobSessionsCompanion.insert(
+                id: id,
+                remoteId: remoteId,
+                bookingId: bookingId,
+                serviceId: serviceId,
+                clientName: clientName,
+                clientPhone: clientPhone,
+                startedAt: startedAt,
+                endedAt: endedAt,
+                durationMinutes: durationMinutes,
+                description: description,
+                materialsCost: materialsCost,
+                laborCharge: laborCharge,
+                finalCharge: finalCharge,
+                photosJson: photosJson,
+                pipelineStage: pipelineStage,
+                synced: synced,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ServiceJobSessionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({serviceId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (serviceId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.serviceId,
+                                referencedTable:
+                                    $$ServiceJobSessionsTableReferences
+                                        ._serviceIdTable(db),
+                                referencedColumn:
+                                    $$ServiceJobSessionsTableReferences
+                                        ._serviceIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ServiceJobSessionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ServiceJobSessionsTable,
+      ServiceJobSession,
+      $$ServiceJobSessionsTableFilterComposer,
+      $$ServiceJobSessionsTableOrderingComposer,
+      $$ServiceJobSessionsTableAnnotationComposer,
+      $$ServiceJobSessionsTableCreateCompanionBuilder,
+      $$ServiceJobSessionsTableUpdateCompanionBuilder,
+      (ServiceJobSession, $$ServiceJobSessionsTableReferences),
+      ServiceJobSession,
+      PrefetchHooks Function({bool serviceId})
     >;
 typedef $$CustomersTableCreateCompanionBuilder =
     CustomersCompanion Function({
@@ -29176,6 +33180,7 @@ typedef $$InventoryLogsTableCreateCompanionBuilder =
     InventoryLogsCompanion Function({
       Value<int> id,
       required String itemId,
+      Value<String> variant,
       required int delta,
       Value<String?> note,
       Value<DateTime> createdAt,
@@ -29184,6 +33189,7 @@ typedef $$InventoryLogsTableUpdateCompanionBuilder =
     InventoryLogsCompanion Function({
       Value<int> id,
       Value<String> itemId,
+      Value<String> variant,
       Value<int> delta,
       Value<String?> note,
       Value<DateTime> createdAt,
@@ -29227,6 +33233,11 @@ class $$InventoryLogsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get variant => $composableBuilder(
+    column: $table.variant,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -29283,6 +33294,11 @@ class $$InventoryLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get variant => $composableBuilder(
+    column: $table.variant,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get delta => $composableBuilder(
     column: $table.delta,
     builder: (column) => ColumnOrderings(column),
@@ -29333,6 +33349,9 @@ class $$InventoryLogsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get variant =>
+      $composableBuilder(column: $table.variant, builder: (column) => column);
 
   GeneratedColumn<int> get delta =>
       $composableBuilder(column: $table.delta, builder: (column) => column);
@@ -29397,12 +33416,14 @@ class $$InventoryLogsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> itemId = const Value.absent(),
+                Value<String> variant = const Value.absent(),
                 Value<int> delta = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => InventoryLogsCompanion(
                 id: id,
                 itemId: itemId,
+                variant: variant,
                 delta: delta,
                 note: note,
                 createdAt: createdAt,
@@ -29411,12 +33432,14 @@ class $$InventoryLogsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String itemId,
+                Value<String> variant = const Value.absent(),
                 required int delta,
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => InventoryLogsCompanion.insert(
                 id: id,
                 itemId: itemId,
+                variant: variant,
                 delta: delta,
                 note: note,
                 createdAt: createdAt,
@@ -31624,6 +35647,7 @@ typedef $$BusinessProfilesTableCreateCompanionBuilder =
       Value<String?> paybillNumber,
       Value<String?> receiptPaymentMethodsJson,
       Value<String?> deliveryProfileJson,
+      Value<int> verificationStatus,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -31661,6 +35685,7 @@ typedef $$BusinessProfilesTableUpdateCompanionBuilder =
       Value<String?> paybillNumber,
       Value<String?> receiptPaymentMethodsJson,
       Value<String?> deliveryProfileJson,
+      Value<int> verificationStatus,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -31827,6 +35852,11 @@ class $$BusinessProfilesTableFilterComposer
 
   ColumnFilters<String> get deliveryProfileJson => $composableBuilder(
     column: $table.deliveryProfileJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -32005,6 +36035,11 @@ class $$BusinessProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -32162,6 +36197,11 @@ class $$BusinessProfilesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -32237,6 +36277,7 @@ class $$BusinessProfilesTableTableManager
                 Value<String?> paybillNumber = const Value.absent(),
                 Value<String?> receiptPaymentMethodsJson = const Value.absent(),
                 Value<String?> deliveryProfileJson = const Value.absent(),
+                Value<int> verificationStatus = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -32272,6 +36313,7 @@ class $$BusinessProfilesTableTableManager
                 paybillNumber: paybillNumber,
                 receiptPaymentMethodsJson: receiptPaymentMethodsJson,
                 deliveryProfileJson: deliveryProfileJson,
+                verificationStatus: verificationStatus,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -32309,6 +36351,7 @@ class $$BusinessProfilesTableTableManager
                 Value<String?> paybillNumber = const Value.absent(),
                 Value<String?> receiptPaymentMethodsJson = const Value.absent(),
                 Value<String?> deliveryProfileJson = const Value.absent(),
+                Value<int> verificationStatus = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -32344,6 +36387,7 @@ class $$BusinessProfilesTableTableManager
                 paybillNumber: paybillNumber,
                 receiptPaymentMethodsJson: receiptPaymentMethodsJson,
                 deliveryProfileJson: deliveryProfileJson,
+                verificationStatus: verificationStatus,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -40726,6 +44770,771 @@ typedef $$ExpenseCategoriesTableProcessedTableManager =
       ExpenseCategory,
       PrefetchHooks Function()
     >;
+typedef $$AvailabilitySchedulesTableCreateCompanionBuilder =
+    AvailabilitySchedulesCompanion Function({
+      Value<int> id,
+      required int dayOfWeek,
+      required String startTime,
+      required String endTime,
+      Value<bool> isAvailable,
+      Value<DateTime> updatedAt,
+    });
+typedef $$AvailabilitySchedulesTableUpdateCompanionBuilder =
+    AvailabilitySchedulesCompanion Function({
+      Value<int> id,
+      Value<int> dayOfWeek,
+      Value<String> startTime,
+      Value<String> endTime,
+      Value<bool> isAvailable,
+      Value<DateTime> updatedAt,
+    });
+
+class $$AvailabilitySchedulesTableFilterComposer
+    extends Composer<_$AppDatabase, $AvailabilitySchedulesTable> {
+  $$AvailabilitySchedulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dayOfWeek => $composableBuilder(
+    column: $table.dayOfWeek,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AvailabilitySchedulesTableOrderingComposer
+    extends Composer<_$AppDatabase, $AvailabilitySchedulesTable> {
+  $$AvailabilitySchedulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dayOfWeek => $composableBuilder(
+    column: $table.dayOfWeek,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AvailabilitySchedulesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AvailabilitySchedulesTable> {
+  $$AvailabilitySchedulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get dayOfWeek =>
+      $composableBuilder(column: $table.dayOfWeek, builder: (column) => column);
+
+  GeneratedColumn<String> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<String> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AvailabilitySchedulesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AvailabilitySchedulesTable,
+          AvailabilitySchedule,
+          $$AvailabilitySchedulesTableFilterComposer,
+          $$AvailabilitySchedulesTableOrderingComposer,
+          $$AvailabilitySchedulesTableAnnotationComposer,
+          $$AvailabilitySchedulesTableCreateCompanionBuilder,
+          $$AvailabilitySchedulesTableUpdateCompanionBuilder,
+          (
+            AvailabilitySchedule,
+            BaseReferences<
+              _$AppDatabase,
+              $AvailabilitySchedulesTable,
+              AvailabilitySchedule
+            >,
+          ),
+          AvailabilitySchedule,
+          PrefetchHooks Function()
+        > {
+  $$AvailabilitySchedulesTableTableManager(
+    _$AppDatabase db,
+    $AvailabilitySchedulesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AvailabilitySchedulesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$AvailabilitySchedulesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AvailabilitySchedulesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> dayOfWeek = const Value.absent(),
+                Value<String> startTime = const Value.absent(),
+                Value<String> endTime = const Value.absent(),
+                Value<bool> isAvailable = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => AvailabilitySchedulesCompanion(
+                id: id,
+                dayOfWeek: dayOfWeek,
+                startTime: startTime,
+                endTime: endTime,
+                isAvailable: isAvailable,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int dayOfWeek,
+                required String startTime,
+                required String endTime,
+                Value<bool> isAvailable = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => AvailabilitySchedulesCompanion.insert(
+                id: id,
+                dayOfWeek: dayOfWeek,
+                startTime: startTime,
+                endTime: endTime,
+                isAvailable: isAvailable,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AvailabilitySchedulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AvailabilitySchedulesTable,
+      AvailabilitySchedule,
+      $$AvailabilitySchedulesTableFilterComposer,
+      $$AvailabilitySchedulesTableOrderingComposer,
+      $$AvailabilitySchedulesTableAnnotationComposer,
+      $$AvailabilitySchedulesTableCreateCompanionBuilder,
+      $$AvailabilitySchedulesTableUpdateCompanionBuilder,
+      (
+        AvailabilitySchedule,
+        BaseReferences<
+          _$AppDatabase,
+          $AvailabilitySchedulesTable,
+          AvailabilitySchedule
+        >,
+      ),
+      AvailabilitySchedule,
+      PrefetchHooks Function()
+    >;
+typedef $$AvailabilityExceptionsTableCreateCompanionBuilder =
+    AvailabilityExceptionsCompanion Function({
+      Value<int> id,
+      Value<int?> remoteId,
+      required String date,
+      Value<bool> isAvailable,
+      Value<String?> startTime,
+      Value<String?> endTime,
+      Value<String?> reason,
+      Value<DateTime> updatedAt,
+    });
+typedef $$AvailabilityExceptionsTableUpdateCompanionBuilder =
+    AvailabilityExceptionsCompanion Function({
+      Value<int> id,
+      Value<int?> remoteId,
+      Value<String> date,
+      Value<bool> isAvailable,
+      Value<String?> startTime,
+      Value<String?> endTime,
+      Value<String?> reason,
+      Value<DateTime> updatedAt,
+    });
+
+class $$AvailabilityExceptionsTableFilterComposer
+    extends Composer<_$AppDatabase, $AvailabilityExceptionsTable> {
+  $$AvailabilityExceptionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AvailabilityExceptionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AvailabilityExceptionsTable> {
+  $$AvailabilityExceptionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AvailabilityExceptionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AvailabilityExceptionsTable> {
+  $$AvailabilityExceptionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<bool> get isAvailable => $composableBuilder(
+    column: $table.isAvailable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<String> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AvailabilityExceptionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AvailabilityExceptionsTable,
+          AvailabilityException,
+          $$AvailabilityExceptionsTableFilterComposer,
+          $$AvailabilityExceptionsTableOrderingComposer,
+          $$AvailabilityExceptionsTableAnnotationComposer,
+          $$AvailabilityExceptionsTableCreateCompanionBuilder,
+          $$AvailabilityExceptionsTableUpdateCompanionBuilder,
+          (
+            AvailabilityException,
+            BaseReferences<
+              _$AppDatabase,
+              $AvailabilityExceptionsTable,
+              AvailabilityException
+            >,
+          ),
+          AvailabilityException,
+          PrefetchHooks Function()
+        > {
+  $$AvailabilityExceptionsTableTableManager(
+    _$AppDatabase db,
+    $AvailabilityExceptionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AvailabilityExceptionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$AvailabilityExceptionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AvailabilityExceptionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                Value<String> date = const Value.absent(),
+                Value<bool> isAvailable = const Value.absent(),
+                Value<String?> startTime = const Value.absent(),
+                Value<String?> endTime = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => AvailabilityExceptionsCompanion(
+                id: id,
+                remoteId: remoteId,
+                date: date,
+                isAvailable: isAvailable,
+                startTime: startTime,
+                endTime: endTime,
+                reason: reason,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
+                required String date,
+                Value<bool> isAvailable = const Value.absent(),
+                Value<String?> startTime = const Value.absent(),
+                Value<String?> endTime = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => AvailabilityExceptionsCompanion.insert(
+                id: id,
+                remoteId: remoteId,
+                date: date,
+                isAvailable: isAvailable,
+                startTime: startTime,
+                endTime: endTime,
+                reason: reason,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AvailabilityExceptionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AvailabilityExceptionsTable,
+      AvailabilityException,
+      $$AvailabilityExceptionsTableFilterComposer,
+      $$AvailabilityExceptionsTableOrderingComposer,
+      $$AvailabilityExceptionsTableAnnotationComposer,
+      $$AvailabilityExceptionsTableCreateCompanionBuilder,
+      $$AvailabilityExceptionsTableUpdateCompanionBuilder,
+      (
+        AvailabilityException,
+        BaseReferences<
+          _$AppDatabase,
+          $AvailabilityExceptionsTable,
+          AvailabilityException
+        >,
+      ),
+      AvailabilityException,
+      PrefetchHooks Function()
+    >;
+typedef $$ParkedSalesTableCreateCompanionBuilder =
+    ParkedSalesCompanion Function({
+      Value<String> id,
+      required String linesJson,
+      Value<String?> notes,
+      Value<String?> customerId,
+      Value<String?> label,
+      Value<String> saleKind,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ParkedSalesTableUpdateCompanionBuilder =
+    ParkedSalesCompanion Function({
+      Value<String> id,
+      Value<String> linesJson,
+      Value<String?> notes,
+      Value<String?> customerId,
+      Value<String?> label,
+      Value<String> saleKind,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ParkedSalesTableFilterComposer
+    extends Composer<_$AppDatabase, $ParkedSalesTable> {
+  $$ParkedSalesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get linesJson => $composableBuilder(
+    column: $table.linesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get saleKind => $composableBuilder(
+    column: $table.saleKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ParkedSalesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ParkedSalesTable> {
+  $$ParkedSalesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get linesJson => $composableBuilder(
+    column: $table.linesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get saleKind => $composableBuilder(
+    column: $table.saleKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ParkedSalesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ParkedSalesTable> {
+  $$ParkedSalesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get linesJson =>
+      $composableBuilder(column: $table.linesJson, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get customerId => $composableBuilder(
+    column: $table.customerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get saleKind =>
+      $composableBuilder(column: $table.saleKind, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ParkedSalesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ParkedSalesTable,
+          ParkedSale,
+          $$ParkedSalesTableFilterComposer,
+          $$ParkedSalesTableOrderingComposer,
+          $$ParkedSalesTableAnnotationComposer,
+          $$ParkedSalesTableCreateCompanionBuilder,
+          $$ParkedSalesTableUpdateCompanionBuilder,
+          (
+            ParkedSale,
+            BaseReferences<_$AppDatabase, $ParkedSalesTable, ParkedSale>,
+          ),
+          ParkedSale,
+          PrefetchHooks Function()
+        > {
+  $$ParkedSalesTableTableManager(_$AppDatabase db, $ParkedSalesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ParkedSalesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ParkedSalesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ParkedSalesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> linesJson = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String?> customerId = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String> saleKind = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ParkedSalesCompanion(
+                id: id,
+                linesJson: linesJson,
+                notes: notes,
+                customerId: customerId,
+                label: label,
+                saleKind: saleKind,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String linesJson,
+                Value<String?> notes = const Value.absent(),
+                Value<String?> customerId = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<String> saleKind = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ParkedSalesCompanion.insert(
+                id: id,
+                linesJson: linesJson,
+                notes: notes,
+                customerId: customerId,
+                label: label,
+                saleKind: saleKind,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ParkedSalesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ParkedSalesTable,
+      ParkedSale,
+      $$ParkedSalesTableFilterComposer,
+      $$ParkedSalesTableOrderingComposer,
+      $$ParkedSalesTableAnnotationComposer,
+      $$ParkedSalesTableCreateCompanionBuilder,
+      $$ParkedSalesTableUpdateCompanionBuilder,
+      (
+        ParkedSale,
+        BaseReferences<_$AppDatabase, $ParkedSalesTable, ParkedSale>,
+      ),
+      ParkedSale,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -40736,6 +45545,8 @@ class $AppDatabaseManager {
       $$ItemStocksTableTableManager(_db, _db.itemStocks);
   $$ServicesTableTableManager get services =>
       $$ServicesTableTableManager(_db, _db.services);
+  $$ServiceJobSessionsTableTableManager get serviceJobSessions =>
+      $$ServiceJobSessionsTableTableManager(_db, _db.serviceJobSessions);
   $$CustomersTableTableManager get customers =>
       $$CustomersTableTableManager(_db, _db.customers);
   $$DeviceContactsTableTableManager get deviceContacts =>
@@ -40808,4 +45619,13 @@ class $AppDatabaseManager {
       $$CustomerMembershipsTableTableManager(_db, _db.customerMemberships);
   $$ExpenseCategoriesTableTableManager get expenseCategories =>
       $$ExpenseCategoriesTableTableManager(_db, _db.expenseCategories);
+  $$AvailabilitySchedulesTableTableManager get availabilitySchedules =>
+      $$AvailabilitySchedulesTableTableManager(_db, _db.availabilitySchedules);
+  $$AvailabilityExceptionsTableTableManager get availabilityExceptions =>
+      $$AvailabilityExceptionsTableTableManager(
+        _db,
+        _db.availabilityExceptions,
+      );
+  $$ParkedSalesTableTableManager get parkedSales =>
+      $$ParkedSalesTableTableManager(_db, _db.parkedSales);
 }

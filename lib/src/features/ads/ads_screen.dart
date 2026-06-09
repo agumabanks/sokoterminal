@@ -18,14 +18,18 @@ import '../../core/theme/design_tokens.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
 import 'ai_ads_tab.dart';
+import 'studio_screen.dart';
+import 'studio_splash.dart';
+import 'studio_template_discovery.dart';
+import 'studio_todays_ads.dart';
 
-/// Ad template style
-enum AdTemplate { story, square, banner, minimal }
+/// Ad template style (legacy local builder)
+enum LegacyAdStyle { story, square, banner, minimal }
 
 /// State for the ad builder
 class AdBuilderState {
   const AdBuilderState({
-    this.template = AdTemplate.story,
+    this.template = LegacyAdStyle.story,
     this.showPrice = true,
     this.showQr = true,
     this.showBrand = true,
@@ -34,7 +38,7 @@ class AdBuilderState {
     this.discount = 0,
   });
 
-  final AdTemplate template;
+  final LegacyAdStyle template;
   final bool showPrice;
   final bool showQr;
   final bool showBrand;
@@ -43,7 +47,7 @@ class AdBuilderState {
   final double discount;
 
   AdBuilderState copyWith({
-    AdTemplate? template,
+    LegacyAdStyle? template,
     bool? showPrice,
     bool? showQr,
     bool? showBrand,
@@ -81,10 +85,19 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
   bool _busy = false;
   late TabController _tabController;
 
+  // Studio splash state
+  bool _splashDone = false;
+  bool _showStudio = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(templateDiscoveryProvider.future);
+      ref.read(todaysAdsProvider);
+    });
   }
 
   @override
@@ -95,6 +108,24 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Show splash → then the full studio hub
+    if (!_splashDone) {
+      return StudioSplashScreen(
+        onReady: () {
+          if (!mounted) return;
+          setState(() {
+            _splashDone = true;
+            _showStudio = true;
+          });
+        },
+      );
+    }
+
+    if (_showStudio) {
+      return const StudioScreen();
+    }
+
+    // Fallback legacy builder (not normally reached)
     final items = ref.watch(itemsStreamProvider);
     final adState = ref.watch(adBuilderStateProvider);
 
@@ -180,8 +211,8 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
               _TemplateSelector(
                 selected: adState.template,
                 onSelect: (t) =>
-                    ref.read(adBuilderStateProvider.notifier).state = adState
-                        .copyWith(template: t),
+                    ref.read(adBuilderStateProvider.notifier).state =
+                        adState.copyWith(template: t),
               ),
 
               const SizedBox(height: DesignTokens.spaceLg),
@@ -604,15 +635,15 @@ class _ProductChip extends StatelessWidget {
 
 class _TemplateSelector extends StatelessWidget {
   const _TemplateSelector({required this.selected, required this.onSelect});
-  final AdTemplate selected;
-  final ValueChanged<AdTemplate> onSelect;
+  final LegacyAdStyle selected;
+  final ValueChanged<LegacyAdStyle> onSelect;
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: AdTemplate.values.map((t) {
+        children: LegacyAdStyle.values.map((t) {
           final isSelected = t == selected;
           return Padding(
             padding: const EdgeInsets.only(right: DesignTokens.spaceSm),
@@ -632,15 +663,15 @@ class _TemplateSelector extends StatelessWidget {
     );
   }
 
-  String _getLabel(AdTemplate t) {
+  String _getLabel(LegacyAdStyle t) {
     switch (t) {
-      case AdTemplate.story:
+      case LegacyAdStyle.story:
         return '📱 Story (9:16)';
-      case AdTemplate.square:
+      case LegacyAdStyle.square:
         return '📷 Square (1:1)';
-      case AdTemplate.banner:
+      case LegacyAdStyle.banner:
         return '🖼️ Banner (16:9)';
-      case AdTemplate.minimal:
+      case LegacyAdStyle.minimal:
         return '✨ Minimal';
     }
   }
@@ -688,7 +719,7 @@ class _AdPreview extends StatelessWidget {
   });
 
   final Item item;
-  final AdTemplate template;
+  final LegacyAdStyle template;
   final bool showPrice;
   final bool showQr;
   final bool showBrand;
@@ -704,13 +735,13 @@ class _AdPreview extends StatelessWidget {
           final shortestSide = constraints.biggest.shortestSide;
           final longestSide = constraints.biggest.longestSide;
           final edgePadding = (shortestSide * 0.08).clamp(12.0, 28.0);
-          final imageSize = template == AdTemplate.minimal
+          final imageSize = template == LegacyAdStyle.minimal
               ? 0.0
-              : (shortestSide * (template == AdTemplate.story ? 0.46 : 0.34))
+              : (shortestSide * (template == LegacyAdStyle.story ? 0.46 : 0.34))
                     .clamp(84.0, 168.0);
           final titleSize = (shortestSide *
-                  (template == AdTemplate.story ? 0.11 : 0.085))
-              .clamp(18.0, template == AdTemplate.story ? 30.0 : 26.0);
+                  (template == LegacyAdStyle.story ? 0.11 : 0.085))
+              .clamp(18.0, template == LegacyAdStyle.story ? 30.0 : 26.0);
           final priceSize = (shortestSide * 0.08).clamp(16.0, 22.0);
           final chipFontSize = (shortestSide * 0.042).clamp(11.0, 14.0);
           final qrSize = (shortestSide * 0.24).clamp(42.0, 76.0);
@@ -839,7 +870,7 @@ class _AdPreview extends StatelessWidget {
                                 fontSize: titleSize,
                                 height: 1.05,
                               ),
-                              maxLines: template == AdTemplate.story ? 3 : 2,
+                              maxLines: template == LegacyAdStyle.story ? 3 : 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             SizedBox(
@@ -944,13 +975,13 @@ class _AdPreview extends StatelessWidget {
 
   double _getAspectRatio() {
     switch (template) {
-      case AdTemplate.story:
+      case LegacyAdStyle.story:
         return 9 / 16;
-      case AdTemplate.square:
+      case LegacyAdStyle.square:
         return 1;
-      case AdTemplate.banner:
+      case LegacyAdStyle.banner:
         return 16 / 9;
-      case AdTemplate.minimal:
+      case LegacyAdStyle.minimal:
         return 1;
     }
   }

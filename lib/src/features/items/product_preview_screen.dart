@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
+import '../checkout/cart_controller.dart';
 import '../../core/db/app_database.dart';
 import '../../core/security/manager_approval.dart';
 import '../../core/theme/design_tokens.dart';
@@ -317,13 +319,39 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                       onPressed: isOutOfStock
                           ? null
                           : () {
+                              final cart = ref.read(cartControllerProvider.notifier);
+                              final String? msg;
+                              if (_hasVariants(stocks) &&
+                                  _selectedVariant.trim().isNotEmpty) {
+                                msg = cart.addItemVariant(
+                                  item: item,
+                                  variant: _selectedVariant,
+                                  price: unitPrice,
+                                  availableStock: stockNow,
+                                  quantity: _qty,
+                                );
+                              } else {
+                                msg = cart.addItem(
+                                  item: item,
+                                  quantity: _qty,
+                                  availableStock: stockEnabled ? stockNow : null,
+                                );
+                              }
+                              if (!context.mounted) return;
+                              if (msg != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(msg)),
+                                );
+                                return;
+                              }
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    'Preview only (no order placed).',
+                                    'Added $_qty × ${item.name} to cart',
                                   ),
                                 ),
                               );
+                              context.go('/home/checkout');
                             },
                       child: const Text('Add to cart'),
                     ),

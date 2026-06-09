@@ -1,25 +1,37 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/haptics.dart';
 import '../../widgets/offline_cached_image.dart';
+import 'catalog_image_preview.dart';
 import 'catalog_service.dart';
+import 'catalog_template.dart';
 
-final _catalogItemsProvider = FutureProvider<List<Item>>((ref) {
-  return ref.watch(appDatabaseProvider).getAllItems();
+final _catalogItemsProvider = StreamProvider<List<Item>>((ref) {
+  return ref.watch(appDatabaseProvider).watchItems();
 });
 
-final _catalogServicesProvider = FutureProvider<List<Service>>((ref) async {
-  final db = ref.watch(appDatabaseProvider);
-  return db.select(db.services).get();
+final _catalogServicesProvider = StreamProvider<List<Service>>((ref) {
+  return ref.watch(appDatabaseProvider).watchServices();
 });
 
 final _businessProfileProvider = FutureProvider<BusinessProfile?>((ref) async {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.businessProfiles)..limit(1)).getSingleOrNull();
+});
+
+final _campaignProvider = StateProvider<CatalogCampaign>((ref) {
+  return const CatalogCampaign();
 });
 
 class CatalogScreen extends ConsumerStatefulWidget {
@@ -29,26 +41,14 @@ class CatalogScreen extends ConsumerStatefulWidget {
   ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
 }
 
-class _CatalogScreenState extends ConsumerState<CatalogScreen>
-    with SingleTickerProviderStateMixin {
-  final _selectedProductIds = <String>{};
-  final _selectedServiceIds = <String>{};
-  bool _includeServices = false;
-  bool _selectAllProducts = true;
-  bool _selectAllServices = true;
+class _CatalogScreenState extends ConsumerState<CatalogScreen> {
+  final _catalogImageKey = GlobalKey();
+  final _titleController = TextEditingController();
   bool _generating = false;
-  late TabController _tabCtrl;
-  static final _currencyFormat = NumberFormat('#,###');
-
-  @override
-  void initState() {
-    super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
-  }
 
   @override
   void dispose() {
-    _tabCtrl.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -57,326 +57,512 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen>
     final itemsAsync = ref.watch(_catalogItemsProvider);
     final servicesAsync = ref.watch(_catalogServicesProvider);
     final profileAsync = ref.watch(_businessProfileProvider);
+    final campaign = ref.watch(_campaignProvider);
 
     return Scaffold(
-      backgroundColor: DesignTokens.surface,
+      backgroundColor: DesignTokens.surfaceGrouped,
       appBar: AppBar(
-        title: Text('Digital Catalog', style: DesignTokens.textTitle),
-        bottom: TabBar(
-          controller: _tabCtrl,
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.inventory_2_outlined, size: 18),
-              text: 'Products (${itemsAsync.valueOrNull?.length ?? 0})',
+        backgroundColor: DesignTokens.surfaceGrouped,
+        title: Text('Digital Catalog', style: DesignTokens.textHeadline),
+        actions: [
+          if (campaign.selectedCount > 0)
+            TextButton(
+              onPressed: () => _showShareSheet(
+                itemsAsync.valueOrNull ?? [],
+                servicesAsync.valueOrNull ?? [],
+                profileAsync.valueOrNull,
+              ),
+              child: const Text('Share'),
             ),
-            Tab(
-              icon: const Icon(Icons.room_service_outlined, size: 18),
-              text: 'Services (${servicesAsync.valueOrNull?.length ?? 0})',
-            ),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: [
-          _buildProductsTab(itemsAsync),
-          _buildServicesTab(servicesAsync),
         ],
       ),
-      bottomNavigationBar: _buildShareBar(
-        itemsAsync.valueOrNull ?? [],
-        servicesAsync.valueOrNull ?? [],
-        profileAsync.valueOrNull,
+      body: itemsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (items) {
+          final services = servicesAsync.valueOrNull ?? [];
+          final profile = profileAsync.valueOrNull;
+
+          if (items.isEmpty && services.isEmpty) {
+            return _emptyState();
+          }
+
+          return Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _buildTemplateBar(campaign)),
+                  SliverToBoxAdapter(child: _buildPromoBar(campaign)),
+                  SliverToBoxAdapter(child: _buildTitleEditor(campaign, profile)),
+                  SliverToBoxAdapter(child: _buildLimitChip(campaign)),
+                  if (items.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: Text(
+                          'Products',
+                          style: DesignTokens.textCaption.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (items.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.all(12),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.78,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _ItemCard(
+                            item: items[index],
+                            selected: campaign.selectedProductIds.contains(items[index].id),
+                            onToggle: () => _toggleProduct(items[index].id, items.length),
+                            promo: campaign.promo,
+                          ),
+                          childCount: items.length,
+                        ),
+                      ),
+                    ),
+                  if (services.isNotEmpty) ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: Row(
+                          children: [
+                            Text(
+                              'Services',
+                              style: DesignTokens.textCaption.copyWith(
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            FilterChip(
+                              label: Text(campaign.includeServices ? 'Included' : 'Skip'),
+                              selected: campaign.includeServices,
+                              onSelected: (v) {
+                                ref.read(_campaignProvider.notifier).state =
+                                    campaign.copyWith(includeServices: v);
+                              },
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (campaign.includeServices)
+                      SliverPadding(
+                        padding: const EdgeInsets.all(12),
+                        sliver: SliverGrid(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.78,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _ServiceCard(
+                              service: services[index],
+                              selected: campaign.selectedServiceIds.contains(services[index].id),
+                              onToggle: () => _toggleService(services[index].id, services.length),
+                              promo: campaign.promo,
+                            ),
+                            childCount: services.length,
+                          ),
+                        ),
+                      ),
+                  ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 200)),
+                ],
+              ),
+              // Hidden off-screen renderer for PNG export
+              Positioned(
+                left: -10000,
+                top: 0,
+                child: RepaintBoundary(
+                  key: _catalogImageKey,
+                  child: CatalogImagePreview(
+                    items: items,
+                    services: services,
+                    campaign: campaign,
+                    profile: profile,
+                  ),
+                ),
+              ),
+              // Floating preview toggle
+              if (campaign.selectedCount > 0)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.extended(
+                    heroTag: 'catalog_share',
+                    backgroundColor: DesignTokens.brandPrimary,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.share, size: 20),
+                    label: const Text('Share'),
+                    onPressed: () => _showShareSheet(
+                      itemsAsync.valueOrNull ?? [],
+                      servicesAsync.valueOrNull ?? [],
+                      profileAsync.valueOrNull,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProductsTab(AsyncValue<List<Item>> itemsAsync) {
-    return itemsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (items) {
-        if (items.isEmpty) {
-          return _emptyState(
-            icon: Icons.inventory_2_outlined,
-            title: 'No products yet',
-            subtitle: 'Add products first to generate a catalog',
-          );
-        }
-        if (_selectAllProducts && _selectedProductIds.isEmpty) {
-          _selectedProductIds.addAll(items.map((i) => i.id));
-        }
-        return Column(
-          children: [
-            _selectionBar(
-              selected: _selectedProductIds.length,
-              total: items.length,
-              selectAll: _selectAllProducts,
-              onToggleAll: () {
-                setState(() {
-                  _selectAllProducts = !_selectAllProducts;
-                  if (_selectAllProducts) {
-                    _selectedProductIds.addAll(items.map((i) => i.id));
-                  } else {
-                    _selectedProductIds.clear();
-                  }
-                });
-              },
-            ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                itemCount: items.length,
-                itemBuilder: (_, i) {
-                  final item = items[i];
-                  final sel = _selectedProductIds.contains(item.id);
-                  return _ProductTile(
-                    item: item,
-                    selected: sel,
-                    onToggle: () => setState(() {
-                      if (sel) {
-                        _selectedProductIds.remove(item.id);
-                        _selectAllProducts = false;
-                      } else {
-                        _selectedProductIds.add(item.id);
-                        if (_selectedProductIds.length == items.length) {
-                          _selectAllProducts = true;
-                        }
-                      }
-                    }),
-                  );
-                },
+  Widget _buildTemplateBar(CatalogCampaign campaign) {
+    return Container(
+      height: 110,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: CatalogLayout.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final layout = CatalogLayout.values[index];
+          final active = campaign.layout == layout;
+          return GestureDetector(
+            onTap: () {
+              Haptics.selection();
+              ref.read(_campaignProvider.notifier).state =
+                  campaign.copyWith(layout: layout);
+            },
+            child: AnimatedContainer(
+              duration: DesignTokens.durationFast,
+              width: 100,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: active ? DesignTokens.brandPrimary : DesignTokens.surfaceRaised,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: active ? DesignTokens.brandPrimary : DesignTokens.dividerSolid,
+                  width: active ? 2 : 1,
+                ),
+                boxShadow: active ? DesignTokens.shadowMd : null,
               ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildServicesTab(AsyncValue<List<Service>> servicesAsync) {
-    return servicesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (services) {
-        if (services.isEmpty) {
-          return _emptyState(
-            icon: Icons.room_service_outlined,
-            title: 'No services yet',
-            subtitle: 'Add services first to include them in the catalog',
-          );
-        }
-        if (_selectAllServices && _selectedServiceIds.isEmpty) {
-          _selectedServiceIds.addAll(services.map((s) => s.id));
-        }
-        return Column(
-          children: [
-            // Include services toggle
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: DesignTokens.surfaceWhite,
-              child: Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.add_circle_outline, size: 18, color: DesignTokens.brandPrimary),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('Include services in catalog', style: TextStyle(fontWeight: FontWeight.w500)),
+                  Icon(
+                    layout.icon,
+                    size: 24,
+                    color: active ? Colors.white : DesignTokens.grayMedium,
                   ),
-                  Switch(
-                    value: _includeServices,
-                    onChanged: (v) => setState(() => _includeServices = v),
+                  const SizedBox(height: 6),
+                  Text(
+                    layout.displayName,
+                    style: DesignTokens.textCaption.copyWith(
+                      color: active ? Colors.white : DesignTokens.textSecondary,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
             ),
-            if (_includeServices) ...[
-              _selectionBar(
-                selected: _selectedServiceIds.length,
-                total: services.length,
-                selectAll: _selectAllServices,
-                onToggleAll: () {
-                  setState(() {
-                    _selectAllServices = !_selectAllServices;
-                    if (_selectAllServices) {
-                      _selectedServiceIds.addAll(services.map((s) => s.id));
-                    } else {
-                      _selectedServiceIds.clear();
-                    }
-                  });
-                },
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  itemCount: services.length,
-                  itemBuilder: (_, i) {
-                    final svc = services[i];
-                    final sel = _selectedServiceIds.contains(svc.id);
-                    return _ServiceTile(
-                      service: svc,
-                      selected: sel,
-                      onToggle: () => setState(() {
-                        if (sel) {
-                          _selectedServiceIds.remove(svc.id);
-                          _selectAllServices = false;
-                        } else {
-                          _selectedServiceIds.add(svc.id);
-                          if (_selectedServiceIds.length == services.length) {
-                            _selectAllServices = true;
-                          }
-                        }
-                      }),
-                    );
-                  },
-                ),
-              ),
-            ] else
-              Expanded(
-                child: _emptyState(
-                  icon: Icons.toggle_off_outlined,
-                  title: 'Services not included',
-                  subtitle: 'Toggle the switch above to add services to your catalog',
-                ),
-              ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  Widget _selectionBar({
-    required int selected,
-    required int total,
-    required bool selectAll,
-    required VoidCallback onToggleAll,
-  }) {
+  Widget _buildPromoBar(CatalogCampaign campaign) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: DesignTokens.surfaceWhite,
-      child: Row(
+      height: 52,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: CatalogPromo.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final promo = CatalogPromo.values[index];
+          final active = campaign.promo == promo;
+          return ChoiceChip(
+            label: Text(promo.displayName),
+            selected: active,
+            onSelected: (_) {
+              Haptics.selection();
+              ref.read(_campaignProvider.notifier).state =
+                  campaign.copyWith(promo: promo);
+            },
+            selectedColor: promo.badgeColor.withValues(alpha: 0.15),
+            labelStyle: TextStyle(
+              color: active ? promo.badgeColor : DesignTokens.grayMedium,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12,
+            ),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTitleEditor(CatalogCampaign campaign, BusinessProfile? profile) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.check_circle, size: 18, color: selected > 0 ? DesignTokens.success : DesignTokens.grayMedium),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('$selected of $total selected', style: DesignTokens.textBody),
-          ),
-          TextButton(
-            onPressed: onToggleAll,
-            child: Text(selectAll ? 'Deselect All' : 'Select All', style: const TextStyle(fontSize: 12)),
+          TextField(
+            controller: _titleController,
+            onChanged: (v) {
+              ref.read(_campaignProvider.notifier).state =
+                  campaign.copyWith(title: v);
+            },
+            style: DesignTokens.textBodyBold,
+            decoration: InputDecoration(
+              hintText: campaign.title.isEmpty
+                  ? '${profile?.shopName ?? 'My Shop'} — ${campaign.layout.displayName} Catalog'
+                  : campaign.title,
+              hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+              prefixIcon: const Icon(Icons.title_outlined, size: 20),
+              filled: true,
+              fillColor: DesignTokens.surfaceRaised,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _emptyState({required IconData icon, required String title, required String subtitle}) {
+  Widget _buildLimitChip(CatalogCampaign campaign) {
+    final limit = campaign.layout.maxRecommended;
+    final count = campaign.selectedCount;
+    final color = count > limit ? DesignTokens.error : DesignTokens.success;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, size: 14, color: color),
+                const SizedBox(width: 6),
+                Text(
+                  '$count / $limit ${campaign.layout.displayName.toLowerCase()}',
+                  style: DesignTokens.textCaption.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: () {
+              Haptics.selection();
+              ref.read(_campaignProvider.notifier).state = campaign.copyWith(
+                selectedProductIds: {},
+                selectedServiceIds: {},
+              );
+            },
+            icon: const Icon(Icons.clear_all, size: 16),
+            label: const Text('Clear'),
+            style: TextButton.styleFrom(
+              foregroundColor: DesignTokens.grayMedium,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState() {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 64, color: DesignTokens.grayMedium),
-          const SizedBox(height: 16),
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: DesignTokens.brandAccentLight,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Icon(Icons.auto_awesome, size: 36, color: DesignTokens.brandAccent),
+          ),
+          const SizedBox(height: 20),
+          Text('Build your first catalog', style: DesignTokens.textTitle),
           const SizedBox(height: 8),
-          Text(subtitle, style: const TextStyle(color: DesignTokens.grayMedium, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShareBar(List<Item> allItems, List<Service> allServices, BusinessProfile? profile) {
-    final selectedProducts = allItems.where((i) => _selectedProductIds.contains(i.id)).toList();
-    final selectedServices = _includeServices
-        ? allServices.where((s) => _selectedServiceIds.contains(s.id)).toList()
-        : <Service>[];
-    final totalSelected = selectedProducts.length + selectedServices.length;
-
-    return Container(
-      padding: const EdgeInsets.all(DesignTokens.spaceMd),
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+          Text(
+            'Add products or services, then create\na professional shareable catalog.',
+            textAlign: TextAlign.center,
+            style: DesignTokens.textBodyMuted,
           ),
         ],
       ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (totalSelected == 0)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Text('Select items to share', style: TextStyle(color: DesignTokens.grayMedium)),
-              )
-            else ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  '$totalSelected item${totalSelected == 1 ? '' : 's'} selected'
-                  '${selectedServices.isNotEmpty ? ' (${selectedProducts.length} products, ${selectedServices.length} services)' : ''}',
-                  style: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: _generating
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.picture_as_pdf, size: 18),
-                      label: const Text('Share PDF'),
-                      onPressed: _generating ? null : () => _sharePdf(selectedProducts, selectedServices, profile),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.message, size: 18),
-                      label: const Text('WhatsApp'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF25D366),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: _generating ? null : () => _shareWhatsApp(selectedProducts, selectedServices, profile),
-                    ),
-                  ),
-                ],
-              ),
-              if (profile?.shopId != null) ...[
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.storefront, size: 18),
-                    label: const Text('Open Shop Link'),
-                    onPressed: () => _openShopLink(profile!.shopId!),
-                  ),
-                ),
-              ],
-            ],
-          ],
-        ),
+    );
+  }
+
+  void _toggleProduct(String id, int totalProducts) {
+    final campaign = ref.read(_campaignProvider);
+    final limit = campaign.layout.maxRecommended;
+    final selected = Set<String>.from(campaign.selectedProductIds);
+
+    if (selected.contains(id)) {
+      selected.remove(id);
+    } else {
+      if (campaign.selectedCount >= limit) {
+        _showLimitToast(limit);
+        return;
+      }
+      selected.add(id);
+    }
+
+    ref.read(_campaignProvider.notifier).state =
+        campaign.copyWith(selectedProductIds: selected);
+    Haptics.selection();
+  }
+
+  void _toggleService(String id, int totalServices) {
+    final campaign = ref.read(_campaignProvider);
+    final limit = campaign.layout.maxRecommended;
+    final selected = Set<String>.from(campaign.selectedServiceIds);
+
+    if (selected.contains(id)) {
+      selected.remove(id);
+    } else {
+      if (campaign.selectedCount >= limit) {
+        _showLimitToast(limit);
+        return;
+      }
+      selected.add(id);
+    }
+
+    ref.read(_campaignProvider.notifier).state =
+        campaign.copyWith(selectedServiceIds: selected);
+    Haptics.selection();
+  }
+
+  void _showLimitToast(int limit) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Select up to $limit items for this layout'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    Haptics.warning();
+  }
+
+  void _showShareSheet(
+    List<Item> allItems,
+    List<Service> allServices,
+    BusinessProfile? profile,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: DesignTokens.surfaceRaised,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => _ShareSheet(
+        campaign: ref.read(_campaignProvider),
+        allItems: allItems,
+        allServices: allServices,
+        profile: profile,
+        onShareImage: () => _shareImage(allItems, allServices, profile),
+        onSharePdf: () => _sharePdf(allItems, allServices, profile),
+        onShareWhatsApp: () => _shareWhatsApp(allItems, allServices, profile),
+        onOpenShopLink: profile?.shopId != null
+            ? () => _openShopLink(profile!.shopId!)
+            : null,
+        generating: _generating,
       ),
     );
   }
 
-  Future<void> _sharePdf(List<Item> items, List<Service> services, BusinessProfile? profile) async {
-    if (items.isEmpty && services.isEmpty || _generating) return;
+  Future<void> _shareImage(
+    List<Item> items,
+    List<Service> services,
+    BusinessProfile? profile,
+  ) async {
+    final campaign = ref.read(_campaignProvider);
+    final selectedProducts = items.where((i) => campaign.selectedProductIds.contains(i.id)).toList();
+    final selectedServices = campaign.includeServices
+        ? services.where((s) => campaign.selectedServiceIds.contains(s.id)).toList()
+        : <Service>[];
+
+    if (selectedProducts.isEmpty && selectedServices.isEmpty) return;
+
     setState(() => _generating = true);
+    Navigator.pop(context);
+
+    try {
+      final boundary = _catalogImageKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw StateError('Preview not ready');
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw StateError('Image conversion failed');
+      final pngBytes = byteData.buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${profile?.shopName ?? 'catalog'}.png');
+      await file.writeAsBytes(pngBytes);
+
+      final shareText = _buildShareText(campaign, profile);
+      await Share.shareXFiles([XFile(file.path)], text: shareText);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  Future<void> _sharePdf(
+    List<Item> items,
+    List<Service> services,
+    BusinessProfile? profile,
+  ) async {
+    final campaign = ref.read(_campaignProvider);
+    final selectedProducts = items.where((i) => campaign.selectedProductIds.contains(i.id)).toList();
+    final selectedServices = campaign.includeServices
+        ? services.where((s) => campaign.selectedServiceIds.contains(s.id)).toList()
+        : <Service>[];
+
+    if (selectedProducts.isEmpty && selectedServices.isEmpty || _generating) return;
+    setState(() => _generating = true);
+    Navigator.pop(context);
+
     try {
       final service = CatalogService(ref.read(appDatabaseProvider));
       await service.sharePdf(
-        items: items,
-        services: services,
+        items: selectedProducts,
+        services: selectedServices,
         shopName: profile?.shopName ?? 'My Shop',
         shopPhone: profile?.shopPhone,
         shopAddress: profile?.shopAddress,
         logoUrl: profile?.logoUrl,
         shopId: profile?.shopId,
+        campaign: campaign,
       );
     } catch (e) {
       if (!mounted) return;
@@ -386,16 +572,29 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen>
     }
   }
 
-  Future<void> _shareWhatsApp(List<Item> items, List<Service> services, BusinessProfile? profile) async {
-    if (items.isEmpty && services.isEmpty || _generating) return;
+  Future<void> _shareWhatsApp(
+    List<Item> items,
+    List<Service> services,
+    BusinessProfile? profile,
+  ) async {
+    final campaign = ref.read(_campaignProvider);
+    final selectedProducts = items.where((i) => campaign.selectedProductIds.contains(i.id)).toList();
+    final selectedServices = campaign.includeServices
+        ? services.where((s) => campaign.selectedServiceIds.contains(s.id)).toList()
+        : <Service>[];
+
+    if (selectedProducts.isEmpty && selectedServices.isEmpty || _generating) return;
     setState(() => _generating = true);
+    Navigator.pop(context);
+
     try {
       final svc = CatalogService(ref.read(appDatabaseProvider));
       await svc.shareWhatsApp(
-        items: items,
-        services: services,
+        items: selectedProducts,
+        services: selectedServices,
         shopName: profile?.shopName ?? 'My Shop',
         shopId: profile?.shopId,
+        campaign: campaign,
       );
     } catch (e) {
       if (!mounted) return;
@@ -409,54 +608,165 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen>
     final svc = CatalogService(ref.read(appDatabaseProvider));
     await svc.openShopLink(shopId);
   }
+
+  String _buildShareText(CatalogCampaign campaign, BusinessProfile? profile) {
+    final buffer = StringBuffer();
+    if (campaign.title.isNotEmpty) {
+      buffer.writeln(campaign.title);
+    } else {
+      buffer.writeln('${profile?.shopName ?? 'My Shop'} — Catalog');
+    }
+    if (campaign.promo != CatalogPromo.none) {
+      buffer.writeln('🏷 ${campaign.promo.bannerText}');
+    }
+    if (profile?.shopId != null) {
+      buffer.writeln('Shop online: https://soko24.co/shop/${profile!.shopId}');
+    }
+    return buffer.toString();
+  }
 }
 
-class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.item, required this.selected, required this.onToggle});
+// ─────────────────────────────────────────────────────────────────────────────
+// Visual item cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ItemCard extends StatelessWidget {
+  const _ItemCard({
+    required this.item,
+    required this.selected,
+    required this.onToggle,
+    required this.promo,
+  });
+
   final Item item;
   final bool selected;
   final VoidCallback onToggle;
+  final CatalogPromo promo;
+
+  static final _currencyFormat = NumberFormat('#,###');
 
   @override
   Widget build(BuildContext context) {
-    final price = 'UGX ${_CatalogScreenState._currencyFormat.format(item.price.round())}';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: selected
-            ? const BorderSide(color: DesignTokens.brandPrimary, width: 1.5)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onToggle,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              _buildImage(),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(price, style: const TextStyle(color: DesignTokens.success, fontWeight: FontWeight.w700, fontSize: 13)),
-                    if (item.stockEnabled && item.stockQty > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text('${item.stockQty} in stock',
-                            style: const TextStyle(fontSize: 11, color: DesignTokens.grayMedium)),
-                      ),
-                  ],
-                ),
-              ),
-              Checkbox(value: selected, onChanged: (_) => onToggle()),
-            ],
+    final price = 'UGX ${_currencyFormat.format(item.price.round())}';
+    return GestureDetector(
+      onTap: onToggle,
+      child: AnimatedContainer(
+        duration: DesignTokens.durationFast,
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? DesignTokens.brandAccent : Colors.transparent,
+            width: selected ? 2.5 : 0,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: DesignTokens.brandAccent.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: _buildImage(),
+                  ),
+                  if (promo != CatalogPromo.none)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: promo.badgeColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          promo.badgeText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: AnimatedContainer(
+                      duration: DesignTokens.durationFast,
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: selected ? DesignTokens.brandAccent : Colors.white.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        selected ? Icons.check : Icons.add,
+                        size: 16,
+                        color: selected ? Colors.white : DesignTokens.grayMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: DesignTokens.brandAccent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (item.stockEnabled && item.stockQty > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${item.stockQty} in stock',
+                        style: DesignTokens.textCaption.copyWith(fontSize: 11),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -465,20 +775,11 @@ class _ProductTile extends StatelessWidget {
   Widget _buildImage() {
     final url = item.thumbnailUrl ?? item.imageUrl;
     if (url != null && url.trim().isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: OfflineCachedImage(
-            imageUrl: url.trim(),
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            placeholder: _placeholder(),
-            errorWidget: _placeholder(),
-          ),
-        ),
+      return OfflineCachedImage(
+        imageUrl: url.trim(),
+        fit: BoxFit.cover,
+        placeholder: _placeholder(),
+        errorWidget: _placeholder(),
       );
     }
     return _placeholder();
@@ -486,69 +787,152 @@ class _ProductTile extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: DesignTokens.grayLight,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.image_outlined, color: DesignTokens.grayMedium, size: 24),
+      color: DesignTokens.grayLight,
+      child: const Icon(Icons.inventory_2_outlined, color: DesignTokens.grayMedium, size: 32),
     );
   }
 }
 
-class _ServiceTile extends StatelessWidget {
-  const _ServiceTile({required this.service, required this.selected, required this.onToggle});
+class _ServiceCard extends StatelessWidget {
+  const _ServiceCard({
+    required this.service,
+    required this.selected,
+    required this.onToggle,
+    required this.promo,
+  });
+
   final Service service;
   final bool selected;
   final VoidCallback onToggle;
+  final CatalogPromo promo;
+
+  static final _currencyFormat = NumberFormat('#,###');
 
   @override
   Widget build(BuildContext context) {
-    final price = 'UGX ${_CatalogScreenState._currencyFormat.format(service.price.round())}';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: selected
-            ? const BorderSide(color: DesignTokens.brandPrimary, width: 1.5)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onToggle,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              _buildImage(),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(service.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(price, style: const TextStyle(color: DesignTokens.success, fontWeight: FontWeight.w700, fontSize: 13)),
-                    if (service.durationMinutes != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.schedule, size: 12, color: DesignTokens.grayMedium),
-                            const SizedBox(width: 4),
-                            Text('${service.durationMinutes} min',
-                                style: const TextStyle(fontSize: 11, color: DesignTokens.grayMedium)),
-                          ],
+    final price = 'UGX ${_currencyFormat.format(service.price.round())}';
+    return GestureDetector(
+      onTap: onToggle,
+      child: AnimatedContainer(
+        duration: DesignTokens.durationFast,
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? DesignTokens.brandAccent : Colors.transparent,
+            width: selected ? 2.5 : 0,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: DesignTokens.brandAccent.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: _buildImage(),
+                  ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F1D40).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'SERVICE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: AnimatedContainer(
+                      duration: DesignTokens.durationFast,
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: selected ? DesignTokens.brandAccent : Colors.white.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        selected ? Icons.check : Icons.add,
+                        size: 16,
+                        color: selected ? Colors.white : DesignTokens.grayMedium,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Checkbox(value: selected, onChanged: (_) => onToggle()),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    service.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: DesignTokens.brandAccent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (service.durationMinutes != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule, size: 12, color: DesignTokens.grayMedium),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${service.durationMinutes} min',
+                            style: DesignTokens.textCaption.copyWith(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -557,20 +941,11 @@ class _ServiceTile extends StatelessWidget {
   Widget _buildImage() {
     final url = service.imageUrl;
     if (url != null && url.trim().isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: OfflineCachedImage(
-            imageUrl: url.trim(),
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            placeholder: _placeholder(),
-            errorWidget: _placeholder(),
-          ),
-        ),
+      return OfflineCachedImage(
+        imageUrl: url.trim(),
+        fit: BoxFit.cover,
+        placeholder: _placeholder(),
+        errorWidget: _placeholder(),
       );
     }
     return _placeholder();
@@ -578,13 +953,219 @@ class _ServiceTile extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: DesignTokens.grayLight,
-        borderRadius: BorderRadius.circular(8),
+      color: DesignTokens.grayLight,
+      child: const Icon(Icons.room_service_outlined, color: DesignTokens.grayMedium, size: 32),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Share bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ShareSheet extends StatelessWidget {
+  const _ShareSheet({
+    required this.campaign,
+    required this.allItems,
+    required this.allServices,
+    required this.profile,
+    required this.onShareImage,
+    required this.onSharePdf,
+    required this.onShareWhatsApp,
+    required this.onOpenShopLink,
+    required this.generating,
+  });
+
+  final CatalogCampaign campaign;
+  final List<Item> allItems;
+  final List<Service> allServices;
+  final BusinessProfile? profile;
+  final VoidCallback onShareImage;
+  final VoidCallback onSharePdf;
+  final VoidCallback onShareWhatsApp;
+  final VoidCallback? onOpenShopLink;
+  final bool generating;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedProducts = allItems.where((i) => campaign.selectedProductIds.contains(i.id)).toList();
+    final selectedServices = campaign.includeServices
+        ? allServices.where((s) => campaign.selectedServiceIds.contains(s.id)).toList()
+        : <Service>[];
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: DesignTokens.grayLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Header
+            Text(
+              campaign.title.isNotEmpty ? campaign.title : profile?.shopName ?? 'Catalog',
+              style: DesignTokens.textHeadline,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${selectedProducts.length} products${selectedServices.isNotEmpty ? ', ${selectedServices.length} services' : ''} · ${campaign.layout.displayName} layout',
+              style: DesignTokens.textBodyMuted,
+            ),
+            if (campaign.promo != CatalogPromo.none) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: campaign.promo.badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  campaign.promo.bannerText,
+                  style: TextStyle(
+                    color: campaign.promo.badgeColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            // Share actions
+            _ShareButton(
+              icon: Icons.message,
+              label: 'Share on WhatsApp',
+              subtitle: 'Send as a rich message with catalog link',
+              color: const Color(0xFF25D366),
+              onPressed: generating ? null : onShareWhatsApp,
+              generating: generating,
+            ),
+            const SizedBox(height: 10),
+            _ShareButton(
+              icon: Icons.image,
+              label: 'Share as Image',
+              subtitle: 'High-res ${campaign.layout.displayName.toLowerCase()} poster',
+              color: DesignTokens.brandPrimary,
+              onPressed: generating ? null : onShareImage,
+              generating: generating,
+            ),
+            const SizedBox(height: 10),
+            _ShareButton(
+              icon: Icons.picture_as_pdf,
+              label: 'Export PDF',
+              subtitle: 'Professional printable catalog',
+              color: const Color(0xFFE53E3E),
+              onPressed: generating ? null : onSharePdf,
+              generating: generating,
+            ),
+            if (onOpenShopLink != null) ...[
+              const SizedBox(height: 10),
+              _ShareButton(
+                icon: Icons.storefront,
+                label: 'Open Shop Link',
+                subtitle: 'soko24.co/shop/${profile?.shopId}',
+                color: DesignTokens.brandAccent,
+                onPressed: onOpenShopLink!,
+                generating: false,
+                outlined: true,
+              ),
+            ],
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
-      child: const Icon(Icons.room_service_outlined, color: DesignTokens.grayMedium, size: 24),
+    );
+  }
+}
+
+class _ShareButton extends StatelessWidget {
+  const _ShareButton({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onPressed,
+    required this.generating,
+    this.outlined = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onPressed;
+  final bool generating;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: outlined ? Colors.transparent : color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: outlined
+              ? BoxDecoration(
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                  borderRadius: BorderRadius.circular(14),
+                )
+              : null,
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: outlined ? color.withValues(alpha: 0.1) : color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: generating
+                    ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                    : Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: outlined ? color : DesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: DesignTokens.textCaption.copyWith(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: outlined ? color : DesignTokens.grayMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

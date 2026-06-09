@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:drift/drift.dart' as drift;
@@ -15,9 +16,7 @@ import '../../core/settings/business_profile_cache.dart';
 import '../../core/settings/shop_payment_settings.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
-import '../../core/theme/design_tokens.dart';
-import '../../widgets/app_button.dart';
-import '../../widgets/app_input.dart';
+import '../../core/util/haptics.dart';
 import '../receipts/receipt_providers.dart';
 import '../settings/staff_pin_controller.dart';
 import '../../core/settings/business_setup_prefs.dart';
@@ -43,6 +42,8 @@ final _activeReceiptTemplateProvider = StreamProvider<ReceiptTemplate?>((ref) {
   return query;
 });
 
+/// Dark, immersive business-setup wizard.
+/// One step per screen. Minimal text. Obvious inputs. Clear CTA.
 class BusinessSetupWizardScreen extends ConsumerStatefulWidget {
   const BusinessSetupWizardScreen({super.key});
 
@@ -52,7 +53,8 @@ class BusinessSetupWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _BusinessSetupWizardScreenState
-    extends ConsumerState<BusinessSetupWizardScreen> {
+    extends ConsumerState<BusinessSetupWizardScreen>
+    with TickerProviderStateMixin {
   static const _uuid = Uuid();
 
   final _shopNameCtrl = TextEditingController();
@@ -71,9 +73,17 @@ class _BusinessSetupWizardScreenState
   bool _bankEnabled = false;
   bool _mobileMoneyEnabled = true;
 
-  bool _loading = true;
-  bool _savingBusiness = false;
-  bool _savingPayments = false;
+  int _currentStep = 0;
+
+  // Animations
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  // Palette — same language as LoginScreen
+  static const Color _bg = Color(0xFF000000);
+  static const Color _surface = Color(0xFF0B0B10);
+  static const Color _accent = Color(0xFF6C63FF);
+  static const Color _mint = Color(0xFF0EBE7E);
 
   @override
   void initState() {
@@ -83,6 +93,25 @@ class _BusinessSetupWizardScreenState
     if (telemetry != null) {
       unawaited(telemetry.event('setup_wizard_open'));
     }
+
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOutQuart,
+    );
+    _fadeController.forward();
+
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.black,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
   }
 
   @override
@@ -97,6 +126,7 @@ class _BusinessSetupWizardScreenState
     _mtnMerchantCtrl.dispose();
     _airtelMerchantCtrl.dispose();
     _paybillCtrl.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -133,7 +163,9 @@ class _BusinessSetupWizardScreenState
     _paybillCtrl.text = settings.paybillNumber;
 
     if (!mounted) return;
-    setState(() => _loading = false);
+    setState(() {
+      _currentStep = _suggestedStepIndex(null);
+    });
   }
 
   bool get _businessComplete => _shopNameCtrl.text.trim().isNotEmpty;
@@ -163,13 +195,10 @@ class _BusinessSetupWizardScreenState
   Future<void> _saveBusinessInfo() async {
     final name = _shopNameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Business name is required')),
-      );
+      _showError('Enter your business name');
       return;
     }
 
-    setState(() => _savingBusiness = true);
     try {
       final db = ref.read(appDatabaseProvider);
       final sync = ref.read(syncServiceProvider);
@@ -252,19 +281,11 @@ class _BusinessSetupWizardScreenState
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Saved. Will sync when online.'),
-          backgroundColor: DesignTokens.brandAccent,
-        ),
-      );
+      Haptics.impact();
+      _nextStep();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
-    } finally {
-      if (mounted) setState(() => _savingBusiness = false);
+      _showError('Save failed: $e');
     }
   }
 
@@ -284,7 +305,6 @@ class _BusinessSetupWizardScreenState
   }
 
   Future<void> _savePaymentSettings() async {
-    setState(() => _savingPayments = true);
     try {
       final prefs = ref.read(sharedPreferencesProvider);
       final settings = _collectPaymentSettings();
@@ -342,12 +362,12 @@ class _BusinessSetupWizardScreenState
               : drift.Value(existingProfile!.deliveryRadiusKm),
           deliveryPickupLatitude:
               existingProfile?.deliveryPickupLatitude == null
-              ? const drift.Value.absent()
-              : drift.Value(existingProfile!.deliveryPickupLatitude),
+                  ? const drift.Value.absent()
+                  : drift.Value(existingProfile!.deliveryPickupLatitude),
           deliveryPickupLongitude:
               existingProfile?.deliveryPickupLongitude == null
-              ? const drift.Value.absent()
-              : drift.Value(existingProfile!.deliveryPickupLongitude),
+                  ? const drift.Value.absent()
+                  : drift.Value(existingProfile!.deliveryPickupLongitude),
           cashOnDeliveryEnabled: drift.Value(settings.cashEnabled),
           bankPaymentEnabled: drift.Value(settings.bankEnabled),
           mobileMoneyEnabled: drift.Value(settings.mobileMoneyEnabled),
@@ -390,20 +410,11 @@ class _BusinessSetupWizardScreenState
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Payment settings saved. Will sync when online.'),
-          backgroundColor: DesignTokens.brandAccent,
-        ),
-      );
-      setState(() {});
+      Haptics.impact();
+      _nextStep();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
-    } finally {
-      if (mounted) setState(() => _savingPayments = false);
+      _showError('Save failed: $e');
     }
   }
 
@@ -446,101 +457,87 @@ class _BusinessSetupWizardScreenState
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Default receipt template created'),
-        backgroundColor: DesignTokens.brandAccent,
-      ),
-    );
+    Haptics.impact();
+    setState(() {
+      _currentStep = _suggestedStepIndex(null);
+    });
   }
 
   Future<void> _choosePrinter() async {
     final devices = await BlueThermalPrinter.instance.getBondedDevices();
     if (!mounted) return;
     if (devices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No paired printers found. Pair one in Bluetooth settings first.',
-          ),
-        ),
-      );
+      _showError('No paired printers found. Pair one in Bluetooth settings first.');
       return;
     }
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: DesignTokens.grayLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Choose printer', style: DesignTokens.textTitle),
-              const SizedBox(height: 8),
-              Text(
-                'Pair in OS Bluetooth first',
-                style: DesignTokens.textSmall.copyWith(
-                  color: DesignTokens.grayMedium,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    final d = devices[index];
-                    return ListTile(
-                      leading: const Icon(Icons.print_outlined),
-                      title: Text(d.name ?? 'Printer'),
-                      subtitle: Text(
-                        d.address ?? '',
-                        style: DesignTokens.textSmall,
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              color: _surface.withOpacity(0.95),
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      onTap: () async {
-                        try {
-                          await ref
-                              .read(printQueueServiceProvider)
-                              .setPreferredPrinter(d);
-                          await BlueThermalPrinter.instance.connect(d);
-                          unawaited(ref.read(printQueueServiceProvider).pump());
-                          if (ctx.mounted) Navigator.pop(ctx);
-                          if (!mounted) return;
-                          setState(() {});
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Selected printer: ${d.name ?? d.address ?? ''}',
-                              ),
-                              backgroundColor: DesignTokens.brandAccent,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Choose printer', style: _titleStyle),
+                    const SizedBox(height: 16),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: devices.length,
+                        itemBuilder: (context, index) {
+                          final d = devices[index];
+                          return ListTile(
+                            leading: const Icon(Icons.print_outlined, color: Colors.white70),
+                            title: Text(d.name ?? 'Printer', style: const TextStyle(color: Colors.white)),
+                            subtitle: Text(
+                              d.address ?? '',
+                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
                             ),
+                            onTap: () async {
+                              try {
+                                await ref
+                                    .read(printQueueServiceProvider)
+                                    .setPreferredPrinter(d);
+                                await BlueThermalPrinter.instance.connect(d);
+                                unawaited(ref.read(printQueueServiceProvider).pump());
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                if (!mounted) return;
+                                setState(() {});
+                                setState(() {
+                                  _currentStep = _suggestedStepIndex(null);
+                                });
+                              } catch (e) {
+                                if (!mounted) return;
+                                _showError('Failed to select printer: $e');
+                              }
+                            },
                           );
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to select printer: $e'),
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  },
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-            ],
+            ),
           ),
         );
       },
@@ -555,117 +552,97 @@ class _BusinessSetupWizardScreenState
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: DesignTokens.grayLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Set terminal PIN', style: DesignTokens.textTitle),
-              const SizedBox(height: 8),
-              Text(
-                'This locks the terminal until PIN unlock.',
-                style: DesignTokens.textSmall.copyWith(
-                  color: DesignTokens.grayMedium,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: pinCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 8,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'PIN',
-                  counterText: '',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmCtrl,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 8,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Confirm PIN',
-                  counterText: '',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  color: _surface.withOpacity(0.95),
+                  padding: EdgeInsets.only(
+                    left: 24,
+                    right: 24,
+                    top: 16,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final pin = pinCtrl.text.trim();
-                        final confirm = confirmCtrl.text.trim();
-                        if (pin.length < 4) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('PIN must be at least 4 digits'),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text('Set terminal PIN', style: _titleStyle),
+                      const SizedBox(height: 8),
+                      Text(
+                        '4–8 digits to lock this device.',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+                      ),
+                      const SizedBox(height: 20),
+                      _DarkInput(controller: pinCtrl, label: 'PIN', obscure: true, digitsOnly: true),
+                      const SizedBox(height: 12),
+                      _DarkInput(controller: confirmCtrl, label: 'Confirm PIN', obscure: true, digitsOnly: true),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _GlassButton(
+                              onTap: () => Navigator.pop(ctx),
+                              child: const Center(
+                                child: Text('Cancel', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                              ),
                             ),
-                          );
-                          return;
-                        }
-                        if (pin != confirm) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('PINs do not match')),
-                          );
-                          return;
-                        }
-
-                        await ctrl.setPin(pin);
-                        await ctrl.unlock(pin); // avoid immediate lock surprise
-
-                        final telemetry = Telemetry.instance;
-                        if (telemetry != null) {
-                          unawaited(telemetry.event('setup_terminal_pin_set'));
-                        }
-
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (!mounted) return;
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Terminal PIN enabled'),
-                            backgroundColor: DesignTokens.brandAccent,
                           ),
-                        );
-                      },
-                      child: const Text('Save PIN'),
-                    ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: _SolidButton(
+                              onTap: () async {
+                                final pin = pinCtrl.text.trim();
+                                final confirm = confirmCtrl.text.trim();
+                                if (pin.length < 4) {
+                                  setSheetState(() {});
+                                  _showError('PIN must be at least 4 digits');
+                                  return;
+                                }
+                                if (pin != confirm) {
+                                  setSheetState(() {});
+                                  _showError('PINs do not match');
+                                  return;
+                                }
+                                await ctrl.setPin(pin);
+                                await ctrl.unlock(pin);
+                                final telemetry = Telemetry.instance;
+                                if (telemetry != null) {
+                                  unawaited(telemetry.event('setup_terminal_pin_set'));
+                                }
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                if (!mounted) return;
+                                setState(() {
+                                  _currentStep = _suggestedStepIndex(null);
+                                });
+                              },
+                              child: const Center(
+                                child: Text('Save PIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -678,9 +655,7 @@ class _BusinessSetupWizardScreenState
     final activeTemplateAsync = ref.read(_activeReceiptTemplateProvider);
     final activeTemplate = activeTemplateAsync.asData?.value;
     if (!_setupComplete(activeTemplate)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Complete all setup steps first')),
-      );
+      _showError('Complete the required steps first');
       return;
     }
 
@@ -691,421 +666,970 @@ class _BusinessSetupWizardScreenState
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Setup complete'),
-        backgroundColor: DesignTokens.brandAccent,
-      ),
-    );
+    Haptics.impact();
     context.go('/home/checkout');
   }
+
+  List<_WizardStepMeta> _buildSteps(ReceiptTemplate? activeTemplate) {
+    final staffPin = ref.read(staffPinProvider);
+    return [
+      _WizardStepMeta(
+        title: 'Business',
+        subtitle: 'What is your business called?',
+        isComplete: _businessComplete,
+        icon: Icons.storefront_outlined,
+      ),
+      _WizardStepMeta(
+        title: 'Payments',
+        subtitle: 'How do you get paid?',
+        isComplete: _paymentsComplete(),
+        icon: Icons.payments_outlined,
+      ),
+      _WizardStepMeta(
+        title: 'Receipts',
+        subtitle: 'Ready to print receipts?',
+        isComplete: activeTemplate != null,
+        icon: Icons.receipt_long_outlined,
+      ),
+      _WizardStepMeta(
+        title: 'Printer',
+        subtitle: 'Connect a Bluetooth printer.',
+        isComplete: _printerComplete(),
+        optional: true,
+        icon: Icons.print_outlined,
+      ),
+      _WizardStepMeta(
+        title: 'Lock',
+        subtitle: 'Protect this device with a PIN.',
+        isComplete: staffPin.enabled,
+        optional: true,
+        icon: Icons.lock_outline,
+      ),
+    ];
+  }
+
+  int _suggestedStepIndex(ReceiptTemplate? activeTemplate) {
+    final resolvedTemplate =
+        activeTemplate ?? ref.read(_activeReceiptTemplateProvider).asData?.value;
+    final staffPin = ref.read(staffPinProvider);
+    final steps = [
+      _businessComplete,
+      _paymentsComplete(),
+      resolvedTemplate != null,
+      _printerComplete(),
+      staffPin.enabled,
+    ];
+    for (var i = 0; i < steps.length; i++) {
+      if (!steps[i]) return i;
+    }
+    return steps.length - 1;
+  }
+
+  void _goToStep(int step, int totalSteps) {
+    setState(() {
+      _currentStep = step.clamp(0, totalSteps - 1);
+    });
+  }
+
+  void _nextStep() {
+    final activeTemplateAsync = ref.read(_activeReceiptTemplateProvider);
+    final activeTemplate = activeTemplateAsync.asData?.value;
+    final steps = _buildSteps(activeTemplate);
+    final totalSteps = steps.length;
+    if (_currentStep < totalSteps - 1) {
+      _goToStep(_currentStep + 1, totalSteps);
+    }
+  }
+
+  void _prevStep() {
+    final activeTemplateAsync = ref.read(_activeReceiptTemplateProvider);
+    final activeTemplate = activeTemplateAsync.asData?.value;
+    final steps = _buildSteps(activeTemplate);
+    final totalSteps = steps.length;
+    if (_currentStep > 0) {
+      _goToStep(_currentStep - 1, totalSteps);
+    }
+  }
+
+  void _showError(String message) {
+    Haptics.warning();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFD30005),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  // ── UI ───────────────────────────────────────────────────────────────────
+
+  static TextStyle get _titleStyle => const TextStyle(
+    color: Colors.white,
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.3,
+  );
+
+  static TextStyle get _captionStyle => TextStyle(
+    color: Colors.white.withOpacity(0.45),
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+  );
 
   @override
   Widget build(BuildContext context) {
     final outletAsync = ref.watch(_primaryOutletProvider);
     final activeTemplateAsync = ref.watch(_activeReceiptTemplateProvider);
-    final staffPin = ref.watch(staffPinProvider);
-    final printer = ref.watch(printQueueServiceProvider);
+    final activeTemplate = activeTemplateAsync.asData?.value;
+    final steps = _buildSteps(activeTemplate);
+    final totalSteps = steps.length;
+    final currentStep = _currentStep.clamp(0, totalSteps - 1);
+    final currentMeta = steps[currentStep];
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: Stack(
+          children: [
+            // Background gradient
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_bg, Color(0xFF05050A), _bg],
+                ),
+              ),
+            ),
+            // Glow blobs
+            Positioned(
+              top: -140,
+              right: -120,
+              child: _GlowBlob(color: _accent.withOpacity(0.14), size: 380),
+            ),
+            Positioned(
+              bottom: -160,
+              left: -130,
+              child: _GlowBlob(color: _mint.withOpacity(0.08), size: 420),
+            ),
+            SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
+                    _buildHeader(currentStep, totalSteps, steps),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutQuart,
+                        switchOutCurve: Curves.easeInQuart,
+                        transitionBuilder: (child, animation) => SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.06, 0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: FadeTransition(opacity: animation, child: child),
+                        ),
+                        child: KeyedSubtree(
+                          key: ValueKey(currentStep),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: switch (currentStep) {
+                              0 => _buildBusinessStep(outletAsync),
+                              1 => _buildPaymentsStep(),
+                              2 => _buildReceiptsStep(activeTemplate),
+                              3 => _buildPrinterStep(),
+                              _ => _buildPinStep(),
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    _buildBottomBar(currentMeta, currentStep, totalSteps, activeTemplate),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    return Scaffold(
-      backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: Text('Business Setup', style: DesignTokens.textTitle),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                ref.read(businessSetupCompletedProvider.notifier).reset(),
-            child: const Text('Reset'),
+  Widget _buildHeader(int currentStep, int totalSteps, List<_WizardStepMeta> steps) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: currentStep > 0 ? _prevStep : () => context.go('/home/checkout'),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    currentStep > 0 ? Icons.arrow_back_ios_new : Icons.close,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  steps[currentStep].title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              Text(
+                '${currentStep + 1} / $totalSteps',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.45),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Segmented progress
+          Row(
+            children: List.generate(totalSteps, (index) {
+              final isActive = index <= currentStep;
+              return Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  height: 4,
+                  margin: EdgeInsets.only(right: index < totalSteps - 1 ? 6 : 0),
+                  decoration: BoxDecoration(
+                    color: isActive ? Colors.white : Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              );
+            }),
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: DesignTokens.paddingScreen,
+    );
+  }
+
+  Widget _buildBusinessStep(AsyncValue<Outlet?> outletAsync) {
+    return ListView(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      children: [
+        Icon(
+          Icons.storefront_outlined,
+          size: 48,
+          color: Colors.white.withOpacity(0.9),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'What is your business called?',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Customers will see this name on receipts and listings.',
+          style: _captionStyle,
+        ),
+        const SizedBox(height: 32),
+        _DarkInput(
+          controller: _shopNameCtrl,
+          label: 'Business name',
+          hint: 'e.g. Soko Mart',
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
+        _DarkInput(
+          controller: _shopPhoneCtrl,
+          label: 'Phone',
+          hint: 'e.g. +256…',
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 16),
+        _DarkInput(
+          controller: _shopAddressCtrl,
+          label: 'Address',
+          hint: 'Street, town',
+          maxLines: 2,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          outletAsync.maybeWhen(
+            data: (o) => o == null ? '' : 'Current: ${o.name}',
+            orElse: () => '',
+          ),
+          style: _captionStyle,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentsStep() {
+    return ListView(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      children: [
+        Icon(
+          Icons.payments_outlined,
+          size: 48,
+          color: Colors.white.withOpacity(0.9),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'How do you get paid?',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Toggle the methods you accept at checkout.',
+          style: _captionStyle,
+        ),
+        const SizedBox(height: 32),
+        _PaymentToggle(
+          icon: Icons.payments_outlined,
+          title: 'Cash',
+          value: _cashEnabled,
+          onChanged: (v) => setState(() => _cashEnabled = v),
+        ),
+        const SizedBox(height: 12),
+        _PaymentToggle(
+          icon: Icons.account_balance_outlined,
+          title: 'Bank transfer',
+          value: _bankEnabled,
+          onChanged: (v) => setState(() => _bankEnabled = v),
+        ),
+        if (_bankEnabled) ...[
+          const SizedBox(height: 12),
+          _DarkInput(controller: _bankNameCtrl, label: 'Bank name', hint: 'e.g. Stanbic'),
+          const SizedBox(height: 12),
+          _DarkInput(controller: _bankAccNameCtrl, label: 'Account name'),
+          const SizedBox(height: 12),
+          _DarkInput(controller: _bankAccNoCtrl, label: 'Account number'),
+        ],
+        const SizedBox(height: 12),
+        _PaymentToggle(
+          icon: Icons.phone_iphone_outlined,
+          title: 'Mobile money',
+          value: _mobileMoneyEnabled,
+          onChanged: (v) => setState(() => _mobileMoneyEnabled = v),
+        ),
+        if (_mobileMoneyEnabled) ...[
+          const SizedBox(height: 12),
+          _DarkInput(controller: _mtnMerchantCtrl, label: 'MTN merchant code', hint: 'e.g. 123456'),
+          const SizedBox(height: 12),
+          _DarkInput(controller: _airtelMerchantCtrl, label: 'Airtel merchant code', hint: 'e.g. 654321'),
+          const SizedBox(height: 12),
+          _DarkInput(controller: _paybillCtrl, label: 'Paybill number', hint: 'e.g. 200200'),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReceiptsStep(ReceiptTemplate? activeTemplate) {
+    return ListView(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      children: [
+        Icon(
+          Icons.receipt_long_outlined,
+          size: 48,
+          color: Colors.white.withOpacity(0.9),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Print receipts?',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          activeTemplate == null
+              ? 'Create a template so every sale gets a receipt.'
+              : 'Your receipt template is ready.',
+          style: _captionStyle,
+        ),
+        const SizedBox(height: 32),
+        if (activeTemplate == null)
+          _SolidButton(
+            onTap: _createDefaultReceiptTemplate,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _SetupHeaderCard(
-                  completed: ref.watch(businessSetupCompletedProvider),
-                ),
-                const SizedBox(height: DesignTokens.spaceMd),
-
-                _StepCard(
-                  title: '1) Business profile',
-                  subtitle: _businessComplete
-                      ? 'Complete'
-                      : 'Add your business name and contact details',
-                  complete: _businessComplete,
-                  child: Column(
-                    children: [
-                      AppInput(
-                        controller: _shopNameCtrl,
-                        label: 'Business name',
-                        hint: 'e.g. Soko Mart',
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      AppInput(
-                        controller: _shopPhoneCtrl,
-                        label: 'Phone (optional)',
-                        hint: 'e.g. +256…',
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      AppInput(
-                        controller: _shopAddressCtrl,
-                        label: 'Address (optional)',
-                        hint: 'Street, town',
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _savingBusiness
-                                  ? null
-                                  : _saveBusinessInfo,
-                              icon: _savingBusiness
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.save_outlined),
-                              label: Text(_savingBusiness ? 'Saving…' : 'Save'),
-                            ),
-                          ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: Text(
-                              outletAsync.maybeWhen(
-                                data: (o) => o == null
-                                    ? 'No outlet yet'
-                                    : 'Outlet: ${o.name}',
-                                orElse: () => 'Outlet: …',
-                              ),
-                              style: DesignTokens.textSmall.copyWith(
-                                color: DesignTokens.grayMedium,
-                              ),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                Icon(Icons.add, color: Colors.black, size: 20),
+                SizedBox(width: 8),
+                Text('Create default template', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 15)),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _mint.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _mint.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: _mint),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Template active: ${activeTemplate.name}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                   ),
-                ),
-
-                const SizedBox(height: DesignTokens.spaceMd),
-
-                _StepCard(
-                  title: '2) Payment methods',
-                  subtitle: _paymentsComplete()
-                      ? 'Complete'
-                      : 'Save at least one accepted payment method',
-                  complete: _paymentsComplete(),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Accept cash'),
-                        value: _cashEnabled,
-                        onChanged: (v) => setState(() => _cashEnabled = v),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Accept bank transfer'),
-                        value: _bankEnabled,
-                        onChanged: (v) => setState(() => _bankEnabled = v),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Accept mobile money'),
-                        value: _mobileMoneyEnabled,
-                        onChanged: (v) =>
-                            setState(() => _mobileMoneyEnabled = v),
-                      ),
-                      if (_mobileMoneyEnabled) ...[
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _mtnMerchantCtrl,
-                          label: 'MTN merchant code (optional)',
-                          hint: 'e.g. 123456',
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _airtelMerchantCtrl,
-                          label: 'Airtel merchant code (optional)',
-                          hint: 'e.g. 654321',
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _paybillCtrl,
-                          label: 'Paybill number (optional)',
-                          hint: 'e.g. 200200',
-                        ),
-                      ],
-                      if (_bankEnabled) ...[
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _bankNameCtrl,
-                          label: 'Bank name (optional)',
-                          hint: 'e.g. Stanbic',
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _bankAccNameCtrl,
-                          label: 'Account name (optional)',
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _bankAccNoCtrl,
-                          label: 'Account number (optional)',
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        AppInput(
-                          controller: _bankRoutingCtrl,
-                          label: 'Routing number (optional)',
-                        ),
-                      ],
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _savingPayments
-                              ? null
-                              : _savePaymentSettings,
-                          icon: _savingPayments
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.save_outlined),
-                          label: Text(_savingPayments ? 'Saving…' : 'Save'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: DesignTokens.spaceMd),
-
-                _StepCard(
-                  title: '3) Receipts',
-                  subtitle: activeTemplateAsync.maybeWhen(
-                    data: (t) => t == null
-                        ? 'Create a receipt template'
-                        : 'Active: ${t.name}',
-                    orElse: () => 'Loading…',
-                  ),
-                  complete: activeTemplateAsync.asData?.value != null,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (activeTemplateAsync.asData?.value == null)
-                        AppButton(
-                          label: 'Create default receipt template',
-                          onPressed: _createDefaultReceiptTemplate,
-                        ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            context.go('/home/more/receipt-templates'),
-                        icon: const Icon(Icons.receipt_outlined),
-                        label: const Text('Open receipt templates'),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: DesignTokens.spaceMd),
-
-                _StepCard(
-                  title: '4) Printer (optional)',
-                  subtitle: printer.printerEnabled
-                      ? (printer.hasPreferredPrinter
-                            ? 'Selected: ${printer.preferredPrinterLabel()}'
-                            : 'Choose a printer when ready')
-                      : 'Printing disabled for now',
-                  complete: _printerComplete(),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Enable Bluetooth printing'),
-                        value: printer.printerEnabled,
-                        onChanged: (v) async {
-                          await ref
-                              .read(printQueueServiceProvider)
-                              .setPrinterEnabled(v);
-                          if (!mounted) return;
-                          setState(() {});
-                        },
-                      ),
-                      if (printer.printerEnabled) ...[
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.print_outlined),
-                          title: const Text('Choose printer'),
-                          subtitle: Text(
-                            printer.preferredPrinterLabel(),
-                            style: DesignTokens.textSmall,
-                          ),
-                          onTap: _choosePrinter,
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Compatibility mode'),
-                          subtitle: const Text(
-                            'Disable paper-cut for some models',
-                          ),
-                          value: printer.compatibilityMode,
-                          onChanged: (v) async {
-                            await ref
-                                .read(printQueueServiceProvider)
-                                .setCompatibilityMode(v);
-                            if (!mounted) return;
-                            setState(() {});
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: DesignTokens.spaceMd),
-
-                _StepCard(
-                  title: '5) Terminal PIN (recommended)',
-                  subtitle: staffPin.enabled
-                      ? 'Enabled'
-                      : 'Add a PIN to lock this device later',
-                  complete: staffPin.enabled,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!staffPin.enabled)
-                        AppButton(
-                          label: 'Set terminal PIN',
-                          onPressed: _setTerminalPin,
-                        )
-                      else
-                        OutlinedButton.icon(
-                          onPressed: _setTerminalPin,
-                          icon: const Icon(Icons.lock_reset),
-                          label: const Text('Change PIN'),
-                        ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: DesignTokens.spaceLg),
-
-                AppButton(
-                  label: _setupComplete(activeTemplateAsync.asData?.value)
-                      ? 'Finish setup'
-                      : 'Finish setup (complete steps first)',
-                  onPressed: _setupComplete(activeTemplateAsync.asData?.value)
-                      ? _finishSetup
-                      : null,
                 ),
               ],
             ),
+          ),
+        const SizedBox(height: 16),
+        _GlassButton(
+          onTap: () => context.go('/home/more/receipt-templates'),
+          child: const Center(
+            child: Text('Edit templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
     );
   }
-}
 
-class _SetupHeaderCard extends StatelessWidget {
-  const _SetupHeaderCard({required this.completed});
-  final bool completed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: DesignTokens.paddingMd,
-      decoration: BoxDecoration(
-        color: completed
-            ? DesignTokens.success.withValues(alpha: 0.08)
-            : DesignTokens.warning.withValues(alpha: 0.08),
-        borderRadius: DesignTokens.borderRadiusMd,
-        border: Border.all(
-          color: completed ? DesignTokens.success : DesignTokens.warning,
-          width: 1,
+  Widget _buildPrinterStep() {
+    final printer = ref.watch(printQueueServiceProvider);
+    return ListView(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      children: [
+        Icon(
+          Icons.print_outlined,
+          size: 48,
+          color: Colors.white.withOpacity(0.9),
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            completed ? Icons.check_circle : Icons.info_outline,
-            color: completed ? DesignTokens.success : DesignTokens.warning,
+        const SizedBox(height: 20),
+        Text(
+          'Connect a printer',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            height: 1.1,
           ),
-          const SizedBox(width: DesignTokens.spaceSm),
-          Expanded(
-            child: Text(
-              completed
-                  ? 'Setup completed. You can re-open this screen anytime.'
-                  : 'Complete business, payments, and receipts now. Printer and terminal PIN can be added later.',
-              style: DesignTokens.textSmall,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Optional — skip if you email or SMS receipts.',
+          style: _captionStyle,
+        ),
+        const SizedBox(height: 32),
+        _PaymentToggle(
+          icon: Icons.bluetooth_outlined,
+          title: 'Enable Bluetooth printing',
+          value: printer.printerEnabled,
+          onChanged: (v) async {
+            await ref.read(printQueueServiceProvider).setPrinterEnabled(v);
+            if (!mounted) return;
+            setState(() {});
+          },
+        ),
+        if (printer.printerEnabled) ...[
+          const SizedBox(height: 16),
+          _GlassButton(
+            onTap: _choosePrinter,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.print_outlined, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  printer.hasPreferredPrinter ? printer.preferredPrinterLabel() : 'Choose printer',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
+          const SizedBox(height: 12),
+          _PaymentToggle(
+            icon: Icons.settings_outlined,
+            title: 'Compatibility mode',
+            subtitle: 'For older printers',
+            value: printer.compatibilityMode,
+            onChanged: (v) async {
+              await ref.read(printQueueServiceProvider).setCompatibilityMode(v);
+              if (!mounted) return;
+              setState(() {});
+            },
+          ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildPinStep() {
+    final staffPin = ref.watch(staffPinProvider);
+    return ListView(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      children: [
+        Icon(
+          Icons.lock_outline,
+          size: 48,
+          color: Colors.white.withOpacity(0.9),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Lock this device?',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.8,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Optional — set a PIN to protect shared devices.',
+          style: _captionStyle,
+        ),
+        const SizedBox(height: 32),
+        if (!staffPin.enabled)
+          _SolidButton(
+            onTap: _setTerminalPin,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add, color: Colors.black, size: 20),
+                SizedBox(width: 8),
+                Text('Set PIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 15)),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _mint.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _mint.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: _mint),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Device lock is active',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                _GlassButton(
+                  onTap: _setTerminalPin,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text('Change', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar(
+    _WizardStepMeta currentMeta,
+    int currentStep,
+    int totalSteps,
+    ReceiptTemplate? activeTemplate,
+  ) {
+    final isLast = currentStep == totalSteps - 1;
+    final canFinish = _setupComplete(activeTemplate);
+    final canContinue = currentMeta.isComplete || currentMeta.optional;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            _bg.withOpacity(0),
+            _bg.withOpacity(0.9),
+            _bg,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SolidButton(
+              onTap: isLast
+                  ? (canFinish ? _finishSetup : null)
+                  : (canContinue ? () {
+                      if (currentStep == 0) _saveBusinessInfo();
+                      else if (currentStep == 1) _savePaymentSettings();
+                      else _nextStep();
+                    } : null),
+              child: Center(
+                child: Text(
+                  isLast
+                      ? (canFinish ? 'Start selling' : 'Complete required steps')
+                      : 'Continue',
+                  style: TextStyle(
+                    color: isLast && !canFinish ? Colors.white.withOpacity(0.4) : Colors.black,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            if (currentMeta.optional && !isLast) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _nextStep,
+                child: Text(
+                  'Skip for now',
+                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StepCard extends StatelessWidget {
-  const _StepCard({
+// ── Data model ─────────────────────────────────────────────────────────────
+
+class _WizardStepMeta {
+  const _WizardStepMeta({
     required this.title,
     required this.subtitle,
-    required this.complete,
-    required this.child,
+    required this.isComplete,
+    required this.icon,
+    this.optional = false,
   });
 
   final String title;
   final String subtitle;
-  final bool complete;
+  final bool isComplete;
+  final IconData icon;
+  final bool optional;
+}
+
+// ── Reusable dark widgets ──────────────────────────────────────────────────
+
+class _DarkInput extends StatefulWidget {
+  const _DarkInput({
+    required this.controller,
+    required this.label,
+    this.hint,
+    this.keyboardType,
+    this.obscure = false,
+    this.maxLines = 1,
+    this.onChanged,
+    this.digitsOnly = false,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+  final TextInputType? keyboardType;
+  final bool obscure;
+  final int maxLines;
+  final ValueChanged<String>? onChanged;
+  final bool digitsOnly;
+
+  @override
+  State<_DarkInput> createState() => _DarkInputState();
+}
+
+class _DarkInputState extends State<_DarkInput> {
+  late final FocusNode _focus;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus = FocusNode();
+    _focus.addListener(() => setState(() => _focused = _focus.hasFocus));
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.55),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B0B10),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _focused
+                  ? Colors.white.withOpacity(0.45)
+                  : Colors.white.withOpacity(0.12),
+              width: _focused ? 1.5 : 1,
+            ),
+            boxShadow: _focused
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.04),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: TextField(
+            controller: widget.controller,
+            focusNode: _focus,
+            keyboardType: widget.keyboardType,
+            obscureText: widget.obscure,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
+            inputFormatters: widget.digitsOnly
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 16),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentToggle extends StatelessWidget {
+  const _PaymentToggle({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutQuart,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: value ? const Color(0xFF0EBE7E).withOpacity(0.12) : const Color(0xFF0B0B10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: value ? const Color(0xFF0EBE7E).withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            width: value ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: value ? const Color(0xFF0EBE7E).withOpacity(0.18) : Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: value ? const Color(0xFF0EBE7E) : Colors.white70, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                    ),
+                ],
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: value
+                  ? Icon(Icons.check_circle, color: const Color(0xFF0EBE7E), key: const ValueKey('on'))
+                  : Icon(Icons.circle_outlined, color: Colors.white.withOpacity(0.2), key: const ValueKey('off')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SolidButton extends StatefulWidget {
+  const _SolidButton({required this.onTap, required this.child});
+  final VoidCallback? onTap;
   final Widget child;
+
+  @override
+  State<_SolidButton> createState() => _SolidButtonState();
+}
+
+class _SolidButtonState extends State<_SolidButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: GestureDetector(
+        onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+        onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+        onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: widget.onTap == null ? Colors.white.withOpacity(0.15) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: widget.onTap == null
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.15),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassButton extends StatefulWidget {
+  const _GlassButton({required this.onTap, required this.child});
+  final VoidCallback? onTap;
+  final Widget child;
+
+  @override
+  State<_GlassButton> createState() => _GlassButtonState();
+}
+
+class _GlassButtonState extends State<_GlassButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      child: GestureDetector(
+        onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+        onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+        onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+              ),
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlowBlob extends StatelessWidget {
+  const _GlowBlob({required this.color, required this.size});
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: DesignTokens.paddingMd,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        borderRadius: DesignTokens.borderRadiusMd,
-        border: Border.all(color: DesignTokens.grayLight),
-        boxShadow: DesignTokens.shadowSm,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                complete ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 18,
-                color: complete
-                    ? DesignTokens.success
-                    : DesignTokens.grayMedium,
-              ),
-              const SizedBox(width: DesignTokens.spaceSm),
-              Expanded(child: Text(title, style: DesignTokens.textBodyBold)),
-            ],
-          ),
-          const SizedBox(height: DesignTokens.spaceXs),
-          Text(
-            subtitle,
-            style: DesignTokens.textSmall.copyWith(
-              color: DesignTokens.grayMedium,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceMd),
-          child,
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.35), blurRadius: 80, spreadRadius: 30),
         ],
       ),
     );

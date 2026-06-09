@@ -916,7 +916,13 @@ class _DeliverySettingsScreenState
       _originLatCtrl.text = latLng.$1.toStringAsFixed(7);
       _originLngCtrl.text = latLng.$2.toStringAsFixed(7);
       if (mounted) setState(() {});
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('pasteLocationFromClipboard failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to read clipboard: $e')),
+      );
+    }
   }
 
   Future<void> _openInMaps() async {

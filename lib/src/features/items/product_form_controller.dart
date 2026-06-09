@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/app_providers.dart';
+import '../../core/util/comma_number_formatter.dart';
+import '../../core/util/image_crop_helper.dart';
 
 /// Reactive state for product creation form
 class ProductFormState {
@@ -12,6 +16,7 @@ class ProductFormState {
   final String? brandName;
   final String unit;
   final String price;
+  final String cost;
   final String stock;
   final String discount;
   final String discountType;
@@ -54,6 +59,7 @@ class ProductFormState {
     this.brandName,
     this.unit = 'pc',
     this.price = '',
+    this.cost = '',
     this.stock = '0',
     this.discount = '',
     this.discountType = 'flat',
@@ -91,6 +97,7 @@ class ProductFormState {
     String? brandName,
     String? unit,
     String? price,
+    String? cost,
     String? stock,
     String? discount,
     String? discountType,
@@ -127,6 +134,7 @@ class ProductFormState {
       brandName: brandName ?? this.brandName,
       unit: unit ?? this.unit,
       price: price ?? this.price,
+      cost: cost ?? this.cost,
       stock: stock ?? this.stock,
       discount: discount ?? this.discount,
       discountType: discountType ?? this.discountType,
@@ -157,20 +165,21 @@ class ProductFormState {
     );
   }
 
-  double? get priceValue => double.tryParse(price.trim());
-  int? get stockValue => int.tryParse(stock.trim());
+  double? get priceValue => double.tryParse(CommaNumberFormatter.unformat(price.trim()));
+  double? get costValue => cost.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(cost.trim()));
+  int? get stockValue => int.tryParse(CommaNumberFormatter.unformat(stock.trim()));
   double? get discountValue =>
-      discount.trim().isEmpty ? 0 : double.tryParse(discount.trim());
-  int? get minQtyValue => int.tryParse(minQty.trim());
+      discount.trim().isEmpty ? 0 : double.tryParse(CommaNumberFormatter.unformat(discount.trim()));
+  int? get minQtyValue => int.tryParse(CommaNumberFormatter.unformat(minQty.trim()));
   int? get lowStockWarningValue => lowStockWarning.trim().isEmpty
       ? null
-      : int.tryParse(lowStockWarning.trim());
+      : int.tryParse(CommaNumberFormatter.unformat(lowStockWarning.trim()));
   double? get weightValue =>
-      weight.trim().isEmpty ? null : double.tryParse(weight.trim());
+      weight.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(weight.trim()));
   int? get shippingDaysValue =>
-      shippingDays.trim().isEmpty ? null : int.tryParse(shippingDays.trim());
+      shippingDays.trim().isEmpty ? null : int.tryParse(CommaNumberFormatter.unformat(shippingDays.trim()));
   double? get shippingFeeValue =>
-      shippingFee.trim().isEmpty ? null : double.tryParse(shippingFee.trim());
+      shippingFee.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(shippingFee.trim()));
 
   /// Check if basic info is valid
   bool get isBasicInfoValid => name.trim().isNotEmpty && unit.isNotEmpty;
@@ -210,8 +219,9 @@ class ProductFormState {
     if (weight.trim().isNotEmpty && weightValue == null) return false;
     final w = weightValue;
     if (w != null && w < 0) return false;
-    if (shippingDays.trim().isNotEmpty && shippingDaysValue == null)
+    if (shippingDays.trim().isNotEmpty && shippingDaysValue == null) {
       return false;
+    }
     final days = shippingDaysValue;
     if (days != null && days < 0) return false;
     if (shippingFee.trim().isNotEmpty && shippingFeeValue == null) return false;
@@ -276,6 +286,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
 
   // Pricing
   void setPrice(String v) => state = state.copyWith(price: v);
+  void setCost(String v) => state = state.copyWith(cost: v);
   void setStock(String v) => state = state.copyWith(stock: v);
   void setDiscount(String v) => state = state.copyWith(discount: v);
   void setDiscountType(String v) => state = state.copyWith(discountType: v);
@@ -352,42 +363,120 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     }
   }
 
+  /// Requests the appropriate media/camera permission for the current platform
+  /// and Android API level. Returns true if the caller may proceed.
+  Future<bool> _requestMediaPermission({required bool camera}) async {
+    if (!Platform.isAndroid && !Platform.isIOS) return true;
+
+    Permission permission;
+    if (camera) {
+      permission = Permission.camera;
+    } else if (Platform.isAndroid) {
+      // READ_MEDIA_IMAGES is the correct permission on Android 13+ (API 33+);
+      // on older versions image_picker handles READ_EXTERNAL_STORAGE itself.
+      final sdkInt = await _androidSdkInt();
+      permission = sdkInt >= 33 ? Permission.photos : Permission.storage;
+    } else {
+      permission = Permission.photos;
+    }
+
+    final status = await permission.request();
+    if (status.isGranted || status.isLimited) return true;
+    if (status.isPermanentlyDenied) {
+      // User must go to settings; surface this via error state.
+      state = state.copyWith(
+        error: camera
+            ? 'Camera access denied. Enable it in Settings → App → Permissions.'
+            : 'Photo library access denied. Enable it in Settings → App → Permissions.',
+      );
+    }
+    return false;
+  }
+
+  /// Returns the Android SDK integer or 0 on non-Android.
+  Future<int> _androidSdkInt() async {
+    if (!Platform.isAndroid) return 0;
+    try {
+      // permission_handler exposes this via a native channel indirectly.
+      // We read it from the build info available via dart:io on Android.
+      final result = Platform.operatingSystemVersion; // e.g. "4.14.117... (Android 13)"
+      final match = RegExp(r'Android (\d+)').firstMatch(result);
+      if (match != null) {
+        final version = int.tryParse(match.group(1) ?? '') ?? 0;
+        return _androidMarketingVersionToApiLevel(version);
+      }
+    } catch (e) {
+      debugPrint('[ProductForm] Could not determine Android SDK: $e');
+    }
+    return 0;
+  }
+
+  /// Maps Android marketing versions (e.g. 13, 14) to API levels for permissions.
+  int _androidMarketingVersionToApiLevel(int version) {
+    const map = <int, int>{
+      15: 35,
+      14: 34,
+      13: 33,
+      12: 31,
+      11: 30,
+      10: 29,
+      9: 28,
+      8: 26,
+      7: 24,
+      6: 23,
+      5: 21,
+    };
+    return map[version] ?? (version >= 13 ? 33 + (version - 13) : version);
+  }
+
   /// Pick thumbnail image
   Future<void> pickThumbnail() async {
+    if (!await _requestMediaPermission(camera: false)) return;
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      imageQuality: 95,
     );
     if (image != null) {
-      state = state.copyWith(thumbnailFile: File(image.path));
+      final cropped = await cropProductImage(File(image.path));
+      if (cropped != null) {
+        state = state.copyWith(thumbnailFile: cropped, error: null);
+      }
     }
   }
 
   /// Take photo for thumbnail
   Future<void> takeThumbnailPhoto() async {
+    if (!await _requestMediaPermission(camera: true)) return;
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      imageQuality: 95,
     );
     if (image != null) {
-      state = state.copyWith(thumbnailFile: File(image.path));
+      final cropped = await cropProductImage(File(image.path));
+      if (cropped != null) {
+        state = state.copyWith(thumbnailFile: cropped, error: null);
+      }
     }
   }
 
   /// Pick gallery images (multiple)
   Future<void> pickGalleryImages() async {
+    if (!await _requestMediaPermission(camera: false)) return;
     final List<XFile> images = await _imagePicker.pickMultiImage(
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      imageQuality: 95,
     );
     if (images.isNotEmpty) {
-      final files = images.map((x) => File(x.path)).toList();
-      state = state.copyWith(galleryFiles: [...state.galleryFiles, ...files]);
+      final files = <File>[];
+      for (final x in images) {
+        final cropped = await cropProductImage(File(x.path));
+        if (cropped != null) files.add(cropped);
+      }
+      if (files.isNotEmpty) {
+        state = state.copyWith(
+          galleryFiles: [...state.galleryFiles, ...files],
+          error: null,
+        );
+      }
     }
   }
 
@@ -398,6 +487,61 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       newList.removeAt(index);
       state = state.copyWith(galleryFiles: newList);
     }
+  }
+
+  /// Set a gallery file as the new thumbnail
+  void setGalleryFileAsThumbnail(int galleryIndex) {
+    final files = List<File>.from(state.galleryFiles);
+    if (galleryIndex < 0 || galleryIndex >= files.length) return;
+
+    final selected = files.removeAt(galleryIndex);
+    final oldThumbFile = state.thumbnailFile;
+
+    // If there was an existing thumbnail, move it to gallery
+    if (oldThumbFile != null) {
+      files.add(oldThumbFile);
+    }
+
+    state = state.copyWith(
+      thumbnailFile: selected,
+      thumbnailUrl: null,
+      thumbnailUploadId: null,
+      galleryFiles: files,
+    );
+  }
+
+  /// Set an existing remote gallery image as thumbnail
+  void setGalleryUrlAsThumbnail(int urlIndex) {
+    final urls = List<String>.from(state.galleryUrls);
+    final ids = List<int>.from(state.galleryUploadIds);
+    if (urlIndex < 0 || urlIndex >= urls.length) return;
+
+    final selectedUrl = urls.removeAt(urlIndex);
+    int? selectedId;
+    if (urlIndex < ids.length) {
+      selectedId = ids.removeAt(urlIndex);
+    }
+
+    final oldThumbFile = state.thumbnailFile;
+    final oldThumbUrl = state.thumbnailUrl;
+    final oldThumbId = state.thumbnailUploadId;
+
+    // Move old thumbnail to gallery if it exists
+    if (oldThumbUrl != null && oldThumbUrl.isNotEmpty) {
+      urls.add(oldThumbUrl);
+      if (oldThumbId != null) ids.add(oldThumbId);
+    } else if (oldThumbFile != null) {
+      state = state.copyWith(
+        galleryFiles: [...state.galleryFiles, oldThumbFile],
+      );
+    }
+
+    state = state.copyWith(
+      thumbnailUrl: selectedUrl,
+      thumbnailUploadId: selectedId,
+      galleryUrls: urls,
+      galleryUploadIds: ids,
+    );
   }
 
   void removeExistingGalleryImage(int index) {
@@ -437,6 +581,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       brandName: state.brandName,
       unit: state.unit,
       price: state.price,
+      cost: state.cost,
       stock: state.stock,
       discount: state.discount,
       discountType: state.discountType,
@@ -469,8 +614,9 @@ class ProductFormController extends StateNotifier<ProductFormState> {
   /// Auto-generate a unique SKU based on product name
   String generateUniqueSKU() {
     final name = state.name.trim();
-    if (name.isEmpty)
+    if (name.isEmpty) {
       return 'PROD-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+    }
 
     // Extract first 3-4 letters from product name
     final letters = name.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');

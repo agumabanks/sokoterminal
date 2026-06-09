@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_providers.dart';
 import '../db/app_database.dart';
+import '../storage/secure_storage.dart';
+import 'pin_hash_service.dart';
 
 /// User role enum for RBAC
 enum UserRole { cashier, manager }
@@ -74,17 +76,19 @@ class StaffData {
 
 /// RBAC controller managing session state
 class RbacController extends StateNotifier<RbacState> {
-  RbacController(this._db) : super(RbacState.initial);
+  RbacController(this._db, this._pinHash) : super(RbacState.initial);
 
   final AppDatabase _db;
+  final PinHashService _pinHash;
 
   /// Login with staff PIN
   Future<bool> loginWithPin(String pin) async {
     try {
-      // Find staff by PIN
+      final hashedPin = await _pinHash.hash(pin);
+      // Find staff by hashed PIN
       final staff =
           await (_db.select(_db.staff)
-                ..where((t) => t.pin.equals(pin))
+                ..where((t) => t.pin.equals(hashedPin))
                 ..where((t) => t.active.equals(true))
                 ..limit(1))
               .getSingleOrNull();
@@ -138,10 +142,11 @@ class RbacController extends StateNotifier<RbacState> {
   /// Request manager PIN for elevated action
   Future<bool> requestManagerOverride(String pin) async {
     try {
-      // Find manager by PIN
+      final hashedPin = await _pinHash.hash(pin);
+      // Find manager by hashed PIN
       final staff =
           await (_db.select(_db.staff)
-                ..where((t) => t.pin.equals(pin))
+                ..where((t) => t.pin.equals(hashedPin))
                 ..where((t) => t.active.equals(true))
                 ..limit(1))
               .getSingleOrNull();
@@ -180,7 +185,8 @@ class RbacController extends StateNotifier<RbacState> {
 /// Provider for RBAC controller
 final rbacProvider = StateNotifierProvider<RbacController, RbacState>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  return RbacController(db);
+  final storage = ref.watch(secureStorageProvider);
+  return RbacController(db, PinHashService(storage: storage));
 });
 
 /// Helper provider to check specific permission

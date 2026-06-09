@@ -200,7 +200,7 @@ class _ReceiptTemplateEditorState extends ConsumerState<ReceiptTemplateEditor> {
                                 children: [
                                   Text('${i['qty']}x ${i['name']}'),
                                   Text(
-                                    '${(i['qty'] as int) * (i['price'] as int)}',
+                                    '${((i['qty'] as num?)?.toInt() ?? 0) * ((i['price'] as num?)?.toInt() ?? 0)}',
                                   ),
                                 ],
                               ),

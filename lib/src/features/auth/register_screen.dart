@@ -677,9 +677,9 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
     return GestureDetector(
       onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
       onTapCancel: disabled ? null : () => setState(() => _pressed = false),
-      onTapUp: disabled
+      onTap: disabled
           ? null
-          : (_) {
+          : () {
               setState(() => _pressed = false);
               widget.onTap();
             },

@@ -15,25 +15,40 @@ class ConnectivityBanner extends ConsumerWidget {
     return connectivity.when(
       data: (results) {
         final isOffline = results.contains(ConnectivityResult.none);
-        if (!isOffline) return const SizedBox.shrink();
-
-        return Container(
+        return AnimatedContainer(
+          duration: DesignTokens.durationNormal,
+          curve: DesignTokens.curveStandard,
+          height: isOffline ? 36 : 0,
           width: double.infinity,
-          color: DesignTokens.grayDark,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.wifi_off, color: Colors.white, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                'You are offline. Changes will sync when connected.',
-                style: DesignTokens.textSmallLight.copyWith(
-                  color: Colors.white,
-                ),
+          decoration: BoxDecoration(
+            color: DesignTokens.warning.withValues(alpha: 0.15),
+            border: Border(
+              left: BorderSide(
+                color: DesignTokens.warning,
+                width: 4,
               ),
-            ],
+            ),
           ),
+          child: isOffline
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.offline_bolt,
+                      color: DesignTokens.warning,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Working offline — changes will sync when connected',
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.warning,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+              : null,
         );
       },
       loading: () => const SizedBox.shrink(),

@@ -419,9 +419,14 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
               ],
               _WalletSectionCard(
                 title: 'Spend from Sanaa Wallet',
-                trailing: Text(
-                  'Offline POS keeps working. Top-up requires internet.',
-                  style: DesignTokens.textSmall,
+                trailing: Flexible(
+                  child: Text(
+                    'Offline POS keeps working. Top-up requires internet.',
+                    style: DesignTokens.textSmall,
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -583,28 +588,36 @@ class _WalletHero extends StatelessWidget {
             style: DesignTokens.textSmall.copyWith(color: Colors.white),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
-          Wrap(
-            spacing: DesignTokens.spaceSm,
-            runSpacing: DesignTokens.spaceSm,
-            children: [
-              FilledButton.icon(
-                onPressed: onTopUp,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF0A3D62),
-                ),
-                icon: const Icon(Icons.add_card_outlined),
-                label: const Text('Add money'),
-              ),
-              Chip(
-                avatar: const Icon(Icons.sms_outlined, size: 18),
-                label: Text('SMS credits: $smsCreditBalance'),
-                backgroundColor: Colors.white.withValues(alpha: 0.16),
-                labelStyle: DesignTokens.textSmall.copyWith(
-                  color: Colors.white,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 360;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onTopUp,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF0A3D62),
+                    ),
+                    icon: const Icon(Icons.add_card_outlined),
+                    label: const Text('Add money'),
+                  ),
+                  if (!isNarrow) const SizedBox(height: DesignTokens.spaceSm),
+                  if (isNarrow)
+                    const SizedBox(height: DesignTokens.spaceXs)
+                  else
+                    Chip(
+                      avatar: const Icon(Icons.sms_outlined, size: 18, color: Colors.white),
+                      label: Text('SMS credits: $smsCreditBalance'),
+                      backgroundColor: Colors.white.withValues(alpha: 0.16),
+                      labelStyle: DesignTokens.textSmall.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -676,16 +689,30 @@ class _PurchaseTile extends StatelessWidget {
         borderRadius: DesignTokens.borderRadiusMd,
         color: DesignTokens.surface,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        title: Text(
-          title,
-          style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(subtitle, style: DesignTokens.textSmall),
-        trailing: FilledButton(
-          onPressed: onPressed,
-          child: Text(trailingLabel),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: DesignTokens.textSmall),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton(
+              onPressed: onPressed,
+              child: Text(trailingLabel),
+            ),
+          ],
         ),
       ),
     );

@@ -76,6 +76,7 @@ void main() {
         paybillNumber: null,
         receiptPaymentMethodsJson: '{"cash":true}',
         deliveryProfileJson: null,
+        verificationStatus: 0,
         updatedAt: DateTime.utc(2026, 3, 7),
         synced: true,
       );

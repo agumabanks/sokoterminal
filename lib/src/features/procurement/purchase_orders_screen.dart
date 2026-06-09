@@ -127,8 +127,17 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
   }
 
   Future<void> _load() async {
-    // Check if POS session is active before calling endpoint that requires it
-    final session = ref.read(posSessionProvider);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    var session = ref.read(posSessionProvider);
+    if (!session.isActive || session.loading) {
+      await ref.read(posSessionProvider.notifier).load();
+      if (!mounted) return;
+      session = ref.read(posSessionProvider);
+    }
     if (!session.isActive) {
       setState(() {
         _loading = false;
@@ -138,10 +147,6 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
     try {
       final res = await ref.read(sellerApiProvider).fetchPurchaseOrders();
       final data = res.data;

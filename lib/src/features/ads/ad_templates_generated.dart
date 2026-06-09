@@ -1,0 +1,933 @@
+import 'package:flutter/material.dart';
+
+import 'ad_templates.dart';
+
+/// Programmatic Studio templates — unique layouts × categories × sizes.
+/// Appended to [builtInTemplates] for 100+ total designs.
+List<AdTemplate> generateStudioTemplates() {
+  final out = <AdTemplate>[];
+  var seq = 0;
+
+  const layouts = <_LayoutRecipe>[
+    _LayoutRecipe('hero', 'Hero Spotlight', _buildHeroLayout),
+    _LayoutRecipe('split', 'Split Showcase', _buildSplitLayout),
+    _LayoutRecipe('banner', 'Bold Banner', _buildBannerLayout),
+    _LayoutRecipe('minimal', 'Clean Minimal', _buildMinimalLayout),
+    _LayoutRecipe('story', 'Story Vertical', _buildStoryLayout),
+    _LayoutRecipe('badge', 'Corner Badge', _buildBadgeLayout),
+    _LayoutRecipe('footer', 'Footer CTA', _buildFooterCtaLayout),
+    _LayoutRecipe('luxury', 'Editorial Luxe', _buildLuxuryLayout),
+  ];
+
+  const categoryMeta = <String, ({String label, List<Color> preview})>{
+    'sale': (label: 'Sale', preview: [Color(0xFFdc2626), Color(0xFFfef08a)]),
+    'new': (label: 'New Drop', preview: [Color(0xFF0f172a), Color(0xFF0EBE7E)]),
+    'promo': (label: 'Promo', preview: [Color(0xFF7c3aed), Color(0xFFf9a8d4)]),
+    'event': (label: 'Event', preview: [Color(0xFF1e3a8a), Color(0xFFfbbf24)]),
+    'food': (label: 'Food Special', preview: [Color(0xFF1c1917), Color(0xFFea580c)]),
+    'fashion': (label: 'Fashion Edit', preview: [Color(0xFF18181b), Color(0xFFf472b6)]),
+    'beauty': (label: 'Beauty Glow', preview: [Color(0xFF831843), Color(0xFFfbcfe8)]),
+    'tech': (label: 'Tech Launch', preview: [Color(0xFF0f172a), Color(0xFF38bdf8)]),
+    'service': (label: 'Service Offer', preview: [Color(0xFF0F1D40), Color(0xFF0EBE7E)]),
+    'whatsapp': (label: 'WhatsApp Order', preview: [Color(0xFF14532d), Color(0xFF22c55e)]),
+    'delivery': (label: 'Fast Delivery', preview: [Color(0xFF1e40af), Color(0xFF93c5fd)]),
+    'booking': (label: 'Book Now', preview: [Color(0xFF4c1d95), Color(0xFFc4b5fd)]),
+    'agri': (label: 'Farm Fresh', preview: [Color(0xFF14532d), Color(0xFF86efac)]),
+    'health': (label: 'Wellness', preview: [Color(0xFF0e7490), Color(0xFF99f6e4)]),
+    'realestate': (label: 'Property', preview: [Color(0xFF334155), Color(0xFFfbbf24)]),
+    'professional': (label: 'Business', preview: [Color(0xFFf8fafc), Color(0xFF0a66c2)]),
+    'catalog': (label: 'Catalog', preview: [Color(0xFFf1f5f9), Color(0xFF0EBE7E)]),
+    'luxury': (label: 'Premium', preview: [Color(0xFF09090b), Color(0xFFd4af37)]),
+    'grand': (label: 'Grand Opening', preview: [Color(0xFF7f1d1d), Color(0xFFfacc15)]),
+    'minimal': (label: 'Minimal', preview: [Color(0xFFffffff), Color(0xFF0f172a)]),
+  };
+
+  const palettes = <({String bg, String accent, String text, String muted})>[
+    (bg: '#0f172a', accent: '#0EBE7E', text: '#ffffff', muted: '#94a3b8'),
+    (bg: '#ffffff', accent: '#0F1D40', text: '#0f172a', muted: '#64748b'),
+    (bg: '#dc2626', accent: '#fef08a', text: '#ffffff', muted: '#fecaca'),
+    (bg: '#1e3a8a', accent: '#fbbf24', text: '#ffffff', muted: '#93c5fd'),
+    (bg: '#14532d', accent: '#86efac', text: '#ffffff', muted: '#bbf7d0'),
+    (bg: '#4c1d95', accent: '#f9a8d4', text: '#ffffff', muted: '#e9d5ff'),
+    (bg: '#1c1917', accent: '#ea580c', text: '#ffffff', muted: '#a8a29e'),
+    (bg: '#09090b', accent: '#d4af37', text: '#ffffff', muted: '#a1a1aa'),
+    (bg: '#0e7490', accent: '#99f6e4', text: '#ffffff', muted: '#cffafe'),
+    (bg: '#831843', accent: '#fbcfe8', text: '#ffffff', muted: '#f9a8d4'),
+  ];
+
+  const sizeKeys = <({String key, double w, double h})>[
+    (key: 'sq', w: 1080, h: 1080),
+    (key: 'story', w: 1080, h: 1920),
+    (key: 'portrait', w: 1080, h: 1350),
+    (key: 'fb', w: 1200, h: 630),
+    (key: 'banner', w: 1920, h: 1080),
+    (key: 'pin', w: 1000, h: 1500),
+  ];
+
+  for (final cat in categoryMeta.entries) {
+    for (final layout in layouts) {
+      if (cat.key == 'luxury' && layout.id == 'luxury') continue;
+      final size = sizeKeys[seq % sizeKeys.length];
+      final palette = palettes[seq % palettes.length];
+      final meta = cat.value;
+      seq++;
+
+      final w = size.w;
+      final h = size.h;
+      final elements = layout.builder(
+        w: w,
+        h: h,
+        palette: palette,
+        headline: meta.label.toUpperCase(),
+        category: cat.key,
+        variant: seq,
+      );
+
+      out.add(
+        AdTemplate(
+          id: 'gen_${layout.id}_${cat.key}_${size.key}_$seq',
+          name: '${meta.label} · ${layout.name}',
+          category: cat.key,
+          canvasWidth: w,
+          canvasHeight: h,
+          background: palette.bg,
+          previewColors: meta.preview,
+          elements: elements,
+        ),
+      );
+    }
+  }
+
+  // Extra seasonal / regional specials (unique handcrafted-style via generator)
+  const specials = [
+    ('ramadan', 'Iftar Special', 'food', '#1e3a5f', '#fbbf24'),
+    ('eid', 'Eid Celebration', 'event', '#14532d', '#86efac'),
+    ('christmas', 'Holiday Sale', 'sale', '#7f1d1d', '#f87171'),
+    ('mothers', "Mother's Day", 'promo', '#9d174d', '#fbcfe8'),
+    ('fathers', "Father's Day", 'promo', '#1e3a8a', '#93c5fd'),
+    ('valentine', 'Valentine Offer', 'promo', '#be185d', '#fda4af'),
+    ('wedding', 'Wedding Season', 'event', '#faf5ff', '#a855f7'),
+    ('graduation', 'Graduation', 'promo', '#1e293b', '#38bdf8'),
+    ('payday', 'Payday Deals', 'sale', '#0f172a', '#22c55e'),
+    ('rainy', 'Rainy Season', 'delivery', '#1e40af', '#60a5fa'),
+    ('sunday', 'Sunday Market', 'agri', '#365314', '#a3e635'),
+    ('nye', 'New Year', 'event', '#09090b', '#facc15'),
+  ];
+
+  for (final (slug, name, category, bg, accent) in specials) {
+    seq++;
+    final size = sizeKeys[seq % sizeKeys.length];
+    final w = size.w;
+    final h = size.h;
+    final palette = (
+      bg: bg,
+      accent: accent,
+      text: _contrastText(bg),
+      muted: '#94a3b8',
+    );
+    out.add(
+      AdTemplate(
+        id: 'gen_special_${slug}_$seq',
+        name: name,
+        category: category,
+        canvasWidth: w,
+        canvasHeight: h,
+        background: bg,
+        previewColors: [parseHexColor(bg), parseHexColor(accent)],
+        elements: _buildHeroLayout(
+          w: w,
+          h: h,
+          palette: palette,
+          headline: name.toUpperCase(),
+          category: category,
+          variant: seq + 7,
+        ),
+      ),
+    );
+  }
+
+  return out;
+}
+
+String _contrastText(String bgHex) {
+  final c = parseHexColor(bgHex);
+  final luminance = c.computeLuminance();
+  return luminance > 0.45 ? '#0f172a' : '#ffffff';
+}
+
+typedef _LayoutBuilder = List<CanvasElement> Function({
+  required double w,
+  required double h,
+  required ({String bg, String accent, String text, String muted}) palette,
+  required String headline,
+  required String category,
+  required int variant,
+});
+
+class _LayoutRecipe {
+  const _LayoutRecipe(this.id, this.name, this.builder);
+  final String id;
+  final String name;
+  final _LayoutBuilder builder;
+}
+
+List<CanvasElement> _buildHeroLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  final imgH = h * 0.45;
+  final imgY = h * 0.22;
+  return [
+    CanvasElement(
+      id: 'accent_bar',
+      type: 'figure',
+      x: 0,
+      y: 0,
+      width: w,
+      height: h * 0.14,
+      fill: palette.accent,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.05,
+      y: h * 0.04,
+      width: w * 0.9,
+      fontSize: w * 0.055,
+      fontWeight: 'bold',
+      fontFamily: variant.isEven ? 'Bebas Neue' : 'Montserrat',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.08,
+      y: imgY,
+      width: w * 0.84,
+      height: imgH,
+      cornerRadius: 20,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.05,
+      y: imgY + imgH + h * 0.04,
+      width: w * 0.9,
+      fontSize: w * 0.042,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 99,000',
+      x: w * 0.05,
+      y: imgY + imgH + h * 0.11,
+      width: w * 0.9,
+      fontSize: w * 0.05,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'cta_bg',
+      type: 'figure',
+      x: w * 0.28,
+      y: h * 0.86,
+      width: w * 0.44,
+      height: h * 0.07,
+      fill: palette.accent,
+      cornerRadius: h * 0.035,
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: category == 'whatsapp' ? 'WA: {{WHATSAPP}}' : 'ORDER NOW',
+      x: w * 0.28,
+      y: h * 0.875,
+      width: w * 0.44,
+      fontSize: w * 0.028,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'footer',
+      type: 'text',
+      text: '{{BUSINESS}} · {{CTA_LINK}}',
+      x: w * 0.05,
+      y: h * 0.95,
+      width: w * 0.9,
+      fontSize: w * 0.018,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+      opacity: 0.7,
+    ),
+  ];
+}
+
+List<CanvasElement> _buildSplitLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  final imageLeft = variant.isOdd;
+  final imgX = imageLeft ? w * 0.05 : w * 0.52;
+  final textX = imageLeft ? w * 0.52 : w * 0.05;
+  return [
+    CanvasElement(
+      id: 'panel',
+      type: 'figure',
+      x: imageLeft ? w * 0.5 : 0,
+      y: 0,
+      width: w * 0.5,
+      height: h,
+      fill: palette.accent,
+      opacity: 0.12,
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: imgX,
+      y: h * 0.12,
+      width: w * 0.43,
+      height: h * 0.55,
+      cornerRadius: 16,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: textX,
+      y: h * 0.14,
+      width: w * 0.4,
+      fontSize: w * 0.04,
+      fontWeight: 'bold',
+      fontFamily: 'Oswald',
+      fill: palette.text,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: textX,
+      y: h * 0.28,
+      width: w * 0.4,
+      fontSize: w * 0.028,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 150,000',
+      x: textX,
+      y: h * 0.42,
+      width: w * 0.4,
+      fontSize: w * 0.045,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'cta_bg',
+      type: 'figure',
+      x: textX,
+      y: h * 0.58,
+      width: w * 0.32,
+      height: h * 0.08,
+      fill: palette.accent,
+      cornerRadius: h * 0.04,
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: 'SHOP NOW',
+      x: textX,
+      y: h * 0.6,
+      width: w * 0.32,
+      fontSize: w * 0.026,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'footer',
+      type: 'text',
+      text: '{{LOCATION}}',
+      x: w * 0.05,
+      y: h * 0.92,
+      width: w * 0.9,
+      fontSize: w * 0.02,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildBannerLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'top_band',
+      type: 'figure',
+      x: 0,
+      y: 0,
+      width: w,
+      height: h * 0.28,
+      fill: palette.accent,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.05,
+      y: h * 0.06,
+      width: w * 0.9,
+      fontSize: w * 0.06,
+      fontWeight: 'bold',
+      fontFamily: 'Staatliches',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'sub',
+      type: 'text',
+      text: 'Limited time only',
+      x: w * 0.05,
+      y: h * 0.16,
+      width: w * 0.9,
+      fontSize: w * 0.028,
+      fontFamily: 'Inter',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+      opacity: 0.85,
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.1,
+      y: h * 0.32,
+      width: w * 0.8,
+      height: h * 0.38,
+      cornerRadius: 18,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.05,
+      y: h * 0.74,
+      width: w * 0.9,
+      fontSize: w * 0.038,
+      fontWeight: '600',
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 75,000',
+      x: w * 0.05,
+      y: h * 0.8,
+      width: w * 0.9,
+      fontSize: w * 0.048,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: category == 'delivery' ? 'Free delivery today' : '📞 {{PHONE}}',
+      x: w * 0.05,
+      y: h * 0.9,
+      width: w * 0.9,
+      fontSize: w * 0.026,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildMinimalLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'rule',
+      type: 'figure',
+      x: w * 0.1,
+      y: h * 0.08,
+      width: w * 0.12,
+      height: 4,
+      fill: palette.accent,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.1,
+      y: h * 0.1,
+      width: w * 0.8,
+      fontSize: w * 0.045,
+      fontWeight: 'bold',
+      fontFamily: 'DM Sans',
+      fill: palette.text,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.1,
+      y: h * 0.22,
+      width: w * 0.8,
+      height: h * 0.48,
+      cornerRadius: 8,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.1,
+      y: h * 0.74,
+      width: w * 0.8,
+      fontSize: w * 0.032,
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 120,000',
+      x: w * 0.1,
+      y: h * 0.8,
+      width: w * 0.5,
+      fontSize: w * 0.04,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: '{{CTA_LINK}}',
+      x: w * 0.55,
+      y: h * 0.81,
+      width: w * 0.35,
+      fontSize: w * 0.022,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'right',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildStoryLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'glow',
+      type: 'figure',
+      x: 0,
+      y: 0,
+      width: w,
+      height: h * 0.35,
+      fill: palette.accent,
+      opacity: 0.35,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.06,
+      y: h * 0.06,
+      width: w * 0.88,
+      fontSize: w * 0.065,
+      fontWeight: 'bold',
+      fontFamily: 'Bebas Neue',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.08,
+      y: h * 0.18,
+      width: w * 0.84,
+      height: h * 0.42,
+      cornerRadius: 24,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.06,
+      y: h * 0.64,
+      width: w * 0.88,
+      fontSize: w * 0.042,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price_bg',
+      type: 'figure',
+      x: w * 0.22,
+      y: h * 0.72,
+      width: w * 0.56,
+      height: h * 0.05,
+      fill: palette.accent,
+      cornerRadius: h * 0.025,
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 49,000',
+      x: w * 0.22,
+      y: h * 0.728,
+      width: w * 0.56,
+      fontSize: w * 0.04,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'swipe',
+      type: 'text',
+      text: 'Swipe up to order ↑',
+      x: w * 0.06,
+      y: h * 0.82,
+      width: w * 0.88,
+      fontSize: w * 0.03,
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+      opacity: 0.8,
+    ),
+    CanvasElement(
+      id: 'footer',
+      type: 'text',
+      text: '{{WHATSAPP}}',
+      x: w * 0.06,
+      y: h * 0.92,
+      width: w * 0.88,
+      fontSize: w * 0.028,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildBadgeLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'badge',
+      type: 'figure',
+      x: w * 0.62,
+      y: h * 0.04,
+      width: w * 0.3,
+      height: w * 0.3,
+      fill: palette.accent,
+      cornerRadius: w * 0.15,
+    ),
+    CanvasElement(
+      id: 'badge_text',
+      type: 'text',
+      text: '-30%',
+      x: w * 0.62,
+      y: h * 0.1,
+      width: w * 0.3,
+      fontSize: w * 0.055,
+      fontWeight: 'bold',
+      fontFamily: 'Bebas Neue',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.06,
+      y: h * 0.08,
+      width: w * 0.55,
+      fontSize: w * 0.048,
+      fontWeight: 'bold',
+      fontFamily: 'Montserrat',
+      fill: palette.text,
+      align: 'left',
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.06,
+      y: h * 0.22,
+      width: w * 0.88,
+      height: h * 0.48,
+      cornerRadius: 16,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.06,
+      y: h * 0.74,
+      width: w * 0.88,
+      fontSize: w * 0.036,
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 99,000',
+      x: w * 0.06,
+      y: h * 0.8,
+      width: w * 0.88,
+      fontSize: w * 0.05,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: 'Tap to order · {{CTA_LINK}}',
+      x: w * 0.06,
+      y: h * 0.9,
+      width: w * 0.88,
+      fontSize: w * 0.022,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildFooterCtaLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.05,
+      y: h * 0.06,
+      width: w * 0.9,
+      fontSize: w * 0.05,
+      fontWeight: 'bold',
+      fontFamily: 'Poppins',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.12,
+      y: h * 0.16,
+      width: w * 0.76,
+      height: h * 0.5,
+      cornerRadius: 20,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.05,
+      y: h * 0.7,
+      width: w * 0.9,
+      fontSize: w * 0.034,
+      fontWeight: '600',
+      fontFamily: 'Inter',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 200,000',
+      x: w * 0.05,
+      y: h * 0.76,
+      width: w * 0.9,
+      fontSize: w * 0.042,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'footer_bar',
+      type: 'figure',
+      x: 0,
+      y: h * 0.86,
+      width: w,
+      height: h * 0.14,
+      fill: palette.accent,
+    ),
+    CanvasElement(
+      id: 'cta_text',
+      type: 'text',
+      text: category == 'booking' ? 'BOOK NOW · {{PHONE}}' : 'ORDER · {{WHATSAPP}}',
+      x: w * 0.05,
+      y: h * 0.9,
+      width: w * 0.9,
+      fontSize: w * 0.03,
+      fontWeight: 'bold',
+      fontFamily: 'Inter',
+      fill: _contrastText(palette.accent),
+      align: 'center',
+    ),
+  ];
+}
+
+List<CanvasElement> _buildLuxuryLayout({
+  required double w,
+  required double h,
+  required palette,
+  required String headline,
+  required String category,
+  required int variant,
+}) {
+  return [
+    CanvasElement(
+      id: 'frame',
+      type: 'figure',
+      x: w * 0.06,
+      y: h * 0.06,
+      width: w * 0.88,
+      height: h * 0.88,
+      fill: 'transparent',
+      strokeColor: palette.accent,
+      strokeWidth: 2,
+      cornerRadius: 4,
+    ),
+    CanvasElement(
+      id: 'headline',
+      type: 'text',
+      text: headline,
+      x: w * 0.1,
+      y: h * 0.1,
+      width: w * 0.8,
+      fontSize: w * 0.04,
+      fontWeight: 'bold',
+      fontFamily: 'Cinzel',
+      fill: palette.accent,
+      align: 'center',
+      letterSpacing: 4,
+    ),
+    CanvasElement(
+      id: 'product_image',
+      type: 'image',
+      src: '',
+      x: w * 0.15,
+      y: h * 0.2,
+      width: w * 0.7,
+      height: h * 0.45,
+      cornerRadius: 2,
+    ),
+    CanvasElement(
+      id: 'product_name',
+      type: 'text',
+      text: 'PRODUCT NAME',
+      x: w * 0.1,
+      y: h * 0.7,
+      width: w * 0.8,
+      fontSize: w * 0.032,
+      fontFamily: 'Playfair Display',
+      fill: palette.text,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'price',
+      type: 'text',
+      text: 'UGX 150,000',
+      x: w * 0.1,
+      y: h * 0.76,
+      width: w * 0.8,
+      fontSize: w * 0.038,
+      fontFamily: 'Inter',
+      fill: palette.accent,
+      align: 'center',
+    ),
+    CanvasElement(
+      id: 'footer',
+      type: 'text',
+      text: '{{BUSINESS}}',
+      x: w * 0.1,
+      y: h * 0.88,
+      width: w * 0.8,
+      fontSize: w * 0.02,
+      fontFamily: 'Inter',
+      fill: palette.muted,
+      align: 'center',
+      letterSpacing: 2,
+    ),
+  ];
+}

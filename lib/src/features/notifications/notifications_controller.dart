@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app.dart';
 import '../../core/app_providers.dart';
 import '../../core/config/build_metadata.dart';
+import '../../core/firebase/firebase_runtime.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/sync/sync_service.dart';
 
 final notificationsControllerProvider =
     StateNotifierProvider<NotificationsController, NotificationsState>((ref) {
@@ -102,43 +104,46 @@ class NotificationsController extends StateNotifier<NotificationsState> {
 
   Future<void> bootstrap() async {
     try {
-      final messaging = FirebaseMessaging.instance;
       final appVersion = BuildMetadata.appVersion;
-      await messaging.requestPermission();
-      final token = await messaging.getToken();
-      if (token != null) {
-        await api.registerDeviceToken(
-          token: token,
-          platform: BuildMetadata.notificationPlatform(),
-          appVersion: appVersion,
-        );
-        state = state.copyWith(token: token);
-      }
-
-      // Refresh token if it changes
-      _subscriptions.add(
-        FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      if (FirebaseRuntime.instance.firebaseEnabled) {
+        final messaging = FirebaseMessaging.instance;
+        await messaging.setAutoInitEnabled(true);
+        await messaging.requestPermission();
+        final token = await messaging.getToken();
+        if (token != null) {
           await api.registerDeviceToken(
-            token: newToken,
+            token: token,
             platform: BuildMetadata.notificationPlatform(),
             appVersion: appVersion,
           );
-          state = state.copyWith(token: newToken);
-        }),
-      );
+          state = state.copyWith(token: token);
+        }
 
-      _subscriptions.add(
-        FirebaseMessaging.onMessage.listen((message) {
-          _ingestForegroundMessage(message);
-        }),
-      );
+        // Refresh token if it changes
+        _subscriptions.add(
+          FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+            await api.registerDeviceToken(
+              token: newToken,
+              platform: BuildMetadata.notificationPlatform(),
+              appVersion: appVersion,
+            );
+            state = state.copyWith(token: newToken);
+          }),
+        );
 
-      _subscriptions.add(
-        FirebaseMessaging.onMessageOpenedApp.listen((message) {
-          _ingestForegroundMessage(message, showToast: false);
-          _handleNotificationRoute(message.data);
-        }),
-      );
+        _subscriptions.add(
+          FirebaseMessaging.onMessage.listen((message) {
+            _ingestForegroundMessage(message);
+          }),
+        );
+
+        _subscriptions.add(
+          FirebaseMessaging.onMessageOpenedApp.listen((message) {
+            _ingestForegroundMessage(message, showToast: false);
+            _handleNotificationRoute(message.data);
+          }),
+        );
+      }
 
       await load();
     } catch (e) {
@@ -200,7 +205,9 @@ class NotificationsController extends StateNotifier<NotificationsState> {
       ];
       state = state.copyWith(items: updated);
       await refreshUnread();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('markRead failed: $e');
+    }
   }
 
   Future<void> markAllRead() async {
@@ -219,7 +226,9 @@ class NotificationsController extends StateNotifier<NotificationsState> {
           ),
       ];
       state = state.copyWith(items: updated, unreadCount: 0);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('markAllRead failed: $e');
+    }
   }
 
   Future<void> deleteNotification(String notificationId) async {
@@ -230,7 +239,8 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     try {
       await api.deleteNotification(notificationId);
       await refreshUnread();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('deleteNotification failed: $e');
       // If failed, reload to restore
       await load();
     }
@@ -244,7 +254,9 @@ class NotificationsController extends StateNotifier<NotificationsState> {
           ? int.tryParse(data['unread_count']?.toString() ?? '') ?? 0
           : 0;
       state = state.copyWith(unreadCount: count);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('refreshUnread failed: $e');
+    }
   }
 
   void handleTap(NotificationDto notification) {
@@ -255,6 +267,15 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     RemoteMessage message, {
     bool showToast = true,
   }) {
+    final data = Map<String, dynamic>.from(message.data);
+
+    // Handle silent sync hints without showing notifications
+    if (data['type']?.toString() == 'sync_hint') {
+      debugPrint('[Notifications] Sync hint received — triggering delta pull');
+      unawaited(ref.read(syncServiceProvider).pullPosDelta());
+      return;
+    }
+
     final title =
         message.notification?.title?.trim() ??
         message.data['title']?.toString().trim() ??
@@ -263,7 +284,6 @@ class NotificationsController extends StateNotifier<NotificationsState> {
         message.notification?.body?.trim() ??
         message.data['body']?.toString().trim() ??
         '';
-    final data = Map<String, dynamic>.from(message.data);
     final item = NotificationDto(
       id:
           message.messageId ??

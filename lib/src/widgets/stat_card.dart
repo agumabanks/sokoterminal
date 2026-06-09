@@ -13,6 +13,7 @@ class StatCard extends StatelessWidget {
   const StatCard({
     required this.label,
     required this.value,
+    this.valueWidget,
     this.icon,
     this.trend,
     this.trendLabel,
@@ -23,6 +24,7 @@ class StatCard extends StatelessWidget {
 
   final String label;
   final String value;
+  final Widget? valueWidget;
   final IconData? icon;
   final StatTrend? trend;
   final String? trendLabel;
@@ -31,61 +33,88 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: DesignTokens.durationNormal,
-        padding: DesignTokens.paddingMd,
-        decoration: BoxDecoration(
-          color: variant.backgroundColor,
-          gradient: variant.gradientBackground,
-          borderRadius: DesignTokens.borderRadiusMd,
-          boxShadow: DesignTokens.shadowSm,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: DesignTokens.borderRadiusMd,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: DesignTokens.borderRadiusMd,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: variant.backgroundColor,
+            gradient: variant.gradientBackground,
+            borderRadius: DesignTokens.borderRadiusMd,
+            boxShadow: DesignTokens.shadowSm,
+          ),
+          child: Padding(
+            padding: DesignTokens.paddingMd,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon != null) ...[
-                  Container(
-                    padding: DesignTokens.paddingXs,
-                    decoration: BoxDecoration(
-                      color: variant.iconBackgroundColor,
-                      borderRadius: DesignTokens.borderRadiusSm,
+                Row(
+                  children: [
+                    if (icon != null) ...[
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: variant.iconBackgroundColor,
+                          borderRadius: DesignTokens.borderRadiusSm,
+                          border: variant == StatCardVariant.gradient
+                              ? Border.all(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                )
+                              : null,
+                        ),
+                        child: Icon(
+                          icon,
+                          size: DesignTokens.iconMd,
+                          color: variant.iconColor,
+                        ),
+                      ),
+                      const SizedBox(width: DesignTokens.spaceSm),
+                    ],
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: DesignTokens.textSmall.copyWith(
+                          color: variant.labelColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    child: Icon(
-                      icon,
-                      size: DesignTokens.iconSm,
-                      color: variant.iconColor,
+                    if (trend != null)
+                      _TrendBadge(trend: trend!, label: trendLabel),
+                  ],
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+                AnimatedSwitcher(
+                  duration: DesignTokens.durationNormal,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.15),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
                     ),
                   ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                ],
-                Expanded(
-                  child: Text(
-                    label,
-                    style: DesignTokens.textSmall.copyWith(
-                      color: variant.labelColor,
+                  child: valueWidget ?? Text(
+                    value,
+                    key: ValueKey<String>(value),
+                    style: DesignTokens.textTitle.copyWith(
+                      color: variant.valueColor,
+                      fontSize: variant == StatCardVariant.compact ? 18 : 22,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (trend != null)
-                  _TrendBadge(trend: trend!, label: trendLabel),
               ],
             ),
-            const SizedBox(height: DesignTokens.spaceSm),
-            Text(
-              value,
-              style: DesignTokens.textTitle.copyWith(
-                color: variant.valueColor,
-                fontSize: variant == StatCardVariant.compact ? 18 : 22,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -172,9 +201,9 @@ enum StatCardVariant {
   Color get labelColor {
     switch (this) {
       case StatCardVariant.gradient:
-        return DesignTokens.surfaceWhite.withValues(alpha: 0.8);
+        return DesignTokens.surfaceWhite.withValues(alpha: 0.9);
       default:
-        return DesignTokens.grayMedium;
+        return DesignTokens.textSecondary;
     }
   }
 
@@ -185,7 +214,7 @@ enum StatCardVariant {
       case StatCardVariant.accent:
         return DesignTokens.brandPrimary;
       default:
-        return DesignTokens.grayDark;
+        return DesignTokens.textPrimary;
     }
   }
 

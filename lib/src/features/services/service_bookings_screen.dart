@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_providers.dart';
 import '../../core/theme/design_tokens.dart';
 import '../checkout/cart_controller.dart';
+import 'booking_create_screen.dart';
 import 'service_bookings_controller.dart';
+import 'service_calendar_screen.dart';
 
 enum _BookingAction { confirm, complete, cancel, createSale }
 
@@ -26,10 +28,27 @@ class ServiceBookingsScreen extends ConsumerWidget {
         title: const Text('Service Bookings'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.calendar_month_outlined),
+            tooltip: 'Calendar',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ServiceCalendarScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: controller.load,
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BookingCreateScreen()),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Booking'),
+        backgroundColor: DesignTokens.brandAccent,
       ),
       body: Builder(
         builder: (context) {

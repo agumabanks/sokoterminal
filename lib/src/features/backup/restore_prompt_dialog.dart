@@ -95,7 +95,7 @@ class RestorePromptDialog extends ConsumerWidget {
             ],
             if (state.restoring) ...[
               const SizedBox(height: 20),
-              const Center(
+              Center(
                 child: Column(
                   children: [
                     CircularProgressIndicator(),
