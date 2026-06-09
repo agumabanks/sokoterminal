@@ -1,0 +1,1 @@
+ +0% 31332/com.soko24.soko_seller_terminal: 0% user + 0% kernel

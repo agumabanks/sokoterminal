@@ -1,0 +1,8 @@
+04-18 01:42:55.868  1244  1391 W EntropyMixer: java.io.FileNotFoundException: /dev/hw_random: open failed: EACCES (Permission denied)
+04-18 01:42:55.868  1244  1391 W EntropyMixer: Caused by: android.system.ErrnoException: open failed: EACCES (Permission denied)
+04-18 04:42:55.874  1244  1391 W EntropyMixer: java.io.FileNotFoundException: /dev/hw_random: open failed: EACCES (Permission denied)
+04-18 04:42:55.874  1244  1391 W EntropyMixer: Caused by: android.system.ErrnoException: open failed: EACCES (Permission denied)
+04-18 04:46:23.868  1244  1392 E ActivityManager: java.lang.SecurityException: Package com.soko24.soko_seller_terminal is currently frozen!
+04-18 05:13:12.168  1244  1537 W ProcessCpuTracker: Failed to stat(/proc/30989): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+04-18 05:13:12.168  1244  1537 W ProcessCpuTracker: Failed to stat(/proc/30990): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+04-18 05:14:28.924  3618  6624 W ExifInterface: java.io.EOFException

@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -50,6 +51,19 @@ if (isReleaseBuild && googleMapsApiKey == null) {
         "Google Maps API key is not configured. Set googleMapsApiKey in android/key.properties " +
             "or export GOOGLE_MAPS_API_KEY for release builds.",
     )
+}
+
+// Pass compile-time dart-defines so BuildMetadata and String.fromEnvironment work
+// without requiring manual --dart-define flags on every flutter build command.
+val dartDefines = mutableListOf<String>()
+if (googleMapsApiKey != null) {
+    dartDefines.add("GOOGLE_MAPS_API_KEY=$googleMapsApiKey")
+}
+if (dartDefines.isNotEmpty()) {
+    val encodedDefines = dartDefines.joinToString(",") {
+        Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8))
+    }
+    project.setProperty("dart-defines", encodedDefines)
 }
 
 android {

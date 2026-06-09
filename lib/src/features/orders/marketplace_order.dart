@@ -280,8 +280,18 @@ class MarketplaceOrder {
   bool get canRequestSokoDelivery {
     if (hasSokoDeliveryRequest) return false;
     final status = normalizedDeliveryStatus;
-    return status != 'delivered' && status != 'cancelled';
+    return status != 'delivered' && status != 'cancelled' && status != 'canceled';
   }
+
+  OrderActionBucket get actionBucket => orderActionBucketFromStatus(
+    normalizedDeliveryStatus,
+    paymentStatus: normalizedPaymentStatus,
+    pendingSync: pendingSync,
+  );
+
+  bool get needsAction => actionBucket == OrderActionBucket.needsAction;
+
+  int get actionSortPriority => orderActionSortPriority(actionBucket);
 
   static List<MarketplaceOrder> listFromJson(Iterable<dynamic> raw) {
     return raw
@@ -320,3 +330,64 @@ String _humanizeStatus(String value) {
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
 }
+
+enum OrderActionBucket { needsAction, inProgress, completed }
+
+OrderActionBucket orderActionBucketFromStatus(
+  String deliveryStatus, {
+  String? paymentStatus,
+  bool pendingSync = false,
+}) {
+  final status = deliveryStatus.trim().toLowerCase().replaceAll(' ', '_');
+  if (pendingSync) return OrderActionBucket.needsAction;
+
+  switch (status) {
+    case 'pending':
+    case 'confirmed':
+      return OrderActionBucket.needsAction;
+    case 'packed':
+    case 'picked_up':
+    case 'on_the_way':
+    case 'out_for_delivery':
+    case 'processing':
+      return OrderActionBucket.inProgress;
+    case 'delivered':
+    case 'complete':
+    case 'completed':
+    case 'cancelled':
+    case 'canceled':
+      return OrderActionBucket.completed;
+    default:
+      final payment = (paymentStatus ?? '').trim().toLowerCase();
+      if (payment == 'unpaid' || payment.isEmpty) {
+        return OrderActionBucket.needsAction;
+      }
+      return OrderActionBucket.needsAction;
+  }
+}
+
+int orderActionSortPriority(OrderActionBucket bucket) {
+  switch (bucket) {
+    case OrderActionBucket.needsAction:
+      return 0;
+    case OrderActionBucket.inProgress:
+      return 1;
+    case OrderActionBucket.completed:
+      return 2;
+  }
+}
+
+List<MarketplaceOrder> sortOrdersForDisplay(List<MarketplaceOrder> orders) {
+  final sorted = [...orders];
+  sorted.sort((a, b) {
+    final priority = a.actionSortPriority.compareTo(b.actionSortPriority);
+    if (priority != 0) return priority;
+    final aTime = a.orderedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.orderedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return bTime.compareTo(aTime);
+  });
+  return sorted;
+}
+
+int countOrdersNeedingAction(Iterable<MarketplaceOrder> orders) =>
+    orders.where((order) => order.needsAction).length;

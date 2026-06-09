@@ -1516,9 +1516,39 @@ input[type="range"]::-moz-range-thumb {
         transform: translateX(0);
     }
     
+    /* Backdrop for mobile sidebar */
+    .right-sidebar.open::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        z-index: -1;
+        pointer-events: auto;
+    }
+    
     .toolbar-center {
         display: none;
     }
+    
+    /* Show mobile-only elements */
+    .mobile-only {
+        display: flex !important;
+    }
+    
+    /* Mobile zoom controls in toolbar-right */
+    .mobile-zoom-controls {
+        display: flex !important;
+        align-items: center;
+        gap: var(--spacing-xs);
+        margin-right: var(--spacing-sm);
+        padding-right: var(--spacing-sm);
+        border-right: 1px solid var(--glass-border);
+    }
+}
+
+/* Hide mobile-only elements on desktop */
+.mobile-only {
+    display: none;
 }
 
 /* ============================================
@@ -1876,5 +1906,70 @@ kbd {
     
     .preset-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ============================================
+   DRAFT RESTORE MODAL
+   ============================================ */
+
+.draft-restore-content {
+    max-width: 480px;
+}
+
+.draft-restore-preview {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xl);
+    padding: var(--spacing-2xl);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.draft-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--accent-primary);
+    flex-shrink: 0;
+}
+
+.draft-info {
+    flex: 1;
+}
+
+.draft-message {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm);
+}
+
+.draft-timestamp {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.draft-actions {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.draft-actions button {
+    flex: 1;
+    justify-content: center;
+}
+
+@media (max-width: 480px) {
+    .draft-restore-preview {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--spacing-lg);
+        padding: var(--spacing-xl);
+    }
+    
+    .draft-actions {
+        flex-direction: column-reverse;
     }
 }

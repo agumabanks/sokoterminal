@@ -67,6 +67,17 @@ String? servicePublishBlockReason(Service service, {required bool wantsPublish})
 bool isServicePendingModeration(Service service) =>
     service.moderationStatus == 'pending';
 
+String servicePublishSnackbarMessage({
+  required bool publishing,
+  String? moderationStatus,
+}) {
+  if (!publishing) return 'Service saved on this device';
+  if (moderationStatus == 'pending') {
+    return 'Submitted for review — your service will appear on the shop once approved';
+  }
+  return 'Publishing service — syncing to your shop…';
+}
+
 class ServiceModerationUpdate {
   const ServiceModerationUpdate({
     this.moderationStatus,

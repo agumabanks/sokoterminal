@@ -1,0 +1,59 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 34693861 Realtime: 34715910
+
+** MEMINFO in pid 31332 [com.soko24.soko_seller_terminal] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap    52661    52508        8       19    53500    88536    43947    39786
+  Dalvik Heap     3829     3768        4       68     4492     8086     4043     4043
+ Dalvik Other     3979     3540       84        1     4672                           
+        Stack     1064     1064        0        0     1072                           
+       Ashmem        2        0        0        0       16                           
+    Other dev      883      788       24        0     1316                           
+     .so mmap    37855      868    31316        5    69020                           
+    .jar mmap     6700        0     3512        0    28768                           
+    .apk mmap     2653        0     1828        0    14788                           
+    .ttf mmap    10363        0     9868        0    11200                           
+    .dex mmap    32530    32484       36        0    32596                           
+    .oat mmap      208        0       68        0     2268                           
+    .art mmap     8115     7516      116       81    15792                           
+   Other mmap   108419     5552   102824        0   109140                           
+   EGL mtrack    24336    24336        0        0    24336                           
+    GL mtrack      576      576        0        0      576                           
+      Unknown   172810   172748       40        1   173164                           
+        TOTAL   467158   305748   149728      175   467158    96622    47990    43829
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    11400                          20284
+         Native Heap:    52508                          53500
+                Code:    79996                         159368
+               Stack:     1064                           1072
+            Graphics:    24912                          24912
+       Private Other:   285596
+              System:    11682
+             Unknown:                                  287580
+ 
+           TOTAL PSS:   467158            TOTAL RSS:   546716       TOTAL SWAP PSS:      175
+ 
+ Objects
+               Views:        8         ViewRootImpl:        1
+         AppContexts:        6           Activities:        1
+              Assets:       15        AssetManagers:        0
+       Local Binders:       33        Proxy Binders:       37
+       Parcel memory:        9         Parcel count:       38
+    Death Recipients:        1      OpenSSL Sockets:        0
+            WebViews:        0
+ 
+ SQL
+         MEMORY_USED:      171
+  PAGECACHE_OVERFLOW:       59          MALLOC_SIZE:      117
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b)          cache  Dbname
+         4      148                      48/45/25  /data/user/0/com.soko24.soko_seller_terminal/databases/google_app_measurement.db
+ 
+ Asset Allocations
+    : 1607K

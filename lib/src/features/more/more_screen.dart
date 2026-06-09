@@ -690,8 +690,8 @@ class _MoreHeroCard extends StatelessWidget {
                 const SizedBox(height: DesignTokens.spaceLg),
                 Text(
                   title,
-                  style: DesignTokens.textTitleLight.copyWith(
-                    fontSize: 26,
+                  style: DesignTokens.textHeadline.copyWith(
+                    color: DesignTokens.canvas,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -763,10 +763,9 @@ class _MoreSection extends StatelessWidget {
           ),
           child: Text(
             title.toUpperCase(),
-            style: DesignTokens.textCaption.copyWith(
+            style: DesignTokens.textSmall.copyWith(
               letterSpacing: 0.8,
               color: DesignTokens.textTertiary,
-              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -774,7 +773,7 @@ class _MoreSection extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             color: DesignTokens.surfaceRaised,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: DesignTokens.borderRadiusSm,
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -791,23 +790,26 @@ class _MoreSection extends StatelessWidget {
                     ),
                     if (actions[i].badge != null)
                       Positioned(
-                        right: 16, top: 0, bottom: 0,
+                        right: DesignTokens.spaceMd,
+                        top: 0,
+                        bottom: 0,
                         child: Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                              horizontal: DesignTokens.spaceSm,
+                              vertical: DesignTokens.spaceXs,
+                            ),
                             decoration: BoxDecoration(
                               color: actions[i].color.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: DesignTokens.borderRadiusFull,
                               border: Border.all(
                                 color: actions[i].color.withValues(alpha: 0.4),
                               ),
                             ),
                             child: Text(
                               actions[i].badge!,
-                              style: TextStyle(
+                              style: DesignTokens.textCaption.copyWith(
                                 color: actions[i].color,
-                                fontSize: 9,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.5,
                               ),

@@ -77,6 +77,24 @@ void main() {
     expect(buildServiceSyncPayload(ready)['is_published'], isTrue);
   });
 
+  test('servicePublishSnackbarMessage explains moderation queue when publishing', () {
+    expect(
+      servicePublishSnackbarMessage(publishing: false),
+      'Service saved on this device',
+    );
+    expect(
+      servicePublishSnackbarMessage(
+        publishing: true,
+        moderationStatus: 'pending',
+      ),
+      contains('review'),
+    );
+    expect(
+      servicePublishSnackbarMessage(publishing: true),
+      contains('syncing'),
+    );
+  });
+
   test('parseServiceModerationFromApiResponse maps pending approval', () {
     final update = parseServiceModerationFromApiResponse({
       'pending_approval': true,

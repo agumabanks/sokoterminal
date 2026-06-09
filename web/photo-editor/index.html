@@ -58,6 +58,18 @@
                 </div>
             </div>
             <div class="toolbar-right">
+                <button class="tool-btn mobile-only" id="btn-toggle-properties" title="Properties">
+                    <i data-lucide="panel-right"></i>
+                </button>
+                <div class="mobile-zoom-controls mobile-only">
+                    <button class="tool-btn" id="btn-mobile-zoom-out" title="Zoom Out">
+                        <i data-lucide="zoom-out"></i>
+                    </button>
+                    <span class="zoom-level" id="mobile-zoom-level">100%</span>
+                    <button class="tool-btn" id="btn-mobile-zoom-in" title="Zoom In">
+                        <i data-lucide="zoom-in"></i>
+                    </button>
+                </div>
                 <button class="tool-btn" id="btn-my-uploads" title="My Uploads (Ctrl+O)">
                     <i data-lucide="images"></i>
                 </button>
@@ -343,6 +355,38 @@
                         <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>[</kbd><span>Send Backward</span></div>
                         <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>J</kbd><span>Duplicate Layer</span></div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Draft Restore Modal -->
+    <div class="modal hidden" id="draft-restore-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content draft-restore-content">
+            <div class="modal-header">
+                <h2>Recover Your Work</h2>
+                <button class="modal-close" id="draft-restore-close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="draft-restore-preview">
+                    <i data-lucide="rotate-ccw" class="draft-icon"></i>
+                    <div class="draft-info">
+                        <p class="draft-message">We found an autosaved draft of this image.</p>
+                        <p class="draft-timestamp" id="draft-timestamp">Last edited: --</p>
+                    </div>
+                </div>
+                <div class="draft-actions">
+                    <button class="btn-secondary" id="btn-draft-discard">
+                        <i data-lucide="trash-2"></i>
+                        Start Fresh
+                    </button>
+                    <button class="btn-primary" id="btn-draft-restore">
+                        <i data-lucide="rotate-ccw"></i>
+                        Restore Draft
+                    </button>
                 </div>
             </div>
         </div>

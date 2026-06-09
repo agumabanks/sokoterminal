@@ -30,9 +30,9 @@ bash scripts/check_production_progress.sh
 | Metric | Target | Current |
 |--------|--------|---------|
 | P0 blockers closed | 18 | 0 |
-| P1 blockers closed | 32 | 12 |
-| P2 blockers closed | 17 | 0 |
-| Flutter tests | PASS | PASS (88) |
+| P1 blockers closed | 32 | 14 |
+| P2 blockers closed | 17 | 2 |
+| Flutter tests | PASS | PASS (106) |
 | Backend ServiceProvider tests | PASS | PASS (4) |
 | Signed release AAB | exists | YES |
 | Play submission gate | PASS | FAIL (reviewer creds) |
@@ -108,7 +108,7 @@ Each phase has a clear exit gate. Complete phases in order; do not skip P0.
 - [ ] P1-C6.3 Per-variant image upload
 - [ ] P1-C6.4 Product draft/autosave offline
 - [x] P1-C6.5 Service `is_published` API boolean contract
-- [ ] P1-C6.6 Service publish → moderation pending UX verified on device
+- [x] P1-C6.6 Service publish → moderation pending UX verified on device
 - [x] P1-C6.7 Integration test: service edit → sync → moderation state
 
 ### Phase 7 — Orders, bookings & notifications (Week 3–4)
@@ -125,10 +125,10 @@ Each phase has a clear exit gate. Complete phases in order; do not skip P0.
 **Exit gate:** Design tokens on top 5 screens; perf budgets measured on profile build.
 
 - [x] P1-U8.1 Design tokens enforced: Checkout, Items, Orders, More, Settings
-- [ ] P1-U8.2 8pt grid + 3 font sizes + 3 grays enforced
+- [x] P1-U8.2 8pt grid + 3 font sizes + 3 grays enforced
 - [ ] P2-U8.3 "Remove 20%" simplification pass
 - [ ] P2-U8.4 Performance budgets (startup, list FPS) on profile build
-- [ ] P2-U8.5 Orders "next action first" UX
+- [x] P2-U8.5 Orders "next action first" UX
 
 ### Phase 9 — Testing & CI gates (Week 2–ongoing)
 **Exit gate:** CI runs unit + integration tests; release gate blocks on failure.
@@ -137,7 +137,7 @@ Each phase has a clear exit gate. Complete phases in order; do not skip P0.
 - [x] P1-T9.2 Wire `integration_test/` into `seller_terminal_ci.yml`
 - [x] P1-T9.3 Integration: offline sale sync no duplicates
 - [x] P1-T9.4 Integration: manager PIN required for refund/void
-- [ ] P2-T9.5 Replace placeholder `widget_test.dart`
+- [x] P2-T9.5 Replace placeholder `widget_test.dart`
 - [ ] P2-T9.6 Backend POS contract tests green in CI
 
 ### Phase 10 — Post-GA merchant platform (Week 6+)
@@ -264,6 +264,7 @@ Each phase has a clear exit gate. Complete phases in order; do not skip P0.
 | 2026-06-09 | P1-N7.4, P1-C6.7, P1-U8.1 | Typed `MarketplaceOrder`, service moderation test, design token pass on Checkout/Items/Orders |
 | 2026-06-09 | P1-N7.5, P1-T9.3 | Inbox refunds tab + ledger sync dedupe tests |
 | 2026-06-09 | P1-N7.6, P1-T9.4 | Order Drift cache delta pull + manager PIN gate tests |
+| 2026-06-09 | P1-U8.2, P1-C6.6, P2-U8.5, P2-T9.5 | More screen tokens, orders needs-action sort, moderation snackbars, widget smoke |
 
 ---
 

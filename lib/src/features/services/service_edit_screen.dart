@@ -18,6 +18,7 @@ import '../../core/util/formatters.dart';
 import '../../core/util/image_crop_helper.dart';
 import '../../core/util/service_html_utils.dart';
 import '../../core/util/service_pricing_utils.dart';
+import '../../core/util/service_publish_utils.dart';
 import 'service_categories_provider.dart';
 import 'service_package_tiers_section.dart';
 import '../../widgets/app_button.dart';
@@ -486,11 +487,15 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _publishOnline
-              ? 'Service saved — syncing to your online shop…'
-              : 'Service saved on this device',
+          servicePublishSnackbarMessage(
+            publishing: _publishOnline,
+            moderationStatus: _publishOnline ? 'pending' : null,
+          ),
         ),
         backgroundColor: DesignTokens.brandAccent,
+        duration: _publishOnline
+            ? const Duration(seconds: 5)
+            : const Duration(seconds: 3),
       ),
     );
   }

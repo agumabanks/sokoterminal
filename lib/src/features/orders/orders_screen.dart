@@ -8,11 +8,20 @@ import 'marketplace_order.dart';
 import 'order_details_screen.dart';
 import 'orders_controller.dart';
 
-class OrdersScreen extends ConsumerWidget {
+enum OrdersListFilter { all, needsAction }
+
+class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
+}
+
+class _OrdersScreenState extends ConsumerState<OrdersScreen> {
+  OrdersListFilter _filter = OrdersListFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(ordersControllerProvider);
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -38,6 +47,10 @@ class OrdersScreen extends ConsumerWidget {
             );
           }
           final orders = state.orders;
+          final needsActionCount = countOrdersNeedingAction(orders);
+          final visibleOrders = _filter == OrdersListFilter.needsAction
+              ? orders.where((order) => order.needsAction).toList()
+              : orders;
 
           final totalRevenue = orders.fold<double>(
             0,
@@ -54,7 +67,39 @@ class OrdersScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _SummaryItem(label: 'Orders', value: '${orders.length}'),
+                    _SummaryItem(
+                      label: 'Needs action',
+                      value: '$needsActionCount',
+                    ),
                     _SummaryItem(label: 'Revenue', value: totalRevenue.toUgx()),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  DesignTokens.spaceMd,
+                  DesignTokens.spaceSm,
+                  DesignTokens.spaceMd,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    _OrdersFilterChip(
+                      label: 'All',
+                      selected: _filter == OrdersListFilter.all,
+                      onTap: () => setState(
+                        () => _filter = OrdersListFilter.all,
+                      ),
+                    ),
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    _OrdersFilterChip(
+                      label: 'Needs action',
+                      count: needsActionCount,
+                      selected: _filter == OrdersListFilter.needsAction,
+                      onTap: () => setState(
+                        () => _filter = OrdersListFilter.needsAction,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -63,19 +108,22 @@ class OrdersScreen extends ConsumerWidget {
                   color: DesignTokens.brandAccent,
                   onRefresh: () =>
                       ref.read(ordersControllerProvider.notifier).load(),
-                  child: orders.isEmpty
+                  child: visibleOrders.isEmpty
                       ? ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: DesignTokens.paddingScreen,
-                          children: const [
-                            _EmptyState(),
+                          children: [
+                            _EmptyState(
+                              filter: _filter,
+                              needsActionCount: needsActionCount,
+                            ),
                           ],
                         )
                       : ListView.builder(
                           padding: DesignTokens.paddingScreen,
-                          itemCount: orders.length,
+                          itemCount: visibleOrders.length,
                           itemBuilder: (context, index) {
-                            final order = orders[index];
+                            final order = visibleOrders[index];
                             return _OrderTile(
                               order: order,
                               onTap: () => _showDetails(context, order),
@@ -237,11 +285,58 @@ class _OrderTile extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _OrdersFilterChip extends StatelessWidget {
+  const _OrdersFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
+    final showCount = count != null && count! > 0;
+    return FilterChip(
+      label: Text(
+        showCount ? '$label ($count)' : label,
+        style: DesignTokens.textSmall.copyWith(
+          color: selected ? DesignTokens.canvas : DesignTokens.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      backgroundColor: DesignTokens.canvasCloud,
+      selectedColor: DesignTokens.brandPrimary,
+      side: BorderSide(
+        color: selected ? DesignTokens.brandPrimary : DesignTokens.hairline,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DesignTokens.spaceSm,
+        vertical: DesignTokens.spaceXs,
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.filter,
+    required this.needsActionCount,
+  });
+
+  final OrdersListFilter filter;
+  final int needsActionCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredEmpty = filter == OrdersListFilter.needsAction;
     return Center(
       child: Padding(
         padding: DesignTokens.paddingScreen,
@@ -249,15 +344,24 @@ class _EmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.receipt_long_outlined,
-              size: 80,
+              filteredEmpty
+                  ? Icons.task_alt_outlined
+                  : Icons.receipt_long_outlined,
+              size: DesignTokens.iconXl + DesignTokens.spaceXl,
               color: DesignTokens.grayLight,
             ),
             const SizedBox(height: DesignTokens.spaceLg),
-            Text('No orders yet', style: DesignTokens.textTitle),
+            Text(
+              filteredEmpty ? 'No orders need action' : 'No orders yet',
+              style: DesignTokens.textTitle,
+            ),
             const SizedBox(height: DesignTokens.spaceSm),
             Text(
-              'Your marketplace orders will appear here',
+              filteredEmpty
+                  ? needsActionCount == 0
+                      ? 'New marketplace orders that need your attention will appear here first.'
+                      : 'Switch to All to see completed and in-progress orders.'
+                  : 'Your marketplace orders will appear here',
               style: DesignTokens.textBody.copyWith(
                 color: DesignTokens.grayMedium,
               ),

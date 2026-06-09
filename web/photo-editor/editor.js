@@ -310,7 +310,8 @@ class SokoPhotoEditor {
         safeCreateIcons();
         
         // Check for URL parameter (image to edit)
-        this.checkUrlParams();
+        // Wrap in setTimeout to allow auth state to be checked first
+        setTimeout(() => this.checkUrlParams(), 0);
     }
 
     setupMessageBridge() {
@@ -385,6 +386,83 @@ class SokoPhotoEditor {
         this.canvas.on('object:modified', () => this.saveState());
         this.canvas.on('object:added', () => this.updateLayersPanel());
         this.canvas.on('object:removed', () => this.updateLayersPanel());
+        
+        // Setup touch gestures for mobile
+        this.setupTouchGestures();
+    }
+    
+    setupTouchGestures() {
+        const canvasElement = document.getElementById('editor-canvas');
+        if (!canvasElement) return;
+        
+        let touchStartDistance = 0;
+        let touchStartZoom = 1;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let isPinching = false;
+        let isPanning = false;
+        
+        // Handle touch start
+        canvasElement.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                // Pinch zoom start
+                isPinching = true;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+                touchStartZoom = this.zoom;
+                e.preventDefault();
+            } else if (e.touches.length === 1 && this.isPanning) {
+                // Pan start
+                isPanning = true;
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Handle touch move
+        canvasElement.addEventListener('touchmove', (e) => {
+            if (isPinching && e.touches.length === 2) {
+                // Pinch zoom
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const scale = distance / touchStartDistance;
+                this.setZoom(Math.max(0.1, Math.min(5, touchStartZoom * scale)));
+                e.preventDefault();
+            } else if (isPanning && e.touches.length === 1) {
+                // Pan
+                const deltaX = e.touches[0].clientX - lastTouchX;
+                const deltaY = e.touches[0].clientY - lastTouchY;
+                this.canvas.relativePan({ x: deltaX, y: deltaY });
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Handle touch end
+        canvasElement.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                isPinching = false;
+            }
+            if (e.touches.length < 1) {
+                isPanning = false;
+            }
+        });
+        
+        // Double tap to fit
+        let lastTapTime = 0;
+        canvasElement.addEventListener('touchend', (e) => {
+            const currentTime = Date.now();
+            if (currentTime - lastTapTime < 300) {
+                // Double tap detected
+                this.zoomFit();
+                e.preventDefault();
+            }
+            lastTapTime = currentTime;
+        });
     }
     
     setupEventListeners() {
@@ -401,6 +479,26 @@ class SokoPhotoEditor {
         document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.zoomIn());
         document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.zoomOut());
         document.getElementById('btn-zoom-fit')?.addEventListener('click', () => this.zoomFit());
+        
+        // Mobile zoom controls
+        document.getElementById('btn-mobile-zoom-in')?.addEventListener('click', () => this.zoomIn());
+        document.getElementById('btn-mobile-zoom-out')?.addEventListener('click', () => this.zoomOut());
+        
+        // Mobile properties sidebar toggle
+        const propsToggle = document.getElementById('btn-toggle-properties');
+        const rightSidebar = document.getElementById('right-sidebar');
+        if (propsToggle && rightSidebar) {
+            propsToggle.addEventListener('click', () => {
+                rightSidebar.classList.toggle('open');
+            });
+            
+            // Close sidebar when clicking backdrop
+            rightSidebar.addEventListener('click', (e) => {
+                if (e.target === rightSidebar) {
+                    rightSidebar.classList.remove('open');
+                }
+            });
+        }
         
         // Reset and Export
         document.getElementById('btn-reset')?.addEventListener('click', () => this.resetImage());
@@ -639,7 +737,7 @@ class SokoPhotoEditor {
         document.getElementById('shortcuts-modal')?.classList.add('hidden');
     }
     
-    checkUrlParams() {
+    async checkUrlParams() {
         const urlParams = new URLSearchParams(window.location.search);
         const imageUrl = urlParams.get('image');
         const showPicker = urlParams.get('picker') === '1';
@@ -654,15 +752,21 @@ class SokoPhotoEditor {
             this.loadImageFromFileId(fileId, imageUrl);
         } else if (imageUrl) {
             this.loadImageFromUrl(imageUrl);
-        } else if (showPicker) {
-            this.showUploadsModal();
-        } else if (window.self === window.top) {
-            this.showUploadsModal();
+        } else if (showPicker || window.self === window.top) {
+            // Check auth before showing uploads modal
+            const isAuth = await this.checkAuth();
+            if (isAuth) {
+                this.showUploadsModal();
+            }
+            // If not auth, modal won't open - auth redirect will happen naturally
         } else {
-            this.defaultPickerTimer = setTimeout(() => {
+            this.defaultPickerTimer = setTimeout(async () => {
                 const dropZone = document.getElementById('drop-zone');
                 if (!this.currentImage && dropZone && !dropZone.classList.contains('hidden')) {
-                    this.showUploadsModal();
+                    const isAuth = await this.checkAuth();
+                    if (isAuth) {
+                        this.showUploadsModal();
+                    }
                 }
             }, 600);
         }
@@ -762,6 +866,17 @@ class SokoPhotoEditor {
 
         if (grid) {
             grid.innerHTML = '<div class="uploads-empty">Loading...</div>';
+        }
+
+        // Check auth first to prevent 401 flash
+        const isAuthenticated = await this.checkAuth();
+        if (!isAuthenticated) {
+            if (grid) {
+                grid.innerHTML = '<div class="uploads-empty">Please sign in to view your uploads</div>';
+            }
+            if (prevBtn) prevBtn.disabled = true;
+            if (nextBtn) nextBtn.disabled = true;
+            return;
         }
 
         try {
@@ -1028,6 +1143,51 @@ class SokoPhotoEditor {
         }
     }
 
+    /**
+     * Check if user is authenticated before making API calls
+     * Uses a silent approach that doesn't trigger console errors
+     * Caches result for 30 seconds to avoid repeated checks
+     */
+    async checkAuth() {
+        // Return cached result if fresh (within 30 seconds)
+        if (this._authCheckCache !== undefined && this._authCheckTime && 
+            (Date.now() - this._authCheckTime) < 30000) {
+            return this._authCheckCache;
+        }
+        
+        try {
+            const baseUrl = window.location.origin;
+            // Use a public endpoint that doesn't require auth to check session
+            // This avoids 401 errors in console for unauthenticated users
+            const response = await fetch(`${baseUrl}/api/v1/auth-check`, {
+                method: 'GET',
+                credentials: 'include',
+                cache: 'no-store'
+            }).catch(() => ({ ok: false }));
+            
+            // If endpoint doesn't exist, fall back to checking session cookie
+            if (!response.ok && response.status === 404) {
+                // Check for session cookie presence
+                const hasSessionCookie = document.cookie.includes('soko_session') || 
+                                         document.cookie.includes('XSRF-TOKEN');
+                this._authCheckCache = hasSessionCookie;
+                this._authCheckTime = Date.now();
+                return hasSessionCookie;
+            }
+            
+            this._authCheckCache = response.ok;
+            this._authCheckTime = Date.now();
+            return response.ok;
+        } catch (e) {
+            // Check for session cookie as fallback
+            const hasSessionCookie = document.cookie.includes('soko_session') || 
+                                     document.cookie.includes('XSRF-TOKEN');
+            this._authCheckCache = hasSessionCookie;
+            this._authCheckTime = Date.now();
+            return hasSessionCookie;
+        }
+    }
+
     getDraftStorageKey() {
         const id = this.originalFileId ? String(this.originalFileId) : 'new';
         return `soko-photo-editor:draft:${id}`;
@@ -1051,22 +1211,82 @@ class SokoPhotoEditor {
         if (!draft || !draft.state) return;
         if (this.historyIndex >= 0 && draft.state === this.history[this.historyIndex]) return;
 
+        // Store draft for later use
+        this.pendingDraft = draft;
+        
+        // Show modal instead of confirm()
+        this.showDraftRestoreModal(draft);
+    }
+    
+    showDraftRestoreModal(draft) {
+        const modal = document.getElementById('draft-restore-modal');
+        const timestampEl = document.getElementById('draft-timestamp');
+        const restoreBtn = document.getElementById('btn-draft-restore');
+        const discardBtn = document.getElementById('btn-draft-discard');
+        const closeBtn = document.getElementById('draft-restore-close');
+        
+        if (!modal) return;
+        
+        // Set timestamp
         let when = '';
         try {
             const date = new Date(draft.updated_at || draft.updatedAt || Date.now());
-            when = date.toLocaleString();
+            when = 'Last edited: ' + date.toLocaleString();
         } catch (e) {
-            when = '';
+            when = 'Last edited: Recently';
         }
-
-        const message = when
-            ? `We found an autosaved draft from ${when}. Restore it?`
-            : 'We found an autosaved draft. Restore it?';
-
-        if (!confirm(message)) return;
-
-        this.loadStateAsBaseline(draft.state);
-        this.showToast('Draft restored', 'success');
+        if (timestampEl) timestampEl.textContent = when;
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        safeCreateIcons();
+        
+        // Handle restore
+        const handleRestore = () => {
+            this.hideDraftRestoreModal();
+            if (this.pendingDraft) {
+                this.loadStateAsBaseline(this.pendingDraft.state);
+                this.showToast('Draft restored', 'success');
+                this.pendingDraft = null;
+            }
+        };
+        
+        // Handle discard
+        const handleDiscard = () => {
+            this.hideDraftRestoreModal();
+            this.pendingDraft = null;
+            // Clear the draft since user explicitly discarded
+            if (this.originalFileId) {
+                this.clearDraft(this.originalFileId);
+            }
+        };
+        
+        // Handle close (treat as discard)
+        const handleClose = () => {
+            this.hideDraftRestoreModal();
+            this.pendingDraft = null;
+        };
+        
+        // Bind events (remove old listeners first)
+        restoreBtn?.replaceWith(restoreBtn.cloneNode(true));
+        discardBtn?.replaceWith(discardBtn.cloneNode(true));
+        closeBtn?.replaceWith(closeBtn.cloneNode(true));
+        
+        // Get fresh references after clone
+        const newRestoreBtn = document.getElementById('btn-draft-restore');
+        const newDiscardBtn = document.getElementById('btn-draft-discard');
+        const newCloseBtn = document.getElementById('draft-restore-close');
+        
+        newRestoreBtn?.addEventListener('click', handleRestore);
+        newDiscardBtn?.addEventListener('click', handleDiscard);
+        newCloseBtn?.addEventListener('click', handleClose);
+        
+        // Close on backdrop click
+        modal.querySelector('.modal-backdrop')?.addEventListener('click', handleClose);
+    }
+    
+    hideDraftRestoreModal() {
+        document.getElementById('draft-restore-modal')?.classList.add('hidden');
     }
 
     loadStateAsBaseline(state) {
@@ -2836,7 +3056,14 @@ class SokoPhotoEditor {
         this.canvas.setWidth(this.canvas.getWidth() * level / this.canvas.getZoom());
         this.canvas.setHeight(this.canvas.getHeight() * level / this.canvas.getZoom());
         
-        document.getElementById('zoom-level').textContent = Math.round(level * 100) + '%';
+        const zoomPercent = Math.round(level * 100) + '%';
+        document.getElementById('zoom-level').textContent = zoomPercent;
+        
+        // Update mobile zoom display if it exists
+        const mobileZoomLevel = document.getElementById('mobile-zoom-level');
+        if (mobileZoomLevel) {
+            mobileZoomLevel.textContent = zoomPercent;
+        }
     }
     
     // ============================================

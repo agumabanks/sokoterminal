@@ -1,3 +1,5 @@
+import com.android.build.gradle.LibraryExtension
+
 allprojects {
     repositories {
         google()
@@ -17,6 +19,15 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+subprojects {
+    plugins.withId("com.android.library") {
+        if (name != "blue_thermal_printer") return@withId
+        extensions.findByType(LibraryExtension::class)?.apply {
+            namespace = "id.kakzaki.blue_thermal_printer"
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

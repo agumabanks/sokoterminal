@@ -104,10 +104,14 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
         SnackBar(
           content: Text(
             value
-                ? 'Publishing service — syncing to your shop…'
+                ? servicePublishSnackbarMessage(
+                    publishing: true,
+                    moderationStatus: 'pending',
+                  )
                 : 'Service moved to draft',
           ),
           backgroundColor: DesignTokens.brandAccent,
+          duration: value ? const Duration(seconds: 5) : const Duration(seconds: 3),
         ),
       );
     } catch (e) {

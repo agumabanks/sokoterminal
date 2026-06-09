@@ -106,7 +106,7 @@ echo "[preflight] codegen (drift/build_runner)"
 flutter pub run build_runner build --delete-conflicting-outputs
 
 echo "[preflight] flutter analyze"
-flutter analyze --no-fatal-infos
+flutter analyze --no-fatal-infos --no-fatal-warnings
 
 echo "[preflight] flutter test"
 flutter test

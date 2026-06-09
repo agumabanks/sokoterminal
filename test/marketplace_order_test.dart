@@ -50,6 +50,31 @@ void main() {
     expect(updated.toJson()['pending_sync'], isTrue);
   });
 
+  test('sortOrdersForDisplay puts needs-action orders first', () {
+    final delivered = MarketplaceOrder.fromJson({
+      'id': 1,
+      'delivery_status': 'delivered',
+      'created_at': '2026-06-09T12:00:00Z',
+    });
+    final pending = MarketplaceOrder.fromJson({
+      'id': 2,
+      'delivery_status': 'pending',
+      'payment_status': 'unpaid',
+      'created_at': '2026-06-09T08:00:00Z',
+    });
+    final processing = MarketplaceOrder.fromJson({
+      'id': 3,
+      'delivery_status': 'processing',
+      'created_at': '2026-06-09T10:00:00Z',
+    });
+
+    final sorted = sortOrdersForDisplay([delivered, pending, processing]);
+    expect(sorted.map((order) => order.id).toList(), [2, 3, 1]);
+    expect(countOrdersNeedingAction(sorted), 1);
+    expect(pending.needsAction, isTrue);
+    expect(delivered.needsAction, isFalse);
+  });
+
   test('MarketplaceOrder merge keeps sparse list fields from detail payload', () {
     final listOrder = MarketplaceOrder.fromJson({
       'id': 9,

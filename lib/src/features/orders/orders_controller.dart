@@ -58,7 +58,7 @@ class OrdersController extends StateNotifier<OrdersState> {
             ),
           )
           .toList();
-      state = OrdersState(orders: list);
+      state = OrdersState(orders: sortOrdersForDisplay(list));
     } catch (e) {
       final cachedRows = await db.getCachedOrders();
       if (cachedRows.isNotEmpty) {
@@ -69,7 +69,10 @@ class OrdersController extends StateNotifier<OrdersState> {
               ),
             )
             .toList();
-        state = OrdersState(error: e.toString(), orders: list);
+        state = OrdersState(
+          error: e.toString(),
+          orders: sortOrdersForDisplay(list),
+        );
       } else {
         state = OrdersState(error: e.toString(), orders: state.orders);
       }
@@ -143,7 +146,7 @@ class OrdersController extends StateNotifier<OrdersState> {
 
       state = OrdersState(
         error: 'Queued for sync: ${e.toString()}',
-        orders: updatedOrders,
+        orders: sortOrdersForDisplay(updatedOrders),
         loading: false,
       );
     }
@@ -199,7 +202,11 @@ class OrdersController extends StateNotifier<OrdersState> {
     if (!updated.any((o) => o.id == order.id)) {
       updated.insert(0, order);
     }
-    state = OrdersState(orders: updated, loading: state.loading, error: state.error);
+    state = OrdersState(
+      orders: sortOrdersForDisplay(updated),
+      loading: state.loading,
+      error: state.error,
+    );
   }
 
   Future<String> requestSokoDelivery(int orderId) async {
@@ -221,6 +228,6 @@ class OrdersController extends StateNotifier<OrdersState> {
           ),
         )
         .toList();
-    state = OrdersState(orders: list, loading: false);
+    state = OrdersState(orders: sortOrdersForDisplay(list), loading: false);
   }
 }
