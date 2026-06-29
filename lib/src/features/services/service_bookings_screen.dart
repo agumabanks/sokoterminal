@@ -205,18 +205,20 @@ class ServiceBookingsScreen extends ConsumerWidget {
 
   static List<_BookingAction> _actionsForStatus(String statusRaw) {
     final status = statusRaw.toLowerCase().trim();
-    if (status == 'pending')
+    if (status == 'pending') {
       return [
         _BookingAction.confirm,
         _BookingAction.createSale,
         _BookingAction.cancel,
       ];
-    if (status == 'confirmed')
+    }
+    if (status == 'confirmed') {
       return [
         _BookingAction.complete,
         _BookingAction.createSale,
         _BookingAction.cancel,
       ];
+    }
     return const [];
   }
 
@@ -289,8 +291,8 @@ class _StatusChip extends StatelessWidget {
     Color fg;
     switch (label) {
       case 'confirmed':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
+        bg = DesignTokens.canvasCloud;
+        fg = DesignTokens.info;
         break;
       case 'completed':
         bg = Colors.green.shade50;

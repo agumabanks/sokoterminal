@@ -12,6 +12,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/app_button.dart';
+import '../ads/studio_editor_launcher.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 
@@ -26,6 +27,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   Customer? _selectedCustomer;
   final List<QuotationLineItem> _lines = [];
   final _notesCtrl = TextEditingController();
+  final _quotationId = const Uuid().v4();
   int _validityDays = 7;
   bool _saving = false;
 
@@ -36,7 +38,23 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(title: const Text('Create Quotation')),
+      appBar: AppBar(
+        title: const Text('Create Quotation'),
+        actions: [
+          IconButton(
+            tooltip: 'Design in Studio',
+            icon: const Icon(Icons.design_services_rounded),
+            onPressed: () async {
+              await launchFullStudioWeb(
+                context,
+                ref,
+                quotationId: _quotationId,
+                openPanel: 'business-branding',
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -236,10 +254,10 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 child: Container(
                   width: 28, height: 28,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0EBE7E).withValues(alpha: 0.12),
+                    color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.add, size: 16, color: Color(0xFF0EBE7E)),
+                  child: const Icon(Icons.add, size: 16, color: DesignTokens.brandAccent),
                 ),
               ),
               const SizedBox(width: 8),
@@ -428,7 +446,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
           ),
           trailing: IconButton(
             icon: const Icon(Icons.add_circle_rounded,
-                color: Color(0xFF0EBE7E)),
+                color: DesignTokens.brandAccent),
             onPressed: () {
               setState(() {
                 _lines.add(QuotationLineItem(
@@ -477,7 +495,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
           ),
           trailing: IconButton(
             icon: const Icon(Icons.add_circle_rounded,
-                color: Color(0xFF0EBE7E)),
+                color: DesignTokens.brandAccent),
             onPressed: () {
               setState(() {
                 _lines.add(QuotationLineItem(
@@ -785,14 +803,13 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
       final db = ref.read(appDatabaseProvider);
       final sync = ref.read(syncServiceProvider);
 
-      final quotationId = const Uuid().v4();
       final number =
           'QT-${DateFormat('yyyy').format(DateTime.now())}-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
       final expiry = DateTime.now().add(Duration(days: _validityDays));
 
       await db.saveQuotation(
         header: QuotationsCompanion.insert(
-          id: Value(quotationId),
+          id: Value(_quotationId),
           customerId: Value(_selectedCustomer!.id),
           number: number,
           date: Value(DateTime.now().toUtc()),
@@ -806,7 +823,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
             .map(
               (l) => QuotationLinesCompanion.insert(
                 id: Value(const Uuid().v4()),
-                quotationId: quotationId,
+                quotationId: _quotationId,
                 description: l.description,
                 quantity: l.quantity,
                 unitPrice: l.unitPrice,
@@ -819,8 +836,8 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
       final customerId = _selectedCustomer!.remoteId ?? _selectedCustomer!.id;
       final notes = _notesCtrl.text.trim();
       await sync.enqueue('quotation_push', {
-        'idempotency_key': quotationId,
-        'id': quotationId,
+        'idempotency_key': _quotationId,
+        'id': _quotationId,
         'quotation_number': number,
         'customer_id': customerId,
         'validity_days': _validityDays,

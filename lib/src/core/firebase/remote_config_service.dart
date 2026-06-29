@@ -21,7 +21,8 @@ class RemoteConfigService {
     'ff_unified_inbox': true,
     'ff_customer_profile': false,
     'ff_contacts_enrichment': true,
-    'ff_soko_studio': false,
+    'ff_soko_studio': true,
+    'ff_sminsta': true,
     'ff_business_setup_wizard': false,
     'ff_expenses_v1': false,
   };
@@ -85,6 +86,7 @@ class RemoteConfigService {
   bool get ffCustomerProfile => _getBool('ff_customer_profile');
   bool get ffContactsEnrichment => _getBool('ff_contacts_enrichment');
   bool get ffSokoStudio => _getBool('ff_soko_studio');
+  bool get ffSmInsta => _getBool('ff_sminsta');
   bool get ffBusinessSetupWizard => _getBool('ff_business_setup_wizard');
   bool get ffExpensesV1 => _getBool('ff_expenses_v1');
 

@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
@@ -24,6 +23,7 @@ import 'studio_providers.dart';
 import 'studio_share_sheet.dart';
 import 'studio_media_picker.dart';
 import 'studio_watermark.dart';
+import 'studio_watermark_settings.dart';
 
 const _injectorShareTemplate = AdTemplate(
   id: 'ad-injector',
@@ -182,15 +182,7 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
     )..repeat(reverse: true);
   }
 
-  @override
-  void activate() {
-    super.activate();
-  }
 
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-  }
 
   @override
   void dispose() {
@@ -284,8 +276,14 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
 
     var bytes = data.buffer.asUint8List();
     final entitlements = await ref.read(studioEntitlementsProvider.future);
+    final watermarkSettings = ref.read(watermarkSettingsProvider);
+    final kit = ref.read(brandKitProvider);
     if (entitlements.needsSokoWatermark) {
-      bytes = await applySokoWatermark(bytes);
+      bytes = await applySokoWatermark(
+        bytes,
+        settings: watermarkSettings,
+        brandKit: kit,
+      );
     }
 
     final dir = await getTemporaryDirectory();

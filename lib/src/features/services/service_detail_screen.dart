@@ -15,6 +15,7 @@ import '../../core/util/service_publish_utils.dart';
 import '../../core/util/service_pricing_utils.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../../widgets/service_description_article.dart';
+import '../ads/studio_editor_launcher.dart';
 import 'availability_schedule_screen.dart';
 import 'service_bookings_screen.dart';
 import 'service_calendar_screen.dart';
@@ -198,12 +199,11 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
       Navigator.pop(parentContext);
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Service deleted'),
-        backgroundColor: DesignTokens.error,
+      const SnackBar(
+        content: Text('Service deleted'),
+        backgroundColor: DesignTokens.success,
       ),
     );
-    Navigator.pop(context);
   }
 
   List<String> _galleryImages(Service service) {
@@ -311,6 +311,24 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 label: 'Edit',
                 color: DesignTokens.info,
                 onTap: _showEditService,
+              ),
+              _ActionTile(
+                icon: Icons.design_services_rounded,
+                label: 'Design in Studio',
+                color: DesignTokens.brandPrimary,
+                onTap: () async {
+                  final file = await launchStudioForService(
+                    context,
+                    ref,
+                    service: service,
+                  );
+                  if (!context.mounted) return;
+                  if (file != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Service promo image saved to Studio')),
+                    );
+                  }
+                },
               ),
               _ActionTile(
                 icon: Icons.style_outlined,

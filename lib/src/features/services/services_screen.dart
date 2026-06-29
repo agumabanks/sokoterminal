@@ -10,6 +10,10 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/service_publish_utils.dart';
 import '../../widgets/sync_status_badge.dart';
+import '../ads/ad_templates.dart';
+import '../ads/brand_kit_screen.dart';
+import '../ads/studio_editor_launcher.dart';
+import '../ads/studio_share_sheet.dart';
 import '../checkout/checkout_screen.dart';
 import 'availability_schedule_screen.dart';
 import 'client_directory_screen.dart';
@@ -152,6 +156,46 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _designInStudio(Service service) async {
+    final file = await launchStudioForService(
+      context,
+      ref,
+      service: service,
+    );
+    if (file != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Service promo image saved to Studio'),
+          action: SnackBarAction(
+            label: 'Share',
+            onPressed: () async {
+              final kit = ref.read(brandKitProvider);
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  fullscreenDialog: true,
+                  builder: (_) => StudioShareSheet(
+                    adFile: file,
+                    template: AdTemplate(
+                      id: 'service_promo_${service.id}',
+                      name: service.title,
+                      category: 'service',
+                      canvasWidth: 1080,
+                      canvasHeight: 1080,
+                      background: '#000000',
+                      elements: const [],
+                    ),
+                    kit: kit,
+                    isService: true,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
   }
 
   static const _servicesScrollPhysics = BouncingScrollPhysics(
@@ -336,6 +380,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                                     child: ServiceGridTile(
                                       service: service,
                                       onTap: () => _openServiceDetail(service),
+                                      onDesignInStudio: () =>
+                                          unawaited(_designInStudio(service)),
                                     ),
                                   );
                                 },
@@ -355,6 +401,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                                       onTap: () => _openServiceDetail(service),
                                       onTogglePublish: (value) =>
                                           _togglePublish(service, value),
+                                      onDesignInStudio: () =>
+                                          unawaited(_designInStudio(service)),
                                     ),
                                   );
                                 },

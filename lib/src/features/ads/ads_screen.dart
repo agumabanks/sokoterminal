@@ -14,10 +14,13 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/firebase/remote_config_service.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
 import 'ai_ads_tab.dart';
+import 'studio_onboarding_prefs.dart';
 import 'studio_screen.dart';
 import 'studio_splash.dart';
 import 'studio_template_discovery.dart';
@@ -85,14 +88,11 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
   bool _busy = false;
   late TabController _tabController;
 
-  // Studio splash state
-  bool _splashDone = false;
-  bool _showStudio = false;
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final studioEnabled = ref.read(remoteConfigProvider).ffSokoStudio;
+    _tabController = TabController(length: studioEnabled ? 2 : 1, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(templateDiscoveryProvider.future);
@@ -108,33 +108,37 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Show splash → then the full studio hub
-    if (!_splashDone) {
+    final hasSeenSplash = ref.watch(hasSeenStudioSplashProvider);
+    final studioEnabled = ref.watch(remoteConfigProvider).ffSokoStudio;
+
+    // Show splash once per install → then the full studio hub
+    if (!hasSeenSplash) {
       return StudioSplashScreen(
         onReady: () {
           if (!mounted) return;
-          setState(() {
-            _splashDone = true;
-            _showStudio = true;
-          });
+          final telemetry = Telemetry.instance;
+          if (telemetry != null) {
+            unawaited(telemetry.event('studio_splash_complete'));
+          }
+          ref.read(hasSeenStudioSplashProvider.notifier).markSeen();
         },
       );
     }
 
-    if (_showStudio) {
+    if (studioEnabled) {
       return const StudioScreen();
     }
 
-    // Fallback legacy builder (not normally reached)
+    // Fallback legacy builder (shown when Studio is disabled by feature flag)
     final items = ref.watch(itemsStreamProvider);
     final adState = ref.watch(adBuilderStateProvider);
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text('Ads & Creatives', style: DesignTokens.textTitle),
+        title: Text('Soko Studio', style: DesignTokens.textTitle),
         actions: [
-          if (_tabController.index == 1)
+          if (!studioEnabled || _tabController.index == 1)
             IconButton(
               icon: const Icon(Icons.tune),
               tooltip: 'Ad Settings',
@@ -144,18 +148,26 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
         bottom: TabBar(
           controller: _tabController,
           onTap: (_) => setState(() {}),
-          tabs: const [
-            Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'AI Studio'),
-            Tab(icon: Icon(Icons.brush, size: 18), text: 'Local Builder'),
-          ],
+          tabs: studioEnabled
+              ? const [
+                  Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'AI Studio'),
+                  Tab(icon: Icon(Icons.brush, size: 18), text: 'Local Builder'),
+                ]
+              : const [
+                  Tab(icon: Icon(Icons.brush, size: 18), text: 'Local Builder'),
+                ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          const AIAdsTab(),
-          _buildLocalBuilder(items, adState),
-        ],
+        children: studioEnabled
+            ? [
+                const AIAdsTab(),
+                _buildLocalBuilder(items, adState),
+              ]
+            : [
+                _buildLocalBuilder(items, adState),
+              ],
       ),
     );
   }
@@ -341,7 +353,7 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
     }
 
     buffer.write('\n\n🛍️ Shop Now at Soko 24');
-    buffer.write('\n🔗 soko24.co/product/${item.id}');
+    buffer.write('\n🔗 soko24.co/product/${item.remoteId ?? item.id}');
     buffer.write('\n\n#Soko24 #Shopping #Uganda');
 
     return buffer.toString();
@@ -944,7 +956,7 @@ class _AdPreview extends StatelessWidget {
                                 borderRadius: DesignTokens.borderRadiusSm,
                               ),
                               child: QrImageView(
-                                data: 'https://soko24.co/product/${item.id}',
+                                data: 'https://soko24.co/product/${item.remoteId ?? item.id}',
                                 version: QrVersions.auto,
                                 size: qrSize,
                               ),

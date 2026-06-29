@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Provider for backup list
 final backupsProvider = FutureProvider.autoDispose<List<BackupItem>>((
@@ -93,7 +94,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Backup created successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: DesignTokens.success,
           ),
         );
       }
@@ -102,7 +103,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to create backup: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: DesignTokens.error,
           ),
         );
       }
@@ -127,7 +128,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.warning),
             child: const Text('Restore'),
           ),
         ],
@@ -149,7 +150,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Backup restored successfully! Syncing...'),
-              backgroundColor: Colors.green,
+              backgroundColor: DesignTokens.success,
             ),
           );
         }
@@ -159,7 +160,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to restore: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: DesignTokens.error,
           ),
         );
       }
@@ -179,7 +180,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
             child: const Text('Delete'),
           ),
         ],
@@ -205,7 +206,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: DesignTokens.error,
           ),
         );
       }
@@ -237,7 +238,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
               gradient: LinearGradient(
                 colors: [
                   theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.7),
+                  theme.colorScheme.primary.withValues(alpha: 0.7),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -269,7 +270,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                           Text(
                             'Secure your business data',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onPrimary.withOpacity(
+                              color: theme.colorScheme.onPrimary.withValues(alpha: 
                                 0.8,
                               ),
                             ),
@@ -383,7 +384,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                     const Icon(
                       Icons.error_outline,
                       size: 48,
-                      color: Colors.red,
+                      color: DesignTokens.error,
                     ),
                     const SizedBox(height: 16),
                     Text('Failed to load backups: $e'),
@@ -449,8 +450,8 @@ class _BackupCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: backup.status == 'complete'
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -458,8 +459,8 @@ class _BackupCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color: backup.status == 'complete'
-                          ? Colors.green
-                          : Colors.orange,
+                          ? DesignTokens.success
+                          : DesignTokens.warning,
                     ),
                   ),
                 ),
@@ -512,7 +513,7 @@ class _BackupCard extends StatelessWidget {
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: const Text('Delete'),
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  style: TextButton.styleFrom(foregroundColor: DesignTokens.error),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(

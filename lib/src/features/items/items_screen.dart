@@ -11,10 +11,15 @@ import '../../core/security/manager_approval.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/formatters.dart';
+import '../../core/util/haptics.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../../widgets/sync_status_badge.dart';
 import '../../widgets/sync_status_chip.dart';
+import '../ads/studio_editor_launcher.dart';
+import '../ads/studio_providers.dart';
+import '../ads/studio_screen.dart';
 import 'add_product_screen.dart';
 import 'stock_history_sheet.dart';
 import 'product_preview_screen.dart';
@@ -56,40 +61,73 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           // Shop approval banner
           StreamBuilder<AppSetting?>(
             stream: db.watchAppSetting('shop_verification_status'),
-            builder: (context, snapshot) {
-              final value = snapshot.data?.valueJson;
-              if (value == '1') {
-                return const SizedBox.shrink();
-              }
-              return Container(
-                margin: DesignTokens.paddingScreen,
-                padding: DesignTokens.paddingMd,
-                decoration: BoxDecoration(
-                  color: DesignTokens.warning.withValues(alpha: 0.12),
-                  borderRadius: DesignTokens.borderRadiusMd,
-                  border: Border.all(
-                    color: DesignTokens.warning.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: DesignTokens.warning,
-                      size: 20,
-                    ),
-                    const SizedBox(width: DesignTokens.spaceSm),
-                    Expanded(
-                      child: Text(
-                        'Your shop is awaiting admin approval. Online listings will be visible once approved.',
-                        style: DesignTokens.textSmall.copyWith(
-                          color: DesignTokens.warning,
-                          fontWeight: FontWeight.w600,
-                        ),
+            builder: (context, appSettingSnapshot) {
+              return StreamBuilder<BusinessProfile?>(
+                stream: db.watchBusinessProfile(),
+                builder: (context, profileSnapshot) {
+                  final appValue = appSettingSnapshot.data?.valueJson;
+                  final profileValue = profileSnapshot.data?.verificationStatus;
+                  final isApproved = appValue == '1' || profileValue == 1;
+                  if (isApproved) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    margin: DesignTokens.paddingScreen,
+                    padding: DesignTokens.paddingMd,
+                    decoration: BoxDecoration(
+                      color: DesignTokens.warning.withValues(alpha: 0.12),
+                      borderRadius: DesignTokens.borderRadiusMd,
+                      border: Border.all(
+                        color: DesignTokens.warning.withValues(alpha: 0.4),
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          color: DesignTokens.warning,
+                          size: 20,
+                        ),
+                        const SizedBox(width: DesignTokens.spaceSm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Your shop is awaiting admin approval. Online listings will be visible once approved.',
+                                style: DesignTokens.textSmall.copyWith(
+                                  color: DesignTokens.warning,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () async {
+                                  await ref.read(syncServiceProvider).pullPosDelta();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Syncing status…'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Text(
+                                  'Tap to refresh',
+                                  style: DesignTokens.textSmall.copyWith(
+                                    color: DesignTokens.brandPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -170,6 +208,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                           unawaited(_showStockAdjust(context, item)),
                       onDelete: () => _confirmDelete(context, item),
                       onToggleOnline: (v) => _toggleOnline(item, v),
+                      onCreateAd: () => _createAdForItem(item),
+                      onDesignInStudio: () => unawaited(_designInStudio(item)),
                       onLongPress: () {
                         showModalBottomSheet(
                           context: context,
@@ -199,15 +239,24 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     final action = existingItem == null ? 'create products' : 'edit products';
     final ok = await requireManagerPin(context, ref, reason: action);
     if (!ok || !context.mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddProductScreen(
-          existingItem: existingItem,
-          startPublishOnline: startPublishOnline,
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AddProductScreen(
+            existingItem: existingItem,
+            startPublishOnline: startPublishOnline,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e, st) {
+      debugPrint('[ItemsScreen] Error opening editor: $e\n$st');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open product editor: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _showItemPreview(BuildContext context, Item item) async {
@@ -464,18 +513,26 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                       if (remoteId != null) {
                         unawaited(ref.read(syncServiceProvider).syncCatalogImmediately());
                       }
+
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Product deleted'),
+                          backgroundColor: DesignTokens.success,
+                        ),
+                      );
                     } catch (e) {
                       debugPrint('[ItemsDelete] Delete failed: $e');
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Delete failed: $e'),
+                          backgroundColor: DesignTokens.error,
+                        ),
+                      );
                     }
-
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Product deleted'),
-                        backgroundColor: DesignTokens.brandAccent,
-                      ),
-                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: DesignTokens.error,
@@ -549,6 +606,23 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     unawaited(sync.syncCatalogImmediately());
   }
 
+  void _createAdForItem(Item item) {
+    Haptics.selection();
+    ref.read(studioProductProvider.notifier).state = item;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const StudioScreen()),
+    );
+  }
+
+  Future<void> _designInStudio(Item item) async {
+    await launchFullStudioWebForProduct(
+      context,
+      ref,
+      item,
+      openPanel: 'smart-ads',
+    );
+  }
+
   List<String> _missingMarketplaceFields(Item item) {
     final missing = <String>[];
     final hasPhoto = ((item.thumbnailUrl ?? item.imageUrl) ?? '')
@@ -578,6 +652,8 @@ class _ItemCard extends StatelessWidget {
     required this.onDelete,
     required this.onToggleOnline,
     this.onLongPress,
+    this.onCreateAd,
+    this.onDesignInStudio,
   });
 
   final Item item;
@@ -587,6 +663,8 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggleOnline;
   final VoidCallback? onLongPress;
+  final VoidCallback? onCreateAd;
+  final VoidCallback? onDesignInStudio;
 
   @override
   Widget build(BuildContext context) {
@@ -694,102 +772,141 @@ class _ItemCard extends StatelessWidget {
               ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.5))
               : null,
         ),
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: DesignTokens.borderRadiusMd,
-          splashFactory: NoSplash.splashFactory,
-          highlightColor: DesignTokens.surfaceGrouped,
-          child: Padding(
-            padding: DesignTokens.paddingMd,
-            child: Row(
-              children: [
-                Hero(
-                  tag: 'item-image-${item.id}',
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: DesignTokens.surfaceGrouped,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: imageUrl != null && imageUrl.isNotEmpty
-                        ? OfflineCachedImage(
-                            imageUrl: imageUrl,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            placeholder: _productFallback(),
-                            errorWidget: _productFallback(),
-                          )
-                        : _productFallback(),
-                  ),
-                ),
-                const SizedBox(width: DesignTokens.spaceMd),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: onTap,
+                onLongPress: onLongPress,
+                borderRadius: DesignTokens.borderRadiusMd,
+                splashFactory: NoSplash.splashFactory,
+                highlightColor: DesignTokens.surfaceGrouped,
+                child: Padding(
+                  padding: DesignTokens.paddingMd,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.name,
-                              style: DesignTokens.textBody.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: DesignTokens.textPrimary,
-                              ),
-                            ),
+                      Hero(
+                        tag: 'item-image-${item.id}',
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: DesignTokens.surfaceGrouped,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          SyncStatusChip(
-                            isSynced: item.synced,
-                            localId: item.id,
-                          ),
-                        ],
+                          clipBehavior: Clip.antiAlias,
+                          child: imageUrl != null && imageUrl.isNotEmpty
+                              ? OfflineCachedImage(
+                                  imageUrl: imageUrl,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  placeholder: _productFallback(),
+                                  errorWidget: _productFallback(),
+                                )
+                              : _productFallback(),
+                        ),
                       ),
-                      const SizedBox(height: DesignTokens.spaceXxs),
-                      Row(
-                        children: [
-                          Text(
-                            'UGX ${item.price.toStringAsFixed(0)}',
-                            style: DesignTokens.textMono.copyWith(fontSize: 14),
-                          ),
-                          const SizedBox(width: DesignTokens.spaceMd),
-                          GestureDetector(
-                            onTap: onStockTap,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: stockColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                stockLabel,
-                                style: DesignTokens.textCaption.copyWith(
-                                  color: stockColor,
-                                  fontWeight: FontWeight.w700,
+                      const SizedBox(width: DesignTokens.spaceMd),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    style: DesignTokens.textBody.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: DesignTokens.textPrimary,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                SyncStatusChip(
+                                  isSynced: item.synced,
+                                  localId: item.id,
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: DesignTokens.spaceXxs),
+                            Row(
+                              children: [
+                                Text(
+                                  item.price.toUgx(),
+                                  style: DesignTokens.textMono.copyWith(fontSize: 14),
+                                ),
+                                const SizedBox(width: DesignTokens.spaceMd),
+                                GestureDetector(
+                                  onTap: onStockTap,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: stockColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      stockLabel,
+                                      style: DesignTokens.textCaption.copyWith(
+                                        color: stockColor,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                _LiveToggle(
-                  value: item.publishedOnline,
-                  onChanged: onToggleOnline,
-                ),
-              ],
+              ),
             ),
-          ),
+
+            if (onCreateAd != null)
+              GestureDetector(
+                onTap: onCreateAd,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.campaign_outlined,
+                    color: DesignTokens.brandPrimary,
+                    size: 22,
+                  ),
+                ),
+              ),
+            if (onDesignInStudio != null)
+              Tooltip(
+                message: 'Design in Studio',
+                child: GestureDetector(
+                  onTap: onDesignInStudio,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.design_services_rounded,
+                      color: DesignTokens.brandPrimary,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: DesignTokens.spaceMd),
+              child: _LiveToggle(
+                value: item.publishedOnline,
+                onChanged: onToggleOnline,
+              ),
+            ),
+          ],
         ),
       ),
     );

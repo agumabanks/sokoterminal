@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_providers.dart';
 import '../core/db/app_database.dart';
+import '../core/theme/design_tokens.dart';
 
 /// A small chip that shows the cloud sync status of an item or service.
 ///
@@ -33,7 +34,7 @@ class SyncStatusChip extends ConsumerWidget {
         if (op == null) {
           return _buildChip(
             icon: isSynced ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-            color: isSynced ? Colors.green : Colors.grey,
+            color: isSynced ? DesignTokens.success : Colors.grey,
             tooltip: isSynced ? 'Online' : 'Local only',
             showPulse: false,
           );
@@ -44,21 +45,21 @@ class SyncStatusChip extends ConsumerWidget {
           case 'synced':
             return _buildChip(
               icon: Icons.cloud_done_outlined,
-              color: Colors.green,
+              color: DesignTokens.success,
               tooltip: 'Online',
               showPulse: false,
             );
           case 'pending':
             return _buildChip(
               icon: Icons.cloud_upload_outlined,
-              color: Colors.blue,
+              color: DesignTokens.info,
               tooltip: 'Syncing…',
               showPulse: true,
             );
           case 'blocked':
             return _buildChip(
               icon: Icons.cloud_off_outlined,
-              color: Colors.red,
+              color: DesignTokens.error,
               tooltip: 'Sync failed: ${op.lastError ?? 'Blocked'}',
               showPulse: false,
             );
@@ -84,7 +85,7 @@ class SyncStatusChip extends ConsumerWidget {
     return Tooltip(
       message: tooltip,
       child: showPulse
-          ? _PulsingIcon(child: iconWidget, color: color)
+          ? _PulsingIcon(color: color, child: iconWidget)
           : iconWidget,
     );
   }

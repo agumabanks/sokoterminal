@@ -6,9 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
 import '../../core/app_providers.dart';
-import '../../core/config/build_metadata.dart';
-import '../../core/firebase/firebase_runtime.dart';
+import '../../core/firebase/fcm_navigation.dart';
+import '../../core/firebase/fcm_service.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/notifications/local_notification_service.dart';
 import '../../core/sync/sync_service.dart';
 
 final notificationsControllerProvider =
@@ -104,46 +105,17 @@ class NotificationsController extends StateNotifier<NotificationsState> {
 
   Future<void> bootstrap() async {
     try {
-      final appVersion = BuildMetadata.appVersion;
-      if (FirebaseRuntime.instance.firebaseEnabled) {
-        final messaging = FirebaseMessaging.instance;
-        await messaging.setAutoInitEnabled(true);
-        await messaging.requestPermission();
-        final token = await messaging.getToken();
-        if (token != null) {
-          await api.registerDeviceToken(
-            token: token,
-            platform: BuildMetadata.notificationPlatform(),
-            appVersion: appVersion,
-          );
-          state = state.copyWith(token: token);
-        }
+      // Initialize local notifications so database-pulled notifications can
+      // also surface in the Android system tray.
+      await LocalNotificationService.instance.init();
 
-        // Refresh token if it changes
-        _subscriptions.add(
-          FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-            await api.registerDeviceToken(
-              token: newToken,
-              platform: BuildMetadata.notificationPlatform(),
-              appVersion: appVersion,
-            );
-            state = state.copyWith(token: newToken);
-          }),
-        );
-
-        _subscriptions.add(
-          FirebaseMessaging.onMessage.listen((message) {
-            _ingestForegroundMessage(message);
-          }),
-        );
-
-        _subscriptions.add(
-          FirebaseMessaging.onMessageOpenedApp.listen((message) {
-            _ingestForegroundMessage(message, showToast: false);
-            _handleNotificationRoute(message.data);
-          }),
-        );
-      }
+      // Listen to the FCM service's broadcast stream instead of subscribing
+      // directly to FirebaseMessaging. This prevents duplicate listeners,
+      // duplicate SnackBars, and duplicate navigation that were caused by
+      // both FCMService and NotificationsController owning Firebase streams.
+      _subscriptions.add(
+        FCMService.instance.foregroundMessages.listen(_ingestForegroundMessage),
+      );
 
       await load();
     } catch (e) {
@@ -175,14 +147,48 @@ class NotificationsController extends StateNotifier<NotificationsState> {
           .where((e) => e.id.isNotEmpty)
           .toList();
 
+      final previousIds = state.items.map((n) => n.id).toSet();
+      final newNotifications = notifications
+          .where((n) => !previousIds.contains(n.id) && !n.isRead)
+          .toList();
+
       state = state.copyWith(
         loading: false,
         items: notifications,
         unreadCount: unreadCount,
       );
+
+      // Surface new database notifications in the system tray as well.
+      for (final n in newNotifications) {
+        unawaited(
+          LocalNotificationService.instance.show(
+            id: n.id.hashCode,
+            title: n.title,
+            body: n.body,
+            channelId: _channelForNotification(n),
+            payload: FcmNavigation.routeForMessageData(n.data) ??
+                '/home/notifications',
+          ),
+        );
+      }
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
+  }
+
+  String _channelForNotification(NotificationDto n) {
+    final type = n.data['type']?.toString().toLowerCase() ?? '';
+    final category = n.data['category']?.toString().toLowerCase() ?? '';
+    if (type == 'order' ||
+        category == 'order' ||
+        category == 'orders' ||
+        type == 'marketplace_order') {
+      return 'orders_channel';
+    }
+    if (type == 'sync_hint' || type == 'sync' || type == 'sync_health') {
+      return 'sync_channel';
+    }
+    return 'general_channel';
   }
 
   Future<void> markRead(String notificationId) async {
@@ -263,13 +269,10 @@ class NotificationsController extends StateNotifier<NotificationsState> {
     _handleNotificationRoute(notification.data);
   }
 
-  void _ingestForegroundMessage(
-    RemoteMessage message, {
-    bool showToast = true,
-  }) {
+  void _ingestForegroundMessage(RemoteMessage message) {
     final data = Map<String, dynamic>.from(message.data);
 
-    // Handle silent sync hints without showing notifications
+    // Handle silent sync hints without mutating the notification list.
     if (data['type']?.toString() == 'sync_hint') {
       debugPrint('[Notifications] Sync hint received — triggering delta pull');
       unawaited(ref.read(syncServiceProvider).pullPosDelta());
@@ -302,24 +305,8 @@ class NotificationsController extends StateNotifier<NotificationsState> {
       unreadCount: state.unreadCount + (alreadyPresent ? 0 : 1),
     );
 
-    if (showToast) {
-      final messenger = rootScaffoldMessengerKey.currentState;
-      if (messenger != null) {
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(body.isEmpty ? title : '$title\n$body'),
-              action: SnackBarAction(
-                label: 'Open',
-                onPressed: () => _handleNotificationRoute(data),
-              ),
-            ),
-          );
-      }
-    }
-
-    load();
+    // Refresh from server so the list stays in sync with backend state.
+    unawaited(load());
   }
 
   void _handleNotificationRoute(Map<String, dynamic> data) {

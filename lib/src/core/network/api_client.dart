@@ -380,6 +380,14 @@ class ApiClient {
     _isRefreshing = true;
     _refreshCompleter = Completer<bool>();
 
+    Future<bool> finish(bool success) async {
+      if (!_refreshCompleter!.isCompleted) {
+        _refreshCompleter!.complete(success);
+      }
+      _isRefreshing = false;
+      return success;
+    }
+
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         'v2/auth/refresh',
@@ -398,23 +406,17 @@ class ApiClient {
         debugPrint(
           '[HTTP] Token refreshed successfully (${newToken.length} chars)',
         );
-        _refreshCompleter!.complete(true);
-        return true;
+        return finish(true);
       }
       debugPrint('[HTTP] Token refresh returned no token');
-      _refreshCompleter!.complete(false);
-      return false;
+      return finish(false);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       debugPrint('[HTTP] Token refresh failed: HTTP $status');
-      _refreshCompleter!.complete(false);
-      return false;
+      return finish(false);
     } catch (e) {
       debugPrint('[HTTP] Token refresh error: $e');
-      _refreshCompleter!.complete(false);
-      return false;
-    } finally {
-      _isRefreshing = false;
+      return finish(false);
     }
   }
 
@@ -434,6 +436,13 @@ class ApiClient {
     await _secureStorage.deleteAccessToken();
     await _secureStorage.deletePosSessionToken();
     _onAuthExpired?.call();
+
+    // If the logout callback did not reset the guard (e.g. it was null or
+    // failed synchronously), reset it ourselves so future 401s are not
+    // permanently suppressed.
+    if (_isLoggingOut) {
+      _isLoggingOut = false;
+    }
   }
 
   static bool _pathEndsWithOneOf(String path, Set<String> suffixes) {

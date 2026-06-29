@@ -634,8 +634,8 @@ class _CreditsHero extends StatelessWidget {
         borderRadius: DesignTokens.borderRadiusLg,
         gradient: LinearGradient(
           colors: isLow
-              ? const [Color(0xFF8C2F39), Color(0xFFC84A4A)]
-              : const [Color(0xFF0B6E4F), Color(0xFF19A974)],
+              ? const [DesignTokens.error, DesignTokens.error]
+              : const [DesignTokens.success, DesignTokens.success],
         ),
       ),
       child: Column(
@@ -672,8 +672,8 @@ class _CreditsHero extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: isLow
-                      ? const Color(0xFF8C2F39)
-                      : const Color(0xFF0B6E4F),
+                      ? DesignTokens.error
+                      : DesignTokens.success,
                 ),
                 icon: const Icon(Icons.add_card_outlined),
                 label: const Text('Open Sanaa Wallet'),

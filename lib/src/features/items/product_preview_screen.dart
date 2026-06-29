@@ -12,6 +12,7 @@ import '../../core/security/manager_approval.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/offline_cached_image.dart';
+import '../ads/studio_editor_launcher.dart';
 import 'add_product_screen.dart';
 
 final _previewItemProvider = StreamProvider.family<Item?, String>((
@@ -151,6 +152,18 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                             builder: (_) =>
                                 AddProductScreen(existingItem: item),
                           ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Design in Studio',
+                      icon: const Icon(Icons.design_services_rounded),
+                      onPressed: () async {
+                        await launchFullStudioWebForProduct(
+                          context,
+                          ref,
+                          item,
+                          openPanel: 'smart-ads',
                         );
                       },
                     ),

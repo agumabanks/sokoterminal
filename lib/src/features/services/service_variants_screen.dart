@@ -9,6 +9,8 @@ import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/comma_number_formatter.dart';
+import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
@@ -57,7 +59,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 child: ListTile(
                   title: Text(v.name),
                   subtitle: Text(
-                    'UGX ${v.price.toStringAsFixed(0)} / ${v.unit ?? "unit"}',
+                    '${v.price.toUgx()} / ${v.unit ?? "unit"}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -74,7 +76,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
                       IconButton(
                         icon: const Icon(
                           Icons.delete_outline,
-                          color: Colors.red,
+                          color: DesignTokens.error,
                         ),
                         onPressed: () => _deleteVariant(context, ref, v),
                       ),
@@ -115,7 +117,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: DesignTokens.error),
             child: const Text('Delete'),
           ),
         ],
@@ -142,7 +144,9 @@ class ServiceVariantsScreen extends ConsumerWidget {
     ServiceVariant? variant,
   }) async {
     final nameCtrl = TextEditingController(text: variant?.name);
-    final priceCtrl = TextEditingController(text: variant?.price.toString());
+    final priceCtrl = TextEditingController(
+      text: variant != null ? variant.price.toInt().formatCommas() : '',
+    );
     final unitCtrl = TextEditingController(text: variant?.unit ?? 'unit');
     bool isDefault = variant?.isDefault ?? false;
 
@@ -162,6 +166,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 controller: priceCtrl,
                 label: 'Price (UGX)',
                 keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
               ),
               const SizedBox(height: DesignTokens.spaceMd),
               AppInput(controller: unitCtrl, label: 'Unit (e.g. page, hr)'),
@@ -177,7 +182,10 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 label: 'Save Variant',
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
-                  final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
+                  final price = double.tryParse(
+                        CommaNumberFormatter.unformat(priceCtrl.text.trim()),
+                      ) ??
+                      0;
                   final unit = unitCtrl.text.trim();
 
                   if (name.isEmpty || price <= 0) {

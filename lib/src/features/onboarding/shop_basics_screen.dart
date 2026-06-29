@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/onboarding/onboarding_controller.dart';
+import '../../core/theme/design_tokens.dart';
 
 class ShopBasicsScreen extends ConsumerStatefulWidget {
   const ShopBasicsScreen({super.key});
@@ -252,11 +253,11 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
   Widget _buildCategoryDropdown() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonFormField<String>(
-        value: _selectedCategory,
+        initialValue: _selectedCategory,
         decoration: InputDecoration(
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -298,7 +299,7 @@ class _ShopBasicsScreenState extends ConsumerState<ShopBasicsScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextFormField(

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/util/country_codes.dart';
 import 'auth_controller.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// "Steve Jobs" Style Phone-First Login
 /// Flow: Phone -> Check -> PIN (if set) OR Password (if not set) OR Register (if new)
@@ -37,6 +38,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _hasPassword = true; // Seller must keep password configured.
   bool _usePassword = false; // Optional fallback when an account has PIN.
   bool _obscureText = true;
+  bool _rememberDevice = false;
 
   int _failedAttempts = 0;
   int _cooldownSeconds = 0;
@@ -47,9 +49,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late Animation<double> _fadeAnimation;
 
   // Soko brand palette — aligned with DesignTokens
-  static const Color _bg = Color(0xFF02040A);
-  static const Color _accent = Color(0xFF0EBE7E);
-  static const Color _surface = Color(0xFF0B0B10);
+  static const Color _bg = DesignTokens.brandPrimary;
+  static const Color _accent = DesignTokens.brandAccent;
+  static const Color _surface = DesignTokens.brandPrimary;
   static const Color _stroke = Color(0x22FFFFFF);
 
   @override
@@ -264,10 +266,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
       if (usePinAuth) {
         // Login with PIN
-        await auth.loginWithQuickPin(phone: _normalizedPhone, pin: input);
+        await auth.loginWithQuickPin(
+          phone: _normalizedPhone,
+          pin: input,
+          rememberDevice: _rememberDevice,
+        );
       } else {
         // Login with Password
-        await auth.login(emailOrPhone: _normalizedPhone, password: input);
+        await auth.login(
+          emailOrPhone: _normalizedPhone,
+          password: input,
+          rememberDevice: _rememberDevice,
+        );
       }
 
       if (!mounted) return;
@@ -475,7 +485,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [_bg, Color(0xFF05050A), _bg],
+                  colors: [_bg, DesignTokens.brandPrimary, _bg],
                 ),
               ),
             ),
@@ -484,13 +494,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withOpacity(0.16), size: 420),
+              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
             ),
             Positioned(
               bottom: -160,
               left: -130,
               child: _GlowBlob(
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 size: 520,
               ),
             ),
@@ -551,7 +561,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _surface.withOpacity(0.55),
+                    color: _surface.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: _stroke),
                   ),
@@ -571,7 +581,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: Text(
                 'Sign in',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   letterSpacing: -0.2,
@@ -596,7 +606,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Text(
               'Soko24',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.95),
+                color: Colors.white.withValues(alpha: 0.95),
                 fontSize: 42,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1.2,
@@ -607,7 +617,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Text(
               'Seller Terminal',
               style: TextStyle(
-                color: _accent.withOpacity(0.95),
+                color: _accent.withValues(alpha: 0.95),
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.6,
@@ -617,7 +627,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Text(
               'Sell in-store, online, and offline — one terminal for your whole business.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.62),
+                color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 15,
                 height: 1.4,
               ),
@@ -628,7 +638,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Text(
               'Enter your phone number',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
@@ -645,7 +655,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Text(
               'We’ll check if you already have an account.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 fontSize: 13,
               ),
             ),
@@ -674,14 +684,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   children: [
                     Icon(
                       Icons.arrow_back,
-                      color: Colors.white.withOpacity(0.55),
+                      color: Colors.white.withValues(alpha: 0.55),
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       _phoneController.text,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha: 0.55),
                         fontSize: 14,
                         letterSpacing: -0.1,
                       ),
@@ -696,7 +706,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ? 'Hello, $_userName'
                   : ((_hasPin && !_usePassword) ? 'Enter PIN' : 'Password'),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.95),
+                color: Colors.white.withValues(alpha: 0.95),
                 fontSize: 34,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.9,
@@ -709,13 +719,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ? 'Enter your 6-digit access PIN.'
                   : 'Enter your password to login.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.62),
+                color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 16,
                 height: 1.35,
               ),
             ),
             const SizedBox(height: 44),
             _buildAuthField(),
+            const SizedBox(height: 16),
+            _buildRememberDeviceRow(),
             const SizedBox(height: 28),
             _MainButton(
               text: (_hasPin && !_usePassword)
@@ -785,7 +797,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   Icon(
                     Icons.keyboard_arrow_down,
                     size: 16,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ],
               ),
@@ -794,7 +806,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           Container(
             width: 1,
             height: 26,
-            color: Colors.white.withOpacity(0.10),
+            color: Colors.white.withValues(alpha: 0.10),
           ),
           Expanded(
             child: TextFormField(
@@ -825,13 +837,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 fillColor: Colors.transparent,
                 hintText: 'Phone number',
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.28),
+                  color: Colors.white.withValues(alpha: 0.28),
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRememberDeviceRow() {
+    return InkWell(
+      onTap: () {
+        Haptics.selection();
+        setState(() => _rememberDevice = !_rememberDevice);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: _rememberDevice,
+                onChanged: (value) {
+                  Haptics.selection();
+                  setState(() => _rememberDevice = value ?? false);
+                },
+                activeColor: _accent,
+                checkColor: Colors.black,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Remember this device for 90 days',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -889,7 +944,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           fillColor: Colors.transparent,
           hintText: (_hasPin && !_usePassword) ? '••••••' : 'Password',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             letterSpacing: (_hasPin && !_usePassword) ? 10 : -0.2,
             fontWeight: FontWeight.w600,
           ),
@@ -897,7 +952,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             splashRadius: 18,
             icon: Icon(
               _obscureText ? Icons.visibility_off : Icons.visibility,
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               size: 20,
             ),
             onPressed: () => setState(() => _obscureText = !_obscureText),
@@ -916,9 +971,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF453A).withOpacity(0.86),
+            color: const Color(0xFFFF453A).withValues(alpha: 0.86),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.18)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -973,9 +1028,9 @@ class _GlassField extends StatelessWidget {
   final bool focused;
 
   // Solid dark background - NO blur to avoid glow bleed-through
-  static const Color _solidBg = Color(0xFF1A1A24);
+  static const Color _solidBg = DesignTokens.brandPrimary;
   static const Color _stroke = Color(0x33FFFFFF);
-  static const Color _strokeFocused = Color(0xFF6C63FF);
+  static const Color _strokeFocused = DesignTokens.info;
 
   @override
   Widget build(BuildContext context) {
@@ -991,7 +1046,7 @@ class _GlassField extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -1005,7 +1060,7 @@ class _GlassField extends StatelessWidget {
 class _LoginFeatureRow extends StatelessWidget {
   const _LoginFeatureRow();
 
-  static const _accent = Color(0xFF0EBE7E);
+  static const _accent = DesignTokens.brandAccent;
   static const _stroke = Color(0x22FFFFFF);
 
   static const _items = [
@@ -1025,7 +1080,7 @@ class _LoginFeatureRow extends StatelessWidget {
             (item) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: _stroke),
               ),
@@ -1037,7 +1092,7 @@ class _LoginFeatureRow extends StatelessWidget {
                   Text(
                     item.$2,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1067,7 +1122,7 @@ class _GlowBlob extends StatelessWidget {
         color: color,
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.55),
+            color: color.withValues(alpha: 0.55),
             blurRadius: 120,
             spreadRadius: 30,
           ),
@@ -1118,16 +1173,16 @@ class _MainButtonState extends State<_MainButton> {
             height: 56,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFF0EBE7E),
+              color: DesignTokens.brandAccent,
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.white.withOpacity(0.10),
+                  color: Colors.white.withValues(alpha: 0.10),
                   blurRadius: 30,
                   offset: const Offset(0, 14),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.35),
+                  color: Colors.black.withValues(alpha: 0.35),
                   blurRadius: 24,
                   offset: const Offset(0, 16),
                 ),

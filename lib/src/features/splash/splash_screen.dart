@@ -9,7 +9,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:soko_seller_terminal/src/core/app_providers.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_session_controller.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_staff_prefs.dart';
-import 'package:soko_seller_terminal/src/features/auth/auth_controller.dart';
 import 'package:soko_seller_terminal/src/core/settings/business_setup_prefs.dart';
 import 'package:soko_seller_terminal/src/core/sync/sync_service.dart';
 import 'package:soko_seller_terminal/src/core/network/dio_auth_utils.dart';
@@ -134,9 +133,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted) { debugPrint('[Splash] not mounted at start'); return; }
     final secureStorage = ref.read(secureStorageProvider);
     final token = await secureStorage.readAccessToken();
-    debugPrint('[Splash] token=${token != null}');
+    final expiresAt = await secureStorage.readAccessTokenExpiresAt();
+    debugPrint('[Splash] token=${token != null} expiresAt=$expiresAt');
 
     if (token == null) {
+      if (mounted) context.go('/login');
+      return;
+    }
+
+    // If the token carries an expiry (e.g. "Remember this device for 90 days"),
+    // treat it as invalid once it has expired. This lets the device operate
+    // offline for up to 90 days and only forces re-auth after the deadline.
+    if (expiresAt != null && DateTime.now().toUtc().isAfter(expiresAt)) {
+      debugPrint('[Splash] Token expired locally, redirecting to login');
+      DioAuthUtils.notifyAuthExpired(detail: 'Session expired — please sign in again');
+      await secureStorage.deleteAccessToken();
+      await secureStorage.deleteAccessTokenExpiresAt();
       if (mounted) context.go('/login');
       return;
     }
@@ -294,7 +306,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF02040A),
+      backgroundColor: DesignTokens.brandPrimary,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -348,8 +360,8 @@ class _Vignette extends StatelessWidget {
           center: Alignment(0, -0.2),
           radius: 0.85,
           colors: [
-            Color(0xFF0A1226),
-            Color(0xFF02040A),
+            DesignTokens.brandPrimary,
+            DesignTokens.brandPrimary,
           ],
           stops: [0, 1],
         ),

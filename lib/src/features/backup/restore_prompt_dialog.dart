@@ -23,8 +23,8 @@ class RestorePromptDialog extends ConsumerWidget {
         : 'Unknown date';
     final counts = backup['data_counts'] as Map<String, dynamic>? ?? {};
 
-    return WillPopScope(
-      onWillPop: () async => !state.restoring,
+    return PopScope(
+      canPop: !state.restoring,
       child: AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: DesignTokens.borderRadiusMd,

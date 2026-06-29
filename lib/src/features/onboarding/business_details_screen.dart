@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_api_availability/google_api_availability.dart';
 
 import '../../core/onboarding/onboarding_controller.dart';
+import '../../core/theme/design_tokens.dart';
 
 class BusinessDetailsEnhancedScreen extends ConsumerStatefulWidget {
   const BusinessDetailsEnhancedScreen({super.key});
@@ -95,9 +96,9 @@ class _BusinessDetailsEnhancedScreenState
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.blue[50],
+                          color: DesignTokens.canvasCloud,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.blue[200]!),
+                          border: Border.all(color: DesignTokens.info),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +108,7 @@ class _BusinessDetailsEnhancedScreenState
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue,
+                                    color: DesignTokens.info,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: const Icon(
@@ -159,8 +160,8 @@ class _BusinessDetailsEnhancedScreenState
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
                                   ),
-                                  side: const BorderSide(color: Colors.blue),
-                                  foregroundColor: Colors.blue,
+                                  side: const BorderSide(color: DesignTokens.info),
+                                  foregroundColor: DesignTokens.info,
                                 ),
                               ),
                             ),
@@ -174,9 +175,9 @@ class _BusinessDetailsEnhancedScreenState
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.green[50],
+                            color: DesignTokens.brandAccentSubtle,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.green[200]!),
+                            border: Border.all(color: DesignTokens.success),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,7 +187,7 @@ class _BusinessDetailsEnhancedScreenState
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.green,
+                                      color: DesignTokens.success,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: const Icon(
@@ -232,7 +233,7 @@ class _BusinessDetailsEnhancedScreenState
                                       divisions: 19,
                                       label:
                                           '${_deliveryRadiusKm.toStringAsFixed(0)} km',
-                                      activeColor: Colors.green,
+                                      activeColor: DesignTokens.success,
                                       onChanged: (value) {
                                         setState(
                                           () => _deliveryRadiusKm = value,
@@ -246,7 +247,7 @@ class _BusinessDetailsEnhancedScreenState
                                       vertical: 8,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.green,
+                                      color: DesignTokens.success,
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
@@ -466,7 +467,7 @@ class _BusinessDetailsEnhancedScreenState
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextFormField(
@@ -606,7 +607,7 @@ class _MapPickerDialogState extends State<_MapPickerDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue,
+                color: DesignTokens.info,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
@@ -666,7 +667,7 @@ class _MapPickerDialogState extends State<_MapPickerDialog> {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context, _currentLocation),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: DesignTokens.info,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

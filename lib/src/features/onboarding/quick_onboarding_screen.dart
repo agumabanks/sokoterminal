@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/app_providers.dart';
 import '../../core/onboarding/onboarding_controller.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/theme/design_tokens.dart';
 
 class QuickOnboardingScreen extends ConsumerStatefulWidget {
   const QuickOnboardingScreen({super.key});
@@ -111,9 +112,9 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: DesignTokens.canvasCloud,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.blue[200]!),
+                    border: Border.all(color: DesignTokens.info),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +124,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.blue,
+                              color: DesignTokens.info,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
@@ -183,7 +184,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                                 : 'Use My Current Location',
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: DesignTokens.info,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -215,7 +216,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue,
+                                    color: DesignTokens.info,
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Text(
@@ -234,7 +235,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
                               min: 1,
                               max: 20,
                               divisions: 19,
-                              activeColor: Colors.blue,
+                              activeColor: DesignTokens.info,
                               onChanged: (value) =>
                                   setState(() => _deliveryRadiusKm = value),
                             ),
@@ -303,11 +304,11 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
   Widget _buildCategoryDropdown() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DropdownButtonFormField<String>(
-        value: _selectedCategory,
+        initialValue: _selectedCategory,
         decoration: InputDecoration(
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -341,7 +342,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextFormField(
@@ -444,7 +445,7 @@ class _QuickOnboardingScreenState extends ConsumerState<QuickOnboardingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Location set successfully ✓'),
-          backgroundColor: Colors.green,
+          backgroundColor: DesignTokens.success,
           duration: Duration(seconds: 2),
         ),
       );

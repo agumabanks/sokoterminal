@@ -1,6 +1,5 @@
 import '../../core/db/app_database.dart';
 import 'brand_kit_screen.dart';
-import 'studio_product_utils.dart';
 import 'studio_variable_utils.dart';
 
 /// Live shop/product values for resolving {{TOKENS}} on canvas and export.

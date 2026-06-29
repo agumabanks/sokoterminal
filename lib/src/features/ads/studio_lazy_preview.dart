@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ad_templates.dart';
 import 'canvas_renderer.dart';
 import 'studio_variable_context.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Lightweight template thumb — gradient placeholder first, live preview deferred.
 class StudioLazyPreview extends StatefulWidget {
@@ -37,7 +38,7 @@ class _StudioLazyPreviewState extends State<StudioLazyPreview> {
   @override
   Widget build(BuildContext context) {
     final colors = widget.template.previewColors ?? const <Color>[];
-    final c1 = colors.isNotEmpty ? colors.first : const Color(0xFF0F1D40);
+    final c1 = colors.isNotEmpty ? colors.first : DesignTokens.brandPrimary;
     final c2 = colors.length > 1 ? colors[1] : c1.withValues(alpha: 0.6);
 
     return RepaintBoundary(
@@ -86,7 +87,7 @@ class StudioColorThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = template.previewColors ?? const <Color>[];
-    final c1 = colors.isNotEmpty ? colors.first : const Color(0xFF0F1D40);
+    final c1 = colors.isNotEmpty ? colors.first : DesignTokens.brandPrimary;
     final c2 = colors.length > 1 ? colors[1] : c1.withValues(alpha: 0.55);
 
     return ClipRRect(

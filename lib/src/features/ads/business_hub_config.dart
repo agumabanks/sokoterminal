@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Business Hub document types — beyond product ads.
 class BusinessHubType {
@@ -9,8 +10,8 @@ class BusinessHubType {
     required this.description,
     required this.templateCategory,
     this.canvasLabel,
-    this.accent = const Color(0xFF0EBE7E),
-    this.gradient = const [Color(0xFF0EBE7E), Color(0xFF059669)],
+    this.accent = DesignTokens.brandAccent,
+    this.gradient = const [DesignTokens.brandAccent, DesignTokens.success],
     this.emoji,
   });
 
@@ -75,7 +76,7 @@ const graphicsCategories = <GraphicsCategory>[
     subtitle: 'Invoices for print & POS',
     icon: Icons.receipt_long_rounded,
     hubIds: ['invoice'],
-    accent: Color(0xFF0EBE7E),
+    accent: DesignTokens.brandAccent,
   ),
 ];
 
@@ -167,8 +168,8 @@ const businessHubTypes = <BusinessHubType>[
     description: 'Print-ready contact card',
     templateCategory: 'business_card',
     canvasLabel: '90×50mm',
-    accent: Color(0xFF0EBE7E),
-    gradient: [Color(0xFF0EBE7E), Color(0xFF059669)],
+    accent: DesignTokens.brandAccent,
+    gradient: [DesignTokens.brandAccent, DesignTokens.success],
     emoji: '💳',
   ),
   BusinessHubType(

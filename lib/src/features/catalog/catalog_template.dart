@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Professional catalog layout templates.
 ///
@@ -167,13 +168,13 @@ extension CatalogPromoExt on CatalogPromo {
       case CatalogPromo.none:
         return Colors.transparent;
       case CatalogPromo.sale:
-        return const Color(0xFFE53E3E);
+        return DesignTokens.error;
       case CatalogPromo.newArrival:
-        return const Color(0xFF4299E1);
+        return DesignTokens.info;
       case CatalogPromo.limitedTime:
-        return const Color(0xFFF6AD55);
+        return DesignTokens.warning;
       case CatalogPromo.bestSeller:
-        return const Color(0xFF0EBE7E);
+        return DesignTokens.brandAccent;
     }
   }
 

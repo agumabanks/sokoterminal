@@ -77,3 +77,9 @@ final blockedSyncCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return db.watchBlockedSyncOpsCount();
 });
+
+/// Current business profile (tax, delivery, payment settings).
+final businessProfileProvider = StreamProvider<BusinessProfile?>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return db.watchBusinessProfile();
+});

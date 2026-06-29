@@ -10,6 +10,7 @@ import '../../core/media/offline_media_cache.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
 import 'brand_kit_screen.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// A picked image from device gallery, catalog, Soko uploads, or brand kit.
 class StudioMediaPick {
@@ -36,8 +37,8 @@ enum StudioMediaSourceKind {
   brandLogo,
 }
 
-const _accent = Color(0xFF0EBE7E);
-const _surface = Color(0xFF0F1D40);
+const _accent = DesignTokens.brandAccent;
+const _surface = DesignTokens.brandPrimary;
 
 /// Production media picker: gallery, camera, catalog, Soko uploads, brand logo.
 Future<StudioMediaPick?> showStudioMediaPicker(

@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'core/app_providers.dart';
+import 'widgets/swipe_back_wrapper.dart';
 import 'core/firebase/fcm_service.dart';
+import 'core/notifications/local_notification_service.dart';
 import 'core/sync/sync_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/design_tokens.dart';
@@ -25,6 +28,9 @@ import 'features/items/items_screen.dart';
 import 'features/services/services_screen.dart';
 import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
+import 'features/ads/item_deep_link_screen.dart';
+import 'features/ads/studio_deep_link_launcher.dart';
+import 'features/ads/studio_notification_scheduler.dart';
 import 'features/marketing/bulk_sms_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -41,6 +47,7 @@ import 'features/profile/shop_info_screen.dart';
 import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
 import 'features/wallet/seller_wallet_screen.dart';
+import 'features/bnpl/bnpl_settings_screen.dart';
 // import 'features/auctions/auctions_screen.dart';
 // import 'features/chat/chat_screen.dart';
 import 'features/coupons/coupons_screen.dart';
@@ -52,6 +59,7 @@ import 'features/delivery/delivery_settings_screen.dart';
 import 'features/quotations/quotations_screen.dart';
 import 'features/settings/receipt_templates_screen.dart';
 import 'features/settings/void_reason_codes_screen.dart';
+import 'features/settings/tax_settings_screen.dart';
 import 'features/expenses/expenses_screen.dart';
 import 'features/backup/backup_screen.dart';
 import 'features/procurement/suppliers_screen.dart';
@@ -63,6 +71,7 @@ import 'features/setup/business_setup_wizard_screen.dart';
 import 'core/settings/business_setup_prefs.dart';
 import 'features/analytics/analytics_screen.dart';
 import 'features/catalog/catalog_screen.dart';
+import 'features/accounting/accounting_screen.dart';
 
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -106,7 +115,7 @@ Page<dynamic> _buildPage({required Widget child, GoRouterState? state}) {
         position: slideOut,
         child: SlideTransition(
           position: slideIn,
-          child: child,
+          child: SwipeBackWrapper(child: child),
         ),
       );
     },
@@ -154,7 +163,60 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_backgroundContactSync());
       _configurePushNavigation();
+      _configureLocalNotifications();
+      _initDeepLinks();
     });
+  }
+
+  Future<void> _initDeepLinks() async {
+    final appLinks = AppLinks();
+    try {
+      final initial = await appLinks.getInitialLink();
+      if (initial != null && mounted) _handleDeepLink(initial);
+    } catch (_) {}
+
+    appLinks.uriLinkStream.listen(
+      (uri) {
+        if (mounted) _handleDeepLink(uri);
+      },
+      onError: (_) {},
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    final host = uri.host.toLowerCase();
+    if (!host.endsWith('soko24.co') && host != 'soko24.co') return;
+    final path = uri.path;
+    if (path.startsWith('/p/')) {
+      final id = int.tryParse(path.split('/').last);
+      if (id != null) widget.router.go('/p/$id');
+    } else if (path.startsWith('/s/')) {
+      final id = int.tryParse(path.split('/').last);
+      if (id != null) widget.router.go('/s/$id');
+    } else if (path == '/studio' || path.startsWith('/studio?')) {
+      widget.router.go(uri.toString().replaceFirst('https://soko24.co', ''));
+    }
+  }
+
+  Future<void> _configureLocalNotifications() async {
+    await LocalNotificationService.instance.init();
+    configureLocalNotificationTapRouting(ref);
+
+    // Schedule/cancel Studio smart reminders based on current prefs once the
+    // notification plugin is initialized and the seller is signed in.
+    final auth = ref.read(authControllerProvider);
+    if (auth.status == AuthStatus.authenticated) {
+      unawaited(
+        ref.read(studioNotificationPrefsProvider.notifier).refreshReminders(),
+      );
+    }
+
+    // If the app was launched from a local notification tap, route there.
+    final launchPayload =
+        await LocalNotificationService.instance.getLaunchPayload();
+    if (launchPayload != null && mounted) {
+      widget.router.go(launchPayload);
+    }
   }
 
   void _configurePushNavigation() {
@@ -233,13 +295,37 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Soko 24 Seller Terminal',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      scaffoldMessengerKey: rootScaffoldMessengerKey,
-      routerConfig: widget.router,
+    return _StudioNotificationInitializer(
+      child: MaterialApp.router(
+        title: 'Soko 24 Seller Terminal',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
+        routerConfig: widget.router,
+      ),
     );
+  }
+}
+
+/// Listens to authentication state and refreshes Studio reminder scheduling
+/// when the seller logs in, or cancels reminders when they log out.
+class _StudioNotificationInitializer extends ConsumerWidget {
+  const _StudioNotificationInitializer({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (next.status == AuthStatus.authenticated) {
+        unawaited(
+          ref.read(studioNotificationPrefsProvider.notifier).refreshReminders(),
+        );
+      } else if (next.status == AuthStatus.unauthenticated) {
+        unawaited(LocalNotificationService.instance.cancelStudioReminders());
+      }
+    });
+    return child;
   }
 }
 
@@ -292,6 +378,46 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         name: 'splash',
         pageBuilder: (context, state) => _buildPage(state: state, child: const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/studio',
+        name: 'studio',
+        pageBuilder: (context, state) {
+          final q = state.uri.queryParameters;
+          return _buildPage(
+            state: state,
+            child: StudioDeepLinkLauncher(
+              productId: int.tryParse(q['product_id'] ?? ''),
+              serviceId: int.tryParse(q['service_id'] ?? ''),
+              quotationId: q['quotation_id'],
+              receiptId: int.tryParse(q['receipt_id'] ?? ''),
+              brandKit: q['brand_kit'] == '1',
+              openPanel: q['open_panel'],
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/p/:id',
+        name: 'product-deep-link',
+        pageBuilder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null) return _buildPage(child: const SplashScreen());
+          return _buildPage(
+            child: ItemDeepLinkScreen(remoteId: id, isService: false),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/s/:id',
+        name: 'service-deep-link',
+        pageBuilder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null) return _buildPage(child: const SplashScreen());
+          return _buildPage(
+            child: ItemDeepLinkScreen(remoteId: id, isService: true),
+          );
+        },
       ),
       GoRoute(
         path: '/pos-login',
@@ -514,6 +640,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     pageBuilder: (context, state) => _buildPage(state: state, child: const DeliverySettingsScreen()),
                   ),
                   GoRoute(
+                    path: 'tax-settings',
+                    name: 'tax-settings',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const TaxSettingsScreen()),
+                  ),
+                  GoRoute(
+                    path: 'accounting',
+                    name: 'accounting',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const AccountingScreen()),
+                  ),
+                  GoRoute(
                     path: 'print-queue',
                     name: 'print-queue',
                     pageBuilder: (context, state) => _buildPage(state: state, child: const PrintQueueScreen()),
@@ -568,6 +704,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'wallet',
                     name: 'wallet',
                     pageBuilder: (context, state) => _buildPage(state: state, child: const SellerWalletScreen()),
+                  ),
+                  GoRoute(
+                    path: 'bnpl-settings',
+                    name: 'bnpl-settings',
+                    pageBuilder: (context, state) => _buildPage(state: state, child: const BnplSettingsScreen()),
                   ),
                   GoRoute(
                     path: 'verification',

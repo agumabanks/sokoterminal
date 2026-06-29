@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_providers.dart';
 import '../db/app_database.dart';
-import '../storage/secure_storage.dart';
 import 'pin_hash_service.dart';
 
 /// User role enum for RBAC

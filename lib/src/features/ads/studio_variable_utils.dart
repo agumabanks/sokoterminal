@@ -30,11 +30,11 @@ String resolveStudioVariables(
   final link = productLink?.isNotEmpty == true
       ? normalizeShareUrl(productLink!)
       : (kit.website.isNotEmpty ? normalizeShareUrl(kit.website) : 'soko24.co');
-  final productName = product?.name ?? 'Product Name';
-  final price = product != null ? formatUgPrice(product.price) : 'UGX 0';
+  final productName = product?.name ?? '';
+  final price = product != null ? formatUgPrice(product.price) : '';
   final tagline = kit.tagline.isNotEmpty ? kit.tagline : '';
 
-  return raw
+  var result = raw
       .replaceAll('{{PRODUCT}}', productName)
       .replaceAll('{{PRICE}}', price)
       .replaceAll('{{WHATSAPP}}', wa)
@@ -43,14 +43,18 @@ String resolveStudioVariables(
       .replaceAll('{{BUSINESS}}', biz)
       .replaceAll('{{LOCATION}}', loc)
       .replaceAll('{{TAGLINE}}', tagline)
-      .replaceAll('{{WA}}', wa)
-      .replaceAll('PRODUCT NAME', productName)
-      .replaceAll('Product Name', productName)
-      .replaceAll('UGX 99,000', price)
-      .replaceAll('UGX 150,000', price)
-      .replaceAll('UGX 75,000', price)
-      .replaceAll('UGX 49,000', price)
-      .replaceAll('UGX 25,000', price)
-      .replaceAll('UGX 120,000', price)
-      .replaceAll('UGX 200,000', price);
+      .replaceAll('{{WA}}', wa);
+
+  if (productName.isNotEmpty) {
+    result = result
+        .replaceAll('PRODUCT NAME', productName)
+        .replaceAll('Product Name', productName);
+  }
+
+  // Catch any hardcoded UGX price placeholder only when we have a real price.
+  if (price.isNotEmpty) {
+    result = result.replaceAll(RegExp(r'UGX\s[0-9,]+'), price);
+  }
+
+  return result;
 }

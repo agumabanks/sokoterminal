@@ -362,18 +362,23 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ...DateFilter.values.map(
-            (filter) => RadioListTile<DateFilter>(
+            (filter) => ListTile(
+              leading: Icon(
+                state.dateFilter == filter
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                color: state.dateFilter == filter
+                    ? DesignTokens.brandPrimary
+                    : DesignTokens.grayLight,
+              ),
               title: Text(_dateFilterLabel(filter, state)),
-              value: filter,
-              groupValue: state.dateFilter,
-              onChanged: (v) {
-                if (v == null) return;
-                if (v == DateFilter.custom) {
+              onTap: () {
+                if (filter == DateFilter.custom) {
                   Navigator.pop(context);
                   _pickCustomRange(context, controller);
                   return;
                 }
-                controller.setDateFilter(v);
+                controller.setDateFilter(filter);
                 Navigator.pop(context);
               },
             ),
@@ -578,10 +583,10 @@ class _POSTransactionTile extends ConsumerWidget {
               onPressed: () => _printReceipt(context, ref, entry.id),
             ),
             entry.synced
-                ? const Icon(Icons.cloud_done, color: Colors.green, size: 18)
+                ? const Icon(Icons.cloud_done, color: DesignTokens.success, size: 18)
                 : const Icon(
                     Icons.cloud_upload,
-                    color: Colors.orange,
+                    color: DesignTokens.warning,
                     size: 18,
                   ),
           ],

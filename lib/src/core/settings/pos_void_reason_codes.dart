@@ -14,8 +14,9 @@ class PosVoidReasonCodesCache {
 
   static List<String> read(SharedPreferences prefs) {
     final raw = prefs.getString(prefsKey);
-    if (raw == null || raw.trim().isEmpty)
+    if (raw == null || raw.trim().isEmpty) {
       return List<String>.from(defaultCodes);
+    }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is List) {

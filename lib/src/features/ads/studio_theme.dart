@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Studio appearance — monochrome keeps focus on the seller's work.
 enum StudioAppearance {
@@ -59,8 +60,8 @@ class StudioThemeData {
   static StudioThemeData forAppearance(StudioAppearance a) => switch (a) {
         StudioAppearance.monochromeLight => const StudioThemeData(
               appearance: StudioAppearance.monochromeLight,
-              scaffold: Color(0xFFFAFAFA),
-              surface: Color(0xFFFFFFFF),
+              scaffold: DesignTokens.canvasCloud,
+              surface: DesignTokens.canvas,
               surfaceElevated: Color(0xFFF4F4F5),
               textPrimary: Color(0xFF09090B),
               textSecondary: Color(0xFF3F3F46),
@@ -68,7 +69,7 @@ class StudioThemeData {
               accent: Color(0xFF09090B),
               accentMuted: Color(0xFFE4E4E7),
               border: Color(0xFFE4E4E7),
-              heroGradient: [Color(0xFFF4F4F5), Color(0xFFFAFAFA), Color(0xFFFFFFFF)],
+              heroGradient: [Color(0xFFF4F4F5), DesignTokens.canvasCloud, DesignTokens.canvas],
               isMonochrome: true,
             ),
         StudioAppearance.monochromeDark => const StudioThemeData(
@@ -76,27 +77,27 @@ class StudioThemeData {
               scaffold: Color(0xFF09090B),
               surface: Color(0xFF18181B),
               surfaceElevated: Color(0xFF27272A),
-              textPrimary: Color(0xFFFAFAFA),
+              textPrimary: DesignTokens.canvasCloud,
               textSecondary: Color(0xFFD4D4D8),
               textMuted: Color(0xFF71717A),
-              accent: Color(0xFFFAFAFA),
+              accent: DesignTokens.canvasCloud,
               accentMuted: Color(0xFF3F3F46),
               border: Color(0xFF3F3F46),
-              heroGradient: [Color(0xFF18181B), Color(0xFF09090B), Color(0xFF000000)],
+              heroGradient: [Color(0xFF18181B), Color(0xFF09090B), DesignTokens.brandPrimary],
               isMonochrome: true,
             ),
         StudioAppearance.studioDark => const StudioThemeData(
               appearance: StudioAppearance.studioDark,
-              scaffold: Color(0xFF0A1628),
-              surface: Color(0xFF0F1D40),
-              surfaceElevated: Color(0xFF162952),
-              textPrimary: Color(0xFFFFFFFF),
+              scaffold: DesignTokens.brandPrimary,
+              surface: DesignTokens.brandPrimary,
+              surfaceElevated: DesignTokens.brandPrimary,
+              textPrimary: DesignTokens.canvas,
               textSecondary: Color(0xB3FFFFFF),
               textMuted: Color(0x66FFFFFF),
-              accent: Color(0xFF0EBE7E),
+              accent: DesignTokens.brandAccent,
               accentMuted: Color(0x330EBE7E),
               border: Color(0x14FFFFFF),
-              heroGradient: [Color(0xFF1e1b4b), Color(0xFF0F1D40), Color(0xFF064e3b)],
+              heroGradient: [DesignTokens.brandPrimary, DesignTokens.brandPrimary, DesignTokens.brandPrimary],
               isMonochrome: false,
             ),
       };

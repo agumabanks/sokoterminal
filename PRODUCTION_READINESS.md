@@ -15,7 +15,7 @@ This section turns the remaining GA scope into PR-sized increments with explicit
 - `ff_unified_inbox` (default: `true`) — enable Inbox module aggregating orders/bookings/notifications
 - `ff_customer_profile` (default: `false`) — enable Customer Profile (LTV, history, tags, WhatsApp)
 - `ff_contacts_enrichment` (default: `true`) — enable contacts normalization + merge/link flow
-- `ff_soko_studio` (default: `false`) — enable Ads → Studio workflow (templates + export/share)
+- `ff_soko_studio` (default: `true`) — enable Ads → Studio workflow (templates + export/share)
 - `ff_business_setup_wizard` (default: `false`) — first-run setup completion gating
 - `ff_expenses_v1` (default: `false`) — expenses module + cashouts + reports linking
 - (planned) `ff_server_exports_v1` (default: `false`) — server-side seller exports (CSV jobs)
@@ -240,16 +240,16 @@ Legend:
 
 ### Milestone M4 — Ads/Studio + Messaging (Phase 5 + Phase 11)
 
-- [ ] PR21 — Studio templates sync + real workflow (replace scaffold)
-  - Flags: `ff_soko_studio` (default: `false`)
+- [x] PR21 — Studio templates sync + real workflow
+  - Flags: `ff_soko_studio` (default: `true`)
   - Backend:
-    - Decide integration approach:
-      - Option A: reuse `/photo-editor/api/templates/*` with seller auth and expose via seller-v2 proxy routes
-      - Option B: create seller-v2 templates endpoints returning template metadata + assets
-    - Track exports and template usage events (minimal).
+    - Reused `/photo-editor/api/templates/*` with seller auth; added `/studio/*` web entry and detail endpoints.
+    - Added `BlockDemoMode` middleware + Studio-specific rate limiters for production safety.
+    - Exposed `soko_studio` + `canvas_first_auto_load` feature flags via `FeatureFlagsController`.
   - Flutter:
-    - Studio flow: pick product/service → choose template → customize → export/share → save drafts offline.
-    - Cache templates locally; export works offline.
+    - Studio flow: pick product/service → choose template → customize → export/share; drafts saved offline.
+    - Templates cached locally; export/share works offline.
+    - First-run splash + coach-marks + editor hints added for discoverability.
 
 - [ ] PR22 — Messaging templates + consent (WhatsApp/SMS)
   - Flags: `ff_messaging_templates_v1` (default: `false`)
@@ -389,6 +389,37 @@ Legend:
   - Flutter: “Send support bundle” added to Export Screen (uploads telemetry log + metadata).
 - [x] Routes registered in `api_seller.php` and migrations run.
 
+## 2026-06-11 Progress — Soko Studio polish + backend production gates (implemented)
+
+- [x] Flutter — Studio first-run experience:
+  - Unified all `launchFullStudioWeb` call sites through typed helpers (`StudioLaunchMode`).
+  - Added persisted splash (`StudioSplashScreen`) + hub coach-marks + editor hint overlay.
+  - Added semantic labels, tooltip wrappers, and haptic feedback for editor chrome.
+- [x] React Studio — editor discoverability:
+  - Loaded-entity chip in topbar with “Open in Studio” CTA.
+  - Empty-state CTAs, mobile design guide, and ShareModal wiring.
+  - Canvas-first auto-load for product/service/quotation/receipt/brand-kit deep links.
+- [x] Backend — Studio production gates:
+  - Added `BlockDemoMode` middleware and applied it to `/photo-editor/api/*` and `/studio/*` mutating routes.
+  - Added dedicated Studio rate limiters (`studio-save`, `studio-template-save`, `studio-marketplace`, `studio-ai`) in `RouteServiceProvider`.
+  - Fixed backend test isolation (`PosSalesMirrorTest` defensive schema + unique emails).
+- [x] CI / verification:
+  - `backend_checkout.yml` now runs `php artisan test --group studio` (49 passing).
+  - `soko_studio_ci.yml` build output corrected to `dist-next/`.
+  - Soko Studio Playwright smoke tests updated and passing (23 tests).
+- [x] Feature flag parity:
+  - Backend `FeatureFlagsController` exposes `soko_studio` + `canvas_first_auto_load` settings.
+  - Flutter `RemoteConfigService` defaults `ff_soko_studio` to `true`.
+  - React consumes the flag and disables save/publish when Studio is off.
+
+### Verification status at this checkpoint
+
+| App | Command | Result |
+|-----|---------|--------|
+| Seller Terminal Flutter | `flutter analyze --no-fatal-infos && flutter test` | Clean, 123 tests passing |
+| Soko Studio React | `npm run build && npm run test -- --run && npx playwright test` | Build OK, 66 Vitest + 23 smoke tests passing |
+| Backend Laravel | `php artisan test --group studio` | 49 passing (1 skipped) |
+
 ## Current readiness score (2025-12-28)
 
 **98 / 100 (GA candidate; repo is release-ready, remaining work is mostly manual QA + Play Console ops)**
@@ -427,7 +458,8 @@ Goal: ship a **GA candidate** to Google Play, onboard a controlled set of paying
 - [ ] Add Remote Config params (if missing) with defaults from the app:
   - [ ] `ff_expenses_v1` (start `false`, enable for pilot cohort)
 - [ ] Define GA rollout flags policy:
-  - [ ] Enable growth flags for pilot cohort first (`ff_unified_inbox`, `ff_contacts_enrichment`), keep others off (`ff_customer_profile`, `ff_soko_studio`)
+  - [ ] Enable growth flags for pilot cohort first (`ff_unified_inbox`, `ff_contacts_enrichment`); keep `ff_customer_profile` off until enrichment is complete.
+  - [ ] `ff_soko_studio` defaults to `true`; monitor save/publish/error telemetry before widening.
   - [ ] Only enable core flags that are verified on devices
 
 ### Step 3 — Android release signing + AAB build

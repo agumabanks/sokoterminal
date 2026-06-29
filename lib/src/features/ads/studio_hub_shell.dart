@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/db/app_database.dart';
+import '../../core/firebase/remote_config_service.dart';
 import '../../core/util/haptics.dart';
 import '../checkout/checkout_screen.dart' show itemsStreamProvider;
 import '../../widgets/offline_cached_image.dart';
@@ -13,6 +16,9 @@ import 'business_hub_templates.dart';
 import 'studio_design_storage.dart';
 import 'studio_editor_launcher.dart';
 import 'studio_media_picker.dart';
+import 'sm_insta_flow.dart';
+import 'studio_onboarding_overlay.dart';
+import 'studio_onboarding_prefs.dart';
 import 'studio_mode.dart';
 import 'studio_providers.dart';
 import 'studio_recent_designs.dart';
@@ -26,6 +32,10 @@ import 'studio_entitlements.dart';
 import 'studio_share_sheet.dart';
 import 'studio_template_exporter.dart';
 import 'studio_todays_ads.dart';
+import 'smart_ad_engine.dart';
+import 'seasonal_campaign_generator.dart';
+import 'marketing_dashboard_screen.dart';
+import '../../core/theme/design_tokens.dart';
 
 // Re-export template card from studio_screen via shared widget below.
 
@@ -62,131 +72,139 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
     final quota = ref.watch(yourDesignsProvider).quota;
     final theme = ref.watch(studioThemeProvider);
     final topPad = MediaQuery.of(context).padding.top;
+    final hasSeenOnboarding = ref.watch(hasSeenStudioOnboardingProvider);
 
-    return Column(
+    return Stack(
       children: [
-        // ── App bar + mode picker ─────────────────────────────────────────
-        Container(
-          color: theme.surface,
-          padding: EdgeInsets.fromLTRB(16, topPad + 8, 16, 10),
-          child: Column(
-            children: [
-              Row(
+        Column(
+          children: [
+            // ── App bar + mode picker ─────────────────────────────────────────
+            Container(
+              color: theme.surface,
+              padding: EdgeInsets.fromLTRB(16, topPad + 8, 16, 10),
+              child: Column(
                 children: [
-                  _StudioCloseBtn(
-                    theme: theme,
-                    onTap: () {
-                      Haptics.soft();
-                      Navigator.of(context).maybePop();
-                    },
+                  Row(
+                    children: [
+                      _StudioCloseBtn(
+                        theme: theme,
+                        onTap: () {
+                          Haptics.soft();
+                          Navigator.of(context).maybePop();
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: theme.isMonochrome
+                              ? theme.textPrimary
+                              : null,
+                          gradient: theme.isMonochrome
+                              ? null
+                              : const LinearGradient(
+                                  colors: [DesignTokens.brandAccent, DesignTokens.success],
+                                ),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          color: theme.isMonochrome
+                              ? theme.scaffold
+                              : Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'SOKO STUDIO',
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.8,
+                        ),
+                      ),
+                      const Spacer(),
+                      _IconBtn(
+                        icon: Icons.tune_rounded,
+                        theme: theme,
+                        onTap: () {
+                          Haptics.selection();
+                          Navigator.of(context).push(
+                            studioPageRoute(const StudioSettingsScreen()),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      TextButton(
+                        onPressed: widget.onOpenFullStudio,
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.accent,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Full Studio',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: theme.isMonochrome
-                          ? theme.textPrimary
-                          : null,
-                      gradient: theme.isMonochrome
-                          ? null
-                          : const LinearGradient(
-                              colors: [Color(0xFF0EBE7E), Color(0xFF059669)],
-                            ),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Icon(
-                      Icons.auto_awesome_rounded,
-                      color: theme.isMonochrome
-                          ? theme.scaffold
-                          : Colors.white,
-                      size: 14,
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ModePicker(
+                          mode: _mode,
+                          theme: theme,
+                          onChanged: (m) {
+                            Haptics.selection();
+                            setState(() => _mode = m);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ProductPill(
+                        selectedItem: widget.selectedItem,
+                        theme: theme,
+                        onTap: () => _showProductPicker(context),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SOKO STUDIO',
-                    style: TextStyle(
-                      color: theme.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.8,
-                    ),
-                  ),
-                  const Spacer(),
-                  _IconBtn(
-                    icon: Icons.tune_rounded,
-                    theme: theme,
-                    onTap: () {
-                      Haptics.selection();
-                      Navigator.of(context).push(
-                        studioPageRoute(const StudioSettingsScreen()),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  TextButton(
-                    onPressed: widget.onOpenFullStudio,
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.accent,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Full Studio',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
+                  const SizedBox(height: 8),
+                  _SanaaCloudBar(quota: quota, theme: theme),
+                  const SizedBox(height: 8),
+                  _StudioUsageStats(theme: theme),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ModePicker(
-                      mode: _mode,
-                      theme: theme,
-                      onChanged: (m) {
-                        Haptics.selection();
-                        setState(() => _mode = m);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _ProductPill(
-                    selectedItem: widget.selectedItem,
-                    theme: theme,
-                    onTap: () => _showProductPicker(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _SanaaCloudBar(quota: quota, theme: theme),
-            ],
-          ),
-        ),
+            ),
 
-        // ── Workspace body ────────────────────────────────────────────────
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 320),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.02, 0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
+            // ── Workspace body ────────────────────────────────────────────────
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.02, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: KeyedSubtree(
+                  key: ValueKey(_mode),
+                  child: _buildBody(),
+                ),
               ),
             ),
-            child: KeyedSubtree(
-              key: ValueKey(_mode),
-              child: _buildBody(),
-            ),
-          ),
+          ],
         ),
+        if (!hasSeenOnboarding) const StudioOnboardingOverlay(),
       ],
     );
   }
@@ -199,6 +217,9 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
           onOpenInjector: () => setState(() => _mode = StudioMode.injector),
           onEditPhoto: _editPhotoFlow,
           onRemoveBackground: _removeBackgroundFlow,
+          onSmInsta: ref.watch(remoteConfigProvider).ffSmInsta
+              ? () => runSmInstaFlow(context, ref)
+              : null,
         ),
       StudioMode.templates => _TemplatesWorkspace(
           selectedItem: widget.selectedItem,
@@ -216,6 +237,7 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
           onEditTemplate: widget.onEditTemplate,
         ),
       StudioMode.injector => const AdInjectorScreen(),
+      StudioMode.campaigns => const MarketingDashboardScreen(),
     };
   }
 
@@ -267,7 +289,7 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
   void _showProductPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F1D40),
+      backgroundColor: DesignTokens.brandPrimary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -458,6 +480,52 @@ class _SanaaCloudBar extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Local usage stats chip
+// ---------------------------------------------------------------------------
+
+class _StudioUsageStats extends ConsumerWidget {
+  const _StudioUsageStats({required this.theme});
+
+  final StudioThemeData theme;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(studioCampaignAnalyticsProvider);
+    final thisWeek = stats.weeklyExports;
+    final totalShares = stats.totalShares;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.trending_up_rounded, color: theme.accent, size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              thisWeek > 0
+                  ? 'You shared $thisWeek ad${thisWeek == 1 ? '' : 's'} this week'
+                  : totalShares > 0
+                      ? '$totalShares ad${totalShares == 1 ? '' : 's'} shared all time'
+                      : 'Create your first ad — track shares here',
+              style: TextStyle(
+                color: theme.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Edit Photos workspace
 // ---------------------------------------------------------------------------
 
@@ -468,6 +536,7 @@ class _EditPhotosWorkspace extends StatelessWidget {
     required this.onOpenInjector,
     required this.onEditPhoto,
     required this.onRemoveBackground,
+    this.onSmInsta,
   });
 
   final VoidCallback onCreateCollage;
@@ -475,6 +544,7 @@ class _EditPhotosWorkspace extends StatelessWidget {
   final VoidCallback onOpenInjector;
   final VoidCallback onEditPhoto;
   final VoidCallback onRemoveBackground;
+  final VoidCallback? onSmInsta;
 
   @override
   Widget build(BuildContext context) {
@@ -497,7 +567,7 @@ class _EditPhotosWorkspace extends StatelessWidget {
         icon: Icons.crop_rounded,
         label: 'Custom Canvas',
         sub: 'Any size — crop & layout',
-        color: const Color(0xFF0EBE7E),
+        color: DesignTokens.brandAccent,
         onTap: onCreateDesign,
       ),
       (
@@ -514,6 +584,14 @@ class _EditPhotosWorkspace extends StatelessWidget {
         color: const Color(0xFF22d3ee),
         onTap: onOpenInjector,
       ),
+      if (onSmInsta != null)
+        (
+          icon: Icons.flip_camera_ios_rounded,
+          label: 'SM Insta',
+          sub: 'Snap, flip & share an ad in seconds',
+          color: const Color(0xFFE1306C),
+          onTap: onSmInsta,
+        ),
     ];
 
     return ListView(
@@ -537,16 +615,18 @@ class _EditPhotosWorkspace extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        ...tools.map((t) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ToolTile(
-                icon: t.icon,
-                label: t.label,
-                subtitle: t.sub,
-                accent: t.color,
-                onTap: t.onTap,
-              ),
-            )),
+        ...tools
+            .where((t) => t.onTap != null)
+            .map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ToolTile(
+                    icon: t.icon,
+                    label: t.label,
+                    subtitle: t.sub,
+                    accent: t.color,
+                    onTap: t.onTap!,
+                  ),
+                )),
       ],
     );
   }
@@ -570,7 +650,7 @@ class _ToolTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF0F1D40),
+      color: DesignTokens.brandPrimary,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -713,9 +793,97 @@ class _DiscoveryScroll extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final recorder = ref.read(templateUseRecorderProvider);
     final theme = ref.watch(studioThemeProvider);
+    final smartAds = ref.watch(smartAdsProvider);
+
+    Future<void> shareSmartAd(SmartAdPackage pkg) async {
+      Haptics.impact();
+      final rootNav = Navigator.of(context, rootNavigator: true);
+      showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 14),
+                  Text('Preparing your ad…'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      try {
+        final entitlements = await ref.read(studioEntitlementsProvider.future);
+        if (!context.mounted) return;
+        final file = await exportStudioTemplatePng(
+          context,
+          template: pkg.template,
+          applyWatermark: entitlements.needsSokoWatermark,
+        );
+        if (!context.mounted) return;
+        rootNav.pop();
+        if (file == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not export ad — try again')),
+          );
+          return;
+        }
+        Item? product;
+        if (!pkg.isService) {
+          final items = ref.read(itemsStreamProvider).valueOrNull ?? [];
+          for (final item in items) {
+            if (item.id == pkg.itemId) {
+              product = item;
+              break;
+            }
+          }
+        }
+        final caption = pkg.captions.values.firstOrNull?.fullText ?? '';
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            fullscreenDialog: true,
+            builder: (_) => StudioShareSheet(
+              adFile: file,
+              template: pkg.template,
+              kit: kit,
+              initialProduct: product,
+              initialCaption: caption,
+              exportTitle: pkg.template.name,
+              showWatermarkBadge: entitlements.needsSokoWatermark,
+            ),
+          ),
+        );
+      } catch (e) {
+        if (context.mounted) {
+          rootNav.pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export failed: $e')),
+          );
+        }
+      }
+    }
 
     return CustomScrollView(
       slivers: [
+        if (smartAds.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _AdOfTheDayCard(
+              pkg: smartAds.first,
+              theme: theme,
+              onCreate: () async {
+                Haptics.selection();
+                await onEditTemplate(smartAds.first.template);
+              },
+              onShare: () => shareSmartAd(smartAds.first),
+            ),
+          ),
+
         if (todaysAds.isNotEmpty)
           SliverToBoxAdapter(
             child: _TodaysAdsSection(
@@ -725,6 +893,15 @@ class _DiscoveryScroll extends ConsumerWidget {
               onEdit: onEditTemplate,
             ),
           ),
+
+        // ── Seasonal campaigns ──────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: _SeasonalCampaignStrip(
+            kit: kit,
+            theme: theme,
+            onEdit: onEditTemplate,
+          ),
+        ),
 
         SliverToBoxAdapter(
           child: Padding(
@@ -787,6 +964,22 @@ class _DiscoveryScroll extends ConsumerWidget {
                 ),
               ),
             ),
+          ),
+        ),
+
+        // ── Brand Kit completeness indicator ────────────────────────────
+        SliverToBoxAdapter(
+          child: _BrandKitIndicator(
+            kit: kit,
+            theme: theme,
+            onTap: () {
+              Haptics.selection();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const BrandKitScreen(),
+                ),
+              );
+            },
           ),
         ),
 
@@ -869,6 +1062,7 @@ class _DiscoveryScroll extends ConsumerWidget {
                 theme: theme,
                 onTap: (tpl) async {
                   await recorder.record(tpl.id);
+                  unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordTemplateUse());
                   await onEditTemplate(tpl);
                 },
               ),
@@ -882,7 +1076,7 @@ class _DiscoveryScroll extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F1D40),
+                  color: DesignTokens.brandPrimary,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: const Color(0xFF22d3ee).withValues(alpha: 0.3)),
@@ -1017,7 +1211,7 @@ class _CreatorsWorkspace extends ConsumerWidget {
       child: Column(
         children: [
           Container(
-            color: const Color(0xFF0F1D40),
+            color: DesignTokens.brandPrimary,
             child: const TabBar(
               labelColor: Color(0xFFf59e0b),
               unselectedLabelColor: Colors.white38,
@@ -1083,7 +1277,7 @@ class _YourDesignsTab extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () => ref.read(yourDesignsProvider.notifier).refreshCloud(),
-      color: const Color(0xFF0EBE7E),
+      color: DesignTokens.brandAccent,
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1108,9 +1302,19 @@ class _YourDesignsTab extends ConsumerWidget {
                 top: 6,
                 right: 6,
                 child: GestureDetector(
-                  onTap: () => ref
-                      .read(yourDesignsProvider.notifier)
-                      .deleteDesign(tpl.id),
+                  onTap: () async {
+                    final ok = await ref
+                        .read(yourDesignsProvider.notifier)
+                        .deleteDesign(tpl.id);
+                    if (!context.mounted) return;
+                    if (!ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Deleted locally — cloud sync when online'),
+                        ),
+                      );
+                    }
+                  },
                   child: Container(
                     width: 26,
                     height: 26,
@@ -1126,6 +1330,178 @@ class _YourDesignsTab extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ad of the day — smart ad hero card
+// ---------------------------------------------------------------------------
+
+class _AdOfTheDayCard extends StatelessWidget {
+  const _AdOfTheDayCard({
+    required this.pkg,
+    required this.theme,
+    required this.onCreate,
+    required this.onShare,
+  });
+
+  final SmartAdPackage pkg;
+  final StudioThemeData theme;
+  final VoidCallback onCreate;
+  final VoidCallback onShare;
+
+  String get _subtitle {
+    final prefix = switch (pkg.source) {
+      SmartAdSource.product => 'Flash promo for',
+      SmartAdSource.service => 'Book now:',
+      SmartAdSource.businessInfo => 'Spotlight:',
+      SmartAdSource.seasonal => 'Trending now —',
+      SmartAdSource.aiGenerated => 'AI pick —',
+    };
+    return '$prefix ${pkg.name}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.isMonochrome ? theme.textPrimary : null,
+          gradient: theme.isMonochrome
+              ? null
+              : LinearGradient(
+                  colors: [theme.accent, theme.accent.withValues(alpha: 0.8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: theme.textPrimary.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (theme.isMonochrome ? theme.scaffold : Colors.white)
+                          .withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      color: theme.isMonochrome ? theme.scaffold : Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ad of the day',
+                          style: TextStyle(
+                            color:
+                                theme.isMonochrome ? theme.scaffold : Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: (theme.isMonochrome ? theme.scaffold : Colors.white)
+                                .withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Material(
+                      color: theme.isMonochrome ? theme.scaffold : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: onCreate,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: Text(
+                              'Create',
+                              style: TextStyle(
+                                color: theme.isMonochrome
+                                    ? theme.textPrimary
+                                    : theme.accent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: onShare,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: (theme.isMonochrome ? theme.scaffold : Colors.white)
+                                  .withValues(alpha: 0.5),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: Text(
+                              'Share now',
+                              style: TextStyle(
+                                color:
+                                    theme.isMonochrome ? theme.scaffold : Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1201,6 +1577,9 @@ class _TodaysAdsSection extends ConsumerWidget {
           }
         }
       }
+      // Pick platform caption
+      final platformCaption = await _pickPlatformCaption(context, entry);
+      if (!context.mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
@@ -1209,7 +1588,7 @@ class _TodaysAdsSection extends ConsumerWidget {
             template: entry.template,
             kit: kit,
             initialProduct: product,
-            initialCaption: entry.caption,
+            initialCaption: platformCaption ?? entry.caption,
             exportTitle: entry.template.name,
             showWatermarkBadge: entitlements.needsSokoWatermark,
           ),
@@ -1223,6 +1602,73 @@ class _TodaysAdsSection extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<String?> _pickPlatformCaption(BuildContext ctx, TodaysAdEntry entry) async {
+    final captions = <(String label, String text)>[
+      if (entry.whatsappCaption.isNotEmpty) ('WhatsApp', entry.whatsappCaption),
+      if (entry.instagramCaption.isNotEmpty) ('Instagram', entry.instagramCaption),
+      if (entry.facebookCaption.isNotEmpty) ('Facebook', entry.facebookCaption),
+      if (entry.xCaption.isNotEmpty) ('X / Twitter', entry.xCaption),
+    ];
+    if (captions.length <= 1) return entry.caption;
+    final picked = await showModalBottomSheet<String>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: theme.scaffold,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: theme.border, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Choose caption',
+                style: TextStyle(color: theme.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              ...captions.map((c) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: theme.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: theme.border),
+                  ),
+                  child: Center(
+                    child: Text(
+                      c.$1[0],
+                      style: TextStyle(color: theme.accent, fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                  ),
+                ),
+                title: Text(c.$1, style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(
+                  c.$2,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: theme.textMuted, fontSize: 11),
+                ),
+                onTap: () => Navigator.pop(ctx, c.$2),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+    return picked;
   }
 
   @override
@@ -1281,12 +1727,12 @@ class _TodaysAdsSection extends ConsumerWidget {
           ),
         ),
         SizedBox(
-          height: 248,
+          height: 320,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(16, 8, 32, 8),
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, i) {
               final entry = entries[i];
               return _TodaysAdCard(
@@ -1322,118 +1768,123 @@ class _TodaysAdCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 148,
+      width: 200,
       decoration: BoxDecoration(
         color: theme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.border),
         boxShadow: [
           BoxShadow(
             color: theme.textPrimary.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Preview (larger, 60% of card) ──────────────────────────
           Expanded(
+            flex: 3,
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: theme.scaffold,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: theme.border),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(5),
                   child: StudioLazyPreview(
                     template: entry.template,
                     deferMs: 50,
-                    borderRadius: 8,
+                    borderRadius: 10,
                   ),
                 ),
               ),
             ),
           ),
+          // ── Info & actions ─────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  entry.itemName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: theme.textPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      flex: 3,
-                      child: Material(
-                        color: theme.textPrimary,
-                        borderRadius: BorderRadius.circular(8),
-                        child: InkWell(
-                          onTap: onPost,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.send_rounded,
-                                  size: 12,
-                                  color: theme.scaffold,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Post now',
-                                  style: TextStyle(
-                                    color: theme.scaffold,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      child: Text(
+                        entry.itemName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 2,
-                      child: OutlinedButton(
-                        onPressed: onPolish,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: theme.textSecondary,
-                          side: BorderSide(color: theme.border),
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          minimumSize: Size.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _SourceBadge(entry: entry),
+                const SizedBox(height: 10),
+                // Full-width Post Now button
+                Material(
+                  color: theme.textPrimary,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: onPost,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.send_rounded,
+                            size: 14,
+                            color: theme.scaffold,
                           ),
-                        ),
-                        child: const Text(
-                          'Polish',
+                          const SizedBox(width: 6),
+                          Text(
+                            'Post Now',
+                            style: TextStyle(
+                              color: theme.scaffold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Polish button (text-only, secondary) with a large hit area
+                Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: onPolish,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        child: Text(
+                          'Polish in Editor',
                           style: TextStyle(
-                            fontSize: 10,
+                            color: theme.textMuted,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -1448,8 +1899,257 @@ class _TodaysAdCard extends StatelessWidget {
 // Shared template thumb (used across hub)
 // ---------------------------------------------------------------------------
 
+class _SourceBadge extends StatelessWidget {
+  const _SourceBadge({required this.entry});
+
+  final TodaysAdEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (entry.source) {
+      SmartAdSource.product => ('Product', const Color(0xFF3b82f6)),
+      SmartAdSource.service => ('Service', const Color(0xFFa855f7)),
+      SmartAdSource.businessInfo => ('Business', DesignTokens.brandAccent),
+      SmartAdSource.seasonal => ('Seasonal', const Color(0xFFf59e0b)),
+      SmartAdSource.aiGenerated => ('AI', const Color(0xFFec4899)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal Campaign Strip
+// ---------------------------------------------------------------------------
+
+class _SeasonalCampaignStrip extends StatelessWidget {
+  const _SeasonalCampaignStrip({
+    required this.kit,
+    required this.theme,
+    required this.onEdit,
+  });
+
+  final BrandKit kit;
+  final StudioThemeData theme;
+  final Future<void> Function(AdTemplate) onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final seasons = currentSeasons();
+    final upcoming = upcomingSeasons();
+    if (seasons.isEmpty && upcoming.isEmpty) return const SizedBox.shrink();
+
+    final all = [...seasons, ...upcoming.where((u) => !seasons.any((s) => s.id == u.id))];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            children: [
+              Icon(Icons.celebration_rounded, color: theme.accent, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Seasonal Campaigns',
+                style: TextStyle(
+                  color: theme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 110,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: all.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final season = all[i];
+              final isActive = seasons.any((s) => s.id == season.id);
+              return GestureDetector(
+                onTap: () {
+                  Haptics.selection();
+                  _openSeasonalAds(context, season);
+                },
+                child: Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        parseHexColor(season.primaryColor),
+                        parseHexColor(season.accentColor),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isActive ? 'Active' : 'Upcoming',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        season.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tap to generate campaign ads',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openSeasonalAds(BuildContext context, SeasonalContext season) {
+    final ads = generateSeasonalCampaign(
+      season: season,
+      businessName: kit.businessName.isNotEmpty ? kit.businessName : 'Soko 24',
+      primaryColor: kit.primaryColor,
+      accentColor: kit.accentColor,
+    );
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: theme.scaffold,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.border, borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${season.name} Campaign',
+                        style: TextStyle(color: theme.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded, color: theme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: ads.length,
+                  itemBuilder: (_, i) {
+                    final ad = ads[i];
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onEdit(ad);
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: theme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: theme.border),
+                              ),
+                              padding: const EdgeInsets.all(6),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: StudioLazyPreview(template: ad, deferMs: 100),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            ad.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class StudioTemplateThumb extends StatelessWidget {
-  const StudioTemplateThumb({
+  const StudioTemplateThumb({super.key, 
     required this.template,
     required this.selectedItem,
     required this.kit,
@@ -1480,7 +2180,7 @@ class StudioTemplateThumb extends StatelessWidget {
       shopUrl: kit.website.isNotEmpty
           ? kit.website
           : selectedItem != null
-              ? 'soko24.co/p/${selectedItem!.id}'
+              ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
               : 'soko24.co',
     );
 
@@ -1514,7 +2214,7 @@ class StudioTemplateThumb extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0F1D40),
+            color: DesignTokens.brandPrimary,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
@@ -1525,6 +2225,137 @@ class StudioTemplateThumb extends StatelessWidget {
     }
 
     return GestureDetector(onTap: onTap, child: content);
+  }
+}
+
+class _BrandKitIndicator extends StatelessWidget {
+  const _BrandKitIndicator({
+    required this.kit,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final BrandKit kit;
+  final StudioThemeData theme;
+  final VoidCallback onTap;
+
+  double get _completeness {
+    int total = 0;
+    int done = 0;
+    void check(bool ok) {
+      total++;
+      if (ok) done++;
+    }
+    check(kit.businessName.isNotEmpty);
+    check(kit.tagline.isNotEmpty);
+    check(kit.hasLogo);
+    check(kit.phone.isNotEmpty);
+    check(kit.whatsapp.isNotEmpty);
+    check(kit.location.isNotEmpty);
+    check(kit.website.isNotEmpty);
+    check(kit.primaryColor != '#0F1D40');
+    check(kit.secondaryColor != '#0EBE7E');
+    check(kit.accentColor != '#fbbf24');
+    check(kit.font != 'Poppins');
+    check(kit.headingFont != 'Montserrat');
+    return total == 0 ? 0.0 : done / total;
+  }
+
+  String get _label {
+    final pct = _completeness;
+    if (pct >= 1.0) return 'Brand Kit complete — you\'re all set!';
+    if (pct >= 0.7) return 'Brand Kit almost ready';
+    if (pct >= 0.4) return 'Brand Kit needs more info';
+    return 'Set up your Brand Kit for better ads';
+  }
+
+  String get _subtitle {
+    final pct = _completeness;
+    if (pct >= 1.0) return 'Your business info powers smarter auto-generated ads.';
+    if (pct >= 0.7) return 'Add the missing details to unlock full auto-ad power.';
+    if (pct >= 0.4) return 'Fill in colors, logo, and contact to improve your designs.';
+    return 'Business name, logo, colors & contacts make ads look pro.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = _completeness;
+    final color = pct >= 1.0
+        ? DesignTokens.brandAccent
+        : pct >= 0.5
+            ? const Color(0xFFfbbf24)
+            : const Color(0xFFef4444);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.surfaceElevated,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.border),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: pct,
+                      strokeWidth: 4,
+                      backgroundColor: theme.border,
+                      valueColor: AlwaysStoppedAnimation(color),
+                    ),
+                    Text(
+                      '${(pct * 100).round()}%',
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _label,
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _subtitle,
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.textSecondary,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1601,10 +2432,12 @@ class _ProductPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = selectedItem != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    return Tooltip(
+      message: active ? 'Selected product: ${selectedItem!.name}' : 'Pick a product',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: active
               ? theme.accent.withValues(alpha: 0.1)
@@ -1645,7 +2478,8 @@ class _ProductPill extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -1689,7 +2523,7 @@ class _ProductPickerSheet extends StatelessWidget {
                 TextButton(
                   onPressed: () => onSelect(null),
                   child: const Text('Clear',
-                      style: TextStyle(color: Color(0xFF0EBE7E))),
+                      style: TextStyle(color: DesignTokens.brandAccent)),
                 ),
             ],
           ),
@@ -1718,12 +2552,12 @@ class _ProductPickerSheet extends StatelessWidget {
                           width: 110,
                           decoration: BoxDecoration(
                             color: sel
-                                ? const Color(0xFF0EBE7E).withValues(alpha: 0.15)
+                                ? DesignTokens.brandAccent.withValues(alpha: 0.15)
                                 : Colors.white.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: sel
-                                  ? const Color(0xFF0EBE7E)
+                                  ? DesignTokens.brandAccent
                                   : Colors.white12,
                             ),
                           ),
@@ -1772,10 +2606,14 @@ class _ProductPickerSheet extends StatelessWidget {
           loading: () => const Padding(
             padding: EdgeInsets.all(24),
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation(Color(0xFF0EBE7E)),
+              valueColor: AlwaysStoppedAnimation(DesignTokens.brandAccent),
             ),
           ),
-          error: (_, __) => const SizedBox(),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Could not load products: $e',
+                style: const TextStyle(color: Colors.white54)),
+          ),
         ),
         const SizedBox(height: 24),
       ],

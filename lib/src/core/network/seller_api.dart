@@ -7,6 +7,9 @@ import 'package:path/path.dart' as p;
 import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
 import 'api_client.dart';
+import '../../features/bnpl/models/bnpl_seller_status.dart';
+import '../../features/bnpl/models/product_bnpl_payload.dart';
+import '../../features/bnpl/models/service_bnpl_payload.dart';
 
 class SellerApi {
   SellerApi({
@@ -31,6 +34,10 @@ class SellerApi {
 
   Future<Response<dynamic>> createPosTransaction(Map<String, dynamic> payload) {
     return client.post('/v2/seller/pos/sales', data: payload);
+  }
+
+  Future<Response<dynamic>> fetchReceiptDetails(int receiptId) {
+    return client.get('/v2/seller/pos/transactions/$receiptId');
   }
 
   Future<Response<dynamic>> fetchOrderItems(int orderId) {
@@ -191,6 +198,10 @@ class SellerApi {
 
   Future<Response<dynamic>> fetchMyServices() {
     return client.get('/v2/service-provider/my/offerings');
+  }
+
+  Future<Response<dynamic>> fetchServiceDetails(int serviceId) {
+    return client.get('/v2/service-provider/offerings/$serviceId');
   }
 
   Future<Response<dynamic>> fetchServiceCategories() {
@@ -852,6 +863,10 @@ class SellerApi {
     return client.get('/v2/seller/pos/quotations', query: {'page': page});
   }
 
+  Future<Response<dynamic>> fetchQuotationDetails(String quotationId) {
+    return client.get('/v2/seller/pos/quotations/$quotationId');
+  }
+
   Future<Response<dynamic>> pushQuotation(
     Map<String, dynamic> payload, {
     required String idempotencyKey,
@@ -1332,15 +1347,22 @@ class SellerApi {
   Future<Response<dynamic>> studioWebEntry({
     int? productId,
     int? serviceId,
+    String? quotationId,
+    int? receiptId,
+    bool brandKit = false,
     String editorMode = 'design',
     String openPanel = 'smart-ads',
   }) {
     final q = <String, dynamic>{
       'editor_mode': editorMode,
       'open_panel': openPanel,
+      'skip_home': 1,
     };
     if (productId != null) q['product_id'] = productId;
     if (serviceId != null) q['service_id'] = serviceId;
+    if (quotationId != null) q['quotation_id'] = quotationId;
+    if (receiptId != null) q['receipt_id'] = receiptId;
+    if (brandKit) q['brand_kit'] = 1;
     return client.get('/v2/seller/studio/web-entry', query: q);
   }
 
@@ -1426,6 +1448,63 @@ class SellerApi {
 
   Future<Response<dynamic>> fetchStudioCloudStorage() {
     return client.get('/v2/seller/studio/cloud-storage');
+  }
+
+  // ─── Sanaa Finance BNPL ───────────────────────────────────────────────────
+
+  Future<BnplSellerStatus> getBnplSellerStatus() async {
+    final res = await client.get('/v2/seller/bnpl/status');
+    final payload = _extractData(res.data);
+    return BnplSellerStatus.fromJson(payload);
+  }
+
+  Future<void> requestBnplEnrollment() async {
+    await client.post('/v2/seller/bnpl/enable-request');
+  }
+
+  Future<void> updateProductBnpl(
+    int productId,
+    ProductBnplPayload payload,
+  ) async {
+    await client.post(
+      '/v2/seller/products/$productId/bnpl',
+      data: payload.toJson(),
+    );
+  }
+
+  Future<void> updateServiceBnpl(
+    int serviceId,
+    ServiceBnplPayload payload,
+  ) async {
+    await client.post(
+      '/v2/seller/services/$serviceId/bnpl',
+      data: payload.toJson(),
+    );
+  }
+
+  Future<ProductBnplPayload?> getProductBnpl(int productId) async {
+    final res = await client.get('/v2/seller/products/$productId/bnpl');
+    final payload = _extractData(res.data);
+    if (payload.isEmpty) return null;
+    return ProductBnplPayload.fromJson(payload);
+  }
+
+  Future<ServiceBnplPayload?> getServiceBnpl(int serviceId) async {
+    final res = await client.get('/v2/seller/services/$serviceId/bnpl');
+    final payload = _extractData(res.data);
+    if (payload.isEmpty) return null;
+    return ServiceBnplPayload.fromJson(payload);
+  }
+
+  static Map<String, dynamic> _extractData(dynamic data) {
+    if (data is Map) {
+      final body = Map<String, dynamic>.from(data);
+      if (body['data'] is Map) {
+        return Map<String, dynamic>.from(body['data'] as Map);
+      }
+      return body;
+    }
+    return const <String, dynamic>{};
   }
 
   static String _extractErrorMessage(dynamic data) {

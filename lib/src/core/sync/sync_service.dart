@@ -2320,6 +2320,14 @@ class SyncService {
         final res = await sellerApi.createPosTransaction(body);
         if (res.statusCode == 200 || res.statusCode == 201) {
           await db.markTransactionSynced(txId);
+          final data = res.data;
+          final remoteId = data is Map
+              ? (data['id'] ?? data['transaction_id'] ?? data['ledger_id'])
+                  ?.toString()
+              : null;
+          if (remoteId != null && remoteId.isNotEmpty) {
+            await db.markLedgerRemoteId(txId, remoteId);
+          }
         }
         break;
 
@@ -2531,11 +2539,16 @@ class SyncService {
           'lines': lines,
         };
 
-        await sellerApi.pushQuotation(body, idempotencyKey: key);
+        final pushRes = await sellerApi.pushQuotation(body, idempotencyKey: key);
         final localId = id.trim();
         if (localId.isNotEmpty) {
-          await (db.update(db.quotations)..where((t) => t.id.equals(localId)))
-              .write(const QuotationsCompanion(synced: drift.Value(true)));
+          final pushedData = pushRes.data;
+          final remoteId = pushedData is Map
+              ? (pushedData['quotation_id'] ?? pushedData['id'])?.toString()
+              : null;
+          if (remoteId != null && remoteId.isNotEmpty) {
+            await db.markQuotationRemoteId(localId, remoteId);
+          }
         }
         break;
       case 'receipt_template_push':
@@ -3109,6 +3122,9 @@ class SyncService {
             barcode: p.barcode != null
                 ? drift.Value(p.barcode)
                 : const drift.Value.absent(),
+            taxRate: p.taxRate != null
+                ? drift.Value(p.taxRate)
+                : const drift.Value.absent(),
             updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
             synced: const drift.Value(true),
           ),
@@ -3402,6 +3418,7 @@ class SyncService {
                 ),
                 totalAmount: drift.Value(q.total),
                 notes: drift.Value(q.notes),
+                remoteId: drift.Value(q.id),
                 synced: const drift.Value(true),
               ),
             );
@@ -3562,6 +3579,8 @@ class SyncService {
       final businessProfile = pull.businessProfile;
       if (businessProfile != null && businessProfile.shopName.isNotEmpty) {
         _safeAddStatus('Syncing business profile...');
+        // Preserve locally-configured tax settings; backend does not own them.
+        final existingProfile = await db.getBusinessProfile();
         await db.upsertBusinessProfile(
           BusinessProfilesCompanion.insert(
             id: kPrimaryBusinessProfileId,
@@ -3618,6 +3637,15 @@ class SyncService {
             ),
             deliveryProfileJson: drift.Value(
               jsonEncode(businessProfile.deliveryProfile),
+            ),
+            verificationStatus: drift.Value(
+              businessProfile.verificationStatus ?? 0,
+            ),
+            taxEnabled: drift.Value(existingProfile?.taxEnabled ?? false),
+            taxRate: drift.Value(existingProfile?.taxRate ?? 0),
+            taxLabel: drift.Value(existingProfile?.taxLabel ?? 'VAT'),
+            taxInclusionMode: drift.Value(
+              existingProfile?.taxInclusionMode ?? 'exclusive',
             ),
             updatedAt: drift.Value(
               businessProfile.updatedAt ?? DateTime.now().toUtc(),
@@ -3725,6 +3753,7 @@ class SyncService {
                 'received_at': e.updatedAt?.toIso8601String(),
               }),
             ),
+            remoteId: drift.Value(e.id),
             customerId: drift.Value(e.customerId),
             createdAt: drift.Value(e.occurredAt ?? DateTime.now().toUtc()),
           ),

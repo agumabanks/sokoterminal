@@ -47,6 +47,7 @@ class Items extends Table {
   BoolColumn get cashOnDelivery =>
       boolean().withDefault(const Constant(true))();
   IntColumn get lowStockWarning => integer().nullable()();
+  RealColumn get taxRate => real().nullable()(); // null = use business default
   // Meta
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
@@ -364,6 +365,12 @@ class BusinessProfiles extends Table {
   TextColumn get receiptPaymentMethodsJson => text().nullable()();
   TextColumn get deliveryProfileJson => text().nullable()();
   IntColumn get verificationStatus => integer().withDefault(const Constant(0))();
+  // Tax settings
+  BoolColumn get taxEnabled => boolean().withDefault(const Constant(false))();
+  RealColumn get taxRate => real().withDefault(const Constant(0))();
+  TextColumn get taxLabel => text().withDefault(const Constant('VAT'))();
+  TextColumn get taxInclusionMode =>
+      text().withDefault(const Constant('exclusive'))(); // inclusive, exclusive
   DateTimeColumn get updatedAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(true))();
@@ -396,10 +403,12 @@ class LedgerEntries extends Table {
   RealColumn get subtotal => real().withDefault(const Constant(0))();
   RealColumn get discount => real().withDefault(const Constant(0))();
   RealColumn get tax => real().withDefault(const Constant(0))();
+  RealColumn get taxRate => real().withDefault(const Constant(0))();
   RealColumn get total => real().withDefault(const Constant(0))();
   TextColumn get note => text().nullable()();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   TextColumn get remoteAck => text().nullable()();
+  TextColumn get remoteId => text().nullable()(); // server ledger/receipt id
   DateTimeColumn get createdAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
@@ -418,6 +427,7 @@ class LedgerLines extends Table {
   RealColumn get unitPrice => real()();
   RealColumn get discount => real().withDefault(const Constant(0))();
   RealColumn get tax => real().withDefault(const Constant(0))();
+  RealColumn get taxRate => real().withDefault(const Constant(0))();
   RealColumn get lineTotal => real()();
 }
 
@@ -513,6 +523,7 @@ class Quotations extends Table {
   TextColumn get status => text().withDefault(const Constant('draft'))();
   TextColumn get notes => text().nullable()();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  TextColumn get remoteId => text().nullable()(); // server quotation id
   @override
   Set<Column<Object>>? get primaryKey => {id};
 }
@@ -735,7 +746,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.forTesting(QueryExecutor executor) = AppDatabase._internal;
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 38;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -911,6 +922,24 @@ class AppDatabase extends _$AppDatabase {
       if (from < 36) {
         await migrator.addColumn(parkedSales, parkedSales.label);
         await migrator.addColumn(parkedSales, parkedSales.saleKind);
+      }
+      if (from < 37) {
+        // Tax module
+        await migrator.addColumn(businessProfiles, businessProfiles.taxEnabled);
+        await migrator.addColumn(businessProfiles, businessProfiles.taxRate);
+        await migrator.addColumn(businessProfiles, businessProfiles.taxLabel);
+        await migrator.addColumn(
+          businessProfiles,
+          businessProfiles.taxInclusionMode,
+        );
+        await migrator.addColumn(items, items.taxRate);
+        await migrator.addColumn(ledgerEntries, ledgerEntries.taxRate);
+        await migrator.addColumn(ledgerLines, ledgerLines.taxRate);
+      }
+      if (from < 38) {
+        // Studio deep-link mapping for quotations and receipts/ledger entries.
+        await migrator.addColumn(quotations, quotations.remoteId);
+        await migrator.addColumn(ledgerEntries, ledgerEntries.remoteId);
       }
   }
 
@@ -1249,6 +1278,15 @@ class AppDatabase extends _$AppDatabase {
         await into(quotationLines).insert(line);
       }
     });
+  }
+
+  Future<void> markQuotationRemoteId(String localId, String remoteId) async {
+    await (update(quotations)..where((t) => t.id.equals(localId))).write(
+      QuotationsCompanion(
+        remoteId: Value(remoteId),
+        synced: const Value(true),
+      ),
+    );
   }
 
   // Receipt Templates
@@ -1787,6 +1825,15 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markLedgerSynced(String id, String ack) async {
     await (update(ledgerEntries)..where((tbl) => tbl.id.equals(id))).write(
       LedgerEntriesCompanion(synced: const Value(true), remoteAck: Value(ack)),
+    );
+  }
+
+  Future<void> markLedgerRemoteId(String localId, String remoteId) async {
+    await (update(ledgerEntries)..where((t) => t.id.equals(localId))).write(
+      LedgerEntriesCompanion(
+        remoteId: Value(remoteId),
+        synced: const Value(true),
+      ),
     );
   }
 
@@ -2945,6 +2992,42 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<Item>> allProducts() => select(items).get();
+
+  /// Sum of [total] for entries of a given type, optionally since a date.
+  Future<double> ledgerEntryTotalByType(String type, {DateTime? since}) async {
+    final sumExpr = ledgerEntries.total.sum();
+    final query = selectOnly(ledgerEntries)
+      ..addColumns([sumExpr])
+      ..where(ledgerEntries.type.equals(type));
+    if (since != null) {
+      query.where(ledgerEntries.createdAt.isBiggerOrEqualValue(since));
+    }
+    final result = await query.getSingle();
+    return result.read(sumExpr) ?? 0.0;
+  }
+
+  /// Count of entries of a given type, optionally since a date.
+  Future<int> ledgerEntryCountByType(String type, {DateTime? since}) async {
+    final countExpr = ledgerEntries.id.count();
+    final query = selectOnly(ledgerEntries)
+      ..addColumns([countExpr])
+      ..where(ledgerEntries.type.equals(type));
+    if (since != null) {
+      query.where(ledgerEntries.createdAt.isBiggerOrEqualValue(since));
+    }
+    final result = await query.getSingle();
+    return result.read(countExpr) ?? 0;
+  }
+
+  /// Total inventory value: SUM(stock_qty * price) across all items.
+  Future<double> totalInventoryValue() async {
+    final query = customSelect(
+      'SELECT COALESCE(SUM(CAST(stock_qty AS REAL) * price), 0) AS total FROM items',
+      readsFrom: {items},
+    );
+    final result = await query.getSingle();
+    return result.read<double>('total');
+  }
 
   // ── Parked Sales (active cart + named parked sales) ──
   static const activeCartSaleId = 'active-cart';

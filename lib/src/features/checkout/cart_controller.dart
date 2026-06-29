@@ -490,6 +490,9 @@ class CartController extends StateNotifier<CartState> {
     required List<CheckoutPayment> payments,
     String? notes,
     Customer? customer,
+    double taxAmount = 0,
+    double taxRate = 0,
+    String taxInclusionMode = 'exclusive',
   }) async {
     var resolvedCustomer = customer ?? state.customer;
 
@@ -510,7 +513,10 @@ class CartController extends StateNotifier<CartState> {
         'At least one payment is required.',
       );
     }
-    final total = state.subtotal;
+    final subtotal = state.subtotal;
+    final total = taxInclusionMode == 'inclusive'
+        ? subtotal
+        : subtotal + taxAmount;
     final paid = payments.fold<double>(0, (sum, p) => sum + p.amount);
     if ((paid - total).abs() > 0.01) {
       throw ArgumentError(
@@ -583,9 +589,10 @@ class CartController extends StateNotifier<CartState> {
         receiptNumber: Value(receiptNumber),
         idempotencyKey: idempotencyKey,
         type: 'sale',
-        subtotal: Value(total),
+        subtotal: Value(subtotal),
         discount: const Value(0),
-        tax: const Value(0),
+        tax: Value(taxAmount),
+        taxRate: Value(taxRate),
         total: Value(total),
         note: Value(notes),
         staffId: Value(staffId),

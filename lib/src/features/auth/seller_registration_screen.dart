@@ -25,6 +25,7 @@ import '../../core/util/country_codes.dart';
 import '../../core/services/places_service.dart';
 import 'auth_controller.dart';
 import 'post_registration_welcome_provider.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Ultra-Premium multi-step seller registration
 /// "Steve Jobs" standard: Minimal, Smart, Liquid Animations
@@ -345,12 +346,12 @@ class _SellerRegistrationScreenState
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E2C).withOpacity(0.95),
+                    color: DesignTokens.brandPrimary.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -363,7 +364,7 @@ class _SellerRegistrationScreenState
                     itemCount: predictions.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 1,
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                     ),
                     itemBuilder: (context, index) {
                       final p = predictions[index];
@@ -375,7 +376,7 @@ class _SellerRegistrationScreenState
                         ),
                         leading: const Icon(
                           Icons.location_on_outlined,
-                          color: Color(0xFF6C63FF),
+                          color: DesignTokens.info,
                           size: 20,
                         ),
                         title: Text(
@@ -389,7 +390,7 @@ class _SellerRegistrationScreenState
                         subtitle: Text(
                           p.secondaryText,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 12,
                           ),
                         ),
@@ -533,18 +534,23 @@ class _SellerRegistrationScreenState
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0:
-        if (_nameController.text.trim().isEmpty)
+        if (_nameController.text.trim().isEmpty) {
           return _showError('Can\'t assume your name!');
-        if (_phoneController.text.trim().isEmpty)
+        }
+        if (_phoneController.text.trim().isEmpty) {
           return _showError('Phone number required');
-        if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text))
+        }
+        if (!RegExp(r'^\d{6}$').hasMatch(_pinController.text)) {
           return _showError('PIN must be exactly 6 digits');
-        if (_pinController.text != _pinConfirmController.text)
+        }
+        if (_pinController.text != _pinConfirmController.text) {
           return _showError('PINs do not match');
+        }
         return true;
       case 1:
-        if (_shopNameController.text.trim().isEmpty)
+        if (_shopNameController.text.trim().isEmpty) {
           return _showError('Business needs a name');
+        }
         if (_selectedCategory == null) return _showError('Select a category');
         if (_plans.isNotEmpty && _selectedPlan == null) {
           return _showError('Choose a Sanaa plan');
@@ -602,8 +608,9 @@ class _SellerRegistrationScreenState
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
+      if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+      }
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
@@ -676,8 +683,8 @@ class _SellerRegistrationScreenState
           circleId: const CircleId('delivery_radius'),
           center: location,
           radius: _deliveryRadiusKm * 1000,
-          fillColor: _deliveryRadiusColor.withOpacity(0.2),
-          strokeColor: _deliveryRadiusStrokeColor.withOpacity(0.95),
+          fillColor: _deliveryRadiusColor.withValues(alpha: 0.2),
+          strokeColor: _deliveryRadiusStrokeColor.withValues(alpha: 0.95),
           strokeWidth: 4,
         ),
       };
@@ -1263,10 +1270,10 @@ class _SellerRegistrationScreenState
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _mintAccentColor.withOpacity(0.18),
+                color: _mintAccentColor.withValues(alpha: 0.18),
                 boxShadow: [
                   BoxShadow(
-                    color: _mintAccentColor.withOpacity(0.25),
+                    color: _mintAccentColor.withValues(alpha: 0.25),
                     blurRadius: 80,
                     spreadRadius: 40,
                   ),
@@ -1317,7 +1324,7 @@ class _SellerRegistrationScreenState
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1374,7 +1381,7 @@ class _SellerRegistrationScreenState
           width: isActive ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.2),
+            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -1403,12 +1410,12 @@ class _SellerRegistrationScreenState
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.96),
+              color: Colors.white.withValues(alpha: 0.96),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: _macBorderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
+                  color: Colors.black.withValues(alpha: 0.12),
                   blurRadius: 18,
                   offset: const Offset(0, 10),
                 ),
@@ -1428,7 +1435,7 @@ class _SellerRegistrationScreenState
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: _errorAccentColor.withOpacity(0.12),
+                      color: _errorAccentColor.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -1466,7 +1473,7 @@ class _SellerRegistrationScreenState
                   const SizedBox(width: 8),
                   Icon(
                     Icons.close,
-                    color: _macTextSecondary.withOpacity(0.8),
+                    color: _macTextSecondary.withValues(alpha: 0.8),
                     size: 18,
                   ),
                 ],
@@ -1592,10 +1599,11 @@ class _SellerRegistrationScreenState
   }
 
   Widget _buildLocationStep() {
-    if (_checkingMaps)
+    if (_checkingMaps) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),
       );
+    }
     return Stack(
       children: [
         Positioned.fill(
@@ -1617,7 +1625,7 @@ class _SellerRegistrationScreenState
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withOpacity(0.85), Colors.transparent],
+                colors: [Colors.black.withValues(alpha: 0.85), Colors.transparent],
               ),
             ),
           ),
@@ -1647,9 +1655,9 @@ class _SellerRegistrationScreenState
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.8),
+                  color: Colors.black.withValues(alpha: 0.8),
                   border: Border(
-                    top: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Column(
@@ -1678,9 +1686,9 @@ class _SellerRegistrationScreenState
       return Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
           children: const [
@@ -1705,9 +1713,9 @@ class _SellerRegistrationScreenState
       return Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1724,7 +1732,7 @@ class _SellerRegistrationScreenState
             Text(
               'Plans are temporarily unavailable. The default starter plan will be applied.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.72),
+                color: Colors.white.withValues(alpha: 0.72),
                 fontSize: 13,
                 height: 1.35,
               ),
@@ -1757,13 +1765,13 @@ class _SellerRegistrationScreenState
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: selected
-                      ? _mintAccentColor.withOpacity(0.14)
-                      : Colors.white.withOpacity(0.05),
+                      ? _mintAccentColor.withValues(alpha: 0.14)
+                      : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: selected
                         ? _mintAccentColor
-                        : Colors.white.withOpacity(0.08),
+                        : Colors.white.withValues(alpha: 0.08),
                     width: selected ? 1.5 : 1,
                   ),
                 ),
@@ -1788,7 +1796,7 @@ class _SellerRegistrationScreenState
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1807,7 +1815,7 @@ class _SellerRegistrationScreenState
                       Text(
                         plan.description!,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
+                          color: Colors.white.withValues(alpha: 0.72),
                           fontSize: 13,
                           height: 1.35,
                         ),
@@ -1912,9 +1920,9 @@ class _SellerRegistrationScreenState
               point: center,
               radius: _deliveryRadiusKm * 1000,
               useRadiusInMeter: true,
-              color: _deliveryRadiusColor.withOpacity(0.2),
+              color: _deliveryRadiusColor.withValues(alpha: 0.2),
               borderStrokeWidth: 4,
-              borderColor: _deliveryRadiusStrokeColor.withOpacity(0.95),
+              borderColor: _deliveryRadiusStrokeColor.withValues(alpha: 0.95),
             ),
           ];
 
@@ -1961,7 +1969,7 @@ class _SellerRegistrationScreenState
                 'Map tiles failed to load. Check your connection or use GPS.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                 ),
               ),
@@ -2002,9 +2010,9 @@ class _SellerRegistrationScreenState
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.55),
+            color: Colors.black.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: Row(
             children: [
@@ -2028,7 +2036,7 @@ class _SellerRegistrationScreenState
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
@@ -2065,13 +2073,13 @@ class _SellerRegistrationScreenState
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: hasLoc
-              ? const Color(0xFF6C63FF).withOpacity(0.1)
-              : Colors.white.withOpacity(0.05),
+              ? DesignTokens.info.withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: hasLoc
-                ? const Color(0xFF6C63FF).withOpacity(0.5)
-                : Colors.white.withOpacity(0.1),
+                ? DesignTokens.info.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.1),
             width: 1.5,
           ),
         ),
@@ -2081,8 +2089,8 @@ class _SellerRegistrationScreenState
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: hasLoc
-                    ? const Color(0xFF6C63FF)
-                    : Colors.white.withOpacity(0.1),
+                    ? DesignTokens.info
+                    : Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
@@ -2108,7 +2116,7 @@ class _SellerRegistrationScreenState
                   Text(
                     _gpsLabel ?? 'Tap to acquire coordinates',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 14,
                     ),
                   ),
@@ -2139,7 +2147,7 @@ class _SellerRegistrationScreenState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -2156,10 +2164,10 @@ class _SellerRegistrationScreenState
         const SizedBox(height: 16),
         SliderTheme(
           data: SliderThemeData(
-            activeTrackColor: const Color(0xFF6C63FF),
-            inactiveTrackColor: Colors.white.withOpacity(0.1),
+            activeTrackColor: DesignTokens.info,
+            inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
             thumbColor: Colors.white,
-            overlayColor: const Color(0xFF6C63FF).withOpacity(0.2),
+            overlayColor: DesignTokens.info.withValues(alpha: 0.2),
             trackHeight: 4,
             thumbShape: const RoundSliderThumbShape(
               enabledThumbRadius: 10,
@@ -2186,9 +2194,9 @@ class _SellerRegistrationScreenState
   Widget _buildPhoneField() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2C),
+        color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
@@ -2212,14 +2220,14 @@ class _SellerRegistrationScreenState
                   const SizedBox(width: 8),
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     size: 16,
                   ),
                 ],
               ),
             ),
           ),
-          Container(width: 1, height: 32, color: Colors.white.withOpacity(0.1)),
+          Container(width: 1, height: 32, color: Colors.white.withValues(alpha: 0.1)),
           Expanded(
             child: TextField(
               controller: _phoneController,
@@ -2231,15 +2239,15 @@ class _SellerRegistrationScreenState
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
-              cursorColor: const Color(0xFF6C63FF),
+              cursorColor: DesignTokens.info,
               decoration: InputDecoration(
                 hintText: '700 000 000',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 prefixText: '${_selectedCountry.code} ',
                 prefixStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 18,
                 ),
                 filled: false,
@@ -2260,13 +2268,13 @@ class _SellerRegistrationScreenState
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: cat != null
-              ? const Color(0xFF6C63FF).withOpacity(0.1)
-              : Colors.white.withOpacity(0.05),
+              ? DesignTokens.info.withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: cat != null
-                ? const Color(0xFF6C63FF).withOpacity(0.5)
-                : Colors.white.withOpacity(0.1),
+                ? DesignTokens.info.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
@@ -2274,8 +2282,8 @@ class _SellerRegistrationScreenState
             Icon(
               cat != null ? Icons.category_rounded : Icons.search_rounded,
               color: cat != null
-                  ? const Color(0xFF6C63FF)
-                  : Colors.white.withOpacity(0.5),
+                  ? DesignTokens.info
+                  : Colors.white.withValues(alpha: 0.5),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -2284,7 +2292,7 @@ class _SellerRegistrationScreenState
                 style: TextStyle(
                   color: cat != null
                       ? Colors.white
-                      : Colors.white.withOpacity(0.5),
+                      : Colors.white.withValues(alpha: 0.5),
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2353,10 +2361,10 @@ class _PremiumTextFieldState extends State<_PremiumTextField> {
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2C),
+        color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _isFocused ? const Color(0xFF6C63FF) : Colors.transparent,
+          color: _isFocused ? DesignTokens.info : Colors.transparent,
           width: 1.5,
         ),
       ),
@@ -2373,19 +2381,19 @@ class _PremiumTextFieldState extends State<_PremiumTextField> {
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
-        cursorColor: const Color(0xFF6C63FF),
+        cursorColor: DesignTokens.info,
         decoration: InputDecoration(
           labelText: widget.label,
           labelStyle: TextStyle(
             color: _isFocused
-                ? const Color(0xFF6C63FF)
-                : Colors.white.withOpacity(0.5),
+                ? DesignTokens.info
+                : Colors.white.withValues(alpha: 0.5),
           ),
           icon: Icon(
             widget.icon,
             color: _isFocused
-                ? const Color(0xFF6C63FF)
-                : Colors.white.withOpacity(0.3),
+                ? DesignTokens.info
+                : Colors.white.withValues(alpha: 0.3),
             size: 20,
           ),
           border: InputBorder.none,
@@ -2395,7 +2403,7 @@ class _PremiumTextFieldState extends State<_PremiumTextField> {
                     widget.obscureText
                         ? Icons.visibility_off_rounded
                         : Icons.visibility_rounded,
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     size: 20,
                   ),
                   onPressed: widget.onToggleObscure,
@@ -2427,15 +2435,15 @@ class _MainButton extends StatelessWidget {
           gradient: isDisabled
               ? null
               : const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+                  colors: [DesignTokens.info, Color(0xFF5A52D5)],
                 ),
-          color: isDisabled ? Colors.white.withOpacity(0.1) : null,
+          color: isDisabled ? Colors.white.withValues(alpha: 0.1) : null,
           borderRadius: BorderRadius.circular(20),
           boxShadow: isDisabled
               ? []
               : [
                   BoxShadow(
-                    color: const Color(0xFF6C63FF).withOpacity(0.4),
+                    color: DesignTokens.info.withValues(alpha: 0.4),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -2455,7 +2463,7 @@ class _MainButton extends StatelessWidget {
                   text,
                   style: TextStyle(
                     color: isDisabled
-                        ? Colors.white.withOpacity(0.3)
+                        ? Colors.white.withValues(alpha: 0.3)
                         : Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -2489,9 +2497,9 @@ class _GlassButton extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Center(
               child: isLoading
@@ -2575,13 +2583,13 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFFFFFFFF), Color(0xFFF5F6FA)],
+                    colors: [DesignTokens.canvas, Color(0xFFF5F6FA)],
                   ),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: _macBorderColor.withOpacity(0.8)),
+                  border: Border.all(color: _macBorderColor.withValues(alpha: 0.8)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 24,
                       offset: const Offset(0, 14),
                     ),
@@ -2595,9 +2603,9 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                       height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _mintAccentColor.withOpacity(0.14),
+                        color: _mintAccentColor.withValues(alpha: 0.14),
                         border: Border.all(
-                          color: _mintAccentColor.withOpacity(0.5),
+                          color: _mintAccentColor.withValues(alpha: 0.5),
                         ),
                       ),
                       child: const Icon(
@@ -2717,7 +2725,7 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                           child: Text(
                             'Continue to Checkout →',
                             style: TextStyle(
-                              color: _macTextSecondary.withOpacity(0.8),
+                              color: _macTextSecondary.withValues(alpha: 0.8),
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -2757,14 +2765,14 @@ class _WelcomeChoiceButton extends StatelessWidget {
     final borderColor = isPrimary ? _mintAccentColor : _macBorderColor;
     final titleColor = isPrimary ? Colors.white : _macTextPrimary;
     final subtitleColor = isPrimary
-        ? Colors.white.withOpacity(0.85)
+        ? Colors.white.withValues(alpha: 0.85)
         : _macTextSecondary;
     final iconBackground = isPrimary
-        ? Colors.white.withOpacity(0.25)
+        ? Colors.white.withValues(alpha: 0.25)
         : const Color(0xFFF2F2F7);
     final iconColor = isPrimary ? Colors.white : _macTextPrimary;
     final arrowColor = isPrimary
-        ? Colors.white.withOpacity(0.9)
+        ? Colors.white.withValues(alpha: 0.9)
         : _macTextSecondary;
     final hasIcon = icon != null;
     final hasSubtitle = subtitle != null && subtitle!.trim().isNotEmpty;
@@ -2783,7 +2791,7 @@ class _WelcomeChoiceButton extends StatelessWidget {
                 : null,
             color: isPrimary ? null : backgroundColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor.withOpacity(0.8)),
+            border: Border.all(color: borderColor.withValues(alpha: 0.8)),
           ),
           child: Row(
             children: [
@@ -2854,7 +2862,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
-        color: Color(0xFF16161E),
+        color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
@@ -2864,7 +2872,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -2875,13 +2883,13 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search Categories',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 prefixIcon: Icon(
                   Icons.search,
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -2894,7 +2902,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: filtered.length,
               separatorBuilder: (_, __) =>
-                  Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                  Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
               itemBuilder: (context, index) {
                 final item = filtered[index];
                 final isSelected = widget.selected == item['name'];
@@ -2905,8 +2913,8 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF6C63FF)
-                          : Colors.white.withOpacity(0.05),
+                          ? DesignTokens.info
+                          : Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -2924,7 +2932,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                     ),
                   ),
                   trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Color(0xFF6C63FF))
+                      ? const Icon(Icons.check_circle, color: DesignTokens.info)
                       : null,
                 );
               },
@@ -3014,13 +3022,13 @@ class _PlanTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.84),
+          color: Colors.white.withValues(alpha: 0.84),
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
@@ -3068,12 +3076,12 @@ String _compactMoney(double value) {
   return buffer.toString().split('').reversed.join();
 }
 
-const Color _mintAccentColor = Color(0xFF5CC7B5);
-const Color _macBorderColor = Color(0xFFE2E3E7);
-const Color _macTextPrimary = Color(0xFF1C1C1E);
-const Color _macTextSecondary = Color(0xFF636366);
-const Color _errorAccentColor = Color(0xFFE53935);
-const Color _deliveryRadiusColor = Color(0xFFE53935);
+const Color _mintAccentColor = DesignTokens.info;
+const Color _macBorderColor = DesignTokens.canvasCloud;
+const Color _macTextPrimary = DesignTokens.brandPrimary;
+const Color _macTextSecondary = DesignTokens.inkMuted;
+const Color _errorAccentColor = DesignTokens.error;
+const Color _deliveryRadiusColor = DesignTokens.error;
 const Color _deliveryRadiusStrokeColor = Color(0xFFFF6B6B);
 
 const String _darkMapStyle = '''

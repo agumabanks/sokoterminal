@@ -466,8 +466,101 @@ class _InboxTile extends ConsumerWidget {
 }
 
 void _openInboxItem(BuildContext context, WidgetRef ref, _InboxItem item) {
-  if (item.type != InboxType.refunds || item.refund == null) return;
-  _showRefundDecision(context, ref, item.refund!);
+  switch (item.type) {
+    case InboxType.refunds:
+      if (item.refund != null) _showRefundDecision(context, ref, item.refund!);
+    case InboxType.alerts:
+      if (item.notification != null) {
+        _showNotificationDetail(context, ref, item.notification!);
+      }
+    case InboxType.orders:
+    case InboxType.bookings:
+    case InboxType.stock:
+    case InboxType.all:
+      break;
+  }
+}
+
+void _showNotificationDetail(
+  BuildContext context,
+  WidgetRef ref,
+  NotificationDto notification,
+) {
+  final controller = ref.read(notificationsControllerProvider.notifier);
+  if (!notification.isRead) {
+    unawaited(controller.markRead(notification.id));
+  }
+
+  BottomSheetModal.show(
+    context: context,
+    title: notification.title,
+    subtitle: notification.dateLabel,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(notification.body, style: DesignTokens.textBody),
+        const SizedBox(height: DesignTokens.spaceLg),
+        if (notification.data.isNotEmpty) ...[
+          Text('Details', style: DesignTokens.textBodyBold),
+          const SizedBox(height: DesignTokens.spaceSm),
+          ...notification.data.entries.map((e) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: DesignTokens.spaceXs),
+              child: Text(
+                '${e.key}: ${e.value}',
+                style: DesignTokens.textSmall,
+              ),
+            );
+          }),
+          const SizedBox(height: DesignTokens.spaceLg),
+        ],
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handleNotificationRoute(context, ref, notification.data);
+            },
+            child: const Text('Open'),
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceSm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+void _handleNotificationRoute(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> data,
+) {
+  final router = ref.read(routerProvider);
+  final screen = data['screen']?.toString().toLowerCase();
+  if (screen == 'bulk_sms') {
+    router.go('/home/more/bulk-sms');
+    return;
+  }
+  if (screen == 'sanaa_wallet' ||
+      screen == 'seller_wallet' ||
+      screen == 'wallet') {
+    router.go('/home/more/wallet');
+    return;
+  }
+  final convoId = data['conversation_id']?.toString();
+  if (convoId != null && convoId.isNotEmpty) {
+    router.go('/home/more/chat/$convoId');
+    return;
+  }
+  router.go('/home/notifications');
 }
 
 void _showRefundDecision(

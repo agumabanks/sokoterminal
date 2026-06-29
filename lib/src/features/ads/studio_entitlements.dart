@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/telemetry/telemetry.dart';
 
 /// Studio tier flags — drives Soko watermark on exports.
 class StudioEntitlements {
@@ -30,7 +33,11 @@ final studioEntitlementsProvider =
     if (wallet is! Map) return StudioEntitlements.free;
     final sub = wallet['subscription'];
     return _parseSubscription(sub);
-  } catch (_) {
+  } catch (e, st) {
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(telemetry.recordError(e, st, hint: 'studio_entitlements_fetch'));
+    }
     return StudioEntitlements.free;
   }
 });

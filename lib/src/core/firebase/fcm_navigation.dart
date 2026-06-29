@@ -55,6 +55,24 @@ class FcmNavigation {
       return '/home/more/low-stock';
     }
 
+    if (type == 'studio') {
+      final params = <String, String>{
+        if (data['product_id'] != null && data['product_id'].toString().isNotEmpty)
+          'product_id': data['product_id'].toString(),
+        if (data['service_id'] != null && data['service_id'].toString().isNotEmpty)
+          'service_id': data['service_id'].toString(),
+        if (data['quotation_id'] != null && data['quotation_id'].toString().isNotEmpty)
+          'quotation_id': data['quotation_id'].toString(),
+        if (data['receipt_id'] != null && data['receipt_id'].toString().isNotEmpty)
+          'receipt_id': data['receipt_id'].toString(),
+        if (data['brand_kit']?.toString() == '1') 'brand_kit': '1',
+        if (data['open_panel'] != null && data['open_panel'].toString().isNotEmpty)
+          'open_panel': data['open_panel'].toString(),
+      };
+      final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+      return query.isEmpty ? '/studio' : '/studio?$query';
+    }
+
     return null;
   }
 

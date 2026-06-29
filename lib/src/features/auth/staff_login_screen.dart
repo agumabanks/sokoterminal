@@ -39,9 +39,9 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  static const Color _bg = Color(0xFF000000);
-  static const Color _accent = Color(0xFF6C63FF);
-  static const Color _surface = Color(0xFF0B0B10);
+  static const Color _bg = DesignTokens.brandPrimary;
+  static const Color _accent = DesignTokens.info;
+  static const Color _surface = DesignTokens.brandPrimary;
   static const Color _stroke = Color(0x22FFFFFF);
 
   @override
@@ -221,7 +221,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [_bg, Color(0xFF05050A), _bg],
+                  colors: [_bg, DesignTokens.brandPrimary, _bg],
                 ),
               ),
             ),
@@ -230,13 +230,13 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withOpacity(0.16), size: 420),
+              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
             ),
             Positioned(
               bottom: -160,
               left: -130,
               child: _GlowBlob(
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 size: 520,
               ),
             ),
@@ -262,7 +262,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                                   Text(
                                     'Staff Sign In',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: Colors.white.withValues(alpha: 0.95),
                                       fontSize: 42,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: -1.2,
@@ -273,7 +273,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                                   Text(
                                     'Enter your phone and 6-digit PIN',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white.withOpacity(0.62),
+                                      color: Colors.white.withValues(alpha: 0.62),
                                       fontSize: 16,
                                       height: 1.35,
                                     ),
@@ -329,11 +329,11 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                   child: Text(
                     'Back to Owner Login',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.55),
+                      color: Colors.white.withValues(alpha: 0.55),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       decoration: TextDecoration.underline,
-                      decorationColor: Colors.white.withOpacity(0.3),
+                      decorationColor: Colors.white.withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -360,7 +360,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _surface.withOpacity(0.55),
+                    color: _surface.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: _stroke),
                   ),
@@ -380,7 +380,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
               child: Text(
                 'Sign in',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   letterSpacing: -0.2,
@@ -418,7 +418,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           fillColor: Colors.transparent,
           hintText: 'Phone number',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.28),
+            color: Colors.white.withValues(alpha: 0.28),
             fontWeight: FontWeight.w500,
           ),
           prefixIcon: const Icon(
@@ -468,7 +468,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           fillColor: Colors.transparent,
           hintText: '6-Digit PIN',
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.28),
+            color: Colors.white.withValues(alpha: 0.28),
             fontWeight: FontWeight.w500,
           ),
           counterText: '',
@@ -500,9 +500,9 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF453A).withOpacity(0.86),
+            color: const Color(0xFFFF453A).withValues(alpha: 0.86),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.18)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,9 +546,9 @@ class _GlassField extends StatelessWidget {
   final Widget child;
   final bool focused;
 
-  static const Color _solidBg = Color(0xFF1A1A24);
+  static const Color _solidBg = DesignTokens.brandPrimary;
   static const Color _stroke = Color(0x33FFFFFF);
-  static const Color _strokeFocused = Color(0xFF6C63FF);
+  static const Color _strokeFocused = DesignTokens.info;
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +564,7 @@ class _GlassField extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -592,7 +592,7 @@ class _GlowBlob extends StatelessWidget {
         color: color,
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.55),
+            color: color.withValues(alpha: 0.55),
             blurRadius: 120,
             spreadRadius: 30,
           ),
@@ -647,12 +647,12 @@ class _GradientButtonState extends State<_GradientButton> {
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: DesignTokens.brandAccent.withOpacity(0.35),
+                  color: DesignTokens.brandAccent.withValues(alpha: 0.35),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.35),
+                  color: Colors.black.withValues(alpha: 0.35),
                   blurRadius: 24,
                   offset: const Offset(0, 16),
                 ),

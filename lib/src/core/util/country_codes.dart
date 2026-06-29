@@ -1,5 +1,6 @@
 // Country code data for phone input
 import 'package:flutter/material.dart';
+import '../../core/theme/design_tokens.dart';
 
 class CountryCode {
   const CountryCode({
@@ -148,7 +149,7 @@ Future<CountryCode?> showCountryPickerBottomSheet(
                 final country = eastAfricanCountryCodes[index];
                 final isSelected = country.code == current.code;
                 return Material(
-                  color: isSelected ? Colors.blue[50] : Colors.transparent,
+                  color: isSelected ? DesignTokens.canvasCloud : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
                     onTap: () => Navigator.pop(context, country),
@@ -189,7 +190,7 @@ Future<CountryCode?> showCountryPickerBottomSheet(
                           if (isSelected)
                             const Icon(
                               Icons.check_circle_rounded,
-                              color: Colors.blue,
+                              color: DesignTokens.info,
                             ),
                         ],
                       ),

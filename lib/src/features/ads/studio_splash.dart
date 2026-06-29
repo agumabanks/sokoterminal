@@ -95,6 +95,18 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
   }
 
   Future<void> _runSequence() async {
+    try {
+      await _runSequenceInternal().timeout(const Duration(seconds: 6));
+    } on TimeoutException {
+      // Safety: never block the UI if animations hang.
+    }
+    if (mounted) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      widget.onReady();
+    }
+  }
+
+  Future<void> _runSequenceInternal() async {
     Haptics.soft();
     unawaited(PosSoundService().playStudioReveal());
 
@@ -117,9 +129,6 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
     }
     await Future.delayed(const Duration(milliseconds: 350));
     await _exitCtrl.forward();
-
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    widget.onReady();
   }
 
   @override

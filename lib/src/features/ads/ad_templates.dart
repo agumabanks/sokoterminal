@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'ad_templates_generated.dart';
@@ -32,6 +34,78 @@ const adSizes = [
   AdSize('A4 Flyer', Icons.description_outlined, 2480, 3508),
 ];
 
+/// Returns the first [AdSize] preset whose dimensions match [width]×[height],
+/// or `null` if none match.
+AdSize? findAdSizeFor(double width, double height) {
+  final w = width.round();
+  final h = height.round();
+  for (final size in adSizes) {
+    if (size.width.round() == w && size.height.round() == h) return size;
+  }
+  return null;
+}
+
+/// Returns a copy of [template] resized to [size] with every element scaled
+/// uniformly so the design fits the new canvas. Text font sizes are clamped
+/// to a minimum of 14 after scaling.
+AdTemplate scaleTemplateToSize(AdTemplate template, AdSize size) {
+  final oldW = template.canvasWidth;
+  final oldH = template.canvasHeight;
+  if (oldW <= 0 || oldH <= 0) {
+    return AdTemplate(
+      id: template.id,
+      name: template.name,
+      category: template.category,
+      canvasWidth: size.width,
+      canvasHeight: size.height,
+      background: template.background,
+      elements: template.elements,
+      previewColors: template.previewColors,
+      tags: template.tags,
+      industry: template.industry,
+      season: template.season,
+      complexity: template.complexity,
+      suggestedCaption: template.suggestedCaption,
+      marketingGoal: template.marketingGoal,
+    );
+  }
+
+  final scale = math.min(size.width / oldW, size.height / oldH);
+  final scaledElements = template.elements.map((el) {
+    final newX = el.x * scale;
+    final newY = el.y * scale;
+    final newW = el.width * scale;
+    final newH = el.height * scale;
+    final newFontSize = el.fontSize != null
+        ? (el.fontSize! * scale).clamp(14.0, double.infinity)
+        : null;
+    return el.copyWith(
+      x: newX,
+      y: newY,
+      width: newW,
+      height: newH,
+      fontSize: newFontSize,
+    );
+  }).toList();
+
+  return AdTemplate(
+    id: template.id,
+    name: template.name,
+    category: template.category,
+    canvasWidth: size.width,
+    canvasHeight: size.height,
+    background: template.background,
+    elements: scaledElements,
+    previewColors: template.previewColors,
+    tags: template.tags,
+    industry: template.industry,
+    season: template.season,
+    complexity: template.complexity,
+    suggestedCaption: template.suggestedCaption,
+    marketingGoal: template.marketingGoal,
+  );
+}
+
 /// Blank canvas for "Create from scratch" flows.
 AdTemplate blankCanvas(AdSize size, {String? name}) => AdTemplate(
       id: 'blank_${size.width.toInt()}x${size.height.toInt()}_${DateTime.now().millisecondsSinceEpoch}',
@@ -41,7 +115,7 @@ AdTemplate blankCanvas(AdSize size, {String? name}) => AdTemplate(
       canvasHeight: size.height,
       background: '#ffffff',
       elements: const [],
-      previewColors: const [Color(0xFFf8fafc), Color(0xFFe2e8f0)],
+      previewColors: const [Color(0xFFFFFFFF), Color(0xFF77ABFF)],
     );
 
 /// Brand palette colors for quick-pick in editors (hex strings).
@@ -55,6 +129,46 @@ List<Color> brandPaletteColors({
       parseHexColor(secondary),
       parseHexColor(accent),
     ];
+
+/// Returns black or white hex text color that contrasts with [bgHex].
+String contrastText(String bgHex) {
+  final rgb = hexToRgb(bgHex);
+  if (rgb == null) return '#000000';
+  final luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
+({int r, int g, int b})? hexToRgb(String hex) {
+  var h = hex.replaceFirst('#', '').trim();
+  if (h.length == 3) {
+    h = h.split('').map((c) => '$c$c').join();
+  }
+  if (h.length != 6) return null;
+  try {
+    return (
+      r: int.parse(h.substring(0, 2), radix: 16),
+      g: int.parse(h.substring(2, 4), radix: 16),
+      b: int.parse(h.substring(4, 6), radix: 16),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// A recipe used by the programmatic template generator.
+class LayoutRecipe {
+  const LayoutRecipe(this.id, this.name, this.builder);
+  final String id;
+  final String name;
+  final List<CanvasElement> Function({
+    required double w,
+    required double h,
+    required dynamic palette,
+    required String headline,
+    required String category,
+    required int variant,
+  }) builder;
+}
 
 /// A single element on the canvas
 class CanvasElement {
@@ -95,6 +209,11 @@ class CanvasElement {
     this.iconFontPackage,
     this.assetId,
     this.isPremium = false,
+    this.isVisible = true,
+    this.fontStyle,
+    this.textTransform,
+    this.imageFit,
+    this.imageFilter,
   });
 
   final String id;
@@ -130,6 +249,11 @@ class CanvasElement {
   final String? iconFontPackage;
   final String? assetId;
   final bool isPremium;
+  final bool isVisible;
+  final String? fontStyle;
+  final String? textTransform;
+  final String? imageFit;
+  final String? imageFilter;
 
   bool get hasShadow => shadowColor != null;
   bool get hasStroke => strokeColor != null && (strokeWidth ?? 0) > 0;
@@ -167,6 +291,11 @@ class CanvasElement {
     String? iconFontPackage,
     String? assetId,
     bool? isPremium,
+    bool? isVisible,
+    String? fontStyle,
+    String? textTransform,
+    String? imageFit,
+    String? imageFilter,
   }) {
     return CanvasElement(
       id: id,
@@ -205,6 +334,11 @@ class CanvasElement {
       iconFontPackage: iconFontPackage ?? this.iconFontPackage,
       assetId: assetId ?? this.assetId,
       isPremium: isPremium ?? this.isPremium,
+      isVisible: isVisible ?? this.isVisible,
+      fontStyle: fontStyle ?? this.fontStyle,
+      textTransform: textTransform ?? this.textTransform,
+      imageFit: imageFit ?? this.imageFit,
+      imageFilter: imageFilter ?? this.imageFilter,
     );
   }
 
@@ -246,6 +380,11 @@ class CanvasElement {
       iconFontPackage: j['iconFontPackage']?.toString(),
       assetId: j['assetId']?.toString(),
       isPremium: j['isPremium'] as bool? ?? false,
+      isVisible: j['isVisible'] as bool? ?? true,
+      fontStyle: j['fontStyle']?.toString(),
+      textTransform: j['textTransform']?.toString(),
+      imageFit: j['imageFit']?.toString(),
+      imageFilter: j['imageFilter']?.toString(),
     );
   }
 
@@ -280,6 +419,11 @@ class CanvasElement {
     if (iconFontPackage != null) 'iconFontPackage': iconFontPackage,
     if (assetId != null) 'assetId': assetId,
     if (isPremium) 'isPremium': isPremium,
+    if (!isVisible) 'isVisible': isVisible,
+    if (fontStyle != null) 'fontStyle': fontStyle,
+    if (textTransform != null) 'textTransform': textTransform,
+    if (imageFit != null) 'imageFit': imageFit,
+    if (imageFilter != null) 'imageFilter': imageFilter,
   };
 }
 
@@ -294,6 +438,12 @@ class AdTemplate {
     required this.background,
     required this.elements,
     this.previewColors,
+    this.tags = const [],
+    this.industry = '',
+    this.season = '',
+    this.complexity = 'starter',
+    this.suggestedCaption = '',
+    this.marketingGoal = 'awareness',
   });
 
   final String id;
@@ -304,6 +454,12 @@ class AdTemplate {
   final String background;
   final List<CanvasElement> elements;
   final List<Color>? previewColors;
+  final List<String> tags;
+  final String industry;
+  final String season;
+  final String complexity;
+  final String suggestedCaption;
+  final String marketingGoal;
 
   double get aspectRatio => canvasWidth / canvasHeight;
 
@@ -339,70 +495,146 @@ class AdTemplate {
     final price   = priceFormatted;
     final pname   = productName;
 
-    final newElements = elements.map((el) {
-      var t = el.text;
-      if (t != null) {
-        // ── Brand CTA variable substitutions ─────────────────────────────
+    String applyCommon(String? raw) {
+      if (raw == null) return '';
+      var t = raw
+          .replaceAll('{{WHATSAPP}}',  waNum)
+          .replaceAll('{{PHONE}}',     phone)
+          .replaceAll('{{CTA_LINK}}',  ctaLink)
+          .replaceAll('{{BUSINESS}}',  biz)
+          .replaceAll('{{LOCATION}}',  loc)
+          .replaceAll('{{TAGLINE}}',   tag)
+          .replaceAll('{{PRODUCT}}',   pname.isNotEmpty ? pname : 'Product Name')
+          .replaceAll('{{PRICE}}',     price.isNotEmpty ? price : 'UGX 0')
+          // Shorthand variants
+          .replaceAll('WA: {{WA}}',    'WA: $waNum')
+          .replaceAll('📞 {{PHONE}}',  '📞 $phone')
+          .replaceAll('💬 {{WA}}',     '💬 $waNum');
+
+      if (productName.isNotEmpty) {
         t = t
-            .replaceAll('{{WHATSAPP}}',  waNum)
-            .replaceAll('{{PHONE}}',     phone)
-            .replaceAll('{{CTA_LINK}}',  ctaLink)
-            .replaceAll('{{BUSINESS}}',  biz)
-            .replaceAll('{{LOCATION}}',  loc)
-            .replaceAll('{{TAGLINE}}',   tag)
-            .replaceAll('{{PRODUCT}}',   pname.isNotEmpty ? pname : 'Product Name')
-            .replaceAll('{{PRICE}}',     price.isNotEmpty ? price : 'UGX 0')
-            // Shorthand variants
-            .replaceAll('WA: {{WA}}',    'WA: $waNum')
-            .replaceAll('📞 {{PHONE}}',  '📞 $phone')
-            .replaceAll('💬 {{WA}}',     '💬 $waNum');
-
-        // ── Product name substitutions (only when non-empty) ─────────────────
-        if (productName.isNotEmpty) {
-          t = t
-              .replaceAll('PRODUCT NAME',      productName)
-              .replaceAll('Product Name',      productName)
-              .replaceAll('Product Name Here', productName)
-              .replaceAll('YOUR PRODUCT HERE', productName)
-              .replaceAll('ADD YOUR PRODUCT',  productName)
-              .replaceAll('PRODUCT IMAGE',     productName)
-              .replaceAll('YOUR PRODUCT',      productName);
-        }
-
-        // ── Price substitutions (only when non-empty) ──────────────────────
-        if (priceFormatted.isNotEmpty) {
-          t = t
-              .replaceAll('UGX 150,000', priceFormatted)
-              .replaceAll('UGX 99,000',  priceFormatted)
-              .replaceAll('UGX 120,000', priceFormatted)
-              .replaceAll('UGX 75,000',  priceFormatted)
-              .replaceAll('UGX 49,000',  priceFormatted)
-              .replaceAll('UGX 25,000',  priceFormatted)
-              .replaceAll('UGX 200,000', priceFormatted);
-        }
-
-        if (category != null) {
-          t = t.replaceAll('FEATURED', category.toUpperCase());
-        }
-
-        // ── Business name substitutions (only when different from placeholder) ─
-        if (biz != 'Soko 24') {
-          t = t
-              .replaceAll('YOUR BUSINESS', biz)
-              .replaceAll('Your Business', biz);
-        }
+            .replaceAll('PRODUCT NAME',      productName)
+            .replaceAll('PRODUCT\nNAME',     productName)
+            .replaceAll('Product Name',      productName)
+            .replaceAll('Product Name Here', productName)
+            .replaceAll('YOUR PRODUCT HERE', productName)
+            .replaceAll('ADD YOUR PRODUCT',  productName)
+            .replaceAll('PRODUCT IMAGE',     productName)
+            .replaceAll('YOUR PRODUCT',      productName);
       }
+
+      if (priceFormatted.isNotEmpty) {
+        t = t
+            .replaceAll('UGX 150,000', priceFormatted)
+            .replaceAll('UGX 99,000',  priceFormatted)
+            .replaceAll('UGX 120,000', priceFormatted)
+            .replaceAll('UGX 75,000',  priceFormatted)
+            .replaceAll('UGX 49,000',  priceFormatted)
+            .replaceAll('UGX 25,000',  priceFormatted)
+            .replaceAll('UGX 200,000', priceFormatted);
+      }
+
+      if (category != null) {
+        t = t.replaceAll('FEATURED', category.toUpperCase());
+      }
+
+      if (biz != 'Soko 24') {
+        t = t
+            .replaceAll('YOUR BUSINESS', biz)
+            .replaceAll('Your Business', biz);
+      }
+      return t;
+    }
+
+    final newElements = elements.map((el) {
+      final t = applyCommon(el.text ?? el.placeholder);
       var src = el.src;
       if (el.type == 'image' && imageUrl != null && imageUrl.isNotEmpty) {
         src = imageUrl;
       }
-      return el.copyWith(text: t, src: src);
+      return el.copyWith(text: t.isEmpty ? null : t, src: src);
     }).toList();
+
     return AdTemplate(
-      id: id, name: name, category: this.category,
-      canvasWidth: canvasWidth, canvasHeight: canvasHeight,
-      background: background, elements: newElements,
+      id: id,
+      name: name,
+      category: this.category,
+      canvasWidth: canvasWidth,
+      canvasHeight: canvasHeight,
+      background: background,
+      elements: newElements,
       previewColors: previewColors,
+      tags: tags,
+      industry: industry,
+      season: season,
+      complexity: complexity,
+      suggestedCaption: applyCommon(suggestedCaption),
+      marketingGoal: marketingGoal,
+    );
+  }
+
+  /// Apply service details to this template (covers product-style placeholders
+  /// plus service-specific wording).
+  AdTemplate applyService({
+    required String serviceName,
+    required String priceFormatted,
+    String? imageUrl,
+    String? shopUrl,
+    String? category,
+    String? whatsappNumber,
+    String? phoneNumber,
+    String? businessName,
+    String? location,
+    String? tagline,
+  }) {
+    final applied = applyProduct(
+      productName: serviceName,
+      priceFormatted: priceFormatted,
+      imageUrl: imageUrl,
+      shopUrl: shopUrl,
+      category: category,
+      whatsappNumber: whatsappNumber,
+      phoneNumber: phoneNumber,
+      businessName: businessName,
+      location: location,
+      tagline: tagline,
+    );
+
+    String serviceSubstitutions(String? raw) {
+      if (raw == null) return '';
+      var t = raw;
+      if (serviceName.isNotEmpty) {
+        t = t
+            .replaceAll('SERVICE NAME',      serviceName)
+            .replaceAll('Service Name',      serviceName)
+            .replaceAll('YOUR SERVICE HERE', serviceName)
+            .replaceAll('YOUR SERVICE',      serviceName)
+            .replaceAll('BOOK NOW',          'BOOK NOW')
+            .replaceAll('SERVICE',           serviceName);
+      }
+      return t;
+    }
+
+    final serviceElements = applied.elements.map((el) {
+      final t = serviceSubstitutions(el.text);
+      return el.copyWith(text: t.isEmpty ? el.text : t);
+    }).toList();
+
+    return AdTemplate(
+      id: id,
+      name: name,
+      category: category ?? this.category,
+      canvasWidth: canvasWidth,
+      canvasHeight: canvasHeight,
+      background: background,
+      elements: serviceElements,
+      previewColors: previewColors,
+      tags: tags,
+      industry: industry,
+      season: season,
+      complexity: complexity,
+      suggestedCaption: serviceSubstitutions(applied.suggestedCaption),
+      marketingGoal: marketingGoal,
     );
   }
 
@@ -451,730 +683,744 @@ class AdTemplate {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Pre-installed templates (matching the webapp's CanvasBuilderService)
-// ---------------------------------------------------------------------------
 final builtInTemplates = <AdTemplate>[
-  // ── Flash Deal (1080x1080) ────────────────────────────────────────────
+  // ── Flash Deal (1080x1080) ──────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_sale_bold', name: 'Flash Deal', category: 'sale',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#dc2626',
-    previewColors: [Color(0xFFdc2626), Color(0xFFfef08a)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#1e3a8a',
+    previewColors: [Color(0xFF1E3A8A), Color(0xFFFF6B6B)],
     elements: [
-      CanvasElement(id: 'headline', type: 'text', text: 'MEGA SALE', x: 40, y: 50, width: 1000, fontSize: 72, fontWeight: 'bold', fontFamily: 'Inter', fill: '#fef08a', align: 'center'),
-      CanvasElement(id: 'subheadline', type: 'text', text: 'Limited Time Offer', x: 40, y: 140, width: 1000, fontSize: 32, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 220, width: 800, height: 480, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 730, width: 1000, fontSize: 36, fontWeight: '600', fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 790, width: 1000, fontSize: 64, fontWeight: 'bold', fontFamily: 'Inter', fill: '#fef08a', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 890, width: 400, height: 70, fill: '#fef08a', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 340, y: 906, width: 400, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#dc2626', align: 'center'),
+      CanvasElement(id: 'top_accent', type: 'figure', x: 60, y: 50, width: 960, height: 8, fill: '#ff6b6b', cornerRadius: 4),
+      CanvasElement(id: 'headline', type: 'text', text: 'MEGA SALE', x: 40, y: 70, width: 1000, fontSize: 78, fontFamily: 'Inter', fill: '#ff6b6b', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subheadline', type: 'text', text: 'Limited Time Offer', x: 40, y: 155, width: 1000, fontSize: 32, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 120, y: 210, width: 840, height: 520, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 760, width: 1000, fontSize: 40, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 820, width: 1000, fontSize: 66, fontFamily: 'Inter', fill: '#ff6b6b', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_shadow', type: 'figure', x: 320, y: 910, width: 440, height: 78, fill: '#000000', cornerRadius: 39, opacity: 0.18, shadowColor: '#000000', shadowDx: 0, shadowDy: 8, shadowBlur: 20),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 910, width: 440, height: 78, fill: '#ff6b6b', cornerRadius: 39),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 320, y: 930, width: 440, fontSize: 30, fontFamily: 'Inter', fill: '#FFFFFF', align: 'center', fontWeight: 'bold'),
       CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1035, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.6),
     ],
   ),
 
-  // ── New Arrival (1080x1080) ───────────────────────────────────────────
+  // ── New Arrival (1080x1080) ─────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_new_arrival', name: 'New Arrival', category: 'new',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#1e293b',
-    previewColors: [Color(0xFF1e293b), Color(0xFFf97316)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#064e3b',
+    previewColors: [Color(0xFF064E3B), Color(0xFFFEF3C7)],
     elements: [
-      CanvasElement(id: 'accent_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 120, fill: '#f97316'),
-      CanvasElement(id: 'headline', type: 'text', text: 'NEW ARRIVAL', x: 40, y: 35, width: 1000, fontSize: 48, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 160, width: 800, height: 500, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 700, width: 1000, fontSize: 42, fontWeight: 'bold', fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 40, y: 770, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#f97316', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 870, width: 400, height: 70, fill: '#f97316', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'BE FIRST', x: 340, y: 886, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.6),
+      CanvasElement(id: 'accent_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 130, fill: '#fef3c7'),
+      CanvasElement(id: 'headline', type: 'text', text: 'NEW ARRIVAL', x: 40, y: 40, width: 1000, fontSize: 54, fontFamily: 'Inter', fill: '#064e3b', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 130, y: 170, width: 820, height: 540, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 740, width: 1000, fontSize: 44, fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 40, y: 805, width: 1000, fontSize: 60, fontFamily: 'Inter', fill: '#fef3c7', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 880, width: 440, height: 78, fill: '#fef3c7', cornerRadius: 39),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'BE FIRST', x: 320, y: 900, width: 440, fontSize: 28, fontFamily: 'Inter', fill: '#064e3b', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.6),
     ],
   ),
 
-  // ── Special Offer (1080x1080) ─────────────────────────────────────────
+  // ── Special Offer (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_promo', name: 'Special Offer', category: 'promo',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#7c3aed',
-    previewColors: [Color(0xFF7c3aed), Color(0xFFf5f3ff)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#581c87',
+    previewColors: [Color(0xFF581C87), Color(0xFFFBBF24)],
     elements: [
-      CanvasElement(id: 'headline', type: 'text', text: 'SPECIAL OFFER', x: 40, y: 60, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'subheadline', type: 'text', text: 'Just For You', x: 40, y: 130, width: 1000, fontSize: 28, fontFamily: 'Poppins', fill: '#f5f3ff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 190, width: 800, height: 480, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 700, width: 1000, fontSize: 40, fontWeight: '600', fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 40, y: 760, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#f5f3ff', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 290, y: 870, width: 500, height: 80, fill: '#ffffff', cornerRadius: 40),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER NOW', x: 290, y: 892, width: 500, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#7c3aed', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.7),
+      CanvasElement(id: 'top_accent', type: 'figure', x: 60, y: 50, width: 960, height: 8, fill: '#fbbf24', cornerRadius: 4),
+      CanvasElement(id: 'headline', type: 'text', text: 'SPECIAL OFFER', x: 40, y: 70, width: 1000, fontSize: 64, fontFamily: 'Inter', fill: '#fbbf24', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subheadline', type: 'text', text: 'Just For You', x: 40, y: 145, width: 1000, fontSize: 30, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 120, y: 200, width: 840, height: 520, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 750, width: 1000, fontSize: 42, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 40, y: 810, width: 1000, fontSize: 62, fontFamily: 'Inter', fill: '#fbbf24', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 280, y: 890, width: 520, height: 82, fill: '#fbbf24', cornerRadius: 41),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER NOW', x: 280, y: 912, width: 520, fontSize: 30, fontFamily: 'Inter', fill: '#581c87', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.7),
     ],
   ),
 
-  // ── Story (1080x1920) ─────────────────────────────────────────────────
+  // ── Story / Status (1080x1920) ──────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_story', name: 'Story / Status', category: 'story',
-    canvasWidth: 1080, canvasHeight: 1920, background: '#e11d48',
-    previewColors: [Color(0xFFe11d48), Color(0xFFfff1f2)],
+    canvasWidth: 1080, canvasHeight: 1920, background: '#f97316',
+    previewColors: [Color(0xFFF97316), Color(0xFF0F172A)],
     elements: [
-      CanvasElement(id: 'top_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 400, fill: '#fff1f2'),
-      CanvasElement(id: 'headline', type: 'text', text: 'HOT DEAL', x: 40, y: 120, width: 1000, fontSize: 72, fontWeight: 'bold', fontFamily: 'Inter', fill: '#e11d48', align: 'center'),
-      CanvasElement(id: 'subheadline', type: 'text', text: "Don't Miss Out!", x: 40, y: 220, width: 1000, fontSize: 36, fontFamily: 'Poppins', fill: '#e11d48', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 480, width: 900, height: 700, cornerRadius: 24),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 1230, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 1300, width: 1000, fontSize: 72, fontWeight: 'bold', fontFamily: 'Inter', fill: '#fff1f2', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 240, y: 1440, width: 600, height: 100, fill: '#fff1f2', cornerRadius: 50),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SWIPE UP', x: 240, y: 1468, width: 600, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#e11d48', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1620, width: 1000, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.8),
+      CanvasElement(id: 'top_glow', type: 'figure', x: 0, y: 0, width: 1080, height: 420, fill: '#0f172a'),
+      CanvasElement(id: 'headline', type: 'text', text: 'HOT DEAL', x: 40, y: 130, width: 1000, fontSize: 80, fontFamily: 'Inter', fill: '#0f172a', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subheadline', type: 'text', text: "Don't Miss Out!", x: 40, y: 230, width: 1000, fontSize: 38, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 460, width: 920, height: 760, cornerRadius: 32, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 1260, width: 1000, fontSize: 48, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 1330, width: 1000, fontSize: 78, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 220, y: 1460, width: 640, height: 105, fill: '#0f172a', cornerRadius: 52),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SWIPE UP', x: 220, y: 1488, width: 640, fontSize: 38, fontFamily: 'Inter', fill: '#0f172a', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1625, width: 1000, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.8),
     ],
   ),
 
-  // ── Premium / Minimal (1080x1080) ─────────────────────────────────────
+  // ── Premium Clean (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_minimal', name: 'Premium Clean', category: 'minimal',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#fafafa',
-    previewColors: [Color(0xFFfafafa), Color(0xFF1e293b)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#fef3c7',
+    previewColors: [Color(0xFFFEF3C7), Color(0xFF115E59)],
     elements: [
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 80, width: 900, height: 560, cornerRadius: 12),
-      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 40, y: 680, width: 1000, fontSize: 44, fontWeight: '600', fontFamily: 'Playfair Display', fill: '#1e293b', align: 'center'),
-      CanvasElement(id: 'selling', type: 'text', text: 'Crafted with care', x: 40, y: 745, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#1e293b', align: 'center', opacity: 0.7),
-      CanvasElement(id: 'divider', type: 'figure', x: 440, y: 800, width: 200, height: 2, fill: '#f97316', opacity: 0.3),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 830, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#f97316', align: 'center'),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'Shop Now →', x: 40, y: 920, width: 1000, fontSize: 24, fontWeight: '600', fontFamily: 'Inter', fill: '#1e293b', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1000, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#1e293b', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 70, width: 920, height: 600, cornerRadius: 20, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 40, y: 700, width: 1000, fontSize: 46, fontFamily: 'Playfair Display', fill: '#115e59', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'selling', type: 'text', text: 'Crafted with care', x: 40, y: 760, width: 1000, fontSize: 24, fontFamily: 'Inter', fill: '#115e59', align: 'center', opacity: 0.7),
+      CanvasElement(id: 'divider', type: 'figure', x: 420, y: 810, width: 240, height: 3, fill: '#115e59', cornerRadius: 1, opacity: 0.4),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 840, width: 1000, fontSize: 56, fontFamily: 'Inter', fill: '#115e59', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'Shop Now →', x: 40, y: 925, width: 1000, fontSize: 26, fontFamily: 'Inter', fill: '#115e59', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1005, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#115e59', align: 'center', opacity: 0.5),
     ],
   ),
 
-  // ── WhatsApp (800x800) ────────────────────────────────────────────────
+  // ── WhatsApp Ready (800x800) ──────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_whatsapp', name: 'WhatsApp Ready', category: 'whatsapp',
-    canvasWidth: 800, canvasHeight: 800, background: '#075e54',
-    previewColors: [Color(0xFF075e54), Color(0xFFdcf8c6)],
+    canvasWidth: 800, canvasHeight: 800, background: '#115e59',
+    previewColors: [Color(0xFF115E59), Color(0xFFFACC15)],
     elements: [
-      CanvasElement(id: 'inner_box', type: 'figure', x: 40, y: 40, width: 720, height: 720, fill: '#ffffff', cornerRadius: 16),
-      CanvasElement(id: 'headline', type: 'text', text: 'ORDER ON', x: 40, y: 70, width: 720, fontSize: 24, fontWeight: 'bold', fontFamily: 'Inter', fill: '#075e54', align: 'center', opacity: 0.9),
-      CanvasElement(id: 'headline2', type: 'text', text: 'WHATSAPP', x: 40, y: 100, width: 720, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#25d366', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 100, y: 160, width: 600, height: 340, cornerRadius: 12),
-      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 40, y: 530, width: 720, fontSize: 28, fontWeight: '600', fontFamily: 'Inter', fill: '#1f2937', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 75,000', x: 40, y: 580, width: 720, fontSize: 40, fontWeight: 'bold', fontFamily: 'Inter', fill: '#25d366', align: 'center'),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'Tap to Order →', x: 40, y: 660, width: 720, fontSize: 22, fontWeight: '600', fontFamily: 'Inter', fill: '#075e54', align: 'center'),
+      CanvasElement(id: 'inner_box', type: 'figure', x: 35, y: 35, width: 730, height: 730, fill: '#ffffff', cornerRadius: 24),
+      CanvasElement(id: 'headline', type: 'text', text: 'ORDER ON', x: 40, y: 75, width: 720, fontSize: 26, fontFamily: 'Inter', fill: '#115e59', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'headline2', type: 'text', text: 'WHATSAPP', x: 40, y: 108, width: 720, fontSize: 40, fontFamily: 'Inter', fill: '#22c55e', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 165, width: 620, height: 360, cornerRadius: 16, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 40, y: 550, width: 720, fontSize: 30, fontFamily: 'Inter', fill: '#115e59', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 75,000', x: 40, y: 600, width: 720, fontSize: 44, fontFamily: 'Inter', fill: '#facc15', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'Tap to Order →', x: 40, y: 680, width: 720, fontSize: 24, fontFamily: 'Inter', fill: '#115e59', align: 'center', fontWeight: '600'),
     ],
   ),
 
-  // ── Book Now (1080x1080) ──────────────────────────────────────────────
+  // ── Book Now (1080x1080) ────────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_booking', name: 'Book Now', category: 'booking',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#1e40af',
-    previewColors: [Color(0xFF1e40af), Color(0xFFdbeafe)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#312e81',
+    previewColors: [Color(0xFF312E81), Color(0xFFA3E635)],
     elements: [
-      CanvasElement(id: 'accent_top', type: 'figure', x: 0, y: 0, width: 1080, height: 8, fill: '#dbeafe'),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 340, y: 40, width: 400, height: 44, fill: '#dbeafe', cornerRadius: 22),
-      CanvasElement(id: 'badge_text', type: 'text', text: 'PROFESSIONAL SERVICE', x: 340, y: 50, width: 400, fontSize: 16, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1e40af', align: 'center'),
-      CanvasElement(id: 'headline', type: 'text', text: 'BOOK TODAY', x: 40, y: 110, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 200, width: 800, height: 440, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 680, width: 1000, fontSize: 38, fontWeight: '600', fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 740, width: 1000, fontSize: 48, fontWeight: 'bold', fontFamily: 'Inter', fill: '#dbeafe', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 290, y: 830, width: 500, height: 80, fill: '#dbeafe', cornerRadius: 40),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'BOOK NOW', x: 290, y: 850, width: 500, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1e40af', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'accent_top', type: 'figure', x: 0, y: 0, width: 1080, height: 8, fill: '#a3e635'),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 320, y: 45, width: 440, height: 50, fill: '#a3e635', cornerRadius: 25),
+      CanvasElement(id: 'badge_text', type: 'text', text: 'PROFESSIONAL SERVICE', x: 320, y: 58, width: 440, fontSize: 18, fontFamily: 'Inter', fill: '#312e81', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'headline', type: 'text', text: 'BOOK TODAY', x: 40, y: 120, width: 1000, fontSize: 60, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 120, y: 210, width: 840, height: 480, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 715, width: 1000, fontSize: 40, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 770, width: 1000, fontSize: 52, fontFamily: 'Inter', fill: '#a3e635', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 270, y: 840, width: 540, height: 82, fill: '#a3e635', cornerRadius: 41),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'BOOK NOW', x: 270, y: 862, width: 540, fontSize: 30, fontFamily: 'Inter', fill: '#312e81', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1005, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
     ],
   ),
 
-  // ── Collection / Catalog (1080x1350) ──────────────────────────────────
+  // ── Collection (1080x1350) ──────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_catalog', name: 'Collection', category: 'catalog',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#111827',
-    previewColors: [Color(0xFF111827), Color(0xFF6366f1)],
+    canvasWidth: 1080, canvasHeight: 1350, background: '#2f44a8',
+    previewColors: [Color(0xFF2F44A8), Color(0xFF5A74F0)],
     elements: [
-      CanvasElement(id: 'top_band', type: 'figure', x: 0, y: 0, width: 1080, height: 6, fill: '#6366f1'),
-      CanvasElement(id: 'cat_bg', type: 'figure', x: 60, y: 40, width: 280, height: 40, fill: '#6366f1', cornerRadius: 20),
-      CanvasElement(id: 'cat_text', type: 'text', text: 'FEATURED', x: 60, y: 48, width: 280, fontSize: 16, fontWeight: 'bold', fontFamily: 'Inter', fill: '#111827', align: 'center'),
-      CanvasElement(id: 'headline', type: 'text', text: 'TOP PICK', x: 60, y: 105, width: 960, fontSize: 48, fontWeight: 'bold', fontFamily: 'Inter', fill: '#f9fafb', align: 'left'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 190, width: 960, height: 640, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 870, width: 960, fontSize: 40, fontWeight: '600', fontFamily: 'Poppins', fill: '#f9fafb', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 60, y: 940, width: 960, height: 2, fill: '#f9fafb', opacity: 0.2),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 970, width: 500, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#6366f1', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 620, y: 970, width: 400, height: 70, fill: '#6366f1', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 620, y: 988, width: 400, fontSize: 24, fontWeight: 'bold', fontFamily: 'Inter', fill: '#111827', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1100, width: 960, fontSize: 18, fontFamily: 'Inter', fill: '#f9fafb', align: 'left', opacity: 0.6),
+      CanvasElement(id: 'top_band', type: 'figure', x: 0, y: 0, width: 1080, height: 6, fill: '#5a74f0'),
+      CanvasElement(id: 'cat_bg', type: 'figure', x: 60, y: 45, width: 280, height: 48, fill: '#5a74f0', cornerRadius: 24),
+      CanvasElement(id: 'cat_text', type: 'text', text: 'FEATURED', x: 60, y: 56, width: 280, fontSize: 18, fontFamily: 'Inter', fill: '#2f44a8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'headline', type: 'text', text: 'TOP PICK', x: 60, y: 115, width: 960, fontSize: 52, fontFamily: 'Inter', fill: '#ffffff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 185, width: 960, height: 670, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 880, width: 960, fontSize: 42, fontFamily: 'Poppins', fill: '#ffffff', align: 'left', fontWeight: '600'),
+      CanvasElement(id: 'divider', type: 'figure', x: 60, y: 945, width: 960, height: 2, fill: '#ffffff', cornerRadius: 1, opacity: 0.2),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 975, width: 500, fontSize: 54, fontFamily: 'Inter', fill: '#5a74f0', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 620, y: 975, width: 400, height: 72, fill: '#5a74f0', cornerRadius: 36),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 620, y: 994, width: 400, fontSize: 26, fontFamily: 'Inter', fill: '#2f44a8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1100, width: 960, fontSize: 18, fontFamily: 'Inter', fill: '#ffffff', align: 'left', opacity: 0.6),
     ],
   ),
 
-  // ── Instagram Gradient (1080x1080) ────────────────────────────────────
+  // ── Instagram (1080x1080) ───────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_instagram', name: 'Instagram', category: 'promo',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#833ab4',
-    previewColors: [Color(0xFFfd1d1d), Color(0xFF833ab4)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#6f08b2',
+    previewColors: [Color(0xFFE6404D), Color(0xFF6F08B2)],
     elements: [
-      CanvasElement(id: 'bg_gradient', type: 'figure', x: 0, y: 0, width: 1080, height: 540, fill: '#fd1d1d', opacity: 0.4),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 190, y: 60, width: 700, height: 500, cornerRadius: 24),
-      CanvasElement(id: 'headline', type: 'text', text: 'HOT NOW', x: 40, y: 590, width: 1000, fontSize: 68, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 680, width: 960, fontSize: 34, fontWeight: '600', fontFamily: 'Poppins', fill: '#ffffff', align: 'center', opacity: 0.9),
-      CanvasElement(id: 'price_bg', type: 'figure', x: 280, y: 750, width: 520, height: 80, fill: '#ffffff', cornerRadius: 40),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 280, y: 768, width: 520, fontSize: 40, fontWeight: 'bold', fontFamily: 'Inter', fill: '#833ab4', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 870, width: 400, height: 65, fill: '#fccc63', cornerRadius: 32),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 340, y: 886, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#833ab4', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1000, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'bg_gradient', type: 'figure', x: 0, y: 0, width: 1080, height: 560, fill: '#e6404d', opacity: 0.35),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 170, y: 60, width: 740, height: 520, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'headline', type: 'text', text: 'HOT NOW', x: 40, y: 610, width: 1000, fontSize: 74, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 700, width: 960, fontSize: 36, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price_bg', type: 'figure', x: 260, y: 760, width: 560, height: 84, fill: '#ffffff', cornerRadius: 42),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 260, y: 780, width: 560, fontSize: 44, fontFamily: 'Inter', fill: '#6f08b2', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 880, width: 440, height: 70, fill: '#fb9623', cornerRadius: 35),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 320, y: 898, width: 440, fontSize: 28, fontFamily: 'Inter', fill: '#6f08b2', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
     ],
   ),
 
-  // ── Dark Luxury (1080x1080) ───────────────────────────────────────────
+  // ── Dark Luxury (1080x1080) ─────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_luxury', name: 'Dark Luxury', category: 'minimal',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#0a0a0a',
-    previewColors: [Color(0xFF0a0a0a), Color(0xFFc9a96e)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFF4A96E)],
     elements: [
-      CanvasElement(id: 'gold_line_top', type: 'figure', x: 100, y: 60, width: 880, height: 1, fill: '#c9a96e', opacity: 0.5),
-      CanvasElement(id: 'headline', type: 'text', text: 'EXCLUSIVE', x: 40, y: 80, width: 1000, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#c9a96e', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 150, width: 800, height: 520, cornerRadius: 8),
-      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 60, y: 710, width: 960, fontSize: 42, fontWeight: '600', fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'selling', type: 'text', text: 'Premium Collection', x: 60, y: 775, width: 960, fontSize: 20, fontFamily: 'Inter', fill: '#c9a96e', align: 'center'),
-      CanvasElement(id: 'gold_line_mid', type: 'figure', x: 380, y: 820, width: 320, height: 1, fill: '#c9a96e', opacity: 0.6),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 850, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#c9a96e', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 300, y: 940, width: 480, height: 65, fill: '#c9a96e', cornerRadius: 4),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 300, y: 955, width: 480, fontSize: 24, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0a0a0a', align: 'center'),
-      CanvasElement(id: 'gold_line_bottom', type: 'figure', x: 100, y: 1040, width: 880, height: 1, fill: '#c9a96e', opacity: 0.5),
+      CanvasElement(id: 'gold_line_top', type: 'figure', x: 100, y: 60, width: 880, height: 2, fill: '#f4a96e', opacity: 0.5),
+      CanvasElement(id: 'headline', type: 'text', text: 'EXCLUSIVE', x: 40, y: 85, width: 1000, fontSize: 40, fontFamily: 'Inter', fill: '#f4a96e', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 120, y: 160, width: 840, height: 560, cornerRadius: 12, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'Product Name', x: 60, y: 745, width: 960, fontSize: 46, fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'selling', type: 'text', text: 'Premium Collection', x: 60, y: 810, width: 960, fontSize: 22, fontFamily: 'Inter', fill: '#f4a96e', align: 'center'),
+      CanvasElement(id: 'gold_line_mid', type: 'figure', x: 380, y: 855, width: 320, height: 2, fill: '#f4a96e', opacity: 0.6),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 885, width: 1000, fontSize: 60, fontFamily: 'Inter', fill: '#f4a96e', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 280, y: 955, width: 520, height: 72, fill: '#f4a96e', cornerRadius: 36),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 280, y: 973, width: 520, fontSize: 26, fontFamily: 'Inter', fill: '#000000', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'gold_line_bottom', type: 'figure', x: 100, y: 1055, width: 880, height: 2, fill: '#f4a96e', opacity: 0.5),
     ],
   ),
 
-  // ── Bold Geometric (1080x1080) ────────────────────────────────────────
+  // ── Bold Geometric (1080x1080) ──────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_geometric', name: 'Bold Geometric', category: 'sale',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#1a1a2e',
-    previewColors: [Color(0xFF1a1a2e), Color(0xFFe94560)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#3046ad',
+    previewColors: [Color(0xFF3046AD), Color(0xFFE74652)],
     elements: [
-      CanvasElement(id: 'shape1', type: 'figure', x: 0, y: 0, width: 540, height: 200, fill: '#e94560'),
-      CanvasElement(id: 'shape2', type: 'figure', x: 540, y: 0, width: 540, height: 120, fill: '#0f3460'),
-      CanvasElement(id: 'headline', type: 'text', text: 'BIG SALE', x: 40, y: 40, width: 480, fontSize: 72, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'left'),
-      CanvasElement(id: 'discount_bg', type: 'figure', x: 600, y: 30, width: 200, height: 60, fill: '#e94560', cornerRadius: 8),
-      CanvasElement(id: 'discount', type: 'text', text: '-50%', x: 600, y: 42, width: 200, fontSize: 32, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 230, width: 960, height: 480, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 740, width: 650, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'left'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 800, width: 650, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#e94560', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 890, width: 350, height: 70, fill: '#e94560', cornerRadius: 12),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'GRAB IT', x: 40, y: 907, width: 350, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'shape3', type: 'figure', x: 750, y: 880, width: 280, height: 180, fill: '#0f3460', cornerRadius: 16),
-      CanvasElement(id: 'qr_hint', type: 'text', text: '{{CTA_LINK}}', x: 750, y: 950, width: 280, fontSize: 22, fontWeight: '600', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'shape1', type: 'figure', x: 0, y: 0, width: 540.0, height: 210, fill: '#e74652'),
+      CanvasElement(id: 'shape2', type: 'figure', x: 540.0, y: 0, width: 540.0, height: 130, fill: '#2d69c9'),
+      CanvasElement(id: 'headline', type: 'text', text: 'BIG SALE', x: 40, y: 45, width: 460, fontSize: 76, fontFamily: 'Inter', fill: '#ffffff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'discount_bg', type: 'figure', x: 590, y: 35, width: 220, height: 65, fill: '#e74652', cornerRadius: 8),
+      CanvasElement(id: 'discount', type: 'text', text: '-50%', x: 590, y: 50, width: 220, fontSize: 34, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 50, y: 240, width: 980, height: 510, cornerRadius: 20, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 775, width: 640, fontSize: 38, fontFamily: 'Inter', fill: '#ffffff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 835, width: 640, fontSize: 56, fontFamily: 'Inter', fill: '#e74652', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 910, width: 380, height: 74, fill: '#e74652', cornerRadius: 12),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'GRAB IT', x: 40, y: 928, width: 380, fontSize: 30, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'shape3', type: 'figure', x: 740, y: 900, width: 300, height: 190, fill: '#2d69c9', cornerRadius: 18),
+      CanvasElement(id: 'qr_hint', type: 'text', text: '{{CTA_LINK}}', x: 740, y: 975, width: 300, fontSize: 24, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: '600'),
     ],
   ),
 
-  // ── Colorful Pop (1080x1350) ──────────────────────────────────────────
+  // ── Colorful Pop (1080x1350) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_colorpop', name: 'Colorful Pop', category: 'new',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#fef3c7',
-    previewColors: [Color(0xFFfef3c7), Color(0xFFf97316)],
+    canvasWidth: 1080, canvasHeight: 1350, background: '#fca84a',
+    previewColors: [Color(0xFFFCA84A), Color(0xFFE1224C)],
     elements: [
-      CanvasElement(id: 'circle1', type: 'figure', x: -100, y: -100, width: 400, height: 400, fill: '#fb923c', cornerRadius: 200),
-      CanvasElement(id: 'circle2', type: 'figure', x: 780, y: 1050, width: 400, height: 400, fill: '#f87171', cornerRadius: 200),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 60, y: 60, width: 200, height: 50, fill: '#f97316', cornerRadius: 25),
-      CanvasElement(id: 'badge_text', type: 'text', text: 'NEW IN', x: 60, y: 70, width: 200, fontSize: 22, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 160, width: 900, height: 600, cornerRadius: 24),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 800, width: 960, fontSize: 44, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1e293b', align: 'left'),
-      CanvasElement(id: 'selling', type: 'text', text: 'Trending now!', x: 60, y: 865, width: 960, fontSize: 24, fontFamily: 'Poppins', fill: '#f97316', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 60, y: 920, width: 200, height: 4, fill: '#f97316', cornerRadius: 2),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 950, width: 600, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1e293b', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 60, y: 1050, width: 400, height: 80, fill: '#f97316', cornerRadius: 16),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 60, y: 1070, width: 400, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1200, width: 960, fontSize: 20, fontFamily: 'Inter', fill: '#1e293b', align: 'left', opacity: 0.4),
+      CanvasElement(id: 'circle1', type: 'figure', x: -100, y: -100, width: 420, height: 420, fill: '#f4a96e', cornerRadius: 210),
+      CanvasElement(id: 'circle2', type: 'figure', x: 780, y: 1060, width: 400, height: 400, fill: '#e95762', cornerRadius: 200),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 60, y: 60, width: 220, height: 56, fill: '#e1224c', cornerRadius: 28),
+      CanvasElement(id: 'badge_text', type: 'text', text: 'NEW IN', x: 60, y: 74, width: 220, fontSize: 24, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 160, width: 920, height: 640, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 830, width: 960, fontSize: 46, fontFamily: 'Inter', fill: '#3249b3', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'selling', type: 'text', text: 'Trending now!', x: 60, y: 895, width: 960, fontSize: 26, fontFamily: 'Poppins', fill: '#e1224c', align: 'left'),
+      CanvasElement(id: 'divider', type: 'figure', x: 60, y: 950, width: 220, height: 5, fill: '#e1224c', cornerRadius: 2),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 985, width: 600, fontSize: 60, fontFamily: 'Inter', fill: '#3249b3', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 60, y: 1070, width: 440, height: 84, fill: '#e1224c', cornerRadius: 18),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 60, y: 1092, width: 440, fontSize: 30, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1205, width: 960, fontSize: 20, fontFamily: 'Inter', fill: '#3249b3', align: 'left', opacity: 0.4),
     ],
   ),
 
-  // ── Food & Restaurant (1080x1080) ────────────────────────────────────
+  // ── Food Special (1080x1080) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_food', name: 'Food Special', category: 'food',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#1c1207',
-    previewColors: [Color(0xFF1c1207), Color(0xFFf59e0b)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFF4A261)],
     elements: [
-      CanvasElement(id: 'top_stripe', type: 'figure', x: 0, y: 0, width: 1080, height: 8, fill: '#f59e0b'),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 40, y: 30, width: 220, height: 55, fill: '#f59e0b', cornerRadius: 8),
-      CanvasElement(id: 'badge_text', type: 'text', text: "TODAY'S SPECIAL", x: 40, y: 42, width: 220, fontSize: 18, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#1c1207', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 120, width: 960, height: 560, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 720, width: 1000, fontSize: 48, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#ffffff', align: 'left'),
-      CanvasElement(id: 'subtitle', type: 'text', text: 'Fresh · Delicious · Quality', x: 40, y: 782, width: 700, fontSize: 20, fontFamily: 'Lato', fill: '#f59e0b', align: 'left'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 75,000', x: 40, y: 860, width: 600, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#f59e0b', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 700, y: 860, width: 340, height: 80, fill: '#f59e0b', cornerRadius: 40),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER', x: 700, y: 880, width: 340, fontSize: 30, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#1c1207', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 18, fontFamily: 'Lato', fill: '#ffffff', align: 'center', opacity: 0.4),
-      CanvasElement(id: 'bottom_stripe', type: 'figure', x: 0, y: 1072, width: 1080, height: 8, fill: '#f59e0b'),
+      CanvasElement(id: 'top_stripe', type: 'figure', x: 0, y: 0, width: 1080, height: 10, fill: '#f4a261'),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 45, y: 35, width: 240, height: 62, fill: '#f4a261', cornerRadius: 10),
+      CanvasElement(id: 'badge_text', type: 'text', text: "TODAY'S SPECIAL", x: 45, y: 52, width: 240, fontSize: 20, fontFamily: 'Oswald', fill: '#000000', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 55, y: 125, width: 970, height: 590, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 745, width: 1000, fontSize: 50, fontFamily: 'Oswald', fill: '#ffffff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'subtitle', type: 'text', text: 'Fresh · Delicious · Quality', x: 40, y: 805, width: 700, fontSize: 22, fontFamily: 'Lato', fill: '#f4a261', align: 'left'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 75,000', x: 40, y: 880, width: 600, fontSize: 56, fontFamily: 'Inter', fill: '#f4a261', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 700, y: 880, width: 340, height: 78, fill: '#f4a261', cornerRadius: 39),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER', x: 700, y: 900, width: 340, fontSize: 32, fontFamily: 'Oswald', fill: '#000000', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.4),
+      CanvasElement(id: 'bottom_stripe', type: 'figure', x: 0, y: 1070, width: 1080, height: 10, fill: '#f4a261'),
     ],
   ),
 
-  // ── Fashion (1080x1350 Portrait) ──────────────────────────────────────
+  // ── Fashion Drop (1080x1350) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_fashion', name: 'Fashion Drop', category: 'fashion',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#f8f4f0',
-    previewColors: [Color(0xFFf8f4f0), Color(0xFF1a1a1a)],
+    canvasWidth: 1080, canvasHeight: 1350, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF000000)],
     elements: [
-      CanvasElement(id: 'sidebar', type: 'figure', x: 0, y: 0, width: 60, height: 1350, fill: '#1a1a1a'),
-      CanvasElement(id: 'label_bg', type: 'figure', x: 100, y: 60, width: 180, height: 40, fill: '#1a1a1a', cornerRadius: 0),
-      CanvasElement(id: 'label', type: 'text', text: 'NEW SEASON', x: 100, y: 68, width: 180, fontSize: 16, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'headline', type: 'text', text: 'PRODUCT\nNAME', x: 100, y: 130, width: 900, fontSize: 80, fontWeight: 'bold', fontFamily: 'Montserrat', fill: '#1a1a1a', align: 'left'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 100, y: 370, width: 880, height: 680, cornerRadius: 4),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 100, y: 1090, width: 500, fontSize: 44, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1a1a1a', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 100, y: 1170, width: 340, height: 70, fill: '#1a1a1a', cornerRadius: 0),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP THE LOOK', x: 100, y: 1188, width: 340, fontSize: 20, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 100, y: 1280, width: 880, fontSize: 18, fontFamily: 'Raleway', fill: '#1a1a1a', align: 'right', opacity: 0.35),
+      CanvasElement(id: 'sidebar', type: 'figure', x: 0, y: 0, width: 70, height: 1350, fill: '#000000'),
+      CanvasElement(id: 'label_bg', type: 'figure', x: 100, y: 60, width: 200, height: 46, fill: '#000000', cornerRadius: 8),
+      CanvasElement(id: 'label', type: 'text', text: 'NEW SEASON', x: 100, y: 71, width: 200, fontSize: 18, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'headline', type: 'text', text: 'PRODUCT\nNAME', x: 100, y: 130, width: 900, fontSize: 78, fontFamily: 'Montserrat', fill: '#000000', align: 'left', fontWeight: 'bold', lineHeight: 1.05),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 100, y: 360, width: 880, height: 700, cornerRadius: 12, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 100, y: 1090, width: 500, fontSize: 48, fontFamily: 'Inter', fill: '#000000', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 100, y: 1170, width: 360, height: 74, fill: '#000000', cornerRadius: 8),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP THE LOOK', x: 100, y: 1189, width: 360, fontSize: 22, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 100, y: 1280, width: 880, fontSize: 18, fontFamily: 'Inter', fill: '#000000', align: 'right', opacity: 0.35),
     ],
   ),
 
-  // ── Real Estate (1080x1080) ───────────────────────────────────────────
+  // ── Property Listing (1080x1080) ────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_realestate', name: 'Property Listing', category: 'realestate',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#0f172a',
-    previewColors: [Color(0xFF0f172a), Color(0xFFd4af37)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#2f44a8',
+    previewColors: [Color(0xFF2F44A8), Color(0xFFFB8704)],
     elements: [
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 580, cornerRadius: 0),
-      CanvasElement(id: 'image_overlay', type: 'figure', x: 0, y: 380, width: 1080, height: 200, fill: '#0f172a', cornerRadius: 0, opacity: 0.6),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 40, y: 40, width: 160, height: 48, fill: '#d4af37', cornerRadius: 6),
-      CanvasElement(id: 'badge_text', type: 'text', text: 'FOR SALE', x: 40, y: 52, width: 160, fontSize: 20, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#0f172a', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 200,000', x: 40, y: 610, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#d4af37', align: 'left'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 680, width: 800, fontSize: 36, fontWeight: '600', fontFamily: 'Merriweather', fill: '#ffffff', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 40, y: 750, width: 120, height: 3, fill: '#d4af37', cornerRadius: 2),
-      CanvasElement(id: 'details', type: 'text', text: 'Premium Quality  ·  Fast Delivery', x: 40, y: 780, width: 900, fontSize: 22, fontFamily: 'Lato', fill: '#94a3b8', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 870, width: 380, height: 75, fill: '#d4af37', cornerRadius: 12),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'ENQUIRE NOW', x: 40, y: 892, width: 380, fontSize: 26, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#0f172a', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 18, fontFamily: 'Lato', fill: '#94a3b8', align: 'right'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 620, cornerRadius: 0),
+      CanvasElement(id: 'image_overlay', type: 'figure', x: 0, y: 420, width: 1080, height: 220, fill: '#2f44a8', opacity: 0.65),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 45, y: 45, width: 180, height: 54, fill: '#fb8704', cornerRadius: 8),
+      CanvasElement(id: 'badge_text', type: 'text', text: 'FOR SALE', x: 45, y: 60, width: 180, fontSize: 22, fontFamily: 'Oswald', fill: '#2f44a8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 200,000', x: 40, y: 650, width: 1000, fontSize: 56, fontFamily: 'Oswald', fill: '#fb8704', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 720, width: 800, fontSize: 40, fontFamily: 'Merriweather', fill: '#ffffff', align: 'left', fontWeight: '600'),
+      CanvasElement(id: 'divider', type: 'figure', x: 40, y: 790, width: 130, height: 4, fill: '#fb8704', cornerRadius: 2),
+      CanvasElement(id: 'details', type: 'text', text: 'Premium Quality  ·  Fast Delivery', x: 40, y: 820, width: 900, fontSize: 24, fontFamily: 'Lato', fill: '#5872ef', align: 'left'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 890, width: 400, height: 78, fill: '#fb8704', cornerRadius: 14),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'ENQUIRE NOW', x: 40, y: 912, width: 400, fontSize: 28, fontFamily: 'Oswald', fill: '#2f44a8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#5872ef', align: 'right'),
     ],
   ),
 
-  // ── Health & Beauty (1080x1080) ───────────────────────────────────────
+  // ── Beauty & Wellness (1080x1080) ───────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_beauty', name: 'Beauty & Wellness', category: 'beauty',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#fdf2f8',
-    previewColors: [Color(0xFFfdf2f8), Color(0xFFbe185d)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFFD31B43)],
     elements: [
-      CanvasElement(id: 'top_accent', type: 'figure', x: 0, y: 0, width: 1080, height: 6, fill: '#be185d'),
-      CanvasElement(id: 'headline', type: 'text', text: 'BEAUTY ESSENTIALS', x: 40, y: 40, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Playfair Display', fill: '#be185d', align: 'center'),
-      CanvasElement(id: 'subline', type: 'text', text: 'Glow · Shine · Radiate', x: 40, y: 100, width: 1000, fontSize: 22, fontFamily: 'Raleway', fill: '#9d174d', align: 'center'),
-      CanvasElement(id: 'circle_bg', type: 'figure', x: 140, y: 160, width: 800, height: 800, fill: '#fce7f3', cornerRadius: 400),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 170, width: 800, height: 500, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 720, width: 1000, fontSize: 38, fontWeight: '600', fontFamily: 'Playfair Display', fill: '#1f2937', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 790, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#be185d', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 290, y: 880, width: 500, height: 80, fill: '#be185d', cornerRadius: 40),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 290, y: 900, width: 500, fontSize: 28, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 18, fontFamily: 'Raleway', fill: '#be185d', align: 'center', opacity: 0.5),
-      CanvasElement(id: 'bottom_accent', type: 'figure', x: 0, y: 1074, width: 1080, height: 6, fill: '#be185d'),
+      CanvasElement(id: 'top_accent', type: 'figure', x: 0, y: 0, width: 1080, height: 8, fill: '#d31b43'),
+      CanvasElement(id: 'headline', type: 'text', text: 'BEAUTY ESSENTIALS', x: 40, y: 45, width: 1000, fontSize: 46, fontFamily: 'Playfair Display', fill: '#d31b43', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subline', type: 'text', text: 'Glow · Shine · Radiate', x: 40, y: 105, width: 1000, fontSize: 24, fontFamily: 'Raleway', fill: '#c81940', align: 'center'),
+      CanvasElement(id: 'circle_bg', type: 'figure', x: 130, y: 160, width: 820, height: 820, fill: '#ffffff', cornerRadius: 410),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 130, y: 170, width: 820, height: 520, cornerRadius: 20, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 725, width: 1000, fontSize: 40, fontFamily: 'Playfair Display', fill: '#2b64bf', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 795, width: 1000, fontSize: 56, fontFamily: 'Inter', fill: '#d31b43', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 270, y: 880, width: 540, height: 80, fill: '#d31b43', cornerRadius: 40),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 270, y: 900, width: 540, fontSize: 30, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#d31b43', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'bottom_accent', type: 'figure', x: 0, y: 1072, width: 1080, height: 8, fill: '#d31b43'),
     ],
   ),
 
-  // ── Services / Barbershop (1080x1080) ─────────────────────────────────
+  // ── Services Bold (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_service_bold', name: 'Services Bold', category: 'service',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#111111',
-    previewColors: [Color(0xFF111111), Color(0xFFFFD700)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFB8500)],
     elements: [
-      CanvasElement(id: 'gold_corner', type: 'figure', x: 0, y: 0, width: 300, height: 8, fill: '#FFD700'),
-      CanvasElement(id: 'gold_corner2', type: 'figure', x: 0, y: 0, width: 8, height: 300, fill: '#FFD700'),
-      CanvasElement(id: 'gold_corner3', type: 'figure', x: 780, y: 1072, width: 300, height: 8, fill: '#FFD700'),
-      CanvasElement(id: 'gold_corner4', type: 'figure', x: 1072, y: 780, width: 8, height: 300, fill: '#FFD700'),
-      CanvasElement(id: 'headline', type: 'text', text: 'BOOK NOW', x: 40, y: 60, width: 1000, fontSize: 80, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#FFD700', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 200, width: 920, height: 520, cornerRadius: 4),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 760, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'tagline', type: 'text', text: 'Professional · Expert · Trusted', x: 40, y: 825, width: 1000, fontSize: 20, fontFamily: 'Lato', fill: '#FFD700', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'FROM UGX 75,000', x: 40, y: 880, width: 1000, fontSize: 32, fontWeight: '600', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 290, y: 950, width: 500, height: 80, fill: '#FFD700', cornerRadius: 0),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'CALL / WHATSAPP', x: 290, y: 970, width: 500, fontSize: 24, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#111111', align: 'center'),
+      CanvasElement(id: 'gold_corner', type: 'figure', x: 0, y: 0, width: 320, height: 10, fill: '#fb8500'),
+      CanvasElement(id: 'gold_corner2', type: 'figure', x: 0, y: 0, width: 10, height: 320, fill: '#fb8500'),
+      CanvasElement(id: 'gold_corner3', type: 'figure', x: 760, y: 1070, width: 320, height: 10, fill: '#fb8500'),
+      CanvasElement(id: 'gold_corner4', type: 'figure', x: 1070, y: 760, width: 10, height: 320, fill: '#fb8500'),
+      CanvasElement(id: 'headline', type: 'text', text: 'BOOK NOW', x: 40, y: 70, width: 1000, fontSize: 84, fontFamily: 'Oswald', fill: '#fb8500', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 75, y: 210, width: 930, height: 560, cornerRadius: 12, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 800, width: 1000, fontSize: 46, fontFamily: 'Oswald', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'tagline', type: 'text', text: 'Professional · Expert · Trusted', x: 40, y: 865, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#fb8500', align: 'center'),
+      CanvasElement(id: 'price', type: 'text', text: 'FROM UGX 75,000', x: 40, y: 915, width: 1000, fontSize: 34, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 270, y: 960, width: 540, height: 82, fill: '#fb8500', cornerRadius: 0),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'CALL / WHATSAPP', x: 270, y: 980, width: 540, fontSize: 26, fontFamily: 'Oswald', fill: '#000000', align: 'center', fontWeight: 'bold'),
     ],
   ),
 
-  // ── Electronics / Tech (1080x1080) ───────────────────────────────────
+  // ── Tech Product (1080x1080) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_tech', name: 'Tech Product', category: 'tech',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#030712',
-    previewColors: [Color(0xFF030712), Color(0xFF3b82f6)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFF506CEF)],
     elements: [
-      CanvasElement(id: 'glow_orb', type: 'figure', x: 330, y: 80, width: 420, height: 420, fill: '#1d4ed8', cornerRadius: 210, opacity: 0.25),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 80, width: 900, height: 520, cornerRadius: 24),
-      CanvasElement(id: 'tag_bg', type: 'figure', x: 40, y: 40, width: 140, height: 44, fill: '#3b82f6', cornerRadius: 22),
-      CanvasElement(id: 'tag', type: 'text', text: 'FEATURED', x: 40, y: 50, width: 140, fontSize: 16, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 640, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Montserrat', fill: '#ffffff', align: 'left'),
-      CanvasElement(id: 'spec_line', type: 'text', text: 'Pro Performance  ·  Free Delivery', x: 40, y: 700, width: 800, fontSize: 20, fontFamily: 'Inter', fill: '#93c5fd', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 40, y: 745, width: 60, height: 3, fill: '#3b82f6', cornerRadius: 2),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 40, y: 770, width: 700, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#3b82f6', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 870, width: 360, height: 80, fill: '#3b82f6', cornerRadius: 16),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'BUY NOW', x: 40, y: 890, width: 360, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#4b5563', align: 'right'),
+      CanvasElement(id: 'glow_orb', type: 'figure', x: 330, y: 80, width: 420, height: 420, fill: '#425fea', cornerRadius: 210, opacity: 0.25),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 80, width: 920, height: 560, cornerRadius: 26, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'tag_bg', type: 'figure', x: 45, y: 45, width: 160, height: 50, fill: '#506cef', cornerRadius: 25),
+      CanvasElement(id: 'tag', type: 'text', text: 'FEATURED', x: 45, y: 58, width: 160, fontSize: 18, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 670, width: 1000, fontSize: 48, fontFamily: 'Montserrat', fill: '#ffffff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'spec_line', type: 'text', text: 'Pro Performance  ·  Free Delivery', x: 40, y: 730, width: 800, fontSize: 22, fontFamily: 'Inter', fill: '#649fff', align: 'left'),
+      CanvasElement(id: 'divider', type: 'figure', x: 40, y: 775, width: 70, height: 4, fill: '#506cef', cornerRadius: 2),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 40, y: 805, width: 700, fontSize: 56, fontFamily: 'Inter', fill: '#506cef', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 40, y: 895, width: 380, height: 80, fill: '#506cef', cornerRadius: 18),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'BUY NOW', x: 40, y: 916, width: 380, fontSize: 30, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1018, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#3b55d1', align: 'right'),
     ],
   ),
 
-  // ── Gradient Story (1080x1920) ────────────────────────────────────────
+  // ── Gradient Story (1080x1920) ──────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_gradient_story', name: 'Gradient Story', category: 'story',
-    canvasWidth: 1080, canvasHeight: 1920, background: '#6d28d9',
-    previewColors: [Color(0xFF6d28d9), Color(0xFFec4899)],
+    canvasWidth: 1080, canvasHeight: 1920, background: '#8338ec',
+    previewColors: [Color(0xFF8338EC), Color(0xFFE32E56)],
     elements: [
-      CanvasElement(id: 'grad1', type: 'figure', x: 0, y: 0, width: 1080, height: 960, fill: '#6d28d9', cornerRadius: 0),
-      CanvasElement(id: 'grad2', type: 'figure', x: 0, y: 960, width: 1080, height: 960, fill: '#db2777', cornerRadius: 0),
-      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 0, width: 1080, height: 1920, fill: '#000000', cornerRadius: 0, opacity: 0.35),
-      CanvasElement(id: 'headline', type: 'text', text: "DON'T MISS", x: 60, y: 120, width: 960, fontSize: 80, fontWeight: 'bold', fontFamily: 'Montserrat', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'subheadline', type: 'text', text: 'This Amazing Deal', x: 60, y: 220, width: 960, fontSize: 44, fontFamily: 'Nunito', fill: '#fce7f3', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 360, width: 920, height: 820, cornerRadius: 32),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 1240, width: 960, fontSize: 52, fontWeight: 'bold', fontFamily: 'Montserrat', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 1320, width: 960, fontSize: 72, fontWeight: 'bold', fontFamily: 'Inter', fill: '#fce7f3', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 190, y: 1450, width: 700, height: 100, fill: '#ffffff', cornerRadius: 50),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'TAP TO ORDER', x: 190, y: 1472, width: 700, fontSize: 34, fontWeight: 'bold', fontFamily: 'Montserrat', fill: '#6d28d9', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1630, width: 960, fontSize: 28, fontFamily: 'Nunito', fill: '#ffffff', align: 'center', opacity: 0.7),
+      CanvasElement(id: 'grad1', type: 'figure', x: 0, y: 0, width: 1080, height: 960.0, fill: '#8338ec'),
+      CanvasElement(id: 'grad2', type: 'figure', x: 0, y: 960.0, width: 1080, height: 960.0, fill: '#e11d48'),
+      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 0, width: 1080, height: 1920, fill: '#000000', opacity: 0.32),
+      CanvasElement(id: 'headline', type: 'text', text: "DON'T MISS", x: 60, y: 120, width: 960, fontSize: 84, fontFamily: 'Montserrat', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subheadline', type: 'text', text: 'This Amazing Deal', x: 60, y: 225, width: 960, fontSize: 46, fontFamily: 'Nunito', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 70, y: 360, width: 940, height: 840, cornerRadius: 36, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 1240, width: 960, fontSize: 56, fontFamily: 'Montserrat', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 60, y: 1330, width: 960, fontSize: 78, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 180, y: 1470, width: 720, height: 105, fill: '#ffffff', cornerRadius: 52),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'TAP TO ORDER', x: 180, y: 1494, width: 720, fontSize: 38, fontFamily: 'Montserrat', fill: '#8338ec', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1650, width: 960, fontSize: 28, fontFamily: 'Nunito', fill: '#ffffff', align: 'center', opacity: 0.7),
     ],
   ),
 
-  // ── Business Professional (1080x1080) ─────────────────────────────────
+  // ── Professional (1080x1080) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_professional', name: 'Professional', category: 'professional',
     canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
-    previewColors: [Color(0xFFffffff), Color(0xFF1d4ed8)],
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF425FEA)],
     elements: [
-      CanvasElement(id: 'left_panel', type: 'figure', x: 0, y: 0, width: 380, height: 1080, fill: '#1d4ed8'),
-      CanvasElement(id: 'brand', type: 'text', text: 'SOKO 24', x: 0, y: 60, width: 380, fontSize: 24, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'vertical_text', type: 'text', text: 'QUALITY', x: 155, y: 500, width: 70, fontSize: 16, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#93c5fd', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 400, y: 60, width: 640, height: 500, cornerRadius: 8),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 420, y: 600, width: 620, fontSize: 36, fontWeight: 'bold', fontFamily: 'Merriweather', fill: '#1e293b', align: 'left'),
-      CanvasElement(id: 'tagline', type: 'text', text: 'Trusted by thousands across Uganda', x: 420, y: 655, width: 620, fontSize: 18, fontFamily: 'Lato', fill: '#64748b', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 420, y: 700, width: 80, height: 3, fill: '#1d4ed8', cornerRadius: 2),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 420, y: 730, width: 620, fontSize: 44, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1d4ed8', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 420, y: 830, width: 300, height: 70, fill: '#1d4ed8', cornerRadius: 8),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'GET YOURS', x: 420, y: 848, width: 300, fontSize: 24, fontWeight: 'bold', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 420, y: 960, width: 620, fontSize: 18, fontFamily: 'Raleway', fill: '#64748b', align: 'right'),
+      CanvasElement(id: 'left_panel', type: 'figure', x: 0, y: 0, width: 400, height: 1080, fill: '#425fea'),
+      CanvasElement(id: 'brand', type: 'text', text: '{{BUSINESS}}', x: 0, y: 70, width: 400, fontSize: 28, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'vertical_text', type: 'text', text: 'QUALITY', x: 162, y: 500, width: 76, fontSize: 18, fontFamily: 'Raleway', fill: '#649fff', align: 'center', fontWeight: 'bold', letterSpacing: 3),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 420, y: 60, width: 620, height: 520, cornerRadius: 12, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 440, y: 610, width: 600, fontSize: 40, fontFamily: 'Merriweather', fill: '#3249b3', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'tagline', type: 'text', text: 'Trusted by thousands across Uganda', x: 440, y: 665, width: 600, fontSize: 20, fontFamily: 'Lato', fill: '#415ee8', align: 'left'),
+      CanvasElement(id: 'divider', type: 'figure', x: 440, y: 710, width: 90, height: 4, fill: '#425fea', cornerRadius: 2),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 440, y: 745, width: 600, fontSize: 48, fontFamily: 'Inter', fill: '#425fea', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 440, y: 840, width: 320, height: 74, fill: '#425fea', cornerRadius: 10),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'GET YOURS', x: 440, y: 860, width: 320, fontSize: 24, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 440, y: 970, width: 600, fontSize: 18, fontFamily: 'Inter', fill: '#415ee8', align: 'right'),
     ],
   ),
 
-  // ── WhatsApp Green (800x800) ──────────────────────────────────────────
+  // ── WhatsApp Business (800x800) ───────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_whatsapp2', name: 'WhatsApp Business', category: 'whatsapp',
-    canvasWidth: 800, canvasHeight: 800, background: '#075e54',
-    previewColors: [Color(0xFF075e54), Color(0xFF25d366)],
+    canvasWidth: 800, canvasHeight: 800, background: '#20796e',
+    previewColors: [Color(0xFF20796E), Color(0xFF0DBC7C)],
     elements: [
-      CanvasElement(id: 'header_bg', type: 'figure', x: 0, y: 0, width: 800, height: 100, fill: '#128c7e'),
-      CanvasElement(id: 'header_text', type: 'text', text: '🛍️ Special Offer for You!', x: 20, y: 28, width: 760, fontSize: 28, fontWeight: 'bold', fontFamily: 'Nunito', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 130, width: 680, height: 340, cornerRadius: 12),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 30, y: 500, width: 740, fontSize: 32, fontWeight: 'bold', fontFamily: 'Nunito', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price_badge', type: 'figure', x: 200, y: 555, width: 400, height: 60, fill: '#25d366', cornerRadius: 30),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 200, y: 568, width: 400, fontSize: 30, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'details', type: 'text', text: '✅ Free Delivery  ·  ✅ Quality Guaranteed', x: 30, y: 640, width: 740, fontSize: 18, fontFamily: 'Nunito', fill: '#d1fae5', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: 'Reply to ORDER  ·  soko24.co', x: 30, y: 700, width: 740, fontSize: 20, fontWeight: '600', fontFamily: 'Nunito', fill: '#25d366', align: 'center'),
+      CanvasElement(id: 'header_bg', type: 'figure', x: 0, y: 0, width: 800, height: 110, fill: '#24867a'),
+      CanvasElement(id: 'header_text', type: 'text', text: '🛍️ Special Offer for You!', x: 20, y: 35, width: 760, fontSize: 30, fontFamily: 'Nunito', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 140, width: 680, height: 360, cornerRadius: 16, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 30, y: 530, width: 740, fontSize: 34, fontFamily: 'Nunito', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price_badge', type: 'figure', x: 190, y: 565, width: 420, height: 66, fill: '#0dbc7c', cornerRadius: 33),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 190, y: 582, width: 420, fontSize: 32, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'details', type: 'text', text: '✅ Free Delivery  ·  ✅ Quality Guaranteed', x: 30, y: 655, width: 740, fontSize: 20, fontFamily: 'Nunito', fill: '#56d1a4', align: 'center'),
+      CanvasElement(id: 'footer', type: 'text', text: 'Reply to ORDER  ·  soko24.co', x: 30, y: 715, width: 740, fontSize: 22, fontFamily: 'Nunito', fill: '#0dbc7c', align: 'center', fontWeight: '600'),
     ],
   ),
 
-  // ── Luxury Black Gold (1080x1080) ─────────────────────────────────────
+  // ── Dark Luxury (1080x1080) ─────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_luxury_gold', name: 'Dark Luxury', category: 'luxury',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#080808',
-    previewColors: [Color(0xFF080808), Color(0xFFd4af37)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFB8704)],
     elements: [
-      CanvasElement(id: 'frame_tl', type: 'figure', x: 30, y: 30, width: 120, height: 3, fill: '#d4af37'),
-      CanvasElement(id: 'frame_tl2', type: 'figure', x: 30, y: 30, width: 3, height: 120, fill: '#d4af37'),
-      CanvasElement(id: 'frame_br', type: 'figure', x: 930, y: 1047, width: 120, height: 3, fill: '#d4af37'),
-      CanvasElement(id: 'frame_br2', type: 'figure', x: 1047, y: 930, width: 3, height: 120, fill: '#d4af37'),
-      CanvasElement(id: 'headline', type: 'text', text: 'LUXURY COLLECTION', x: 40, y: 70, width: 1000, fontSize: 28, fontWeight: '300', fontFamily: 'Raleway', fill: '#d4af37', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 130, width: 920, height: 560, cornerRadius: 0),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 730, width: 1000, fontSize: 40, fontWeight: '300', fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'divider_left', type: 'figure', x: 340, y: 790, width: 140, height: 1, fill: '#d4af37'),
-      CanvasElement(id: 'divider_right', type: 'figure', x: 600, y: 790, width: 140, height: 1, fill: '#d4af37'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 200,000', x: 40, y: 820, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Inter', fill: '#d4af37', align: 'center'),
-      CanvasElement(id: 'cta_text', type: 'text', text: '⸻ ENQUIRE NOW ⸻', x: 40, y: 920, width: 1000, fontSize: 20, fontWeight: '500', fontFamily: 'Raleway', fill: '#d4af37', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 16, fontFamily: 'Raleway', fill: '#d4af37', align: 'center', opacity: 0.4),
+      CanvasElement(id: 'frame_tl', type: 'figure', x: 35, y: 35, width: 130, height: 4, fill: '#fb8704'),
+      CanvasElement(id: 'frame_tl2', type: 'figure', x: 35, y: 35, width: 4, height: 130, fill: '#fb8704'),
+      CanvasElement(id: 'frame_br', type: 'figure', x: 915, y: 1041, width: 130, height: 4, fill: '#fb8704'),
+      CanvasElement(id: 'frame_br2', type: 'figure', x: 1041, y: 915, width: 4, height: 130, fill: '#fb8704'),
+      CanvasElement(id: 'headline', type: 'text', text: 'LUXURY COLLECTION', x: 40, y: 75, width: 1000, fontSize: 32, fontFamily: 'Raleway', fill: '#fb8704', align: 'center', fontWeight: '300'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 75, y: 140, width: 930, height: 590, cornerRadius: 0, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 760, width: 1000, fontSize: 44, fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center', fontWeight: '300'),
+      CanvasElement(id: 'divider_left', type: 'figure', x: 330, y: 820, width: 150, height: 2, fill: '#fb8704'),
+      CanvasElement(id: 'divider_right', type: 'figure', x: 600, y: 820, width: 150, height: 2, fill: '#fb8704'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 200,000', x: 40, y: 855, width: 1000, fontSize: 50, fontFamily: 'Inter', fill: '#fb8704', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_text', type: 'text', text: '⸻ ENQUIRE NOW ⸻', x: 40, y: 935, width: 1000, fontSize: 22, fontFamily: 'Raleway', fill: '#fb8704', align: 'center', fontWeight: '500'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#fb8704', align: 'center', opacity: 0.4),
     ],
   ),
 
-  // ── Grand Opening (1080x1080) ────────────────────────────────────────────
+  // ── Grand Opening (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_grand_opening', name: 'Grand Opening', category: 'grand',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#7c2d12',
-    previewColors: [Color(0xFF7c2d12), Color(0xFFfbbf24)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#bb183c',
+    previewColors: [Color(0xFFBB183C), Color(0xFFFB8A0C)],
     elements: [
-      CanvasElement(id: 'confetti1', type: 'figure', x: 0, y: 0, width: 1080, height: 12, fill: '#fbbf24'),
-      CanvasElement(id: 'confetti2', type: 'figure', x: 0, y: 1068, width: 1080, height: 12, fill: '#fbbf24'),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 290, y: 60, width: 500, height: 70, fill: '#fbbf24', cornerRadius: 35),
-      CanvasElement(id: 'badge_text', type: 'text', text: '🎉 GRAND OPENING', x: 290, y: 77, width: 500, fontSize: 26, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#7c2d12', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 175, width: 920, height: 500, cornerRadius: 20),
-      CanvasElement(id: 'business_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 715, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Bebas Neue', fill: '#fbbf24', align: 'center'),
-      CanvasElement(id: 'tagline', type: 'text', text: 'We are officially open! Come visit us today.', x: 40, y: 790, width: 1000, fontSize: 22, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 870, width: 400, height: 75, fill: '#fbbf24', cornerRadius: 37),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'VISIT US TODAY', x: 340, y: 890, width: 400, fontSize: 24, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#7c2d12', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1000, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#fbbf24', align: 'center', opacity: 0.6),
+      CanvasElement(id: 'confetti1', type: 'figure', x: 0, y: 0, width: 1080, height: 14, fill: '#fb8a0c'),
+      CanvasElement(id: 'confetti2', type: 'figure', x: 0, y: 1066, width: 1080, height: 14, fill: '#fb8a0c'),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 280, y: 60, width: 520, height: 76, fill: '#fb8a0c', cornerRadius: 38),
+      CanvasElement(id: 'badge_text', type: 'text', text: '🎉 GRAND OPENING', x: 280, y: 80, width: 520, fontSize: 28, fontFamily: 'Oswald', fill: '#bb183c', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 75, y: 175, width: 930, height: 530, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'business_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 735, width: 1000, fontSize: 56, fontFamily: 'Bebas Neue', fill: '#fb8a0c', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'tagline', type: 'text', text: 'We are officially open! Come visit us today.', x: 40, y: 810, width: 1000, fontSize: 24, fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 875, width: 440, height: 78, fill: '#fb8a0c', cornerRadius: 39),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'VISIT US TODAY', x: 320, y: 896, width: 440, fontSize: 26, fontFamily: 'Oswald', fill: '#bb183c', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1005, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#fb8a0c', align: 'center', opacity: 0.6),
     ],
   ),
 
-  // ── Minimal White (1080x1080) ─────────────────────────────────────────────
+  // ── Minimal White (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_minimal_white', name: 'Minimal White', category: 'minimal',
     canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
-    previewColors: [Color(0xFFffffff), Color(0xFF111111)],
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF000000)],
     elements: [
-      CanvasElement(id: 'accent_line', type: 'figure', x: 80, y: 100, width: 4, height: 880, fill: '#111111'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 100, width: 860, height: 580, cornerRadius: 0),
-      CanvasElement(id: 'category', type: 'text', text: 'FEATURED', x: 140, y: 720, width: 860, fontSize: 14, fontWeight: '600', fontFamily: 'Inter', fill: '#999999', align: 'left'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 140, y: 760, width: 860, fontSize: 48, fontWeight: '800', fontFamily: 'Inter', fill: '#111111', align: 'left'),
-      CanvasElement(id: 'divider', type: 'figure', x: 140, y: 840, width: 200, height: 2, fill: '#111111'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 140, y: 870, width: 400, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#111111', align: 'left'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 140, y: 960, width: 860, fontSize: 16, fontFamily: 'Inter', fill: '#999999', align: 'right'),
+      CanvasElement(id: 'accent_line', type: 'figure', x: 80, y: 100, width: 5, height: 880, fill: '#000000', cornerRadius: 2),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 100, width: 800, height: 610, cornerRadius: 0, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'category', type: 'text', text: 'FEATURED', x: 140, y: 740, width: 800, fontSize: 16, fontFamily: 'Inter', fill: '#64748b', align: 'left', fontWeight: '600'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 140, y: 780, width: 800, fontSize: 52, fontFamily: 'Inter', fill: '#000000', align: 'left', fontWeight: '800'),
+      CanvasElement(id: 'divider', type: 'figure', x: 140, y: 855, width: 220, height: 3, fill: '#000000', cornerRadius: 1),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 140, y: 890, width: 420, fontSize: 40, fontFamily: 'Inter', fill: '#000000', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 140, y: 975, width: 800, fontSize: 16, fontFamily: 'Inter', fill: '#64748b', align: 'right', opacity: 0.7),
     ],
   ),
 
-  // ── Free Delivery (1080x1080) ─────────────────────────────────────────────
+  // ── Free Delivery (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_free_delivery', name: 'Free Delivery', category: 'delivery',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#0f766e',
-    previewColors: [Color(0xFF0f766e), Color(0xFFffffff)],
-    elements: [
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 680, cornerRadius: 0),
-      CanvasElement(id: 'image_overlay', type: 'figure', x: 0, y: 520, width: 1080, height: 200, fill: '#0f766e', cornerRadius: 0, opacity: 0.7),
-      CanvasElement(id: 'delivery_badge', type: 'figure', x: 40, y: 40, width: 220, height: 60, fill: '#ffffff', cornerRadius: 30),
-      CanvasElement(id: 'delivery_text', type: 'text', text: '🚚 FREE DELIVERY', x: 40, y: 58, width: 220, fontSize: 18, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0f766e', align: 'center'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 720, width: 1000, fontSize: 48, fontWeight: 'bold', fontFamily: 'Poppins', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 800, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'sub', type: 'text', text: 'Free delivery within Kampala • Order now', x: 40, y: 880, width: 1000, fontSize: 20, fontFamily: 'Lato', fill: '#ffffff', align: 'center', opacity: 0.85),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 940, width: 400, height: 70, fill: '#ffffff', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 340, y: 958, width: 400, fontSize: 20, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0f766e', align: 'center'),
-    ],
-  ),
-
-  // ── Limited Stock (1080x1080) ─────────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_limited_stock', name: 'Limited Stock', category: 'sale',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#1c1c1c',
-    previewColors: [Color(0xFF1c1c1c), Color(0xFFef4444)],
-    elements: [
-      CanvasElement(id: 'urgent_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 80, fill: '#ef4444'),
-      CanvasElement(id: 'urgent_text', type: 'text', text: '⚠️  LIMITED STOCK — HURRY!', x: 40, y: 22, width: 1000, fontSize: 28, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 120, y: 120, width: 840, height: 500, cornerRadius: 12),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 660, width: 1000, fontSize: 42, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'stock_badge', type: 'figure', x: 390, y: 730, width: 300, height: 55, fill: '#ef4444', cornerRadius: 8),
-      CanvasElement(id: 'stock_text', type: 'text', text: 'Only 5 left in stock!', x: 390, y: 746, width: 300, fontSize: 20, fontWeight: '600', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 820, width: 1000, fontSize: 60, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ef4444', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: 'Get it before it runs out • soko24.co', x: 40, y: 1010, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
-    ],
-  ),
-
-  // ── Event Invite (1080x1350) ──────────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_event', name: 'Event Invite', category: 'event',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#1e1b4b',
-    previewColors: [Color(0xFF1e1b4b), Color(0xFFa78bfa)],
-    elements: [
-      CanvasElement(id: 'glow1', type: 'figure', x: -100, y: -100, width: 500, height: 500, fill: '#7c3aed', cornerRadius: 250, opacity: 0.2),
-      CanvasElement(id: 'glow2', type: 'figure', x: 700, y: 900, width: 400, height: 400, fill: '#ec4899', cornerRadius: 200, opacity: 0.15),
-      CanvasElement(id: 'event_label', type: 'text', text: '✦  YOU ARE INVITED  ✦', x: 40, y: 80, width: 1000, fontSize: 20, fontWeight: '600', fontFamily: 'Raleway', fill: '#a78bfa', align: 'center'),
-      CanvasElement(id: 'event_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 140, width: 1000, fontSize: 72, fontWeight: '800', fontFamily: 'Syne', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'divider', type: 'figure', x: 440, y: 260, width: 200, height: 2, fill: '#a78bfa'),
-      CanvasElement(id: 'event_image', type: 'image', src: '', x: 80, y: 300, width: 920, height: 620, cornerRadius: 24),
-      CanvasElement(id: 'date_bg', type: 'figure', x: 240, y: 960, width: 600, height: 80, fill: '#7c3aed', cornerRadius: 12),
-      CanvasElement(id: 'date_text', type: 'text', text: '📅  Saturday, 1 June 2025', x: 240, y: 980, width: 600, fontSize: 22, fontWeight: '700', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'location', type: 'text', text: '📍  Kampala, Uganda', x: 40, y: 1080, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#a78bfa', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 1150, width: 400, height: 70, fill: '#a78bfa', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'RSVP NOW', x: 340, y: 168, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#1e1b4b', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1270, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#a78bfa', align: 'center', opacity: 0.5),
-    ],
-  ),
-
-  // ── Health & Wellness (1080x1080) ────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_health', name: 'Health & Wellness', category: 'health',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#f0fdf4',
-    previewColors: [Color(0xFFf0fdf4), Color(0xFF16a34a)],
-    elements: [
-      CanvasElement(id: 'leaf1', type: 'figure', x: -60, y: -60, width: 250, height: 250, fill: '#bbf7d0', cornerRadius: 125, opacity: 0.5),
-      CanvasElement(id: 'leaf2', type: 'figure', x: 900, y: 880, width: 200, height: 200, fill: '#bbf7d0', cornerRadius: 100, opacity: 0.4),
-      CanvasElement(id: 'badge_bg', type: 'figure', x: 40, y: 60, width: 200, height: 50, fill: '#16a34a', cornerRadius: 10),
-      CanvasElement(id: 'badge_text', type: 'text', text: '🌿 NATURAL', x: 40, y: 73, width: 200, fontSize: 20, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 150, width: 920, height: 520, cornerRadius: 24),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 710, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Plus Jakarta Sans', fill: '#14532d', align: 'center'),
-      CanvasElement(id: 'benefit', type: 'text', text: '100% Natural  •  No Chemicals  •  Results Guaranteed', x: 40, y: 780, width: 1000, fontSize: 18, fontFamily: 'Lato', fill: '#16a34a', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 840, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#14532d', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 930, width: 400, height: 70, fill: '#16a34a', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER NOW', x: 340, y: 948, width: 400, fontSize: 24, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-    ],
-  ),
-
-  // ── Farm Fresh (1080x1080) ────────────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_agri', name: 'Farm Fresh', category: 'agri',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#451a03',
-    previewColors: [Color(0xFF451a03), Color(0xFF84cc16)],
-    elements: [
-      CanvasElement(id: 'soil_strip', type: 'figure', x: 0, y: 0, width: 1080, height: 1080, fill: '#451a03'),
-      CanvasElement(id: 'green_strip', type: 'figure', x: 0, y: 0, width: 1080, height: 120, fill: '#84cc16'),
-      CanvasElement(id: 'headline', type: 'text', text: '🌱 FRESH FROM THE FARM', x: 40, y: 35, width: 1000, fontSize: 36, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#451a03', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 160, width: 920, height: 500, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 700, width: 1000, fontSize: 50, fontWeight: 'bold', fontFamily: 'Fjalla One', fill: '#84cc16', align: 'center'),
-      CanvasElement(id: 'quality', type: 'text', text: 'Organically Grown  •  Direct from Farmers', x: 40, y: 775, width: 1000, fontSize: 20, fontFamily: 'Lato', fill: '#d9f99d', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 840, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 930, width: 400, height: 70, fill: '#84cc16', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'BUY FRESH TODAY', x: 340, y: 948, width: 400, fontSize: 22, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#451a03', align: 'center'),
-    ],
-  ),
-
-  // ── Weekend Sale (1080x1080) ──────────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_weekend_sale', name: 'Weekend Sale', category: 'sale',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#faf5ff',
-    previewColors: [Color(0xFFfaf5ff), Color(0xFF7c3aed)],
-    elements: [
-      CanvasElement(id: 'big_circle', type: 'figure', x: 540, y: 0, width: 800, height: 800, fill: '#7c3aed', cornerRadius: 400, opacity: 0.08),
-      CanvasElement(id: 'weekend_badge', type: 'figure', x: 0, y: 0, width: 1080, height: 90, fill: '#7c3aed'),
-      CanvasElement(id: 'weekend_text', type: 'text', text: 'WEEKEND SALE  🔥  ENDS SUNDAY', x: 40, y: 25, width: 1000, fontSize: 32, fontWeight: 'bold', fontFamily: 'Barlow Condensed', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 100, y: 130, width: 880, height: 520, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 690, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Plus Jakarta Sans', fill: '#1e1b4b', align: 'center'),
-      CanvasElement(id: 'was_price', type: 'text', text: 'Was UGX 150,000', x: 40, y: 760, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#6b7280', align: 'center'),
-      CanvasElement(id: 'now_price', type: 'text', text: 'NOW UGX 99,000', x: 40, y: 810, width: 1000, fontSize: 58, fontWeight: 'bold', fontFamily: 'Inter', fill: '#7c3aed', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 910, width: 400, height: 70, fill: '#7c3aed', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 340, y: 928, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1018, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#6b7280', align: 'center'),
-    ],
-  ),
-
-  // ── Booking Card (1080x1080) ──────────────────────────────────────────────
-  AdTemplate(
-    id: 'tpl_booking_session', name: 'Book a Session', category: 'booking',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#0c0a09',
-    previewColors: [Color(0xFF0c0a09), Color(0xFFfbbf24)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#228075',
+    previewColors: [Color(0xFF228075), Color(0xFFFFFFFF)],
     elements: [
       CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 700, cornerRadius: 0),
-      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 0, width: 1080, height: 700, fill: '#000000', cornerRadius: 0, opacity: 0.45),
-      CanvasElement(id: 'service_label', type: 'text', text: 'BOOK A SESSION', x: 40, y: 60, width: 1000, fontSize: 18, fontWeight: '600', fontFamily: 'Raleway', fill: '#fbbf24', align: 'center'),
-      CanvasElement(id: 'service_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 120, width: 1000, fontSize: 64, fontWeight: 'bold', fontFamily: 'Cinzel', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'slots', type: 'text', text: 'Mon – Sat  •  9:00 AM – 6:00 PM', x: 40, y: 230, width: 1000, fontSize: 20, fontFamily: 'Lato', fill: '#fbbf24', align: 'center'),
-      CanvasElement(id: 'price_bg', type: 'figure', x: 340, y: 280, width: 400, height: 70, fill: '#fbbf24', cornerRadius: 8),
-      CanvasElement(id: 'price_text', type: 'text', text: 'From UGX 50,000', x: 340, y: 298, width: 400, fontSize: 22, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0c0a09', align: 'center'),
-      CanvasElement(id: 'bottom_box', type: 'figure', x: 0, y: 700, width: 1080, height: 380, fill: '#0c0a09'),
-      CanvasElement(id: 'description', type: 'text', text: 'Professional service tailored just for you.', x: 40, y: 730, width: 1000, fontSize: 22, fontFamily: 'Raleway', fill: '#d6d3d1', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 240, y: 810, width: 600, height: 80, fill: '#fbbf24', cornerRadius: 40),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 240, y: 830, width: 600, fontSize: 28, fontWeight: 'bold', fontFamily: 'Oswald', fill: '#0c0a09', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 940, width: 1000, fontSize: 18, fontFamily: 'Raleway', fill: '#fbbf24', align: 'center', opacity: 0.6),
+      CanvasElement(id: 'image_overlay', type: 'figure', x: 0, y: 520, width: 1080, height: 200, fill: '#228075', opacity: 0.72),
+      CanvasElement(id: 'delivery_badge', type: 'figure', x: 45, y: 45, width: 240, height: 66, fill: '#ffffff', cornerRadius: 33),
+      CanvasElement(id: 'delivery_text', type: 'text', text: '🚚 FREE DELIVERY', x: 45, y: 65, width: 240, fontSize: 20, fontFamily: 'Inter', fill: '#228075', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 735, width: 1000, fontSize: 52, fontFamily: 'Poppins', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 815, width: 1000, fontSize: 62, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'sub', type: 'text', text: 'Free delivery within Kampala • Order now', x: 40, y: 895, width: 1000, fontSize: 22, fontFamily: 'Lato', fill: '#ffffff', align: 'center', opacity: 0.9),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 950, width: 440, height: 76, fill: '#ffffff', cornerRadius: 38),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 320, y: 970, width: 440, fontSize: 22, fontFamily: 'Inter', fill: '#228075', align: 'center', fontWeight: 'bold'),
     ],
   ),
 
-  // ── Daily Special (1080x1080) ─────────────────────────────────────────────
+  // ── Limited Stock (1080x1080) ───────────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_limited_stock', name: 'Limited Stock', category: 'sale',
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFE74854)],
+    elements: [
+      CanvasElement(id: 'urgent_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 88, fill: '#e74854'),
+      CanvasElement(id: 'urgent_text', type: 'text', text: '⚠️  LIMITED STOCK — HURRY!', x: 40, y: 26, width: 1000, fontSize: 30, fontFamily: 'Oswald', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 110, y: 125, width: 860, height: 540, cornerRadius: 16, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 690, width: 1000, fontSize: 44, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'stock_badge', type: 'figure', x: 360, y: 755, width: 360, height: 62, fill: '#e74854', cornerRadius: 10),
+      CanvasElement(id: 'stock_text', type: 'text', text: 'Only 5 left in stock!', x: 360, y: 772, width: 360, fontSize: 22, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 850, width: 1000, fontSize: 66, fontFamily: 'Inter', fill: '#e74854', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: 'Get it before it runs out • soko24.co', x: 40, y: 1015, width: 1000, fontSize: 17, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+    ],
+  ),
+
+  // ── Event Invite (1080x1350) ────────────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_event', name: 'Event Invite', category: 'event',
+    canvasWidth: 1080, canvasHeight: 1350, background: '#334bb8',
+    previewColors: [Color(0xFF334BB8), Color(0xFF9B5FEF)],
+    elements: [
+      CanvasElement(id: 'glow1', type: 'figure', x: -100, y: -100, width: 520, height: 520, fill: '#8a43ed', cornerRadius: 260, opacity: 0.18),
+      CanvasElement(id: 'glow2', type: 'figure', x: 700, y: 900, width: 420, height: 420, fill: '#e32e56', cornerRadius: 210, opacity: 0.12),
+      CanvasElement(id: 'event_label', type: 'text', text: '✦  YOU ARE INVITED  ✦', x: 40, y: 85, width: 1000, fontSize: 22, fontFamily: 'Raleway', fill: '#9b5fef', align: 'center', fontWeight: '600', letterSpacing: 2),
+      CanvasElement(id: 'event_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 140, width: 1000, fontSize: 76, fontFamily: 'Syne', fill: '#ffffff', align: 'center', fontWeight: '800'),
+      CanvasElement(id: 'divider', type: 'figure', x: 430, y: 265, width: 220, height: 3, fill: '#9b5fef', cornerRadius: 1),
+      CanvasElement(id: 'event_image', type: 'image', src: '', x: 70, y: 305, width: 940, height: 660, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'date_bg', type: 'figure', x: 230, y: 990, width: 620, height: 84, fill: '#8a43ed', cornerRadius: 14),
+      CanvasElement(id: 'date_text', type: 'text', text: '📅  Saturday, 1 June 2025', x: 230, y: 1012, width: 620, fontSize: 24, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: '700'),
+      CanvasElement(id: 'location', type: 'text', text: '📍  Kampala, Uganda', x: 40, y: 1110, width: 1000, fontSize: 24, fontFamily: 'Inter', fill: '#9b5fef', align: 'center'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 1185, width: 440, height: 76, fill: '#9b5fef', cornerRadius: 38),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'RSVP NOW', x: 320, y: 1205, width: 440, fontSize: 28, fontFamily: 'Oswald', fill: '#334bb8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1290, width: 1000, fontSize: 17, fontFamily: 'Inter', fill: '#9b5fef', align: 'center', opacity: 0.5),
+    ],
+  ),
+
+  // ── Health & Wellness (1080x1080) ───────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_health', name: 'Health & Wellness', category: 'health',
+    canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF0CAA71)],
+    elements: [
+      CanvasElement(id: 'leaf1', type: 'figure', x: -60, y: -60, width: 270, height: 270, fill: '#4dcf9f', cornerRadius: 135, opacity: 0.45),
+      CanvasElement(id: 'leaf2', type: 'figure', x: 900, y: 880, width: 220, height: 220, fill: '#4dcf9f', cornerRadius: 110, opacity: 0.35),
+      CanvasElement(id: 'badge_bg', type: 'figure', x: 45, y: 60, width: 220, height: 56, fill: '#0caa71', cornerRadius: 12),
+      CanvasElement(id: 'badge_text', type: 'text', text: '🌿 NATURAL', x: 45, y: 75, width: 220, fontSize: 22, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 70, y: 155, width: 940, height: 560, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 745, width: 1000, fontSize: 46, fontFamily: 'Plus Jakarta Sans', fill: '#0a9361', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'benefit', type: 'text', text: '100% Natural  •  No Chemicals  •  Results Guaranteed', x: 40, y: 810, width: 1000, fontSize: 20, fontFamily: 'Lato', fill: '#0caa71', align: 'center'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 870, width: 1000, fontSize: 56, fontFamily: 'Inter', fill: '#0a9361', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 950, width: 440, height: 74, fill: '#0caa71', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'ORDER NOW', x: 320, y: 969, width: 440, fontSize: 26, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+    ],
+  ),
+
+  // ── Farm Fresh (1080x1080) ──────────────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_agri', name: 'Farm Fresh', category: 'agri',
+    canvasWidth: 1080, canvasHeight: 1080, background: '#a41534',
+    previewColors: [Color(0xFFA41534), Color(0xFFF0B622)],
+    elements: [
+      CanvasElement(id: 'green_strip', type: 'figure', x: 0, y: 0, width: 1080, height: 130, fill: '#f0b622'),
+      CanvasElement(id: 'headline', type: 'text', text: '🌱 FRESH FROM THE FARM', x: 40, y: 38, width: 1000, fontSize: 38, fontFamily: 'Oswald', fill: '#a41534', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 70, y: 165, width: 940, height: 540, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 735, width: 1000, fontSize: 52, fontFamily: 'Fjalla One', fill: '#f0b622', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'quality', type: 'text', text: 'Organically Grown  •  Direct from Farmers', x: 40, y: 805, width: 1000, fontSize: 22, fontFamily: 'Lato', fill: '#fbcd54', align: 'center'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 40, y: 870, width: 1000, fontSize: 60, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 950, width: 440, height: 74, fill: '#f0b622', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'BUY FRESH TODAY', x: 320, y: 969, width: 440, fontSize: 24, fontFamily: 'Oswald', fill: '#a41534', align: 'center', fontWeight: 'bold'),
+    ],
+  ),
+
+  // ── Weekend Sale (1080x1080) ────────────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_weekend_sale', name: 'Weekend Sale', category: 'sale',
+    canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF8A43ED)],
+    elements: [
+      CanvasElement(id: 'big_circle', type: 'figure', x: 540, y: 0, width: 820, height: 820, fill: '#8a43ed', cornerRadius: 410, opacity: 0.08),
+      CanvasElement(id: 'weekend_badge', type: 'figure', x: 0, y: 0, width: 1080, height: 100, fill: '#8a43ed'),
+      CanvasElement(id: 'weekend_text', type: 'text', text: 'WEEKEND SALE  🔥  ENDS SUNDAY', x: 40, y: 28, width: 1000, fontSize: 34, fontFamily: 'Barlow Condensed', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 130, width: 900, height: 560, cornerRadius: 20, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 715, width: 1000, fontSize: 46, fontFamily: 'Plus Jakarta Sans', fill: '#334bb8', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'was_price', type: 'text', text: 'Was UGX 150,000', x: 40, y: 775, width: 1000, fontSize: 24, fontFamily: 'Inter', fill: '#6c757d', align: 'center'),
+      CanvasElement(id: 'now_price', type: 'text', text: 'NOW UGX 99,000', x: 40, y: 825, width: 1000, fontSize: 62, fontFamily: 'Inter', fill: '#8a43ed', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 915, width: 440, height: 74, fill: '#8a43ed', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 320, y: 934, width: 440, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1020, width: 1000, fontSize: 17, fontFamily: 'Inter', fill: '#6c757d', align: 'center'),
+    ],
+  ),
+
+  // ── Book a Session (1080x1080) ──────────────────────────────────────────────────────
+  AdTemplate(
+    id: 'tpl_booking_session', name: 'Book a Session', category: 'booking',
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFB8A0C)],
+    elements: [
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 720, cornerRadius: 0),
+      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 0, width: 1080, height: 720, fill: '#000000', opacity: 0.42),
+      CanvasElement(id: 'service_label', type: 'text', text: 'BOOK A SESSION', x: 40, y: 65, width: 1000, fontSize: 20, fontFamily: 'Raleway', fill: '#fb8a0c', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'service_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 125, width: 1000, fontSize: 68, fontFamily: 'Cinzel', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'slots', type: 'text', text: 'Mon – Sat  •  9:00 AM – 6:00 PM', x: 40, y: 240, width: 1000, fontSize: 22, fontFamily: 'Lato', fill: '#fb8a0c', align: 'center'),
+      CanvasElement(id: 'price_bg', type: 'figure', x: 330, y: 290, width: 420, height: 74, fill: '#fb8a0c', cornerRadius: 10),
+      CanvasElement(id: 'price_text', type: 'text', text: 'From UGX 50,000', x: 330, y: 310, width: 420, fontSize: 24, fontFamily: 'Inter', fill: '#000000', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'bottom_box', type: 'figure', x: 0, y: 720, width: 1080, height: 360, fill: '#000000'),
+      CanvasElement(id: 'description', type: 'text', text: 'Professional service tailored just for you.', x: 40, y: 755, width: 1000, fontSize: 24, fontFamily: 'Raleway', fill: '#f8f9fa', align: 'center'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 230, y: 825, width: 620, height: 84, fill: '#fb8a0c', cornerRadius: 42),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 230, y: 847, width: 620, fontSize: 30, fontFamily: 'Oswald', fill: '#000000', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 955, width: 1000, fontSize: 18, fontFamily: 'Inter', fill: '#fb8a0c', align: 'center', opacity: 0.6),
+    ],
+  ),
+
+  // ── Daily Special (1080x1080) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_daily_special', name: 'Daily Special', category: 'food',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#fff7ed',
-    previewColors: [Color(0xFFfff7ed), Color(0xFFea580c)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFFDE1C47)],
     elements: [
-      CanvasElement(id: 'top_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 100, fill: '#ea580c'),
-      CanvasElement(id: 'day_text', type: 'text', text: '🍽️  TODAY\'S SPECIAL', x: 40, y: 30, width: 1000, fontSize: 32, fontWeight: 'bold', fontFamily: 'Staatliches', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 60, y: 140, width: 960, height: 560, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 745, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Staatliches', fill: '#431407', align: 'center'),
-      CanvasElement(id: 'desc', type: 'text', text: 'Fresh · Made with love · Ready to serve', x: 40, y: 820, width: 1000, fontSize: 20, fontFamily: 'Pacifico', fill: '#ea580c', align: 'center'),
-      CanvasElement(id: 'price_bg', type: 'figure', x: 390, y: 870, width: 300, height: 70, fill: '#ea580c', cornerRadius: 35),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 25,000', x: 390, y: 890, width: 300, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: 'Order now · soko24.co', x: 40, y: 990, width: 1000, fontSize: 16, fontFamily: 'Lato', fill: '#9a3412', align: 'center', opacity: 0.6),
+      CanvasElement(id: 'top_bar', type: 'figure', x: 0, y: 0, width: 1080, height: 110, fill: '#de1c47'),
+      CanvasElement(id: 'day_text', type: 'text', text: "🍽️  TODAY'S SPECIAL", x: 40, y: 33, width: 1000, fontSize: 34, fontFamily: 'Staatliches', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 50, y: 140, width: 980, height: 590, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 760, width: 1000, fontSize: 54, fontFamily: 'Staatliches', fill: '#a51534', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'desc', type: 'text', text: 'Fresh · Made with love · Ready to serve', x: 40, y: 830, width: 1000, fontSize: 22, fontFamily: 'Pacifico', fill: '#de1c47', align: 'center'),
+      CanvasElement(id: 'price_bg', type: 'figure', x: 370, y: 880, width: 340, height: 74, fill: '#de1c47', cornerRadius: 37),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 25,000', x: 370, y: 900, width: 340, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: 'Order now · soko24.co', x: 40, y: 995, width: 1000, fontSize: 17, fontFamily: 'Inter', fill: '#c5193f', align: 'center', opacity: 0.6),
     ],
   ),
 
-  // ── Catalog Grid Story (1080x1350) ────────────────────────────────────────
+  // ── Catalog Story (1080x1350) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_catalog_story', name: 'Catalog Story', category: 'catalog',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#0a0a0a',
-    previewColors: [Color(0xFF0a0a0a), Color(0xFFffffff)],
+    canvasWidth: 1080, canvasHeight: 1350, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFFFFFF)],
     elements: [
-      CanvasElement(id: 'header_bg', type: 'figure', x: 0, y: 0, width: 1080, height: 120, fill: '#0a0a0a'),
-      CanvasElement(id: 'brand_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 38, width: 1000, fontSize: 38, fontWeight: '800', fontFamily: 'Space Grotesk', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'divider', type: 'figure', x: 80, y: 115, width: 920, height: 1, fill: '#333333'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 120, width: 1080, height: 820, cornerRadius: 0),
-      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 700, width: 1080, height: 250, fill: '#000000', cornerRadius: 0, opacity: 0.65),
-      CanvasElement(id: 'item_name', type: 'text', text: 'Collection Piece', x: 40, y: 730, width: 1000, fontSize: 48, fontWeight: '300', fontFamily: 'Raleway', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 40, y: 800, width: 1000, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer_bg', type: 'figure', x: 0, y: 940, width: 1080, height: 410, fill: '#0a0a0a'),
-      CanvasElement(id: 'tagline', type: 'text', text: 'Swipe to see more →', x: 40, y: 990, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#999999', align: 'center'),
-      CanvasElement(id: 'shop_url', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1050, width: 1000, fontSize: 28, fontWeight: '600', fontFamily: 'Space Grotesk', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 240, y: 1120, width: 600, height: 70, fill: '#ffffff', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP THE COLLECTION', x: 240, y: 138, width: 600, fontSize: 22, fontWeight: 'bold', fontFamily: 'Space Grotesk', fill: '#0a0a0a', align: 'center'),
+      CanvasElement(id: 'header_bg', type: 'figure', x: 0, y: 0, width: 1080, height: 125, fill: '#000000'),
+      CanvasElement(id: 'brand_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 42, width: 1000, fontSize: 40, fontFamily: 'Space Grotesk', fill: '#ffffff', align: 'center', fontWeight: '800'),
+      CanvasElement(id: 'divider', type: 'figure', x: 80, y: 118, width: 920, height: 2, fill: '#343a40', cornerRadius: 1),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 0, y: 125, width: 1080, height: 850, cornerRadius: 0),
+      CanvasElement(id: 'overlay', type: 'figure', x: 0, y: 720, width: 1080, height: 280, fill: '#000000', opacity: 0.6),
+      CanvasElement(id: 'item_name', type: 'text', text: 'Collection Piece', x: 40, y: 755, width: 1000, fontSize: 50, fontFamily: 'Raleway', fill: '#ffffff', align: 'center', fontWeight: '300'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 120,000', x: 40, y: 825, width: 1000, fontSize: 38, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer_bg', type: 'figure', x: 0, y: 955, width: 1080, height: 395, fill: '#000000'),
+      CanvasElement(id: 'tagline', type: 'text', text: 'Swipe to see more →', x: 40, y: 1005, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#f8f9fa', align: 'center'),
+      CanvasElement(id: 'shop_url', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1065, width: 1000, fontSize: 30, fontFamily: 'Space Grotesk', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 230, y: 1135, width: 620, height: 74, fill: '#ffffff', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP THE COLLECTION', x: 230, y: 1155, width: 620, fontSize: 24, fontFamily: 'Space Grotesk', fill: '#000000', align: 'center', fontWeight: 'bold'),
     ],
   ),
 
-  // ── Testimonial / Review (1080x1080) ─────────────────────────────────────
+  // ── Customer Review (1080x1080) ─────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_review', name: 'Customer Review', category: 'promo',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#eff6ff',
-    previewColors: [Color(0xFFeff6ff), Color(0xFF1d4ed8)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF425FEA)],
     elements: [
-      CanvasElement(id: 'quote_mark', type: 'text', text: '"', x: 40, y: 20, width: 200, fontSize: 180, fontWeight: 'bold', fontFamily: 'Playfair Display', fill: '#bfdbfe', align: 'left'),
-      CanvasElement(id: 'review_text', type: 'text', text: 'This is the best product I have ever bought. Highly recommend to everyone in Kampala!', x: 80, y: 180, width: 920, fontSize: 36, fontFamily: 'Merriweather', fill: '#1e3a8a', align: 'center'),
-      CanvasElement(id: 'reviewer_img', type: 'image', src: '', x: 440, y: 500, width: 200, height: 200, cornerRadius: 100),
-      CanvasElement(id: 'reviewer_name', type: 'text', text: 'Jane Nakato', x: 40, y: 730, width: 1000, fontSize: 28, fontWeight: 'bold', fontFamily: 'Inter', fill: '#1d4ed8', align: 'center'),
-      CanvasElement(id: 'stars', type: 'text', text: '★★★★★', x: 40, y: 780, width: 1000, fontSize: 40, fill: '#fbbf24', align: 'center'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'Try PRODUCT NAME today', x: 40, y: 860, width: 1000, fontSize: 30, fontWeight: '600', fontFamily: 'Inter', fill: '#1e3a8a', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 940, width: 400, height: 70, fill: '#1d4ed8', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 340, y: 958, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'quote_mark', type: 'text', text: '"', x: 40, y: 15, width: 200, fontSize: 180, fontFamily: 'Playfair Display', fill: '#71a7ff', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'review_text', type: 'text', text: 'This is the best product I have ever bought. Highly recommend to everyone in Kampala!', x: 80, y: 170, width: 920, fontSize: 36, fontFamily: 'Merriweather', fill: '#3a54cf', align: 'center', lineHeight: 1.5),
+      CanvasElement(id: 'reviewer_img', type: 'image', src: '', x: 430, y: 470, width: 220, height: 220, cornerRadius: 110, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'reviewer_name', type: 'text', text: 'Jane Nakato', x: 40, y: 725, width: 1000, fontSize: 30, fontFamily: 'Inter', fill: '#425fea', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'stars', type: 'text', text: '★★★★★', x: 40, y: 780, width: 1000, fontSize: 42, fontFamily: 'Inter', fill: '#fbbf24', align: 'center'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'Try PRODUCT NAME today', x: 40, y: 860, width: 1000, fontSize: 32, fontFamily: 'Inter', fill: '#3a54cf', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 945, width: 440, height: 74, fill: '#425fea', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'SHOP NOW', x: 320, y: 964, width: 440, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
     ],
   ),
 
-  // ── Back-to-School (1080x1080) ────────────────────────────────────────────
+  // ── Back to School (1080x1080) ──────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_school', name: 'Back to School', category: 'promo',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#fef9c3',
-    previewColors: [Color(0xFFfef9c3), Color(0xFF713f12)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#fca748',
+    previewColors: [Color(0xFFFCA748), Color(0xFFE63946)],
     elements: [
-      CanvasElement(id: 'ruler_left', type: 'figure', x: 0, y: 0, width: 40, height: 1080, fill: '#713f12'),
-      CanvasElement(id: 'ruler_right', type: 'figure', x: 1040, y: 0, width: 40, height: 1080, fill: '#713f12'),
-      CanvasElement(id: 'badge', type: 'figure', x: 340, y: 60, width: 400, height: 70, fill: '#dc2626', cornerRadius: 8),
-      CanvasElement(id: 'badge_text', type: 'text', text: '✏️ BACK TO SCHOOL', x: 340, y: 78, width: 400, fontSize: 26, fontWeight: 'bold', fontFamily: 'Permanent Marker', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 180, width: 920, height: 500, cornerRadius: 12),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 80, y: 720, width: 920, fontSize: 48, fontWeight: 'bold', fontFamily: 'Permanent Marker', fill: '#713f12', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 80, y: 800, width: 920, fontSize: 52, fontWeight: 'bold', fontFamily: 'Inter', fill: '#dc2626', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 340, y: 890, width: 400, height: 70, fill: '#713f12', cornerRadius: 35),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 340, y: 908, width: 400, fontSize: 22, fontWeight: 'bold', fontFamily: 'Inter', fill: '#fef9c3', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1010, width: 1000, fontSize: 16, fontFamily: 'Inter', fill: '#713f12', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'ruler_left', type: 'figure', x: 0, y: 0, width: 45, height: 1080, fill: '#c7844f'),
+      CanvasElement(id: 'ruler_right', type: 'figure', x: 1035, y: 0, width: 45, height: 1080, fill: '#c7844f'),
+      CanvasElement(id: 'badge', type: 'figure', x: 330, y: 60, width: 420, height: 76, fill: '#e63946', cornerRadius: 10),
+      CanvasElement(id: 'badge_text', type: 'text', text: '✏️ BACK TO SCHOOL', x: 330, y: 80, width: 420, fontSize: 28, fontFamily: 'Permanent Marker', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 75, y: 175, width: 930, height: 530, cornerRadius: 14, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 80, y: 740, width: 920, fontSize: 50, fontFamily: 'Permanent Marker', fill: '#c7844f', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 49,000', x: 80, y: 820, width: 920, fontSize: 56, fontFamily: 'Inter', fill: '#e63946', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 320, y: 905, width: 440, height: 74, fill: '#c7844f', cornerRadius: 37),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'WA: {{WHATSAPP}}', x: 320, y: 924, width: 440, fontSize: 24, fontFamily: 'Inter', fill: '#fca748', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1015, width: 1000, fontSize: 17, fontFamily: 'Inter', fill: '#c7844f', align: 'center', opacity: 0.5),
     ],
   ),
 
-  // ── TikTok Viral (1080x1920) ─────────────────────────────────────────────
+  // ── TikTok Viral (1080x1920) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_tiktok', name: 'TikTok Viral', category: 'story',
     canvasWidth: 1080, canvasHeight: 1920, background: '#000000',
-    previewColors: [Color(0xFF000000), Color(0xFFfe2c55)],
+    previewColors: [Color(0xFF000000), Color(0xFFE74551)],
     elements: [
-      CanvasElement(id: 'glow', type: 'figure', x: 0, y: 0, width: 1080, height: 600, fill: '#fe2c55', opacity: 0.25),
-      CanvasElement(id: 'headline', type: 'text', text: 'POV: YOU NEED THIS', x: 60, y: 120, width: 960, fontSize: 58, fontWeight: 'bold', fontFamily: 'Bebas Neue', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 320, width: 900, height: 900, cornerRadius: 24),
-      CanvasElement(id: 'price_bg', type: 'figure', x: 240, y: 1280, width: 600, height: 90, fill: '#fe2c55', cornerRadius: 45),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 240, y: 1300, width: 600, fontSize: 44, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'Link in bio 👆', x: 60, y: 1420, width: 960, fontSize: 32, fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1780, width: 960, fontSize: 22, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'glow', type: 'figure', x: 0, y: 0, width: 1080, height: 620, fill: '#e74551', opacity: 0.28),
+      CanvasElement(id: 'headline', type: 'text', text: 'POV: YOU NEED THIS', x: 60, y: 120, width: 960, fontSize: 62, fontFamily: 'Bebas Neue', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 330, width: 920, height: 920, cornerRadius: 28, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'price_bg', type: 'figure', x: 220, y: 1295, width: 640, height: 95, fill: '#e74551', cornerRadius: 47),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 220, y: 1318, width: 640, fontSize: 46, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'Link in bio 👆', x: 60, y: 1440, width: 960, fontSize: 34, fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{CTA_LINK}}', x: 60, y: 1790, width: 960, fontSize: 24, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
     ],
   ),
 
-  // ── LinkedIn Professional (1200x627) ─────────────────────────────────────
+  // ── LinkedIn Post (1200x627) ───────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_linkedin', name: 'LinkedIn Post', category: 'professional',
-    canvasWidth: 1200, canvasHeight: 627, background: '#f8fafc',
-    previewColors: [Color(0xFFf8fafc), Color(0xFF0a66c2)],
+    canvasWidth: 1200, canvasHeight: 627, background: '#ffffff',
+    previewColors: [Color(0xFFFFFFFF), Color(0xFF357BEB)],
     elements: [
-      CanvasElement(id: 'accent', type: 'figure', x: 0, y: 0, width: 12, height: 627, fill: '#0a66c2'),
-      CanvasElement(id: 'headline', type: 'text', text: 'Now Available', x: 60, y: 60, width: 700, fontSize: 42, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0f172a', align: 'left'),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 120, width: 700, fontSize: 28, fontFamily: 'Inter', fill: '#334155', align: 'left'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 780, y: 60, width: 380, height: 380, cornerRadius: 12),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 60, y: 200, width: 500, fontSize: 36, fontWeight: 'bold', fontFamily: 'Inter', fill: '#0a66c2', align: 'left'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 60, y: 480, width: 220, height: 56, fill: '#0a66c2', cornerRadius: 28),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'Learn more', x: 60, y: 494, width: 220, fontSize: 20, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'footer', type: 'text', text: '{{BUSINESS}} · {{CTA_LINK}}', x: 60, y: 570, width: 1100, fontSize: 16, fontFamily: 'Inter', fill: '#64748b', align: 'left'),
+      CanvasElement(id: 'accent', type: 'figure', x: 0, y: 0, width: 14, height: 627, fill: '#357beb'),
+      CanvasElement(id: 'headline', type: 'text', text: 'Now Available', x: 60, y: 55, width: 700, fontSize: 44, fontFamily: 'Inter', fill: '#2f44a8', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 60, y: 115, width: 700, fontSize: 30, fontFamily: 'Inter', fill: '#3750c4', align: 'left'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 790, y: 55, width: 390, height: 390, cornerRadius: 14, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 150,000', x: 60, y: 200, width: 500, fontSize: 38, fontFamily: 'Inter', fill: '#357beb', align: 'left', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 60, y: 490, width: 240, height: 60, fill: '#357beb', cornerRadius: 30),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'Learn more', x: 60, y: 506, width: 240, fontSize: 22, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'footer', type: 'text', text: '{{BUSINESS}} · {{CTA_LINK}}', x: 60, y: 585, width: 1100, fontSize: 17, fontFamily: 'Inter', fill: '#415ee8', align: 'left'),
     ],
   ),
 
-  // ── Black Friday (1080x1080) ─────────────────────────────────────────────
+  // ── Black Friday (1080x1080) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_black_friday', name: 'Black Friday', category: 'sale',
-    canvasWidth: 1080, canvasHeight: 1080, background: '#09090b',
-    previewColors: [Color(0xFF09090b), Color(0xFFfacc15)],
+    canvasWidth: 1080, canvasHeight: 1080, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFB8706)],
     elements: [
-      CanvasElement(id: 'burst', type: 'figure', x: 340, y: 40, width: 400, height: 400, fill: '#facc15', cornerRadius: 200, opacity: 0.15),
-      CanvasElement(id: 'headline', type: 'text', text: 'BLACK FRIDAY', x: 40, y: 80, width: 1000, fontSize: 64, fontWeight: 'bold', fontFamily: 'Bebas Neue', fill: '#facc15', align: 'center'),
-      CanvasElement(id: 'subheadline', type: 'text', text: 'UP TO 50% OFF', x: 40, y: 160, width: 1000, fontSize: 36, fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 140, y: 240, width: 800, height: 480, cornerRadius: 16),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 760, width: 1000, fontSize: 34, fontWeight: '600', fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 820, width: 1000, fontSize: 56, fontWeight: 'bold', fontFamily: 'Inter', fill: '#facc15', align: 'center'),
-      CanvasElement(id: 'cta_bg', type: 'figure', x: 290, y: 920, width: 500, height: 72, fill: '#facc15', cornerRadius: 36),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'GRAB THE DEAL', x: 290, y: 938, width: 500, fontSize: 26, fontWeight: 'bold', fontFamily: 'Inter', fill: '#09090b', align: 'center'),
+      CanvasElement(id: 'burst', type: 'figure', x: 340, y: 40, width: 420, height: 420, fill: '#fb8706', cornerRadius: 210, opacity: 0.18),
+      CanvasElement(id: 'headline', type: 'text', text: 'BLACK FRIDAY', x: 40, y: 85, width: 1000, fontSize: 68, fontFamily: 'Bebas Neue', fill: '#fb8706', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'subheadline', type: 'text', text: 'UP TO 50% OFF', x: 40, y: 170, width: 1000, fontSize: 38, fontFamily: 'Inter', fill: '#ffffff', align: 'center'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 130, y: 250, width: 820, height: 510, cornerRadius: 20, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 785, width: 1000, fontSize: 36, fontFamily: 'Inter', fill: '#ffffff', align: 'center', fontWeight: '600'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 99,000', x: 40, y: 840, width: 1000, fontSize: 62, fontFamily: 'Inter', fill: '#fb8706', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_bg', type: 'figure', x: 280, y: 930, width: 520, height: 76, fill: '#fb8706', cornerRadius: 38),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'GRAB THE DEAL', x: 280, y: 950, width: 520, fontSize: 28, fontFamily: 'Inter', fill: '#000000', align: 'center', fontWeight: 'bold'),
     ],
   ),
 
-  // ── Restaurant Special (1080x1350) ───────────────────────────────────────
+  // ── Menu Special (1080x1350) ────────────────────────────────────────────────────────
   AdTemplate(
     id: 'tpl_restaurant', name: 'Menu Special', category: 'food',
-    canvasWidth: 1080, canvasHeight: 1350, background: '#1c1917',
-    previewColors: [Color(0xFF1c1917), Color(0xFFea580c)],
+    canvasWidth: 1080, canvasHeight: 1350, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFDE1C47)],
     elements: [
-      CanvasElement(id: 'top_band', type: 'figure', x: 0, y: 0, width: 1080, height: 280, fill: '#ea580c'),
-      CanvasElement(id: 'headline', type: 'text', text: "TODAY'S SPECIAL", x: 40, y: 80, width: 1000, fontSize: 52, fontWeight: 'bold', fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'product_image', type: 'image', src: '', x: 90, y: 320, width: 900, height: 560, cornerRadius: 20),
-      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 920, width: 1000, fontSize: 44, fontWeight: 'bold', fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center'),
-      CanvasElement(id: 'price', type: 'text', text: 'UGX 25,000', x: 40, y: 990, width: 1000, fontSize: 48, fontWeight: 'bold', fontFamily: 'Inter', fill: '#ea580c', align: 'center'),
-      CanvasElement(id: 'cta_text', type: 'text', text: 'Order: {{WHATSAPP}}', x: 40, y: 1080, width: 1000, fontSize: 28, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.85),
-      CanvasElement(id: 'footer', type: 'text', text: '{{LOCATION}}', x: 40, y: 1260, width: 1000, fontSize: 20, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+      CanvasElement(id: 'top_band', type: 'figure', x: 0, y: 0, width: 1080, height: 290, fill: '#de1c47'),
+      CanvasElement(id: 'headline', type: 'text', text: "TODAY'S SPECIAL", x: 40, y: 85, width: 1000, fontSize: 54, fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'product_image', type: 'image', src: '', x: 80, y: 325, width: 920, height: 590, cornerRadius: 24, shadowColor: '#000000', shadowDx: 0, shadowDy: 12, shadowBlur: 28),
+      CanvasElement(id: 'product_name', type: 'text', text: 'PRODUCT NAME', x: 40, y: 945, width: 1000, fontSize: 46, fontFamily: 'Playfair Display', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'price', type: 'text', text: 'UGX 25,000', x: 40, y: 1015, width: 1000, fontSize: 52, fontFamily: 'Inter', fill: '#de1c47', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta_text', type: 'text', text: 'Order: {{WHATSAPP}}', x: 40, y: 1100, width: 1000, fontSize: 30, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.9),
+      CanvasElement(id: 'footer', type: 'text', text: '{{LOCATION}}', x: 40, y: 1285, width: 1000, fontSize: 22, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.5),
+    ],
+  ),
+
+  // ── SM Insta / Flip what you see (1080x1350) ────────────────────────────
+  AdTemplate(
+    id: 'tpl_sminsta', name: 'SM Insta', category: 'camera',
+    canvasWidth: 1080, canvasHeight: 1350, background: '#000000',
+    previewColors: [Color(0xFF000000), Color(0xFFFBBF24)],
+    elements: [
+      CanvasElement(id: 'photo', type: 'image', src: '', x: 0, y: 0, width: 1080, height: 1080, imageFit: 'cover'),
+      CanvasElement(id: 'fade', type: 'figure', x: 0, y: 960, width: 1080, height: 390, fill: '#000000', opacity: 0.65),
+      CanvasElement(id: 'business', type: 'text', text: '{{BUSINESS}}', x: 40, y: 1010, width: 1000, fontSize: 42, fontFamily: 'Montserrat', fill: '#ffffff', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'whatsapp', type: 'text', text: 'WhatsApp: {{WHATSAPP}}', x: 40, y: 1070, width: 1000, fontSize: 26, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.9),
+      CanvasElement(id: 'price', type: 'text', text: '{{PRICE}}', x: 40, y: 1130, width: 1000, fontSize: 56, fontFamily: 'Inter', fill: '#fbbf24', align: 'center', fontWeight: 'bold'),
+      CanvasElement(id: 'cta', type: 'text', text: '{{CTA_LINK}}', x: 40, y: 1220, width: 1000, fontSize: 24, fontFamily: 'Inter', fill: '#ffffff', align: 'center', opacity: 0.7),
     ],
   ),
 
@@ -1329,6 +1575,36 @@ const fontDescriptors = <String, ({String sample, String vibe})>{
   'Cormorant Garamond': (sample: 'Aa', vibe: 'Editorial'),
 };
 
+/// Curated modern, vibrant, professional color palettes for Studio templates.
+/// Each palette guarantees readable text via [contrastText].
+const studioVibrantPalettes = <({String bg, String accent, String text, String muted})>[
+  // Cobalt + Coral
+  (bg: '#1e3a8a', accent: '#ff6b6b', text: '#ffffff', muted: '#93c5fd'),
+  // Emerald + Cream
+  (bg: '#064e3b', accent: '#fef3c7', text: '#ffffff', muted: '#6ee7b7'),
+  // Royal Purple + Gold
+  (bg: '#581c87', accent: '#fbbf24', text: '#ffffff', muted: '#d8b4fe'),
+  // Sunset Orange + Deep Navy
+  (bg: '#f97316', accent: '#0f172a', text: '#ffffff', muted: '#fed7aa'),
+  // Magenta + Soft Blush
+  (bg: '#be185d', accent: '#fce7f3', text: '#ffffff', muted: '#fbcfe8'),
+  // Teal + Citrus
+  (bg: '#115e59', accent: '#facc15', text: '#ffffff', muted: '#5eead4'),
+  // Deep Indigo + Electric Lime
+  (bg: '#312e81', accent: '#a3e635', text: '#ffffff', muted: '#a5b4fc'),
+  // Charcoal + Tangerine
+  (bg: '#1f2937', accent: '#fb923c', text: '#ffffff', muted: '#9ca3af'),
+  // Midnight + Cyan
+  (bg: '#0f172a', accent: '#22d3ee', text: '#ffffff', muted: '#94a3b8'),
+  // Wine + Peach
+  (bg: '#7f1d1d', accent: '#fdba74', text: '#ffffff', muted: '#fca5a5'),
+];
+
+/// Returns a stable palette from [studioVibrantPalettes] based on [seed].
+({String bg, String accent, String text, String muted}) studioPaletteFor(int seed) {
+  return studioVibrantPalettes[seed.abs() % studioVibrantPalettes.length];
+}
+
 /// Template categories for the Studio picker
 const templateCategories = <({String id, String label, IconData icon})>[
   (id: 'all',          label: 'All',         icon: Icons.grid_view_rounded),
@@ -1357,53 +1633,70 @@ const templateCategories = <({String id, String label, IconData icon})>[
 
 /// Preset gradient backgrounds for the canvas background panel
 const gradientPresets = <({String id, String label, List<Color> colors})>[
-  (id: 'sunset',    label: 'Sunset',    colors: [Color(0xFFff6b35), Color(0xFFf7c59f)]),
-  (id: 'ocean',     label: 'Ocean',     colors: [Color(0xFF0077b6), Color(0xFF00b4d8)]),
-  (id: 'forest',    label: 'Forest',    colors: [Color(0xFF1b4332), Color(0xFF40916c)]),
-  (id: 'neon',      label: 'Neon',      colors: [Color(0xFF6d28d9), Color(0xFFec4899)]),
-  (id: 'gold',      label: 'Gold',      colors: [Color(0xFF92400e), Color(0xFFd4af37)]),
-  (id: 'midnight',  label: 'Midnight',  colors: [Color(0xFF0f0c29), Color(0xFF302b63)]),
-  (id: 'rose',      label: 'Rose',      colors: [Color(0xFFbe185d), Color(0xFFfda4af)]),
-  (id: 'arctic',    label: 'Arctic',    colors: [Color(0xFF1e3a5f), Color(0xFF4a9eff)]),
-  (id: 'fire',      label: 'Fire',      colors: [Color(0xFF7f1d1d), Color(0xFFef4444)]),
-  (id: 'mint',      label: 'Mint',      colors: [Color(0xFF064e3b), Color(0xFF34d399)]),
-  (id: 'peach',     label: 'Peach',     colors: [Color(0xFFfed7aa), Color(0xFFfdba74)]),
-  (id: 'slate',     label: 'Slate',     colors: [Color(0xFF0f172a), Color(0xFF334155)]),
-  (id: 'soko',      label: 'Soko',      colors: [Color(0xFF0F1D40), Color(0xFF0EBE7E)]),
-  (id: 'candy',     label: 'Candy',     colors: [Color(0xFFf093fb), Color(0xFFf5576c)]),
-  (id: 'cosmic',    label: 'Cosmic',    colors: [Color(0xFF141e30), Color(0xFF243b55)]),
-  (id: 'lime',      label: 'Lime',      colors: [Color(0xFF134e5e), Color(0xFF71b280)]),
-  (id: 'velvet',    label: 'Velvet',    colors: [Color(0xFF200122), Color(0xFF6f0000)]),
-  (id: 'sky',       label: 'Sky',       colors: [Color(0xFF2980b9), Color(0xFF6dd5fa)]),
-  (id: 'sunrise',   label: 'Sunrise',   colors: [Color(0xFFff512f), Color(0xFFf09819)]),
+  (id: 'cobaltCoral', label: 'Cobalt Coral', colors: [Color(0xFF1E3A8A), Color(0xFFFF6B6B)]),
+  (id: 'emeraldCream', label: 'Emerald Cream', colors: [Color(0xFF064E3B), Color(0xFFFEF3C7)]),
+  (id: 'royalGold', label: 'Royal Gold', colors: [Color(0xFF581C87), Color(0xFFFBBF24)]),
+  (id: 'sunsetNavy', label: 'Sunset Navy', colors: [Color(0xFFF97316), Color(0xFF0F172A)]),
+  (id: 'magentaBlush', label: 'Magenta Blush', colors: [Color(0xFFBE185D), Color(0xFFFCE7F3)]),
+  (id: 'tealCitrus', label: 'Teal Citrus', colors: [Color(0xFF115E59), Color(0xFFFACC15)]),
+  (id: 'indigoLime', label: 'Indigo Lime', colors: [Color(0xFF312E81), Color(0xFFA3E635)]),
+  (id: 'charcoalTangerine', label: 'Charcoal Tangerine', colors: [Color(0xFF1F2937), Color(0xFFFB923C)]),
+  (id: 'midnightCyan', label: 'Midnight Cyan', colors: [Color(0xFF0F172A), Color(0xFF22D3EE)]),
+  (id: 'winePeach', label: 'Wine Peach', colors: [Color(0xFF7F1D1D), Color(0xFFFDBA74)]),
+  (id: 'sunset',    label: 'Sunset',    colors: [Color(0xFFE32E56), Color(0xFFF6B684)]),
+  (id: 'ocean',     label: 'Ocean',     colors: [Color(0xFF3377E3), Color(0xFF367EF0)]),
+  (id: 'forest',    label: 'Forest',    colors: [Color(0xFF0A9160), Color(0xFF0DB175)]),
+  (id: 'neon',      label: 'Neon',      colors: [Color(0xFF8338EC), Color(0xFFE32E56)]),
+  (id: 'gold',      label: 'Gold',      colors: [Color(0xFFC1183D), Color(0xFFFB8704)]),
+  (id: 'midnight',  label: 'Midnight',  colors: [Color(0xFF5C27A5), Color(0xFF6D2EC4)]),
+  (id: 'rose',      label: 'Rose',      colors: [Color(0xFFD31B43), Color(0xFFEB6872)]),
+  (id: 'arctic',    label: 'Arctic',    colors: [Color(0xFF2E6CCE), Color(0xFF4F93FF)]),
+  (id: 'fire',      label: 'Fire',      colors: [Color(0xFFC4303B), Color(0xFFE74854)]),
+  (id: 'mint',      label: 'Mint',      colors: [Color(0xFF1F756B), Color(0xFF2C9E90)]),
+  (id: 'peach',     label: 'Peach',     colors: [Color(0xFFF6B988), Color(0xFFF5B17B)]),
+  (id: 'slate',     label: 'Slate',     colors: [Color(0xFF2F44A8), Color(0xFF3750C4)]),
+  (id: 'soko',      label: 'Soko',      colors: [Color(0xFF3147B0), Color(0xFF269184)]),
+  (id: 'candy',     label: 'Candy',     colors: [Color(0xFF8F3CC6), Color(0xFFE84F5A)]),
+  (id: 'cosmic',    label: 'Cosmic',    colors: [Color(0xFF3046AC), Color(0xFF2E6BCC)]),
+  (id: 'lime',      label: 'Lime',      colors: [Color(0xFF2D6AC9), Color(0xFF1AC184)]),
+  (id: 'velvet',    label: 'Velvet',    colors: [Color(0xFF000000), Color(0xFFB52C37)]),
+  (id: 'sky',       label: 'Sky',       colors: [Color(0xFF3780F4), Color(0xFF5898FF)]),
+  (id: 'sunrise',   label: 'Sunrise',   colors: [Color(0xFFE74652), Color(0xFFF4A363)]),
 ];
 
 /// Solid color palette (displayed in background & color pickers)
 const colorPalette = <Color>[
-  Color(0xFFffffff), Color(0xFF000000), Color(0xFF1e293b), Color(0xFF0f172a),
-  Color(0xFF111827), Color(0xFF374151), Color(0xFF6b7280), Color(0xFF9ca3af),
-  Color(0xFFe5e7eb), Color(0xFFf9fafb),
+  // Modern curated accents
+  Color(0xFFFF6B6B), Color(0xFFFEF3C7), Color(0xFFFBBF24), Color(0xFFF97316),
+  Color(0xFFFCE7F3), Color(0xFFFACC15), Color(0xFFA3E635), Color(0xFFFB923C),
+  Color(0xFF22D3EE), Color(0xFFFDBA74),
+  // Curated backgrounds
+  Color(0xFF1E3A8A), Color(0xFF064E3B), Color(0xFF581C87), Color(0xFF0F172A),
+  Color(0xFFBE185D), Color(0xFF115E59), Color(0xFF312E81), Color(0xFF1F2937),
+  Color(0xFF7F1D1D),
+  Color(0xFFFFFFFF), Color(0xFF000000), Color(0xFF3249B3), Color(0xFF2F44A8),
+  Color(0xFF3750C4), Color(0xFF6C757D), Color(0xFFF8F9FA),
+  Color(0xFF7C91F3),
   // Reds
-  Color(0xFF7f1d1d), Color(0xFFdc2626), Color(0xFFef4444), Color(0xFFf87171),
-  Color(0xFFfecaca),
+  Color(0xFFC4303B), Color(0xFFE63946), Color(0xFFE74854), Color(0xFFE95762),
+  Color(0xFFED737C),
   // Oranges
-  Color(0xFF92400e), Color(0xFFd97706), Color(0xFFf59e0b), Color(0xFFfbbf24),
-  Color(0xFFfef08a),
+  Color(0xFFC1183D), Color(0xFFE89A5C), Color(0xFFF4A261), Color(0xFFFB8A0C),
+  Color(0xFFFB9D33),
   // Greens
-  Color(0xFF14532d), Color(0xFF16a34a), Color(0xFF22c55e), Color(0xFF0EBE7E),
-  Color(0xFF34d399),
+  Color(0xFF0A9361), Color(0xFF0CAA71), Color(0xFF0DB779), Color(0xFF269184),
+  Color(0xFF2C9E90),
   // Blues
-  Color(0xFF1e3a8a), Color(0xFF1d4ed8), Color(0xFF3b82f6), Color(0xFF60a5fa),
-  Color(0xFF93c5fd),
+  Color(0xFF3A54CF), Color(0xFF425FEA), Color(0xFF506CEF), Color(0xFF5496FF),
+  Color(0xFF649FFF),
   // Purples
-  Color(0xFF4c1d95), Color(0xFF7c3aed), Color(0xFFa855f7), Color(0xFFd8b4fe),
-  Color(0xFFf3e8ff),
+  Color(0xFF7431D1), Color(0xFF8A43ED), Color(0xFF914EEE), Color(0xFFA36CF1),
   // Pinks
-  Color(0xFF9d174d), Color(0xFFbe185d), Color(0xFFec4899), Color(0xFFf9a8d4),
+  Color(0xFFC81940), Color(0xFFD31B43), Color(0xFFE32E56), Color(0xFFE85273),
   // Brand
-  Color(0xFF0F1D40), Color(0xFF0EBE7E),
+  Color(0xFF3147B0), Color(0xFF269184),
   // Gold
-  Color(0xFF78350f), Color(0xFFd4af37), Color(0xFFfbbf24),
+  Color(0xFFB9173B), Color(0xFFFB8704), Color(0xFFFB8A0C),
 ];
 
 Color parseHexColor(String hex) {

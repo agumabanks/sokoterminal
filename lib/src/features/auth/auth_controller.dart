@@ -56,13 +56,6 @@ class AuthController extends StateNotifier<AuthState> {
   final Ref ref;
   final ApiClient _apiClient;
   final SecureStorage _storage;
-  Timer? _refreshTimer;
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
 
   Future<void> bootstrap() async {
     // Register the 401 logout callback so the API client can trigger logout.
@@ -79,7 +72,6 @@ class AuthController extends StateNotifier<AuthState> {
         '[Auth] Restored persisted access token (${token.length} chars)',
       );
       state = AuthState(status: AuthStatus.authenticated, token: token);
-      _scheduleTokenRefresh();
       // Subscribe to seller sync topic (best-effort; sellerId may not be stored yet)
       final sellerId = await _storage.readSellerId();
       if (sellerId != null && sellerId.isNotEmpty) {
@@ -99,6 +91,7 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> login({
     required String emailOrPhone,
     required String password,
+    bool rememberDevice = false,
   }) async {
     state = state.copyWith(status: AuthStatus.loading, message: null);
     try {
@@ -110,9 +103,11 @@ class AuthController extends StateNotifier<AuthState> {
         identifier: isEmail ? emailOrPhone.trim() : (normalizedPhone ?? ''),
         rawIdentifier: rawIdentifier,
         password: password,
+        rememberDevice: rememberDevice,
       );
       final data = response.data ?? {};
       final token = _extractAccessToken(data);
+      final expiresAt = _extractExpiresAt(data);
 
       // Ensure local database is cleared before starting a new session
       // This prevents data bleeding between different users on the same device
@@ -120,6 +115,7 @@ class AuthController extends StateNotifier<AuthState> {
       await db.clearAllData();
 
       final persistedToken = await _persistAccessToken(token);
+      await _persistTokenMeta(expiresAt: expiresAt, rememberDevice: rememberDevice);
 
       // Store seller UUID for identity persistence
       final user = data['user'] is Map<String, dynamic>
@@ -152,7 +148,6 @@ class AuthController extends StateNotifier<AuthState> {
         status: AuthStatus.authenticated,
         token: persistedToken,
       );
-      _scheduleTokenRefresh();
       // Trigger full sync after login
       unawaited(ref.read(syncServiceProvider).syncNow());
       unawaited(ref.read(migrationProvider.notifier).checkForBackups());
@@ -240,7 +235,6 @@ class AuthController extends StateNotifier<AuthState> {
         status: AuthStatus.authenticated,
         token: persistedToken,
       );
-      _scheduleTokenRefresh();
       unawaited(ref.read(syncServiceProvider).syncNow());
       unawaited(ref.read(migrationProvider.notifier).checkForBackups());
     } on DioException catch (e) {
@@ -263,6 +257,7 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> loginWithQuickPin({
     required String phone,
     required String pin,
+    bool rememberDevice = false,
   }) async {
     state = state.copyWith(status: AuthStatus.loading, message: null);
     final normalized = normalizeUgPhone(phone);
@@ -271,12 +266,17 @@ class AuthController extends StateNotifier<AuthState> {
       // Try backend verification first
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/v2/seller/pos/pin/verify',
-        data: {'phone': normalized, 'pin': pin},
+        data: {
+          'phone': normalized,
+          'pin': pin,
+          'remember_me': rememberDevice,
+        },
       );
 
       final data = response.data ?? {};
       if (data['result'] == true && data['access_token'] != null) {
         final token = _extractAccessToken(data);
+        final expiresAt = _extractExpiresAt(data);
 
         // Ensure local database is cleared before starting a new session
         // This prevents data bleeding between different users on the same device
@@ -284,6 +284,7 @@ class AuthController extends StateNotifier<AuthState> {
         await db.clearAllData();
 
         final persistedToken = await _persistAccessToken(token);
+        await _persistTokenMeta(expiresAt: expiresAt, rememberDevice: rememberDevice);
         await _storage.writeLastLoginPhone(normalized);
         debugPrint('[Auth] Quick PIN login succeeded');
         _apiClient.resetLogoutGuard();
@@ -291,7 +292,6 @@ class AuthController extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           token: persistedToken,
         );
-        _scheduleTokenRefresh();
         unawaited(ref.read(syncServiceProvider).syncNow());
         // Quick PIN login check for backups
         unawaited(ref.read(migrationProvider.notifier).checkForBackups());
@@ -349,7 +349,6 @@ class AuthController extends StateNotifier<AuthState> {
   Future<String?> getQuickPinPhone() => _storage.readSellerQuickPhone();
 
   Future<void> logout() async {
-    _refreshTimer?.cancel();
     debugPrint('[Auth] Clearing local session state');
 
     // Reset the logout callback so late-fired interceptor errors
@@ -388,6 +387,8 @@ class AuthController extends StateNotifier<AuthState> {
 
     // Clear all secure storage (tokens, credentials, POS sessions, quick login data)
     await _storage.clearAll();
+    await _storage.deleteAccessTokenExpiresAt();
+    await _storage.deleteRememberDevice();
 
     // Remove only auth-related SharedPreferences keys.
     // Keep printer settings, business setup flags, receipt templates, etc.
@@ -410,8 +411,10 @@ class AuthController extends StateNotifier<AuthState> {
         '/v2/auth/refresh',
       );
       final newToken = response.data?['access_token'];
+      final expiresAt = _extractExpiresAt(response.data ?? {});
       if (newToken != null && newToken is String && newToken.isNotEmpty) {
         await _storage.writeAccessToken(newToken);
+        await _persistTokenMeta(expiresAt: expiresAt);
         state = state.copyWith(token: newToken);
         return true;
       }
@@ -428,13 +431,6 @@ class AuthController extends StateNotifier<AuthState> {
     return false;
   }
 
-  void _scheduleTokenRefresh() {
-    _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(minutes: 55), (timer) async {
-      await refreshToken();
-    });
-  }
-
   String _extractAccessToken(
     Map<String, dynamic> data, {
     bool allowMissing = false,
@@ -446,6 +442,28 @@ class AuthController extends StateNotifier<AuthState> {
       throw Exception('Missing token from API');
     }
     return token;
+  }
+
+  DateTime? _extractExpiresAt(Map<String, dynamic> data) {
+    final raw = data['expires_at'];
+    if (raw == null) return null;
+    if (raw is DateTime) return raw.toUtc();
+    final parsed = DateTime.tryParse(raw.toString())?.toUtc();
+    return parsed;
+  }
+
+  Future<void> _persistTokenMeta({
+    DateTime? expiresAt,
+    bool? rememberDevice,
+  }) async {
+    if (expiresAt != null) {
+      await _storage.writeAccessTokenExpiresAt(expiresAt);
+    } else {
+      await _storage.deleteAccessTokenExpiresAt();
+    }
+    if (rememberDevice != null) {
+      await _storage.writeRememberDevice(rememberDevice);
+    }
   }
 
   Future<String> _persistAccessToken(String token) async {
@@ -473,6 +491,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String identifier,
     required String rawIdentifier,
     required String password,
+    bool rememberDevice = false,
   }) async {
     Future<Response<Map<String, dynamic>>> request(String loginIdentifier) {
       return _apiClient.post<Map<String, dynamic>>(
@@ -483,6 +502,7 @@ class AuthController extends StateNotifier<AuthState> {
           'email': loginIdentifier,
           'password': password,
           'user_type': 'seller',
+          'remember_me': rememberDevice,
         },
       );
     }

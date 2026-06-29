@@ -64,13 +64,13 @@ class _ServiceInsightsScreenState extends ConsumerState<ServiceInsightsScreen> {
                     )
                   else
                     _RevenueHeadline(state: state),
-                  if (!state.bookings.isEmpty && state.thisWeekBookings > 0) ...[
+                  if (state.bookings.isNotEmpty && state.thisWeekBookings > 0) ...[
                     const SizedBox(height: 20),
                     _SectionTitle('This Week Revenue'),
                     const SizedBox(height: 8),
                     _DailyRevenueChart(data: state.dailyRevenue),
                   ],
-                  if (!state.bookings.isEmpty) ...[
+                  if (state.bookings.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _SectionTitle('Booking Status'),
                     const SizedBox(height: 8),
@@ -236,8 +236,8 @@ class _StatusBreakdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _StatusItem('Pending', state.pendingCount, Colors.orange),
-      _StatusItem('Confirmed', state.confirmedCount, Colors.blue),
+      _StatusItem('Pending', state.pendingCount, DesignTokens.warning),
+      _StatusItem('Confirmed', state.confirmedCount, DesignTokens.info),
       _StatusItem('Completed', state.completedCount, DesignTokens.brandAccent),
       _StatusItem('Cancelled', state.cancelledCount, DesignTokens.grayMedium),
     ];

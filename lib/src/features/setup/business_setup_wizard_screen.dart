@@ -20,6 +20,7 @@ import '../../core/util/haptics.dart';
 import '../receipts/receipt_providers.dart';
 import '../settings/staff_pin_controller.dart';
 import '../../core/settings/business_setup_prefs.dart';
+import '../../core/theme/design_tokens.dart';
 
 final _primaryOutletProvider = StreamProvider<Outlet?>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -80,10 +81,10 @@ class _BusinessSetupWizardScreenState
   late Animation<double> _fadeAnimation;
 
   // Palette — same language as LoginScreen
-  static const Color _bg = Color(0xFF000000);
-  static const Color _surface = Color(0xFF0B0B10);
-  static const Color _accent = Color(0xFF6C63FF);
-  static const Color _mint = Color(0xFF0EBE7E);
+  static const Color _bg = DesignTokens.brandPrimary;
+  static const Color _surface = DesignTokens.brandPrimary;
+  static const Color _accent = DesignTokens.info;
+  static const Color _mint = DesignTokens.brandAccent;
 
   @override
   void initState() {
@@ -481,7 +482,7 @@ class _BusinessSetupWizardScreenState
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              color: _surface.withOpacity(0.95),
+              color: _surface.withValues(alpha: 0.95),
               child: SafeArea(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -491,7 +492,7 @@ class _BusinessSetupWizardScreenState
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -509,7 +510,7 @@ class _BusinessSetupWizardScreenState
                             title: Text(d.name ?? 'Printer', style: const TextStyle(color: Colors.white)),
                             subtitle: Text(
                               d.address ?? '',
-                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                             ),
                             onTap: () async {
                               try {
@@ -561,7 +562,7 @@ class _BusinessSetupWizardScreenState
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
-                  color: _surface.withOpacity(0.95),
+                  color: _surface.withValues(alpha: 0.95),
                   padding: EdgeInsets.only(
                     left: 24,
                     right: 24,
@@ -575,7 +576,7 @@ class _BusinessSetupWizardScreenState
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -584,7 +585,7 @@ class _BusinessSetupWizardScreenState
                       const SizedBox(height: 8),
                       Text(
                         '4–8 digits to lock this device.',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
                       ),
                       const SizedBox(height: 20),
                       _DarkInput(controller: pinCtrl, label: 'PIN', obscure: true, digitsOnly: true),
@@ -756,7 +757,7 @@ class _BusinessSetupWizardScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFFD30005),
+        backgroundColor: DesignTokens.error,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -774,7 +775,7 @@ class _BusinessSetupWizardScreenState
   );
 
   static TextStyle get _captionStyle => TextStyle(
-    color: Colors.white.withOpacity(0.45),
+    color: Colors.white.withValues(alpha: 0.45),
     fontSize: 13,
     fontWeight: FontWeight.w500,
   );
@@ -800,7 +801,7 @@ class _BusinessSetupWizardScreenState
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [_bg, Color(0xFF05050A), _bg],
+                  colors: [_bg, DesignTokens.brandPrimary, _bg],
                 ),
               ),
             ),
@@ -808,12 +809,12 @@ class _BusinessSetupWizardScreenState
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withOpacity(0.14), size: 380),
+              child: _GlowBlob(color: _accent.withValues(alpha: 0.14), size: 380),
             ),
             Positioned(
               bottom: -160,
               left: -130,
-              child: _GlowBlob(color: _mint.withOpacity(0.08), size: 420),
+              child: _GlowBlob(color: _mint.withValues(alpha: 0.08), size: 420),
             ),
             SafeArea(
               child: FadeTransition(
@@ -872,7 +873,7 @@ class _BusinessSetupWizardScreenState
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -897,7 +898,7 @@ class _BusinessSetupWizardScreenState
               Text(
                 '${currentStep + 1} / $totalSteps',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
+                  color: Colors.white.withValues(alpha: 0.45),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -915,7 +916,7 @@ class _BusinessSetupWizardScreenState
                   height: 4,
                   margin: EdgeInsets.only(right: index < totalSteps - 1 ? 6 : 0),
                   decoration: BoxDecoration(
-                    color: isActive ? Colors.white : Colors.white.withOpacity(0.12),
+                    color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -934,13 +935,13 @@ class _BusinessSetupWizardScreenState
         Icon(
           Icons.storefront_outlined,
           size: 48,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(height: 20),
         Text(
           'What is your business called?',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
@@ -992,13 +993,13 @@ class _BusinessSetupWizardScreenState
         Icon(
           Icons.payments_outlined,
           size: 48,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(height: 20),
         Text(
           'How do you get paid?',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
@@ -1058,13 +1059,13 @@ class _BusinessSetupWizardScreenState
         Icon(
           Icons.receipt_long_outlined,
           size: 48,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(height: 20),
         Text(
           'Print receipts?',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
@@ -1095,9 +1096,9 @@ class _BusinessSetupWizardScreenState
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _mint.withOpacity(0.12),
+              color: _mint.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _mint.withOpacity(0.3)),
+              border: Border.all(color: _mint.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -1131,13 +1132,13 @@ class _BusinessSetupWizardScreenState
         Icon(
           Icons.print_outlined,
           size: 48,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(height: 20),
         Text(
           'Connect a printer',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
@@ -1201,13 +1202,13 @@ class _BusinessSetupWizardScreenState
         Icon(
           Icons.lock_outline,
           size: 48,
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
         ),
         const SizedBox(height: 20),
         Text(
           'Lock this device?',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha: 0.95),
             fontSize: 26,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.8,
@@ -1236,9 +1237,9 @@ class _BusinessSetupWizardScreenState
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _mint.withOpacity(0.12),
+              color: _mint.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _mint.withOpacity(0.3)),
+              border: Border.all(color: _mint.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -1281,8 +1282,8 @@ class _BusinessSetupWizardScreenState
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            _bg.withOpacity(0),
-            _bg.withOpacity(0.9),
+            _bg.withValues(alpha: 0),
+            _bg.withValues(alpha: 0.9),
             _bg,
           ],
         ),
@@ -1297,9 +1298,13 @@ class _BusinessSetupWizardScreenState
               onTap: isLast
                   ? (canFinish ? _finishSetup : null)
                   : (canContinue ? () {
-                      if (currentStep == 0) _saveBusinessInfo();
-                      else if (currentStep == 1) _savePaymentSettings();
-                      else _nextStep();
+                      if (currentStep == 0) {
+                        _saveBusinessInfo();
+                      } else if (currentStep == 1) {
+                        _savePaymentSettings();
+                      } else {
+                        _nextStep();
+                      }
                     } : null),
               child: Center(
                 child: Text(
@@ -1307,7 +1312,7 @@ class _BusinessSetupWizardScreenState
                       ? (canFinish ? 'Start selling' : 'Complete required steps')
                       : 'Continue',
                   style: TextStyle(
-                    color: isLast && !canFinish ? Colors.white.withOpacity(0.4) : Colors.black,
+                    color: isLast && !canFinish ? Colors.white.withValues(alpha: 0.4) : Colors.black,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
@@ -1320,7 +1325,7 @@ class _BusinessSetupWizardScreenState
                 onPressed: _nextStep,
                 child: Text(
                   'Skip for now',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w600),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -1401,7 +1406,7 @@ class _DarkInputState extends State<_DarkInput> {
         Text(
           widget.label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+            color: Colors.white.withValues(alpha: 0.55),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -1410,18 +1415,18 @@ class _DarkInputState extends State<_DarkInput> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B0B10),
+            color: DesignTokens.brandPrimary,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _focused
-                  ? Colors.white.withOpacity(0.45)
-                  : Colors.white.withOpacity(0.12),
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : Colors.white.withValues(alpha: 0.12),
               width: _focused ? 1.5 : 1,
             ),
             boxShadow: _focused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.04),
+                      color: Colors.white.withValues(alpha: 0.04),
                       blurRadius: 12,
                       spreadRadius: 1,
                     ),
@@ -1441,7 +1446,7 @@ class _DarkInputState extends State<_DarkInput> {
             style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               hintText: widget.hint,
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 16),
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 16),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             ),
@@ -1476,10 +1481,10 @@ class _PaymentToggle extends StatelessWidget {
         curve: Curves.easeOutQuart,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: value ? const Color(0xFF0EBE7E).withOpacity(0.12) : const Color(0xFF0B0B10),
+          color: value ? DesignTokens.brandAccent.withValues(alpha: 0.12) : DesignTokens.brandPrimary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: value ? const Color(0xFF0EBE7E).withOpacity(0.4) : Colors.white.withOpacity(0.1),
+            color: value ? DesignTokens.brandAccent.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
             width: value ? 1.5 : 1,
           ),
         ),
@@ -1489,10 +1494,10 @@ class _PaymentToggle extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: value ? const Color(0xFF0EBE7E).withOpacity(0.18) : Colors.white.withOpacity(0.06),
+                color: value ? DesignTokens.brandAccent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: value ? const Color(0xFF0EBE7E) : Colors.white70, size: 20),
+              child: Icon(icon, color: value ? DesignTokens.brandAccent : Colors.white70, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1502,7 +1507,7 @@ class _PaymentToggle extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1510,7 +1515,7 @@ class _PaymentToggle extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
                     ),
                 ],
               ),
@@ -1518,8 +1523,8 @@ class _PaymentToggle extends StatelessWidget {
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: value
-                  ? Icon(Icons.check_circle, color: const Color(0xFF0EBE7E), key: const ValueKey('on'))
-                  : Icon(Icons.circle_outlined, color: Colors.white.withOpacity(0.2), key: const ValueKey('off')),
+                  ? Icon(Icons.check_circle, color: DesignTokens.brandAccent, key: const ValueKey('on'))
+                  : Icon(Icons.circle_outlined, color: Colors.white.withValues(alpha: 0.2), key: const ValueKey('off')),
             ),
           ],
         ),
@@ -1553,13 +1558,13 @@ class _SolidButtonState extends State<_SolidButton> {
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: widget.onTap == null ? Colors.white.withOpacity(0.15) : Colors.white,
+            color: widget.onTap == null ? Colors.white.withValues(alpha: 0.15) : Colors.white,
             borderRadius: BorderRadius.circular(18),
             boxShadow: widget.onTap == null
                 ? null
                 : [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       blurRadius: 20,
                       spreadRadius: 2,
                       offset: const Offset(0, 4),
@@ -1602,9 +1607,9 @@ class _GlassButtonState extends State<_GlassButton> {
             child: Container(
               height: 52,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: widget.child,
             ),
@@ -1629,7 +1634,7 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: [
-          BoxShadow(color: color.withOpacity(0.35), blurRadius: 80, spreadRadius: 30),
+          BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 80, spreadRadius: 30),
         ],
       ),
     );

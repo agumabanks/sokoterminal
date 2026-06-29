@@ -89,9 +89,14 @@ class _SellerWalletPaymentScreenState
       final response = await ref
           .read(sellerApiProvider)
           .fetchSellerWalletTopupStatus(widget.topupId);
-      final body = response.data is Map<String, dynamic>
-          ? Map<String, dynamic>.from(response.data as Map<String, dynamic>)
-          : const <String, dynamic>{};
+      final rawData = response.data;
+      if (rawData is! Map<String, dynamic>) {
+        debugPrint(
+          '[WalletPayment] Unexpected response shape: ${rawData.runtimeType}',
+        );
+        return;
+      }
+      final body = Map<String, dynamic>.from(rawData);
       final data = body['data'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(body['data'] as Map<String, dynamic>)
           : const <String, dynamic>{};

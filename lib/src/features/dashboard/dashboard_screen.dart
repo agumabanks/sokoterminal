@@ -9,21 +9,18 @@ import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_status_provider.dart';
 import '../../core/theme/design_tokens.dart';
-import '../../widgets/stat_card.dart';
 
 final dashboardMetricsProvider = FutureProvider<DashboardMetrics>((ref) async {
   final db = ref.read(appDatabaseProvider);
-  final entries = await db.watchLedgerEntries().first;
-  final sales = entries.where((e) => e.type == 'sale').toList();
-  final refunds = entries.where((e) => e.type == 'refund').toList();
-  final gross = sales.fold<double>(0, (p, e) => p + e.total);
-  final net = gross - refunds.fold<double>(0, (p, e) => p + e.total);
+  final gross = await db.ledgerEntryTotalByType('sale');
+  final refundTotal = await db.ledgerEntryTotalByType('refund');
+  final net = gross - refundTotal;
+  final transactions = await db.ledgerEntryCountByType('sale');
 
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
-  final todaySales = sales.where((t) => !t.createdAt.isBefore(todayStart)).toList();
-  final todayRevenue = todaySales.fold<double>(0, (p, e) => p + e.total);
-  final todayCount = todaySales.length;
+  final todayRevenue = await db.ledgerEntryTotalByType('sale', since: todayStart);
+  final todayCount = await db.ledgerEntryCountByType('sale', since: todayStart);
 
   // Estimate gross profit assuming ~40% margin when cost data unavailable
   // Use net sales as proxy (net = gross - refunds)
@@ -32,8 +29,8 @@ final dashboardMetricsProvider = FutureProvider<DashboardMetrics>((ref) async {
   return DashboardMetrics(
     grossSales: gross,
     netSales: net,
-    transactions: sales.length,
-    averageSale: sales.isEmpty ? 0 : gross / sales.length,
+    transactions: transactions,
+    averageSale: transactions == 0 ? 0 : gross / transactions,
     todayTransactions: todayCount,
     todayRevenue: todayRevenue,
     grossProfit: grossProfit,
@@ -47,7 +44,8 @@ final _businessProfileProvider = FutureProvider<BusinessProfile?>((ref) async {
 
 final _recentLedgerProvider = FutureProvider<List<_RecentSale>>((ref) async {
   final db = ref.read(appDatabaseProvider);
-  final entries = await db.watchLedgerEntries().first;
+  final since = DateTime.now().subtract(const Duration(days: 7));
+  final entries = await db.watchLedgerEntriesSince(since).first;
   final sales = entries.where((e) => e.type == 'sale').take(5).toList();
   final result = <_RecentSale>[];
   for (final entry in sales) {
@@ -61,18 +59,15 @@ final _recentLedgerProvider = FutureProvider<List<_RecentSale>>((ref) async {
 
 final _sparklineDataProvider = FutureProvider<List<double>>((ref) async {
   final db = ref.read(appDatabaseProvider);
-  final entries = await db.watchLedgerEntries().first;
   final now = DateTime.now();
   final days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
   final dailySales = <double>[];
   for (final day in days) {
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));
+    final entries = await db.ledgerEntriesBetween(dayStart, dayEnd);
     final total = entries
-        .where((e) =>
-            e.type == 'sale' &&
-            !e.createdAt.isBefore(dayStart) &&
-            e.createdAt.isBefore(dayEnd))
+        .where((e) => e.type == 'sale')
         .fold<double>(0, (sum, e) => sum + e.total);
     dailySales.add(total);
   }
@@ -195,7 +190,7 @@ class DashboardScreen extends ConsumerWidget {
                             label: 'Avg Order',
                             value: 'UGX ${_formatNumber(m.averageSale)}',
                             icon: Icons.trending_up,
-                            iconColor: const Color(0xFF805AD5),
+                            iconColor: DesignTokens.info,
                           ),
                         ),
                         const SizedBox(width: DesignTokens.spaceSm),
@@ -319,7 +314,7 @@ class DashboardScreen extends ConsumerWidget {
                                   icon: Icons.bar_chart,
                                   label: 'Reports',
                                   subtitle: 'Sales reports',
-                                  color: const Color(0xFF805AD5),
+                                  color: DesignTokens.info,
                                   onTap: () => context.go('/home/more/reports'),
                                 ),
                               ),
@@ -816,14 +811,14 @@ class _HeroRevenueCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0EBE7E), Color(0xFF059669)],
+          colors: [DesignTokens.brandAccent, DesignTokens.success],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: DesignTokens.borderRadiusLg,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0EBE7E).withValues(alpha: 0.28),
+            color: DesignTokens.brandAccent.withValues(alpha: 0.28),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),

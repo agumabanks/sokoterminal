@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ad_templates.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Starter templates for Business Hub document types.
 final businessHubTemplates = <AdTemplate>[
@@ -12,7 +13,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1080,
     background: 'gradient:soko',
-    previewColors: const [Color(0xFF0F1D40), Color(0xFF0EBE7E)],
+    previewColors: const [DesignTokens.brandPrimary, DesignTokens.brandAccent],
     elements: [
       CanvasElement(
         id: 'logo_circle', type: 'figure',
@@ -38,7 +39,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 540,
     background: '#0f172a',
-    previewColors: const [Color(0xFF0f172a), Color(0xFF0EBE7E)],
+    previewColors: const [DesignTokens.brandPrimary, DesignTokens.brandAccent],
     elements: [
       CanvasElement(
         id: 'wm_name', type: 'text', text: '{{BUSINESS}}',
@@ -101,6 +102,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1080,
     background: '#ffffff',
+    previewColors: const [DesignTokens.canvas, DesignTokens.brandPrimary],
     elements: [
       for (var i = 0; i < 4; i++)
         CanvasElement(
@@ -131,6 +133,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1920,
     background: 'gradient:forest',
+    previewColors: const [Color(0xFF14532d), Color(0xFF86efac)],
     elements: [
       CanvasElement(
         id: 'menu_title', type: 'text', text: '{{BUSINESS}}',
@@ -163,7 +166,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1920,
     background: '#0f172a',
-    previewColors: const [Color(0xFF0f172a), Color(0xFF0EBE7E)],
+    previewColors: const [DesignTokens.brandPrimary, DesignTokens.brandAccent],
     elements: [
       CanvasElement(
         id: 'mm_bar', type: 'figure',
@@ -196,6 +199,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1520,
     background: 'gradient:midnight',
+    previewColors: const [DesignTokens.brandPrimary, Color(0xFF38bdf8)],
     elements: [
       CanvasElement(
         id: 'bro_title', type: 'text', text: '{{BUSINESS}}',
@@ -221,6 +225,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1920,
     background: '#ffffff',
+    previewColors: const [DesignTokens.canvas, DesignTokens.brandPrimary],
     elements: [
       CanvasElement(
         id: 'cp_head', type: 'figure',
@@ -254,6 +259,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1920,
     background: 'gradient:velvet',
+    previewColors: const [Color(0xFF4c1d95), Color(0xFFfef08a)],
     elements: [
       CanvasElement(
         id: 'inv_head', type: 'text', text: "You're Invited",
@@ -286,6 +292,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1520,
     background: 'gradient:fire',
+    previewColors: const [Color(0xFFdc2626), Color(0xFFfef08a)],
     elements: [
       CanvasElement(
         id: 'ef_title', type: 'text', text: 'BIG EVENT',
@@ -311,6 +318,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1520,
     background: 'gradient:arctic',
+    previewColors: const [Color(0xFF0e7490), Color(0xFF99f6e4)],
     elements: [
       CanvasElement(
         id: 'sf_title', type: 'text', text: '{{PRODUCT}}',
@@ -341,7 +349,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1080,
     canvasHeight: 1520,
     background: 'gradient:midnight',
-    previewColors: const [Color(0xFF1e1b4b), Color(0xFFa855f7)],
+    previewColors: const [DesignTokens.brandPrimary, Color(0xFFa855f7)],
     elements: [
       CanvasElement(
         id: 'ne_title', type: 'text', text: 'LIVE\nTONIGHT',
@@ -409,6 +417,7 @@ final businessHubTemplates = <AdTemplate>[
     canvasWidth: 1050,
     canvasHeight: 600,
     background: '#0F1D40',
+    previewColors: const [DesignTokens.brandPrimary, DesignTokens.brandAccent],
     elements: [
       CanvasElement(
         id: 'bc_name', type: 'text', text: '{{BUSINESS}}',
@@ -493,12 +502,19 @@ List<AdTemplate> get allStudioTemplates => [
       ...builtInTemplates,
 ];
 
+/// Lazily-built index for O(1) template lookups.
 AdTemplate? templateById(String id) {
+  final cache = _templateByIdCache;
+  if (cache != null) return cache[id];
+  final built = <String, AdTemplate>{};
   for (final t in allStudioTemplates) {
-    if (t.id == id) return t;
+    built[t.id] = t;
   }
-  return null;
+  _templateByIdCache = built;
+  return built[id];
 }
+
+Map<String, AdTemplate>? _templateByIdCache;
 
 /// All hub templates for a document category.
 List<AdTemplate> templatesForCategory(String category) =>

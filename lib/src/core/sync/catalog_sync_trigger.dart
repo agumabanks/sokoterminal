@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../app_providers.dart';
 import '../network/dio_auth_utils.dart';
 import 'sync_service.dart';
 

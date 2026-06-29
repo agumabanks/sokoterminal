@@ -277,10 +277,12 @@ class _SupplierCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitleParts = <String>[];
-    if ((supplier.phone ?? '').trim().isNotEmpty)
+    if ((supplier.phone ?? '').trim().isNotEmpty) {
       subtitleParts.add(supplier.phone!.trim());
-    if ((supplier.contactName ?? '').trim().isNotEmpty)
+    }
+    if ((supplier.contactName ?? '').trim().isNotEmpty) {
       subtitleParts.add(supplier.contactName!.trim());
+    }
     final subtitle = subtitleParts.join(' • ');
 
     return Card(

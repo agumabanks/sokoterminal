@@ -123,28 +123,31 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
 
   Future<void> _uploadFeedback(BuildContext context) async {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text('Sending feedback to Soko24…')),
     );
     try {
       final api = ref.read(sellerApiProvider);
       final count = await BugReportSync.uploadPending(api);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            count > 0
-                ? 'Sent $count report${count == 1 ? '' : 's'} to support'
-                : 'No new reports to send',
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              count > 0
+                  ? 'Sent $count report${count == 1 ? '' : 's'} to support'
+                  : 'No new reports to send',
+            ),
           ),
-        ),
-      );
-      _refresh();
+        );
+        _refresh();
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload failed: $e')),
-      );
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_providers.dart';
 import '../../core/onboarding/onboarding_controller.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/theme/design_tokens.dart';
 
 class OnboardingWelcomeScreen extends ConsumerStatefulWidget {
   const OnboardingWelcomeScreen({super.key});
@@ -38,7 +39,7 @@ class _OnboardingWelcomeScreenState
                     width: 120,
                     height: 120,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF4CAF50),
+                      color: DesignTokens.success,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -73,7 +74,7 @@ class _OnboardingWelcomeScreenState
                   icon: Icons.inventory_2_outlined,
                   title: 'Add Your First Product',
                   subtitle: 'Start building your catalog',
-                  color: const Color(0xFF2196F3),
+                  color: DesignTokens.info,
                 ),
                 const SizedBox(height: 16),
 
@@ -81,7 +82,7 @@ class _OnboardingWelcomeScreenState
                   icon: Icons.point_of_sale_outlined,
                   title: 'Make Your First Sale',
                   subtitle: 'Use the POS to sell in-store',
-                  color: const Color(0xFFFF9800),
+                  color: DesignTokens.warning,
                 ),
                 const SizedBox(height: 16),
 
@@ -89,7 +90,7 @@ class _OnboardingWelcomeScreenState
                   icon: Icons.analytics_outlined,
                   title: 'Track Your Performance',
                   subtitle: 'Monitor sales and inventory',
-                  color: const Color(0xFF9C27B0),
+                  color: DesignTokens.info,
                 ),
                 const SizedBox(height: 48),
 

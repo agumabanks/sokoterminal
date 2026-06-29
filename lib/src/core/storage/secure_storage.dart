@@ -154,6 +154,24 @@ class SecureStorage {
   Future<String?> readAccessToken() => _safeRead('access_token');
   Future<void> deleteAccessToken() => _safeDelete('access_token');
 
+  Future<void> writeAccessTokenExpiresAt(DateTime expiresAt) =>
+      _safeWrite('access_token_expires_at', expiresAt.toUtc().toIso8601String());
+  Future<DateTime?> readAccessTokenExpiresAt() async {
+    final raw = await _safeRead('access_token_expires_at');
+    if (raw == null || raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw.trim())?.toUtc();
+  }
+  Future<void> deleteAccessTokenExpiresAt() =>
+      _safeDelete('access_token_expires_at');
+
+  Future<void> writeRememberDevice(bool value) =>
+      _safeWrite('remember_device', value ? '1' : '0');
+  Future<bool> readRememberDevice() async {
+    final raw = await _safeRead('remember_device');
+    return raw == '1';
+  }
+  Future<void> deleteRememberDevice() => _safeDelete('remember_device');
+
   Future<void> writeLastLoginPhone(String phone) =>
       _safeWrite('last_login_phone', phone);
   Future<String?> readLastLoginPhone() => _safeRead('last_login_phone');

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/settings/business_setup_prefs.dart';
 import '../../core/util/country_codes.dart';
 import 'auth_controller.dart';
+import '../../core/theme/design_tokens.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -33,8 +34,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   CountryCode _selectedCountry = defaultCountryCode;
 
   // Palette
-  static const Color _bg = Color(0xFF000000);
-  static const Color _accent = Color(0xFF6C63FF);
+  static const Color _bg = DesignTokens.brandPrimary;
+  static const Color _accent = DesignTokens.info;
 
   @override
   void initState() {
@@ -94,7 +95,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [_bg, Color(0xFF05050A), _bg],
+                  colors: [_bg, DesignTokens.brandPrimary, _bg],
                 ),
               ),
             ),
@@ -103,13 +104,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withOpacity(0.16), size: 420),
+              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
             ),
             Positioned(
               bottom: -160,
               left: -130,
               child: _GlowBlob(
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 size: 520,
               ),
             ),
@@ -133,7 +134,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               Text(
                                 'Create account',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.90),
+                                  color: Colors.white.withValues(alpha: 0.90),
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: -0.2,
@@ -147,7 +148,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             'Create Account',
                             textAlign: TextAlign.left,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
+                              color: Colors.white.withValues(alpha: 0.95),
                               fontSize: 40,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -1.1,
@@ -159,7 +160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             'Start managing your business today.',
                             textAlign: TextAlign.left,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.60),
+                              color: Colors.white.withValues(alpha: 0.60),
                               fontSize: 16,
                               height: 1.35,
                             ),
@@ -188,10 +189,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               onFieldSubmitted: (_) =>
                                   _phoneFocus.requestFocus(),
                               validator: (value) {
-                                if (value == null || value.trim().isEmpty)
+                                if (value == null || value.trim().isEmpty) {
                                   return 'Name is required';
-                                if (value.trim().length < 2)
+                                }
+                                if (value.trim().length < 2) {
                                   return 'Name is too short';
+                                }
                                 return null;
                               },
                             ),
@@ -224,7 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     _obscurePassword
                                         ? Icons.visibility_outlined
                                         : Icons.visibility_off_outlined,
-                                    color: Colors.white.withOpacity(0.35),
+                                    color: Colors.white.withValues(alpha: 0.35),
                                     size: 20,
                                   ),
                                   onPressed: () => setState(
@@ -235,10 +238,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               onFieldSubmitted: (_) =>
                                   _confirmFocus.requestFocus(),
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return 'Password is required';
-                                if (value.length < 6)
+                                }
+                                if (value.length < 6) {
                                   return 'Password must be at least 6 characters';
+                                }
                                 return null;
                               },
                             ),
@@ -268,7 +273,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     _obscureConfirm
                                         ? Icons.visibility_outlined
                                         : Icons.visibility_off_outlined,
-                                    color: Colors.white.withOpacity(0.35),
+                                    color: Colors.white.withValues(alpha: 0.35),
                                     size: 20,
                                   ),
                                   onPressed: () => setState(
@@ -279,10 +284,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               onFieldSubmitted: (_) =>
                                   _handleRegister(isLoading: isLoading),
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return 'Please confirm your password';
-                                if (value != _passwordController.text)
+                                }
+                                if (value != _passwordController.text) {
                                   return 'Passwords do not match';
+                                }
                                 return null;
                               },
                             ),
@@ -314,7 +321,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               Text(
                                 'Already have an account? ',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.50),
+                                  color: Colors.white.withValues(alpha: 0.50),
                                   fontSize: 14,
                                 ),
                               ),
@@ -323,7 +330,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 child: Text(
                                   'Sign In',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.92),
+                                    color: Colors.white.withValues(alpha: 0.92),
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: -0.2,
@@ -338,7 +345,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             'By creating an account, you agree to our platform terms.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.30),
+                              color: Colors.white.withValues(alpha: 0.30),
                               fontSize: 12.5,
                               height: 1.3,
                             ),
@@ -368,16 +375,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       fillColor: Colors.transparent,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 8),
-        child: Icon(icon, color: Colors.white.withOpacity(0.35), size: 22),
+        child: Icon(icon, color: Colors.white.withValues(alpha: 0.35), size: 22),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       labelText: label,
       labelStyle: TextStyle(
-        color: Colors.white.withOpacity(0.35),
+        color: Colors.white.withValues(alpha: 0.35),
         fontWeight: FontWeight.w500,
       ),
       floatingLabelStyle: TextStyle(
-        color: Colors.white.withOpacity(0.65),
+        color: Colors.white.withValues(alpha: 0.65),
         fontWeight: FontWeight.w600,
       ),
       suffixIcon: suffix,
@@ -412,14 +419,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.2,
-                      color: Colors.white.withOpacity(0.82),
+                      color: Colors.white.withValues(alpha: 0.82),
                     ),
                   ),
                   const SizedBox(width: 6),
                   Icon(
                     Icons.keyboard_arrow_down,
                     size: 18,
-                    color: Colors.white.withOpacity(0.45),
+                    color: Colors.white.withValues(alpha: 0.45),
                   ),
                 ],
               ),
@@ -428,7 +435,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           Container(
             width: 1,
             height: 26,
-            color: Colors.white.withOpacity(0.10),
+            color: Colors.white.withValues(alpha: 0.10),
           ),
           Expanded(
             child: TextFormField(
@@ -458,15 +465,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 fillColor: Colors.transparent,
                 labelText: 'Phone number',
                 labelStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontWeight: FontWeight.w500,
                 ),
                 floatingLabelStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
+                  color: Colors.white.withValues(alpha: 0.65),
                   fontWeight: FontWeight.w600,
                 ),
                 hintText: '706272481',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.18)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.18)),
               ),
               onFieldSubmitted: (_) => _passFocus.requestFocus(),
               validator: (value) {
@@ -532,14 +539,14 @@ class _BackPill extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF0B0B10).withOpacity(0.55),
+              color: DesignTokens.brandPrimary.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0x22FFFFFF)),
             ),
             child: Icon(
               Icons.arrow_back_ios_new,
               size: 18,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -554,7 +561,7 @@ class _GlassField extends StatelessWidget {
   final Widget child;
   final bool focused;
 
-  static const Color _glass = Color(0xFF101018);
+  static const Color _glass = DesignTokens.brandPrimary;
   static const Color _stroke = Color(0x22FFFFFF);
   static const Color _strokeStrong = Color(0x44FFFFFF);
 
@@ -568,7 +575,7 @@ class _GlassField extends StatelessWidget {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
           decoration: BoxDecoration(
-            color: _glass.withOpacity(0.62),
+            color: _glass.withValues(alpha: 0.62),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: focused ? _strokeStrong : _stroke,
@@ -577,14 +584,14 @@ class _GlassField extends StatelessWidget {
             boxShadow: focused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       blurRadius: 22,
                       offset: const Offset(0, 10),
                     ),
                   ]
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.35),
+                      color: Colors.black.withValues(alpha: 0.35),
                       blurRadius: 24,
                       offset: const Offset(0, 14),
                     ),
@@ -618,9 +625,9 @@ class _StatusPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: tint.withOpacity(0.18),
+            color: tint.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tint.withOpacity(0.35)),
+            border: Border.all(color: tint.withValues(alpha: 0.35)),
           ),
           child: Row(
             children: [
@@ -628,7 +635,7 @@ class _StatusPill extends StatelessWidget {
                 type == _StatusType.error
                     ? Icons.error_outline
                     : Icons.check_circle_outline,
-                color: tint.withOpacity(0.95),
+                color: tint.withValues(alpha: 0.95),
                 size: 18,
               ),
               const SizedBox(width: 10),
@@ -637,7 +644,7 @@ class _StatusPill extends StatelessWidget {
                   message,
                   textAlign: TextAlign.left,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     height: 1.25,
@@ -694,12 +701,12 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.white.withOpacity(0.10),
+                color: Colors.white.withValues(alpha: 0.10),
                 blurRadius: 30,
                 offset: const Offset(0, 14),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withValues(alpha: 0.35),
                 blurRadius: 24,
                 offset: const Offset(0, 16),
               ),
@@ -744,7 +751,7 @@ class _GlowBlob extends StatelessWidget {
         color: color,
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.55),
+            color: color.withValues(alpha: 0.55),
             blurRadius: 120,
             spreadRadius: 30,
           ),

@@ -260,6 +260,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.go('/home/more/delivery-settings'),
           ),
           ListTile(
+            leading: const Icon(Icons.account_balance_outlined),
+            title: const Text('Tax settings'),
+            subtitle: const Text('Configure tax rate and inclusion mode'),
+            onTap: () => context.go('/home/more/tax-settings'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.calculate_outlined),
+            title: const Text('Accounting'),
+            subtitle: const Text('Sales summary and tax collected'),
+            onTap: () => context.go('/home/more/accounting'),
+          ),
+          ListTile(
             leading: const Icon(Icons.block_outlined),
             title: const Text('Void reason codes'),
             subtitle: const Text('Required reasons for voids'),

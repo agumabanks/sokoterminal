@@ -18,6 +18,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/util/formatters.dart';
 import '../../core/util/haptics.dart';
+import '../../core/util/tax_calculator.dart';
 import '../../core/audio/pos_sound_service.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 import '../../widgets/offline_cached_image.dart';
@@ -175,11 +176,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  /// Legacy manual sync (kept for pull-to-refresh or edge cases).
-  Future<void> _syncCatalog(BuildContext context) async {
-    await _syncCatalogSilently();
-  }
-
   Future<String?> _addProduct(BuildContext context, Item item) async {
     if (_addingProduct) return null;
     _addingProduct = true;
@@ -312,7 +308,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final servicesAsync = ref.watch(servicesStreamProvider);
     final cart = ref.watch(cartControllerProvider);
     final parked = ref.watch(parkedSalesProvider);
+    final profileAsync = ref.watch(businessProfileProvider);
     final cartController = ref.read(cartControllerProvider.notifier);
+    final profile = profileAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -539,6 +537,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             onCheckout: () => _handleCheckout(context, ref),
             onClear: () => cartController.clear(),
             onRemove: (id) => cartController.removeLine(id),
+            taxEnabled: profile?.taxEnabled ?? false,
+            taxRate: profile?.taxRate ?? 0,
+            taxLabel: profile?.taxLabel ?? 'VAT',
+            taxInclusionMode: profile?.taxInclusionMode ?? 'exclusive',
           );
 
           // ─────────────────────────────────────────────────────────────────
@@ -570,6 +572,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                     total: cart.subtotal,
                     onTap: () => _showCartSheet(context, ref),
+                    taxEnabled: profile?.taxEnabled ?? false,
+                    taxRate: profile?.taxRate ?? 0,
+                    taxInclusionMode: profile?.taxInclusionMode ?? 'exclusive',
                   ),
                 ),
             ],
@@ -1259,10 +1264,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         builder: (sheetContext, sheetRef, _) {
           final cart = sheetRef.watch(cartControllerProvider);
           final parked = sheetRef.watch(parkedSalesProvider);
+          final profile = sheetRef.watch(businessProfileProvider).valueOrNull;
           return _CartPane(
             cart: cart,
             customer: cart.customer,
             parkedCount: parked.length,
+            taxEnabled: profile?.taxEnabled ?? false,
+            taxRate: profile?.taxRate ?? 0,
+            taxLabel: profile?.taxLabel ?? 'VAT',
+            taxInclusionMode: profile?.taxInclusionMode ?? 'exclusive',
             onSelectCustomer: () {
               Navigator.of(sheetContext).pop();
               _selectCustomer(rootContext);
@@ -1318,8 +1328,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     WidgetRef ref,
     CartState cart,
   ) async {
-
-    final total = cart.subtotal;
+    final profileAsync = ref.read(businessProfileProvider);
+    final profile = profileAsync.valueOrNull;
+    final taxEnabled = profile?.taxEnabled ?? false;
+    final taxRate = taxEnabled ? (profile?.taxRate ?? 0.0) : 0.0;
+    final taxInclusionMode = profile?.taxInclusionMode ?? 'exclusive';
+    final taxAmount = TaxCalculator.taxAmount(
+      cart.subtotal,
+      taxRate,
+      inclusive: taxInclusionMode == 'inclusive',
+    );
+    final total = taxInclusionMode == 'inclusive'
+        ? cart.subtotal
+        : cart.subtotal + taxAmount;
     final prefs = ref.read(sharedPreferencesProvider);
     final staffInitialized = prefs.getBool(posStaffInitializedPrefKey) ?? false;
     final connectivity = await Connectivity().checkConnectivity();
@@ -1523,7 +1544,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       id = await ref
           .read(cartControllerProvider.notifier)
-          .checkout(payments: payments, notes: note);
+          .checkout(
+            payments: payments,
+            notes: note,
+            taxAmount: taxAmount,
+            taxRate: taxRate,
+            taxInclusionMode: taxInclusionMode,
+          );
     } catch (e) {
       if (!context.mounted) return;
       PosSoundService().playError();
@@ -2813,6 +2840,10 @@ class _CartPane extends StatelessWidget {
     required this.onCheckout,
     required this.onClear,
     required this.onRemove,
+    this.taxEnabled = false,
+    this.taxRate = 0.0,
+    this.taxLabel = 'VAT',
+    this.taxInclusionMode = 'exclusive',
   });
 
   final CartState cart;
@@ -2825,9 +2856,22 @@ class _CartPane extends StatelessWidget {
   final VoidCallback onCheckout;
   final VoidCallback onClear;
   final void Function(String id) onRemove;
+  final bool taxEnabled;
+  final double taxRate;
+  final String taxLabel;
+  final String taxInclusionMode;
 
   @override
   Widget build(BuildContext context) {
+    final taxAmount = TaxCalculator.taxAmount(
+      cart.subtotal,
+      taxEnabled ? taxRate : 0,
+      inclusive: taxInclusionMode == 'inclusive',
+    );
+    final total = taxInclusionMode == 'inclusive'
+        ? cart.subtotal
+        : cart.subtotal + taxAmount;
+
     return Container(
       color: DesignTokens.surfaceWhite,
       child: Column(
@@ -2964,6 +3008,22 @@ class _CartPane extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (taxEnabled && taxAmount > 0) ...[
+                  const SizedBox(height: DesignTokens.spaceSm),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$taxLabel (${taxRate.toStringAsFixed(0)}%)',
+                        style: DesignTokens.textBody,
+                      ),
+                      Text(
+                        taxAmount.toUgx(),
+                        style: DesignTokens.textBodyBold,
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: DesignTokens.spaceMd),
                 ElevatedButton(
                   onPressed: cart.lines.isEmpty ? null : onCheckout,
@@ -2974,7 +3034,7 @@ class _CartPane extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    'Charge ${cart.subtotal.toUgx()}',
+                    'Charge ${total.toUgx()}',
                     style: DesignTokens.textBody.copyWith(
                       color: DesignTokens.surfaceWhite,
                       fontWeight: FontWeight.w600,
@@ -3186,14 +3246,29 @@ class _FloatingCartSummary extends StatelessWidget {
     required this.itemCount,
     required this.total,
     required this.onTap,
+    this.taxEnabled = false,
+    this.taxRate = 0.0,
+    this.taxInclusionMode = 'exclusive',
   });
 
   final int itemCount;
   final double total;
   final VoidCallback onTap;
+  final bool taxEnabled;
+  final double taxRate;
+  final String taxInclusionMode;
 
   @override
   Widget build(BuildContext context) {
+    final taxAmount = TaxCalculator.taxAmount(
+      total,
+      taxEnabled ? taxRate : 0,
+      inclusive: taxInclusionMode == 'inclusive',
+    );
+    final displayTotal = taxInclusionMode == 'inclusive'
+        ? total
+        : total + taxAmount;
+
     return AnimatedSlide(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
@@ -3250,7 +3325,7 @@ class _FloatingCartSummary extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  total.toUgx(),
+                  displayTotal.toUgx(),
                   style: DesignTokens.textTitle.copyWith(
                     color: Colors.white,
                   ),
@@ -3364,12 +3439,8 @@ class _ErrorState extends StatelessWidget {
 class _EmptySearchState extends StatelessWidget {
   const _EmptySearchState({
     required this.message,
-    this.actionLabel,
-    this.onAction,
   });
   final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -3400,18 +3471,6 @@ class _EmptySearchState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: DesignTokens.spaceLg),
-            ElevatedButton.icon(
-              onPressed: onAction,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: DesignTokens.brandAccent,
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.sync),
-              label: Text(actionLabel!),
-            ),
-          ],
         ],
       ),
     );

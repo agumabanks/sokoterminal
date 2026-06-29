@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,8 @@ import '../contacts/contacts_controller.dart';
 import 'ad_templates.dart';
 import 'brand_kit_screen.dart';
 import 'studio_product_utils.dart';
+import 'studio_providers.dart';
+import 'studio_template_exporter.dart';
 
 // ---------------------------------------------------------------------------
 // StudioShareSheet — product-aware share review with social destinations
@@ -28,15 +31,19 @@ class StudioShareSheet extends ConsumerStatefulWidget {
     required this.template,
     required this.kit,
     this.initialProduct,
+    this.isService = false,
     this.showWatermarkBadge = false,
     this.exportTitle,
     this.initialCaption,
+    this.activeSize,
   });
 
   final File adFile;
   final AdTemplate template;
   final BrandKit kit;
+  final AdSize? activeSize;
   final Item? initialProduct;
+  final bool isService;
   final bool showWatermarkBadge;
   /// Overrides [template.name] in captions and preview (e.g. Ad Injector exports).
   final String? exportTitle;
@@ -85,6 +92,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
       product: _product,
       kit: widget.kit,
       api: ref.read(sellerApiProvider),
+      isService: widget.isService,
     );
     if (mounted) setState(() => _productLink = link);
   }
@@ -111,6 +119,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
         text = '$text\n\n$hint';
       }
       await Share.shareXFiles([XFile(widget.adFile.path)], text: text);
+      unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordShare());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -123,6 +132,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
         [XFile(widget.adFile.path)],
         text: _captionCtrl.text,
       );
+      unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordShare());
     } catch (_) {
       final encoded = Uri.encodeComponent(_captionCtrl.text);
       final number = (toNumber ?? widget.kit.whatsapp)
@@ -162,6 +172,93 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
     }
   }
 
+  String get _currentSizeLabel {
+    final size = widget.activeSize ??
+        findAdSizeFor(widget.template.canvasWidth, widget.template.canvasHeight);
+    if (size != null) {
+      return '${size.label} ${size.width.toInt()}×${size.height.toInt()}';
+    }
+    return '${widget.template.canvasWidth.toInt()}×${widget.template.canvasHeight.toInt()}';
+  }
+
+  Future<void> _exportMoreSizes() async {
+    final selected = await showDialog<List<AdSize>>(
+      context: context,
+      builder: (ctx) => _SizeSelectorDialog(
+        current: widget.activeSize ??
+            findAdSizeFor(widget.template.canvasWidth, widget.template.canvasHeight),
+      ),
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final files = await exportStudioTemplatePngForSizes(
+        context,
+        template: widget.template,
+        sizes: selected,
+        applyWatermark: widget.showWatermarkBadge,
+        pixelRatio: 1.5,
+      );
+      if (!mounted) return;
+      if (files.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed — no files generated')),
+        );
+        return;
+      }
+      await _showMultiExportResult(files);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showMultiExportResult(List<File> files) async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: DesignTokens.brandPrimary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _MultiExportResultSheet(
+        files: files,
+        caption: _captionCtrl.text,
+        onShare: _shareFiles,
+        onSave: _saveFiles,
+      ),
+    );
+  }
+
+  Future<void> _shareFiles(List<File> files) async {
+    await Share.shareXFiles(
+      files.map((f) => XFile(f.path)).toList(),
+      text: _captionCtrl.text,
+    );
+  }
+
+  Future<void> _saveFiles(List<File> files) async {
+    final dir = await getExternalStorageDirectory() ??
+        await getApplicationDocumentsDirectory();
+    final folder = Directory(p.join(dir.path, 'SokoStudio'));
+    await folder.create(recursive: true);
+    final saved = <String>[];
+    for (var i = 0; i < files.length; i++) {
+      final file = files[i];
+      final ext = p.extension(file.path);
+      final dest = p.join(
+        folder.path,
+        'ad-${widget.template.id}-${DateTime.now().millisecondsSinceEpoch}_$i$ext',
+      );
+      await file.copy(dest);
+      saved.add(dest);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved ${saved.length} images to SokoStudio folder ✓')),
+      );
+    }
+  }
+
   void _copyCaption() {
     Clipboard.setData(ClipboardData(text: _captionCtrl.text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +279,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
 
     final picked = await showModalBottomSheet<Item>(
       context: context,
-      backgroundColor: const Color(0xFF111827),
+      backgroundColor: DesignTokens.brandPrimary,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -201,7 +298,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
     final topPad = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080E1C),
+      backgroundColor: DesignTokens.brandPrimary,
       body: Column(
         children: [
           _buildTopBar(topPad),
@@ -225,7 +322,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPad + 8, 16, 12),
       decoration: const BoxDecoration(
-        color: Color(0xFF0F1D40),
+        color: DesignTokens.brandPrimary,
         border: Border(bottom: BorderSide(color: Colors.white12)),
       ),
       child: Row(
@@ -299,59 +396,118 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Product picker
-          _SectionLabel('Product for this post'),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _pickProduct,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          // Canvas size + multi-export
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Canvas size',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _currentSizeLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: DesignTokens.brandAccent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.inventory_2_rounded,
-                        color: DesignTokens.brandAccent, size: 22),
+              GestureDetector(
+                onTap: _busy ? null : _exportMoreSizes,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _product?.name ?? 'No product selected',
-                          style: TextStyle(
-                            color: _product != null ? Colors.white : Colors.white54,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.aspect_ratio_rounded, color: Colors.white54, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Export more sizes',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Product picker (only allow changing when no product was baked into the image)
+          if (widget.initialProduct == null) ...[
+            _SectionLabel('Product for this post'),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _pickProduct,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: DesignTokens.brandAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.inventory_2_rounded,
+                          color: DesignTokens.brandAccent, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _product?.name ?? 'No product selected',
+                            style: TextStyle(
+                              color: _product != null ? Colors.white : Colors.white54,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        Text(
-                          _product != null
-                              ? formatUgPrice(_product!.price)
-                              : 'Tap to attach product name, price & link',
-                          style: const TextStyle(color: Colors.white38, fontSize: 12),
-                        ),
-                      ],
+                          Text(
+                            _product != null
+                                ? formatUgPrice(_product!.price)
+                                : 'Tap to attach product name, price & link',
+                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
-                ],
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                  ],
+                ),
               ),
             ),
-          ),
-
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
           _SectionLabel('Include in caption'),
           const SizedBox(height: 8),
           _DetailToggles(
@@ -412,7 +568,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPad + 12),
       decoration: const BoxDecoration(
-        color: Color(0xFF0F1D40),
+        color: DesignTokens.brandPrimary,
         border: Border(top: BorderSide(color: Colors.white12)),
       ),
       child: Column(
@@ -458,7 +614,7 @@ class _StudioShareSheetState extends ConsumerState<StudioShareSheet> {
                 child: _SecBtn(
                   icon: _saved ? Icons.check_circle_rounded : Icons.download_rounded,
                   label: _saved ? 'Saved!' : 'Save',
-                  color: _saved ? const Color(0xFF0EBE7E) : null,
+                  color: _saved ? DesignTokens.brandAccent : null,
                   onTap: _busy ? null : _saveToDevice,
                 ),
               ),
@@ -486,8 +642,8 @@ class _DetailToggles extends StatelessWidget {
         label: Text(label, style: const TextStyle(fontSize: 12)),
         selected: on,
         onSelected: (_) => toggle(),
-        selectedColor: const Color(0xFF0EBE7E).withValues(alpha: 0.25),
-        checkmarkColor: const Color(0xFF0EBE7E),
+        selectedColor: DesignTokens.brandAccent.withValues(alpha: 0.25),
+        checkmarkColor: DesignTokens.brandAccent,
         labelStyle: TextStyle(
           color: on ? Colors.white : Colors.white54,
           fontWeight: on ? FontWeight.w600 : FontWeight.normal,
@@ -517,6 +673,10 @@ class _DetailToggles extends StatelessWidget {
             () => onChanged(details.copyWith(includeLocation: !details.includeLocation))),
         chip('Tagline', details.includeTagline,
             () => onChanged(details.copyWith(includeTagline: !details.includeTagline))),
+        chip('Category', details.includeCategory,
+            () => onChanged(details.copyWith(includeCategory: !details.includeCategory))),
+        chip('Hashtags', details.includeHashtags,
+            () => onChanged(details.copyWith(includeHashtags: !details.includeHashtags))),
       ],
     );
   }
@@ -583,7 +743,7 @@ class _SocialPlatformRow extends StatelessWidget {
           children: [
             tile(Icons.music_note_rounded, 'TikTok', Colors.white, onTikTok),
             tile(Icons.alternate_email_rounded, 'X', Colors.white70, onTwitter),
-            tile(Icons.apps_rounded, 'More', const Color(0xFF0EBE7E), onMore),
+            tile(Icons.apps_rounded, 'More', DesignTokens.brandAccent, onMore),
           ],
         ),
       ],
@@ -620,10 +780,10 @@ class _ProductPickerSheet extends StatelessWidget {
                 final item = items[i];
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF0EBE7E).withValues(alpha: 0.15),
+                    backgroundColor: DesignTokens.brandAccent.withValues(alpha: 0.15),
                     child: Text(
                       item.name.isNotEmpty ? item.name[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Color(0xFF0EBE7E)),
+                      style: const TextStyle(color: DesignTokens.brandAccent),
                     ),
                   ),
                   title: Text(item.name,
@@ -733,7 +893,7 @@ class _AdPreviewCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0EBE7E),
+                      color: DesignTokens.brandAccent,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
@@ -765,13 +925,13 @@ class _SmartLinkCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0EBE7E).withValues(alpha: 0.08),
+        color: DesignTokens.brandAccent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF0EBE7E).withValues(alpha: 0.2)),
+        border: Border.all(color: DesignTokens.brandAccent.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.link_rounded, color: Color(0xFF0EBE7E), size: 20),
+          const Icon(Icons.link_rounded, color: DesignTokens.brandAccent, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -813,10 +973,10 @@ class _SmartLinkCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0EBE7E).withValues(alpha: 0.15),
+                color: DesignTokens.brandAccent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.copy_rounded, color: Color(0xFF0EBE7E), size: 16),
+              child: const Icon(Icons.copy_rounded, color: DesignTokens.brandAccent, size: 16),
             ),
           ),
         ],
@@ -923,11 +1083,11 @@ class _ContactsPanel extends ConsumerWidget {
                     dense: true,
                     leading: CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFF0EBE7E).withValues(alpha: 0.15),
+                      backgroundColor: DesignTokens.brandAccent.withValues(alpha: 0.15),
                       child: Text(
                         initials,
                         style: const TextStyle(
-                          color: Color(0xFF0EBE7E),
+                          color: DesignTokens.brandAccent,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -964,6 +1124,209 @@ class _ContactsPanel extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-size export selector
+// ---------------------------------------------------------------------------
+
+class _SizeSelectorDialog extends StatefulWidget {
+  const _SizeSelectorDialog({this.current});
+  final AdSize? current;
+
+  @override
+  State<_SizeSelectorDialog> createState() => _SizeSelectorDialogState();
+}
+
+class _SizeSelectorDialogState extends State<_SizeSelectorDialog> {
+  final Set<String> _selected = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (final size in adSizes) {
+      if (widget.current == null || size.label != widget.current!.label) {
+        _selected.add(size.label);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: DesignTokens.brandPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Export more sizes',
+        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: adSizes.length,
+          itemBuilder: (_, i) {
+            final size = adSizes[i];
+            final checked = _selected.contains(size.label);
+            return CheckboxListTile(
+              dense: true,
+              value: checked,
+              activeColor: DesignTokens.brandAccent,
+              side: const BorderSide(color: Colors.white24),
+              title: Text(
+                size.label,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              subtitle: Text(
+                '${size.width.toInt()}×${size.height.toInt()}',
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              onChanged: (_) {
+                setState(() {
+                  if (checked) {
+                    _selected.remove(size.label);
+                  } else {
+                    _selected.add(size.label);
+                  }
+                });
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+        ),
+        TextButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.pop(
+                    context,
+                    adSizes.where((s) => _selected.contains(s.label)).toList(),
+                  ),
+          child: const Text('Export', style: TextStyle(color: DesignTokens.brandAccent)),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-size export result sheet
+// ---------------------------------------------------------------------------
+
+class _MultiExportResultSheet extends StatelessWidget {
+  const _MultiExportResultSheet({
+    required this.files,
+    required this.caption,
+    required this.onShare,
+    required this.onSave,
+  });
+
+  final List<File> files;
+  final String caption;
+  final void Function(List<File>) onShare;
+  final void Function(List<File>) onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPad + 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              '${files.length} size${files.length == 1 ? '' : 's'} exported',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              caption.isNotEmpty ? caption : 'Ready to share or save.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.35),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: files.length,
+                itemBuilder: (_, i) {
+                  final name = p.basename(files[i].path);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.image_rounded, color: Colors.white38, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _SecBtn(
+                    icon: Icons.ios_share_rounded,
+                    label: 'Share all',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onShare(files);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SecBtn(
+                    icon: Icons.download_rounded,
+                    label: 'Save all',
+                    onTap: () {
+                      Navigator.pop(context);
+                      onSave(files);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

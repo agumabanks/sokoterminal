@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/build_metadata.dart';
+import '../../core/notifications/local_notification_service.dart';
 import '../network/seller_api.dart';
 import 'fcm_navigation.dart';
 import 'firebase_runtime.dart';
@@ -18,7 +19,11 @@ typedef FcmForegroundBannerCallback = void Function({
 });
 typedef FcmSyncHintCallback = Future<void> Function();
 
-/// Firebase Cloud Messaging service for push notifications
+/// Firebase Cloud Messaging service for push notifications.
+///
+/// This singleton owns all Firebase stream subscriptions and exposes a
+/// [foregroundMessages] broadcast stream so UI controllers can react to pushes
+/// without creating duplicate listeners.
 class FCMService {
   FCMService._();
   static final instance = FCMService._();
@@ -32,6 +37,14 @@ class FCMService {
   StreamSubscription<String>? _tokenRefreshSub;
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<RemoteMessage>? _openedAppSub;
+
+  final _foregroundMessageController = StreamController<RemoteMessage>.broadcast();
+
+  /// Broadcast stream of FCM messages received while the app is in the foreground.
+  /// Consumers (e.g. [NotificationsController]) should listen here rather than
+  /// subscribing to [FirebaseMessaging.onMessage] directly to avoid leaks and
+  /// duplicate UI (double SnackBars, double navigation).
+  Stream<RemoteMessage> get foregroundMessages => _foregroundMessageController.stream;
 
   FirebaseMessaging? get _messagingOrNull {
     if (!FirebaseRuntime.instance.firebaseEnabled) return null;
@@ -62,44 +75,49 @@ class FCMService {
       return;
     }
 
-    await messaging.setAutoInitEnabled(true);
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      await messaging.setAutoInitEnabled(true);
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    debugPrint('[FCM] Permission status: ${settings.authorizationStatus}');
+      debugPrint('[FCM] Permission status: ${settings.authorizationStatus}');
 
-    if (settings.authorizationStatus != AuthorizationStatus.authorized &&
-        settings.authorizationStatus != AuthorizationStatus.provisional) {
-      return;
-    }
+      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        return;
+      }
 
-    _token = await messaging.getToken();
-    if (kDebugMode) debugPrint('[FCM] Token obtained');
-    if (_token != null) {
-      unawaited(_registerTokenWithBackend(_token!));
-    }
+      _token = await messaging.getToken();
+      if (kDebugMode) debugPrint('[FCM] Token obtained');
+      if (_token != null) {
+        unawaited(_registerTokenWithBackend(_token!));
+      }
 
-    await _tokenRefreshSub?.cancel();
-    _tokenRefreshSub = messaging.onTokenRefresh.listen((newToken) {
-      _token = newToken;
-      debugPrint('[FCM] Token refreshed');
-      unawaited(_registerTokenWithBackend(newToken));
-    });
+      await _tokenRefreshSub?.cancel();
+      _tokenRefreshSub = messaging.onTokenRefresh.listen((newToken) {
+        _token = newToken;
+        debugPrint('[FCM] Token refreshed');
+        unawaited(_registerTokenWithBackend(newToken));
+      });
 
-    await _foregroundSub?.cancel();
-    _foregroundSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      await _foregroundSub?.cancel();
+      _foregroundSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    await _openedAppSub?.cancel();
-    _openedAppSub = FirebaseMessaging.onMessageOpenedApp.listen(
-      _handleNotificationTap,
-    );
+      await _openedAppSub?.cancel();
+      _openedAppSub = FirebaseMessaging.onMessageOpenedApp.listen(
+        _handleNotificationTap,
+      );
 
-    final initial = await messaging.getInitialMessage();
-    if (initial != null) {
-      _handleNotificationTap(initial);
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) {
+        _handleNotificationTap(initial);
+      }
+    } catch (e, st) {
+      debugPrint('[FCM] Initialization failed: $e\n$st');
+      // Do not crash the app if Firebase is partially unavailable.
     }
   }
 
@@ -109,7 +127,8 @@ class FCMService {
     try {
       await api.registerDeviceToken(
         token: token,
-        platform: Platform.isIOS ? 'ios' : 'android',
+        platform: BuildMetadata.notificationPlatform(),
+        appVersion: BuildMetadata.appVersion,
       );
       if (kDebugMode) debugPrint('[FCM] Device token registered with backend');
     } catch (e, st) {
@@ -120,6 +139,10 @@ class FCMService {
   void _handleForegroundMessage(RemoteMessage message) {
     final data = Map<String, dynamic>.from(message.data);
     debugPrint('[FCM] Foreground message: ${message.notification?.title}');
+
+    // Emit to broadcast stream so NotificationsController can ingest without
+    // creating a duplicate Firebase listener.
+    _foregroundMessageController.add(message);
 
     if (FcmNavigation.shouldTriggerSync(data)) {
       unawaited(_onSyncHint?.call());
@@ -148,6 +171,35 @@ class FCMService {
       actionLabel: route == null ? null : 'Open',
       onAction: route == null ? null : () => _onNavigate?.call(route),
     );
+
+    // Also post a system-tray local notification so the message is visible
+    // when the user is outside the app or on another screen.
+    unawaited(
+      LocalNotificationService.instance.show(
+        id: message.hashCode,
+        title: title ?? 'Notification',
+        body: body ?? '',
+        channelId: _channelForData(data),
+        payload: route,
+      ),
+    );
+  }
+
+  String _channelForData(Map<String, dynamic> data) {
+    final type = data['type']?.toString().toLowerCase() ?? '';
+    final category = data['category']?.toString().toLowerCase() ?? '';
+    if (type == 'order' ||
+        category == 'order' ||
+        category == 'orders' ||
+        type == 'marketplace_order') {
+      return 'orders_channel';
+    }
+    if (type == 'sync_hint' ||
+        type == 'sync' ||
+        type == 'sync_health') {
+      return 'sync_channel';
+    }
+    return 'general_channel';
   }
 
   void _handleNotificationTap(RemoteMessage message) {
@@ -168,6 +220,7 @@ class FCMService {
     await _tokenRefreshSub?.cancel();
     await _foregroundSub?.cancel();
     await _openedAppSub?.cancel();
+    await _foregroundMessageController.close();
     _tokenRefreshSub = null;
     _foregroundSub = null;
     _openedAppSub = null;
@@ -179,13 +232,21 @@ class FCMService {
   Future<void> subscribeToTopic(String topic) async {
     final messaging = _messagingOrNull;
     if (messaging == null) return;
-    await messaging.subscribeToTopic(topic);
+    try {
+      await messaging.subscribeToTopic(topic);
+    } catch (e) {
+      debugPrint('[FCM] subscribeToTopic failed: $e');
+    }
   }
 
   Future<void> unsubscribeFromTopic(String topic) async {
     final messaging = _messagingOrNull;
     if (messaging == null) return;
-    await messaging.unsubscribeFromTopic(topic);
+    try {
+      await messaging.unsubscribeFromTopic(topic);
+    } catch (e) {
+      debugPrint('[FCM] unsubscribeFromTopic failed: $e');
+    }
   }
 }
 

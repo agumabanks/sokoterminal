@@ -274,7 +274,7 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
             builder: (context, snap) {
               final services = snap.data ?? [];
               return DropdownButtonFormField<String?>(
-                value: _selectedServiceId,
+                initialValue: _selectedServiceId,
                 decoration: const InputDecoration(
                   labelText: 'Service',
                   prefixIcon: Icon(Icons.room_service_outlined),
@@ -460,7 +460,7 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
 
           // Meeting type
           DropdownButtonFormField<String>(
-            value: _meetingType,
+            initialValue: _meetingType,
             decoration: const InputDecoration(
               labelText: 'Meeting Type',
               prefixIcon: Icon(Icons.meeting_room_outlined),

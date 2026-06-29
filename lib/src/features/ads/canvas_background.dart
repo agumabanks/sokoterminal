@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ad_templates.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Extra mesh / pattern backgrounds beyond flat gradients.
 const meshBackgroundPresets = <({
@@ -20,7 +21,7 @@ const meshBackgroundPresets = <({
   (
     id: 'soko',
     label: 'Soko Green',
-    colors: [Color(0xFF0F1D40), Color(0xFF0EBE7E), Color(0xFF059669)],
+    colors: [DesignTokens.brandPrimary, DesignTokens.brandAccent, DesignTokens.success],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   ),
@@ -55,7 +56,7 @@ const meshBackgroundPresets = <({
   (
     id: 'sky',
     label: 'Sky',
-    colors: [Color(0xFF2980b9), Color(0xFF6dd5fa), Color(0xFFffffff)],
+    colors: [Color(0xFF2980b9), Color(0xFF6dd5fa), DesignTokens.canvas],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   ),

@@ -28,7 +28,7 @@ class GraphicsWorkspace extends ConsumerWidget {
         kit: kit,
         product: selectedItem,
         productLink: selectedItem != null
-            ? 'soko24.co/p/${selectedItem!.id}'
+            ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
             : kit.website,
       );
 

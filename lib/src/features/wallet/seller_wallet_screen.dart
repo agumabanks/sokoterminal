@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/theme/design_tokens.dart';
+import '../bnpl/bnpl_settings_screen.dart';
+import '../bnpl/providers/bnpl_seller_status_provider.dart';
 import '../wallet/seller_wallet_payment_screen.dart';
 
 class SellerWalletScreen extends ConsumerStatefulWidget {
@@ -406,6 +408,8 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                 onTopUp: _startTopup,
               ),
               const SizedBox(height: DesignTokens.spaceLg),
+              const _BnplWalletCard(),
+              const SizedBox(height: DesignTokens.spaceLg),
               if (wallet.subscription != null) ...[
                 _WalletSectionCard(
                   title: 'Current subscription',
@@ -562,7 +566,7 @@ class _WalletHero extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: DesignTokens.borderRadiusLg,
         gradient: const LinearGradient(
-          colors: [Color(0xFF0A3D62), Color(0xFF177E89)],
+          colors: [DesignTokens.brandPrimary, DesignTokens.info],
         ),
       ),
       child: Column(
@@ -598,7 +602,7 @@ class _WalletHero extends StatelessWidget {
                     onPressed: onTopUp,
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF0A3D62),
+                      foregroundColor: DesignTokens.brandPrimary,
                     ),
                     icon: const Icon(Icons.add_card_outlined),
                     label: const Text('Add money'),
@@ -740,6 +744,69 @@ class _InfoStrip extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Text(text, style: DesignTokens.textSmall)),
         ],
+      ),
+    );
+  }
+}
+
+class _BnplWalletCard extends ConsumerWidget {
+  const _BnplWalletCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(bnplSellerStatusProvider);
+    final status = statusAsync.valueOrNull;
+    final (icon, color, label) = switch (status?.status) {
+      'active' => (Icons.check_circle_outline, DesignTokens.success, 'BNPL active'),
+      'pending' => (Icons.hourglass_top_outlined, DesignTokens.warning, 'BNPL pending'),
+      'suspended' => (Icons.block_outlined, DesignTokens.error, 'BNPL suspended'),
+      _ => (Icons.account_balance_wallet_outlined, DesignTokens.grayMedium, 'Sanaa Finance BNPL'),
+    };
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const BnplSettingsScreen()),
+      ),
+      child: Container(
+        padding: DesignTokens.paddingLg,
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceWhite,
+          borderRadius: DesignTokens.borderRadiusLg,
+          border: Border.all(color: DesignTokens.hairline),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: DesignTokens.borderRadiusMd,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    status?.isActive ?? false
+                        ? 'Manage pay-later settings'
+                        : 'Let customers buy now and pay later',
+                    style: DesignTokens.textSmall,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: DesignTokens.inkMuted),
+          ],
+        ),
       ),
     );
   }

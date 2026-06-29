@@ -221,9 +221,17 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         ),
       if (!isStaffSession)
         _MoreAction(
-          title: 'Ads & Creatives',
-          subtitle: 'Promotion campaigns and generated content',
-          icon: Icons.campaign_outlined,
+          title: 'Sanaa Finance BNPL',
+          subtitle: 'Let customers pay later',
+          icon: Icons.payments_outlined,
+          color: DesignTokens.brandAccent,
+          route: '/home/more/bnpl-settings',
+        ),
+      if (!isStaffSession && remoteConfig.ffSokoStudio)
+        _MoreAction(
+          title: 'Soko Studio',
+          subtitle: 'Designs, ads, campaigns & marketing tools',
+          icon: Icons.auto_awesome_outlined,
           color: DesignTokens.brandPrimary,
           route: '/home/more/ads',
         ),

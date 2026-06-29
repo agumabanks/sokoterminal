@@ -54,7 +54,7 @@ String _fontDisplayName(String? family) {
   }
 }
 
-enum _EditorTool { none, text, font, fontSize, color, image }
+enum _EditorTool { none, text, font, fontSize, color }
 
 class AdDetailScreen extends StatefulWidget {
   const AdDetailScreen({

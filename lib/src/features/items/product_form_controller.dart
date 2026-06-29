@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +32,18 @@ class ProductFormState {
   final bool refundable;
   final bool cashOnDelivery;
   final bool publishOnline;
+
+  // BNPL
+  final bool bnplEnabled;
+  final String bnplMinOrderAmount;
+  final String bnplMaxOrderAmount;
+  final String bnplInstallmentCount;
+
+  // Tax
+  final bool taxEnabled;
+  final String taxRate;
+  final String taxLabel;
+  final String taxInclusionMode;
 
   // Images
   final File? thumbnailFile;
@@ -74,6 +87,14 @@ class ProductFormState {
     this.refundable = false,
     this.cashOnDelivery = true,
     this.publishOnline = false,
+    this.bnplEnabled = false,
+    this.bnplMinOrderAmount = '',
+    this.bnplMaxOrderAmount = '',
+    this.bnplInstallmentCount = '',
+    this.taxEnabled = false,
+    this.taxRate = '',
+    this.taxLabel = 'VAT',
+    this.taxInclusionMode = 'exclusive',
     this.thumbnailFile,
     this.thumbnailUrl,
     this.thumbnailUploadId,
@@ -112,6 +133,14 @@ class ProductFormState {
     bool? refundable,
     bool? cashOnDelivery,
     bool? publishOnline,
+    bool? bnplEnabled,
+    String? bnplMinOrderAmount,
+    String? bnplMaxOrderAmount,
+    String? bnplInstallmentCount,
+    bool? taxEnabled,
+    String? taxRate,
+    String? taxLabel,
+    String? taxInclusionMode,
     File? thumbnailFile,
     String? thumbnailUrl,
     int? thumbnailUploadId,
@@ -149,6 +178,14 @@ class ProductFormState {
       refundable: refundable ?? this.refundable,
       cashOnDelivery: cashOnDelivery ?? this.cashOnDelivery,
       publishOnline: publishOnline ?? this.publishOnline,
+      bnplEnabled: bnplEnabled ?? this.bnplEnabled,
+      bnplMinOrderAmount: bnplMinOrderAmount ?? this.bnplMinOrderAmount,
+      bnplMaxOrderAmount: bnplMaxOrderAmount ?? this.bnplMaxOrderAmount,
+      bnplInstallmentCount: bnplInstallmentCount ?? this.bnplInstallmentCount,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      taxRate: taxRate ?? this.taxRate,
+      taxLabel: taxLabel ?? this.taxLabel,
+      taxInclusionMode: taxInclusionMode ?? this.taxInclusionMode,
       thumbnailFile: thumbnailFile ?? this.thumbnailFile,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       thumbnailUploadId: thumbnailUploadId ?? this.thumbnailUploadId,
@@ -267,6 +304,21 @@ class ProductFormController extends StateNotifier<ProductFormState> {
 
   ProductFormController(this.ref) : super(const ProductFormState());
 
+  /// Load business tax settings into the form defaults.
+  Future<void> loadBusinessTaxSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final profile = await db.getBusinessProfile();
+    if (profile == null) return;
+    state = state.copyWith(
+      taxEnabled: profile.taxEnabled,
+      taxRate: profile.taxRate > 0
+          ? CommaNumberFormatter.format(profile.taxRate.toStringAsFixed(0))
+          : '',
+      taxLabel: profile.taxLabel,
+      taxInclusionMode: profile.taxInclusionMode,
+    );
+  }
+
   // Tab navigation
   void setTab(int tab) => state = state.copyWith(currentTab: tab);
 
@@ -305,6 +357,17 @@ class ProductFormController extends StateNotifier<ProductFormState> {
   void setRefundable(bool v) => state = state.copyWith(refundable: v);
   void setCashOnDelivery(bool v) => state = state.copyWith(cashOnDelivery: v);
 
+  // BNPL
+  void setBnplEnabled(bool v) => state = state.copyWith(bnplEnabled: v);
+  void setBnplMinOrderAmount(String v) =>
+      state = state.copyWith(bnplMinOrderAmount: v);
+  void setBnplMaxOrderAmount(String v) =>
+      state = state.copyWith(bnplMaxOrderAmount: v);
+  void setBnplInstallmentCount(String v) =>
+      state = state.copyWith(bnplInstallmentCount: v);
+
+  void setTaxRate(String v) => state = state.copyWith(taxRate: v);
+
   /// Toggle publish online - triggers smart prefetch
   Future<void> setPublishOnline(bool v) async {
     state = state.copyWith(publishOnline: v);
@@ -314,10 +377,11 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     }
   }
 
-  /// Load categories from API
+  /// Load categories from API, with shared-preferences cache fallback.
   Future<void> _loadCategories() async {
     if (state.isLoadingCategories) return;
     state = state.copyWith(isLoadingCategories: true);
+    final prefs = ref.read(sharedPreferencesProvider);
     try {
       final api = ref.read(sellerApiProvider);
       final res = await api.fetchCategories();
@@ -328,22 +392,35 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       } else if (data is List) {
         categories = List<Map<String, dynamic>>.from(data);
       }
+      await prefs.setString('product_categories_cache_v1', jsonEncode(categories));
       state = state.copyWith(
         categories: categories,
         isLoadingCategories: false,
       );
     } catch (e) {
+      final cached = prefs.getString('product_categories_cache_v1');
+      List<Map<String, dynamic>>? fallback;
+      if (cached != null && cached.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cached);
+          if (decoded is List) {
+            fallback = List<Map<String, dynamic>>.from(decoded);
+          }
+        } catch (_) {}
+      }
       state = state.copyWith(
+        categories: fallback ?? state.categories,
         isLoadingCategories: false,
-        error: 'Failed to load categories',
+        error: fallback == null ? 'Failed to load categories' : null,
       );
     }
   }
 
-  /// Load brands from API
+  /// Load brands from API, with shared-preferences cache fallback.
   Future<void> _loadBrands() async {
     if (state.isLoadingBrands) return;
     state = state.copyWith(isLoadingBrands: true);
+    final prefs = ref.read(sharedPreferencesProvider);
     try {
       final api = ref.read(sellerApiProvider);
       final res = await api.fetchBrands();
@@ -354,11 +431,23 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       } else if (data is List) {
         brands = List<Map<String, dynamic>>.from(data);
       }
+      await prefs.setString('product_brands_cache_v1', jsonEncode(brands));
       state = state.copyWith(brands: brands, isLoadingBrands: false);
     } catch (e) {
+      final cached = prefs.getString('product_brands_cache_v1');
+      List<Map<String, dynamic>>? fallback;
+      if (cached != null && cached.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cached);
+          if (decoded is List) {
+            fallback = List<Map<String, dynamic>>.from(decoded);
+          }
+        } catch (_) {}
+      }
       state = state.copyWith(
+        brands: fallback ?? state.brands,
         isLoadingBrands: false,
-        error: 'Failed to load brands',
+        error: fallback == null ? 'Failed to load brands' : null,
       );
     }
   }
@@ -480,6 +569,15 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     }
   }
 
+  /// Add pre-cropped gallery files directly (from custom picker)
+  void addGalleryFiles(List<File> files) {
+    if (files.isEmpty) return;
+    state = state.copyWith(
+      galleryFiles: [...state.galleryFiles, ...files],
+      error: null,
+    );
+  }
+
   /// Remove gallery image
   void removeGalleryImage(int index) {
     final newList = List<File>.from(state.galleryFiles);
@@ -571,43 +669,12 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     );
   }
 
-  /// Remove thumbnail
+  /// Remove thumbnail while preserving all other form state, including tax.
   void removeThumbnail() {
-    state = ProductFormState(
-      name: state.name,
-      categoryId: state.categoryId,
-      categoryName: state.categoryName,
-      brandId: state.brandId,
-      brandName: state.brandName,
-      unit: state.unit,
-      price: state.price,
-      cost: state.cost,
-      stock: state.stock,
-      discount: state.discount,
-      discountType: state.discountType,
-      sku: state.sku,
-      minQty: state.minQty,
-      lowStockWarning: state.lowStockWarning,
-      description: state.description,
-      tags: state.tags,
-      shippingDays: state.shippingDays,
-      shippingFee: state.shippingFee,
-      weight: state.weight,
-      refundable: state.refundable,
-      cashOnDelivery: state.cashOnDelivery,
-      publishOnline: state.publishOnline,
+    state = state.copyWith(
       thumbnailFile: null,
       thumbnailUrl: null,
       thumbnailUploadId: null,
-      galleryFiles: state.galleryFiles,
-      galleryUrls: state.galleryUrls,
-      galleryUploadIds: state.galleryUploadIds,
-      categories: state.categories,
-      brands: state.brands,
-      isLoadingCategories: state.isLoadingCategories,
-      isLoadingBrands: state.isLoadingBrands,
-      currentTab: state.currentTab,
-      isSubmitting: state.isSubmitting,
     );
   }
 

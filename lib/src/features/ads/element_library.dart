@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ad_templates.dart';
+import '../../core/theme/design_tokens.dart';
 
 // ---------------------------------------------------------------------------
 // Built-in element presets
@@ -114,15 +115,15 @@ class _ElementLibraryPanelState extends State<ElementLibraryPanel>
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF0D1A35),
+      color: DesignTokens.brandPrimary,
       constraints: const BoxConstraints(maxHeight: 240),
       child: Column(
         children: [
           TabBar(
             controller: _tc,
-            labelColor: const Color(0xFF0EBE7E),
+            labelColor: DesignTokens.brandAccent,
             unselectedLabelColor: Colors.white38,
-            indicatorColor: const Color(0xFF0EBE7E),
+            indicatorColor: DesignTokens.brandAccent,
             indicatorWeight: 2,
             labelStyle: const TextStyle(fontSize: 11),
             tabs: const [

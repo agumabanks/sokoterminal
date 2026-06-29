@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:soko_seller_terminal/src/core/config/app_config.dart';
@@ -45,30 +46,84 @@ void main() {
     test(
         'does NOT logout when retry fails with 401 after successful refresh',
         () async {
-      // We can't easily mock the Dio instance inside ApiClient, but we can
-      // verify the public behavior: resetLogoutGuard works and the callback
-      // is wired correctly.
-      //
       // The key fix is in the onError interceptor: after a successful token
       // refresh, if the retry still 401s, the interceptor must NOT call
       // _performLogout. It should just pass the error through.
-      //
-      // This test verifies that the interceptor code path no longer calls
-      // _performLogout for retry-401s by inspecting the source logic.
-      // A more thorough integration test would spin up a mock HTTP server.
+      final source =
+          File('lib/src/core/network/api_client.dart').readAsStringSync();
 
-      // For now, ensure the client can be constructed and the guard resets.
+      final refreshBlockStart = source.indexOf('if (refreshed) {');
+      expect(refreshBlockStart, isNonNegative);
+      // Find the matching else for the refreshed branch by looking for the
+      // "Refresh failed" comment, which sits just above the else clause.
+      final refreshBlockEnd = source.indexOf(
+        '// Refresh failed or returned no token',
+        refreshBlockStart,
+      );
+      expect(refreshBlockEnd, isNonNegative);
+      final refreshBlock = source.substring(refreshBlockStart, refreshBlockEnd);
+
+      expect(
+        refreshBlock.contains('handler.next(retryErr)'),
+        isTrue,
+        reason: 'Retry 401 after successful refresh must not trigger logout',
+      );
+      expect(
+        refreshBlock.contains('_performLogout'),
+        isFalse,
+        reason: 'Retry 401 must not call _performLogout',
+      );
+
+      // The public guard still resets correctly.
       client.resetLogoutGuard();
       expect(logoutCalled, isFalse);
     });
 
-    test('logout callback is wired and can be triggered manually', () {
+    test('logout guard resets even when callback is null or fails', () {
+      final source =
+          File('lib/src/core/network/api_client.dart').readAsStringSync();
+
+      final logoutBlockStart = source.indexOf('Future<void> _performLogout(');
+      final logoutBlockEnd = source.indexOf('\n  }', logoutBlockStart);
+      expect(logoutBlockStart, isNonNegative);
+      expect(logoutBlockEnd, isNonNegative);
+      final logoutBlock = source.substring(logoutBlockStart, logoutBlockEnd);
+
+      expect(
+        logoutBlock.contains('_onAuthExpired?.call();'),
+        isTrue,
+        reason: '_performLogout must invoke the logout callback',
+      );
+      expect(
+        logoutBlock.contains('if (_isLoggingOut)'),
+        isTrue,
+        reason: '_performLogout must reset _isLoggingOut if the callback '
+            'did not (e.g. null callback)',
+      );
+
       client.resetLogoutGuard();
       expect(logoutCalled, isFalse);
+    });
 
-      // Simulate what _performLogout does internally via the callback.
-      // In production this is triggered by the interceptor only when
-      // token refresh itself fails.
+    test('token refresh uses single-flight completer', () {
+      final source =
+          File('lib/src/core/network/api_client.dart').readAsStringSync();
+
+      expect(
+        source.contains('Completer<bool>? _refreshCompleter;'),
+        isTrue,
+        reason: 'Concurrent refresh attempts must be serialized',
+      );
+      expect(
+        source.contains('return _refreshCompleter!.future;'),
+        isTrue,
+        reason: 'In-flight refresh requests must await the same future',
+      );
+      expect(
+        source.contains("if (!_refreshCompleter!.isCompleted)"),
+        isTrue,
+        reason: 'Refresh completer must be guarded against double-complete',
+      );
     });
   });
 }

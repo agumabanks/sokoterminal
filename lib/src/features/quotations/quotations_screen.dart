@@ -11,6 +11,7 @@ import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/error_page.dart';
 import '../ads/brand_kit_screen.dart';
+import '../ads/studio_editor_launcher.dart';
 import '../invoices/invoice_providers.dart';
 import 'quotation_creator.dart';
 
@@ -402,6 +403,24 @@ class _QuotationCard extends ConsumerWidget {
                       },
                       icon: const Icon(Icons.picture_as_pdf_outlined),
                       label: const Text('Share PDF'),
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await launchFullStudioWebForQuotation(
+                          context,
+                          ref,
+                          quotation,
+                          openPanel: 'business-branding',
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.design_services_rounded,
+                        color: DesignTokens.brandPrimary,
+                      ),
+                      label: const Text('Design in Studio'),
                     ),
                   ),
                 ],

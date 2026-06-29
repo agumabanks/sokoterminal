@@ -43,6 +43,10 @@
 	</array>
 	<key>NSContactsUsageDescription</key>
 	<string>Soko needs access to your contacts so you can sync your customers across all your Soko terminals and never lose a client.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Soko Studio needs camera access so you can turn a photo into an ad instantly.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Soko Studio needs photo library access to save and share your ads.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

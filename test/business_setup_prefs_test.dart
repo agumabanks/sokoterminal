@@ -77,6 +77,10 @@ void main() {
         receiptPaymentMethodsJson: '{"cash":true}',
         deliveryProfileJson: null,
         verificationStatus: 0,
+        taxEnabled: false,
+        taxRate: 0,
+        taxLabel: 'VAT',
+        taxInclusionMode: 'exclusive',
         updatedAt: DateTime.utc(2026, 3, 7),
         synced: true,
       );

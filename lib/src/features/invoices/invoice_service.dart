@@ -108,7 +108,7 @@ class InvoiceService {
               pw.Container(
                 padding: const pw.EdgeInsets.all(10),
                 decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.red, width: 2),
+                  border: pw.Border.all(color: const PdfColor.fromInt(0xFFD30005), width: 2),
                   borderRadius: pw.BorderRadius.circular(6),
                 ),
                 child: pw.Column(
@@ -119,7 +119,7 @@ class InvoiceService {
                       style: pw.TextStyle(
                         fontSize: 16,
                         fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.red,
+                        color: const PdfColor.fromInt(0xFFD30005),
                         letterSpacing: 2,
                       ),
                       textAlign: pw.TextAlign.center,

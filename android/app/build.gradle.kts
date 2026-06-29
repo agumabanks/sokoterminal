@@ -63,7 +63,7 @@ if (dartDefines.isNotEmpty()) {
     val encodedDefines = dartDefines.joinToString(",") {
         Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8))
     }
-    project.setProperty("dart-defines", encodedDefines)
+    extra["dart-defines"] = encodedDefines
 }
 
 android {
@@ -74,6 +74,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -122,4 +123,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Required by flutter_local_notifications for Java 8+ time APIs on older Android.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

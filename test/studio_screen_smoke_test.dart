@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:soko_seller_terminal/src/features/ads/ad_templates.dart';
 import 'package:soko_seller_terminal/src/features/ads/brand_kit_screen.dart';
 import 'package:soko_seller_terminal/src/features/ads/business_hub_templates.dart';
 import 'package:soko_seller_terminal/src/features/ads/graphics_workspace.dart';

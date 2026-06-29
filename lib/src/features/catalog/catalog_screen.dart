@@ -855,7 +855,7 @@ class _ServiceCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F1D40).withValues(alpha: 0.85),
+                        color: DesignTokens.brandPrimary.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
@@ -1064,7 +1064,7 @@ class _ShareSheet extends StatelessWidget {
               icon: Icons.picture_as_pdf,
               label: 'Export PDF',
               subtitle: 'Professional printable catalog',
-              color: const Color(0xFFE53E3E),
+              color: DesignTokens.error,
               onPressed: generating ? null : onSharePdf,
               generating: generating,
             ),

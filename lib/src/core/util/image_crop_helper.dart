@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Crops a product/service photo to a professional 800×800 square.
 Future<File?> cropProductImage(File source) async {
-  const brandPrimary = Color(0xFF0F1D40);
+  const brandPrimary = DesignTokens.brandPrimary;
   final cropped = await ImageCropper().cropImage(
     sourcePath: source.path,
     maxWidth: 800,
@@ -17,8 +18,8 @@ Future<File?> cropProductImage(File source) async {
         toolbarTitle: 'Crop Photo',
         toolbarColor: brandPrimary,
         toolbarWidgetColor: Colors.white,
-        statusBarColor: brandPrimary,
-        activeControlsWidgetColor: const Color(0xFF0EBE7E),
+        statusBarLight: true,
+        activeControlsWidgetColor: DesignTokens.brandAccent,
         lockAspectRatio: true,
         initAspectRatio: CropAspectRatioPreset.square,
         hideBottomControls: false,

@@ -132,19 +132,6 @@ class _InteractiveCanvasState extends State<InteractiveCanvas> {
     return null;
   }
 
-  void _handleTap(Offset localPos, double sx, double sy) {
-    final id = _hitTest(localPos, sx, sy);
-    widget.onElementSelected(id);
-  }
-
-  void _handleDragStart(Offset localPos, double sx, double sy) {
-    final id = _hitTest(localPos, sx, sy);
-    if (id != null) {
-      widget.onElementSelected(id);
-      _dragStart = localPos;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return AspectRatio(

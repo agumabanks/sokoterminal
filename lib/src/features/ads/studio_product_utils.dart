@@ -5,6 +5,7 @@ import '../../core/db/app_database.dart';
 import '../../core/network/seller_api.dart';
 import 'brand_kit_screen.dart';
 import 'overlay_presets.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Which product/shop fields to include when sharing an ad.
 class StudioShareDetails {
@@ -18,6 +19,7 @@ class StudioShareDetails {
     this.includeLocation = true,
     this.includeTagline = true,
     this.includeCategory = false,
+    this.includeHashtags = true,
   });
 
   final bool includeProductName;
@@ -29,6 +31,7 @@ class StudioShareDetails {
   final bool includeLocation;
   final bool includeTagline;
   final bool includeCategory;
+  final bool includeHashtags;
 
   StudioShareDetails copyWith({
     bool? includeProductName,
@@ -40,6 +43,7 @@ class StudioShareDetails {
     bool? includeLocation,
     bool? includeTagline,
     bool? includeCategory,
+    bool? includeHashtags,
   }) =>
       StudioShareDetails(
         includeProductName: includeProductName ?? this.includeProductName,
@@ -51,6 +55,7 @@ class StudioShareDetails {
         includeLocation: includeLocation ?? this.includeLocation,
         includeTagline: includeTagline ?? this.includeTagline,
         includeCategory: includeCategory ?? this.includeCategory,
+        includeHashtags: includeHashtags ?? this.includeHashtags,
       );
 }
 
@@ -95,7 +100,7 @@ Color _parseKitColor(String hex) {
     if (h.length == 6) h = 'FF$h';
     return Color(int.parse(h, radix: 16));
   } catch (_) {
-    return const Color(0xFF0F1D40);
+    return DesignTokens.brandPrimary;
   }
 }
 
@@ -108,13 +113,20 @@ String normalizeShareUrl(String raw) {
   return 'https://$trimmed';
 }
 
-/// Build a buyer-facing product URL (slug preferred).
+/// Build a buyer-facing product/service URL (remote-id preferred for deep-linking).
 Future<String> resolveProductShareLink({
   required Item? product,
   required BrandKit kit,
   SellerApi? api,
+  bool isService = false,
 }) async {
-  if (product?.remoteId != null && api != null) {
+  final remoteId = product?.remoteId;
+  if (remoteId != null) {
+    if (isService) return 'https://soko24.co/s/$remoteId';
+    return 'https://soko24.co/p/$remoteId';
+  }
+
+  if (product?.remoteId != null && api != null && !isService) {
     try {
       final res = await api.fetchProductDetails(product!.remoteId!);
       final data = res.data;
@@ -145,50 +157,62 @@ String buildShareCaption({
 }) {
   final buf = StringBuffer();
 
+  // Opening line: business + optional tagline, written like a person would post.
   if (details.includeBusiness && kit.businessName.isNotEmpty) {
-    buf.writeln('✨ ${kit.businessName}');
-  }
-  if (details.includeTagline && kit.tagline.isNotEmpty) {
+    if (kit.tagline.isNotEmpty && details.includeTagline) {
+      buf.writeln('${kit.businessName} — ${kit.tagline}');
+    } else {
+      buf.writeln(kit.businessName);
+    }
+    buf.writeln();
+  } else if (details.includeTagline && kit.tagline.isNotEmpty) {
     buf.writeln(kit.tagline);
-  }
-  buf.writeln();
-
-  if (details.includeProductName && product != null) {
-    buf.writeln('🛍️ ${product.name}');
-  } else {
-    buf.writeln('📌 $templateName');
-  }
-
-  if (details.includeCategory &&
-      product?.categoryName != null &&
-      product!.categoryName!.isNotEmpty) {
-    buf.writeln('🏷️ ${product.categoryName}');
-  }
-
-  if (details.includePrice && product != null) {
-    buf.writeln('💰 ${formatUgPrice(product.price)}');
-  }
-
-  if (details.includeLocation && kit.location.isNotEmpty) {
-    buf.writeln('📍 ${kit.location}');
-  }
-
-  buf.writeln();
-  if (details.includeProductLink && productLink != null && productLink.isNotEmpty) {
-    buf.writeln('🔗 $productLink');
     buf.writeln();
   }
 
-  if (details.includeWhatsapp && kit.whatsapp.isNotEmpty) {
-    buf.writeln('💬 Order on WhatsApp: ${kit.whatsapp}');
-  }
-  if (details.includePhone && kit.phone.isNotEmpty) {
-    buf.writeln('📞 ${kit.phone}');
+  // Product / service pitch
+  if (details.includeProductName && product != null) {
+    buf.write(product.name);
+    if (details.includeCategory &&
+        product.categoryName != null &&
+        product.categoryName!.isNotEmpty) {
+      buf.write(' (${product.categoryName})');
+    }
+    buf.writeln();
+  } else {
+    buf.writeln(templateName);
   }
 
-  buf.writeln();
-  final tag = kit.businessName.replaceAll(RegExp(r'\s+'), '');
-  buf.write('#Soko24 #SokoStudio${tag.isNotEmpty ? ' #$tag' : ''}');
+  if (details.includePrice && product != null) {
+    buf.writeln('Price: ${formatUgPrice(product.price)}${formatProductWasPrice(product).isNotEmpty ? ' (${formatProductWasPrice(product)})' : ''}');
+  }
+
+  if (details.includeLocation && kit.location.isNotEmpty) {
+    buf.writeln('Location: ${kit.location}');
+  }
+
+  if (details.includeProductLink && productLink != null && productLink.isNotEmpty) {
+    buf.writeln();
+    buf.writeln('View / order: $productLink');
+  }
+
+  if (details.includeWhatsapp && kit.whatsapp.isNotEmpty) {
+    buf.writeln('WhatsApp: ${kit.whatsapp}');
+  }
+  if (details.includePhone && kit.phone.isNotEmpty) {
+    buf.writeln('Call: ${kit.phone}');
+  }
+
+  if (details.includeHashtags) {
+    buf.writeln();
+    final tags = <String>['Soko24'];
+    final bizTag = kit.businessName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    if (bizTag.isNotEmpty && bizTag.length > 2) tags.add(bizTag);
+    if (product?.categoryName?.isNotEmpty == true) {
+      tags.add(product!.categoryName!.replaceAll(RegExp(r'\s+'), ''));
+    }
+    buf.write(tags.map((t) => '#$t').join(' '));
+  }
 
   return buf.toString().trim();
 }

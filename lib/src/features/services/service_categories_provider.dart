@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+
+const _kServiceCategoriesCacheKey = 'service_categories_cache_v1';
 
 class ServiceCategoryOption {
   const ServiceCategoryOption({
@@ -21,13 +25,8 @@ class ServiceCategoryOption {
       parentName != null && parentName!.isNotEmpty ? '$parentName › $name' : name;
 }
 
-final serviceCategoriesProvider =
-    FutureProvider.autoDispose<List<ServiceCategoryOption>>((ref) async {
-  final api = ref.read(sellerApiProvider);
-  final res = await api.fetchServiceCategories();
-  final body = res.data;
+List<ServiceCategoryOption> _parseCategories(dynamic body) {
   if (body is! Map) return const [];
-
   final data = body['data'];
   if (data is! List) return const [];
 
@@ -63,4 +62,31 @@ final serviceCategoriesProvider =
       })
       .toList()
     ..sort((a, b) => a.displayLabel.compareTo(b.displayLabel));
+}
+
+final serviceCategoriesProvider =
+    FutureProvider.autoDispose<List<ServiceCategoryOption>>((ref) async {
+  final api = ref.read(sellerApiProvider);
+  final prefs = ref.read(sharedPreferencesProvider);
+
+  try {
+    final res = await api.fetchServiceCategories();
+    final body = res.data;
+    final categories = _parseCategories(body);
+    // Cache the raw payload so category selection works offline next time.
+    if (body is Map) {
+      await prefs.setString(_kServiceCategoriesCacheKey, jsonEncode(body));
+    }
+    return categories;
+  } catch (e) {
+    final cached = prefs.getString(_kServiceCategoriesCacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        return _parseCategories(jsonDecode(cached));
+      } catch (_) {
+        // Fall through to empty list if cached JSON is corrupt.
+      }
+    }
+    return const [];
+  }
 });

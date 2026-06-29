@@ -354,9 +354,9 @@ class _TemplateCard extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, color: Colors.red),
+                        Icon(Icons.delete_outline, color: DesignTokens.error),
                         SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
+                        Text('Delete', style: TextStyle(color: DesignTokens.error)),
                       ],
                     ),
                   ),

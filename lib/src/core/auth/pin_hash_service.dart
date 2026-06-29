@@ -12,7 +12,6 @@ class PinHashService {
   PinHashService({required SecureStorage storage}) : _storage = storage;
 
   final SecureStorage _storage;
-  static const _saltKey = 'pin_hash_salt';
 
   /// Generates a new random salt if one doesn't exist.
   Future<String> _ensureSalt() async {

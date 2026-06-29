@@ -274,6 +274,7 @@ class PosSyncProduct {
     this.photoUploadIds = const [],
     this.galleryUrls = const [],
     this.stocks = const [],
+    this.taxRate,
   });
 
   final String id;
@@ -304,6 +305,7 @@ class PosSyncProduct {
   final List<int> photoUploadIds;
   final List<String> galleryUrls;
   final List<PosSyncProductStock> stocks;
+  final double? taxRate;
 
   factory PosSyncProduct.fromJson(Map<String, dynamic> json) {
     return PosSyncProduct(
@@ -332,6 +334,7 @@ class PosSyncProduct {
       imageUrl: json['image_url']?.toString() ?? json['image']?.toString(),
       thumbnailUploadId: _asNullableInt(json['thumbnail_upload_id']),
       thumbnailUrl: json['thumbnail_url']?.toString(),
+      taxRate: _asNullableDouble(json['tax_rate']),
       photoUploadIds: (json['photo_upload_ids'] is List)
           ? (json['photo_upload_ids'] as List)
                 .map((e) => _asNullableInt(e))

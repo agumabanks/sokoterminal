@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ad_templates.dart';
+import '../../core/theme/design_tokens.dart';
 
 // ---------------------------------------------------------------------------
 // Template Save Dialog
@@ -62,7 +63,7 @@ class _TemplateSaveDialogState extends State<TemplateSaveDialog>
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF111827),
+        color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -98,7 +99,7 @@ class _TemplateSaveDialogState extends State<TemplateSaveDialog>
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
         child: Row(
           children: [
-            const Icon(Icons.bookmark_add_rounded, color: Color(0xFF0EBE7E), size: 22),
+            const Icon(Icons.bookmark_add_rounded, color: DesignTokens.brandAccent, size: 22),
             const SizedBox(width: 10),
             const Text('Save Template',
                 style: TextStyle(color: Colors.white, fontSize: 17,
@@ -115,9 +116,9 @@ class _TemplateSaveDialogState extends State<TemplateSaveDialog>
 
   Widget _tabBar() => TabBar(
         controller: _tabs,
-        labelColor: const Color(0xFF0EBE7E),
+        labelColor: DesignTokens.brandAccent,
         unselectedLabelColor: Colors.white54,
-        indicatorColor: const Color(0xFF0EBE7E),
+        indicatorColor: DesignTokens.brandAccent,
         indicatorSize: TabBarIndicatorSize.label,
         tabs: const [
           Tab(text: 'My Templates'),
@@ -199,7 +200,7 @@ class _LocalSaveTab extends StatelessWidget {
           FilledButton(
             onPressed: onSave,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0EBE7E),
+              backgroundColor: DesignTokens.brandAccent,
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
@@ -235,13 +236,13 @@ class _CommunityTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.blueAccent.withOpacity(0.1),
+              color: Colors.blueAccent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blueAccent.withOpacity(0.2)),
+              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.people_alt_rounded, color: Colors.blueAccent, size: 20),
+                Icon(Icons.people_alt_rounded, color: DesignTokens.info, size: 20),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -261,7 +262,7 @@ class _CommunityTab extends StatelessWidget {
           FilledButton(
             onPressed: onShare,
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: DesignTokens.info,
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
@@ -340,7 +341,7 @@ class _MarketplaceTab extends StatelessWidget {
                       height: 46,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.07),
+                        color: Colors.white.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: DropdownButtonHideUnderline(
@@ -365,13 +366,13 @@ class _MarketplaceTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF0EBE7E).withOpacity(0.08),
+              color: DesignTokens.brandAccent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
               children: [
                 Icon(Icons.monetization_on_outlined,
-                    color: Color(0xFF0EBE7E), size: 16),
+                    color: DesignTokens.brandAccent, size: 16),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -386,7 +387,7 @@ class _MarketplaceTab extends StatelessWidget {
           FilledButton(
             onPressed: onPublish,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0EBE7E),
+              backgroundColor: DesignTokens.brandAccent,
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
@@ -436,7 +437,7 @@ class _TextField extends StatelessWidget {
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white24),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.07),
+          fillColor: Colors.white.withValues(alpha: 0.07),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -470,12 +471,12 @@ class _CategoryChips extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isSel
-                    ? const Color(0xFF0EBE7E).withOpacity(0.15)
-                    : Colors.white.withOpacity(0.06),
+                    ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSel
-                      ? const Color(0xFF0EBE7E)
+                      ? DesignTokens.brandAccent
                       : Colors.transparent,
                   width: 1.2,
                 ),
@@ -483,7 +484,7 @@ class _CategoryChips extends StatelessWidget {
               child: Text(
                 c[0].toUpperCase() + c.substring(1),
                 style: TextStyle(
-                  color: isSel ? const Color(0xFF0EBE7E) : Colors.white60,
+                  color: isSel ? DesignTokens.brandAccent : Colors.white60,
                   fontSize: 12,
                   fontWeight: isSel ? FontWeight.w700 : FontWeight.normal,
                 ),

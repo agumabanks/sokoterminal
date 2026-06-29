@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,11 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
-import '../../core/theme/design_tokens.dart';
+import '../../core/telemetry/telemetry.dart';
 import '../checkout/checkout_screen.dart';
 import 'ad_templates.dart';
 import 'brand_kit_screen.dart';
-import 'full_studio_webview_screen.dart';
 import 'studio_create_sheet.dart';
 import 'studio_editor_launcher.dart';
 import 'studio_hub_shell.dart';
@@ -51,7 +51,11 @@ class SavedTemplatesNotifier extends StateNotifier<List<AdTemplate>> {
               .map((e) => CanvasElement.fromJson(e as Map<String, dynamic>))
               .toList(),
         );
-      } catch (_) {
+      } catch (e, st) {
+        final telemetry = Telemetry.instance;
+        if (telemetry != null) {
+          unawaited(telemetry.recordError(e, st, hint: 'studio_load_saved_template'));
+        }
         return null;
       }
     }).whereType<AdTemplate>().toList();
@@ -98,6 +102,15 @@ class StudioScreen extends ConsumerStatefulWidget {
 
 class _StudioScreenState extends ConsumerState<StudioScreen> {
   @override
+  void initState() {
+    super.initState();
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(telemetry.event('studio_open'));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final selectedItem = ref.watch(studioProductProvider);
     final items = ref.watch(itemsStreamProvider);
@@ -128,37 +141,13 @@ class _StudioScreenState extends ConsumerState<StudioScreen> {
   }
 
   Future<void> _openFullStudio(Item? selectedItem, {String openPanel = 'smart-ads'}) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final api = ref.read(sellerApiProvider);
-      final res = await api.studioWebEntry(
-        productId: selectedItem?.remoteId,
-        editorMode: 'design',
-        openPanel: openPanel,
-      );
-      final body = res.data;
-      if (body is! Map) {
-        throw StateError('Invalid studio web-entry response');
-      }
-      final url = body['url']?.toString();
-      if (url == null || url.isEmpty) {
-        throw StateError('Studio web-entry URL missing');
-      }
-      if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FullStudioWebViewScreen(initialUrl: url),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Could not open Full Studio: $e'),
-          backgroundColor: DesignTokens.error,
-        ),
-      );
-    }
+    if (selectedItem == null) return;
+    await launchFullStudioWebForProduct(
+      context,
+      ref,
+      selectedItem,
+      openPanel: openPanel,
+    );
   }
 
   Future<void> _openEditor(AdTemplate tpl) async {

@@ -17,6 +17,7 @@ import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../ads/studio_editor_launcher.dart';
 import '../invoices/invoice_providers.dart';
 import 'receipt_providers.dart';
 
@@ -228,6 +229,28 @@ class ReceiptDetailsSheet extends ConsumerWidget {
                         onPressed: () => _printReceipt(context, ref, entryId),
                         icon: const Icon(Icons.print),
                         label: const Text('Print'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DesignTokens.spaceSm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await launchFullStudioWebForReceipt(
+                            context,
+                            ref,
+                            entry,
+                            openPanel: 'business-branding',
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.design_services_rounded,
+                          color: DesignTokens.brandPrimary,
+                        ),
+                        label: const Text('Design in Studio'),
                       ),
                     ),
                   ],

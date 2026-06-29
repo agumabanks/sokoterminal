@@ -291,7 +291,7 @@ class _AddExceptionSheetState extends State<_AddExceptionSheet> {
             subtitle: Text(_isAvailable ? 'Open for bookings' : 'Blocked / Day off'),
             value: _isAvailable,
             onChanged: (v) => setState(() => _isAvailable = v),
-            activeColor: DesignTokens.brandAccent,
+            activeThumbColor: DesignTokens.brandAccent,
           ),
           if (_isAvailable)
             CheckboxListTile(

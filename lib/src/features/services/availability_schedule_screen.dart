@@ -204,7 +204,7 @@ class _AvailabilityScheduleScreenState
                         Switch(
                           value: day.isAvailable,
                           onChanged: (v) => setState(() => day.isAvailable = v),
-                          activeColor: DesignTokens.brandAccent,
+                          activeThumbColor: DesignTokens.brandAccent,
                         ),
                       ],
                     ),

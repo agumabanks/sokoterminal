@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'ad_templates.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Canva-style "Create a design" sheet — pick a social format or start blank.
 Future<AdTemplate?> showStudioCreateSheet(BuildContext context) {
   return showModalBottomSheet<AdTemplate>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF0F1D40),
+    backgroundColor: DesignTokens.brandPrimary,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -73,7 +74,7 @@ class _StudioCreateSheet extends StatelessWidget {
                   label: 'Blank canvas',
                   subtitle: 'Start from scratch',
                   icon: Icons.add_rounded,
-                  accent: const Color(0xFF0EBE7E),
+                  accent: DesignTokens.brandAccent,
                   onTap: () => Navigator.pop(
                     context,
                     blankCanvas(adSizes.first),

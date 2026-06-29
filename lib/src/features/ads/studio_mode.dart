@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Primary studio workspaces — Canva-style entry points.
 enum StudioMode {
@@ -7,6 +8,7 @@ enum StudioMode {
   graphics,
   creators,
   injector,
+  campaigns,
 }
 
 extension StudioModeX on StudioMode {
@@ -16,6 +18,7 @@ extension StudioModeX on StudioMode {
         StudioMode.graphics => 'Graphics',
         StudioMode.creators => 'Creators',
         StudioMode.injector => 'Injector',
+        StudioMode.campaigns => 'Campaigns',
       };
 
   String get subtitle => switch (this) {
@@ -24,6 +27,7 @@ extension StudioModeX on StudioMode {
         StudioMode.graphics => 'Logos, flyers, cards & invoices',
         StudioMode.creators => 'AI ads & marketplace',
         StudioMode.injector => 'Overlay brand on photo or video',
+        StudioMode.campaigns => 'Marketing dashboard & campaigns',
       };
 
   IconData get icon => switch (this) {
@@ -32,13 +36,15 @@ extension StudioModeX on StudioMode {
         StudioMode.graphics => Icons.layers_outlined,
         StudioMode.creators => Icons.auto_awesome_outlined,
         StudioMode.injector => Icons.auto_fix_high_rounded,
+        StudioMode.campaigns => Icons.campaign_rounded,
       };
 
   Color get accent => switch (this) {
-        StudioMode.editPhotos => const Color(0xFF3b82f6),
-        StudioMode.templates => const Color(0xFF0EBE7E),
-        StudioMode.graphics => const Color(0xFFa855f7),
-        StudioMode.creators => const Color(0xFFf59e0b),
-        StudioMode.injector => const Color(0xFF22d3ee),
+        StudioMode.editPhotos => DesignTokens.brandPrimary,
+        StudioMode.templates => DesignTokens.brandAccent,
+        StudioMode.graphics => const Color(0xFF27272A),
+        StudioMode.creators => DesignTokens.brandPrimary,
+        StudioMode.injector => const Color(0xFF52525B),
+        StudioMode.campaigns => DesignTokens.brandPrimary,
       };
 }

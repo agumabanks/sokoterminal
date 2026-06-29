@@ -121,7 +121,7 @@ class ReceiptService {
                 pw.Container(
                   padding: const pw.EdgeInsets.all(10),
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.red, width: 2),
+                    border: pw.Border.all(color: const PdfColor.fromInt(0xFFD30005), width: 2),
                     borderRadius: pw.BorderRadius.circular(6),
                   ),
                   child: pw.Column(
@@ -132,7 +132,7 @@ class ReceiptService {
                         style: pw.TextStyle(
                           fontSize: 18,
                           fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.red,
+                          color: const PdfColor.fromInt(0xFFD30005),
                           letterSpacing: 2,
                         ),
                         textAlign: pw.TextAlign.center,
@@ -350,6 +350,36 @@ class ReceiptService {
               pw.SizedBox(height: 8),
 
               // ============ TOTAL ============
+              if (entry.tax > 0) ...[
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Subtotal',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      'UGX ${_formatAmount(entry.subtotal)}',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Tax (${entry.taxRate.toStringAsFixed(0)}%)',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.Text(
+                      'UGX ${_formatAmount(entry.tax)}',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+              ],
               pw.Container(
                 padding: const pw.EdgeInsets.all(10),
                 decoration: pw.BoxDecoration(
@@ -624,6 +654,18 @@ class ReceiptService {
         1,
       );
     }
+    if (entry.tax > 0) {
+      printer.printLeftRight(
+        'Subtotal',
+        'UGX ${entry.subtotal.toStringAsFixed(0)}',
+        1,
+      );
+      printer.printLeftRight(
+        'Tax (${entry.taxRate.toStringAsFixed(0)}%)',
+        'UGX ${entry.tax.toStringAsFixed(0)}',
+        1,
+      );
+    }
     printer.printLeftRight(
       'TOTAL',
       'UGX $sign${entry.total.toStringAsFixed(0)}',
@@ -721,6 +763,10 @@ class ReceiptService {
       );
     }
     sb.writeln('-----');
+    if (entry.tax > 0) {
+      sb.writeln('Subtotal: UGX ${entry.subtotal.toStringAsFixed(0)}');
+      sb.writeln('Tax (${entry.taxRate.toStringAsFixed(0)}%): UGX ${entry.tax.toStringAsFixed(0)}');
+    }
     sb.writeln('Total: UGX $sign${entry.total.toStringAsFixed(0)}');
     if (bundle.payments.isNotEmpty) {
       sb.writeln('Payments:');

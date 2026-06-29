@@ -6,7 +6,6 @@ import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -17,15 +16,15 @@ import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../checkout/checkout_screen.dart';
-import 'ad_detail_screen.dart';
-import 'ad_editor_screen.dart';
 import 'ad_templates.dart';
 import 'brand_kit_screen.dart';
 import 'canvas_renderer.dart';
 import 'studio_design_storage.dart';
 import 'studio_editor_launcher.dart';
+import 'studio_product_utils.dart';
 import 'studio_screen.dart'; // for savedTemplatesProvider
 import 'studio_share_sheet.dart';
+import 'studio_variable_context.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,7 +65,7 @@ class AdCatalogEntry {
   final Service? _service;
 
   Item toItem() {
-    if (_item != null) return _item!;
+    if (_item != null) return _item;
     return Item(
       id: id,
       remoteId: remoteId,
@@ -123,9 +122,6 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
   final _searchCtrl = TextEditingController();
   String _query = '';
 
-  // Mode: 'templates' | 'ai'
-  String _mode = 'templates';
-
   // Template filter
   String _templateCategory = 'all';
 
@@ -141,9 +137,6 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
-    _tabCtrl.addListener(() => setState(() {
-      _mode = _tabCtrl.index == 0 ? 'templates' : 'ai';
-    }));
     _checkLlm();
   }
 
@@ -174,7 +167,7 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
     return itemsAsync.when(
       loading: () => const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation(Color(0xFF0EBE7E))),
+          valueColor: AlwaysStoppedAnimation(DesignTokens.brandAccent)),
       ),
       error: (e, _) => Center(
         child: Text('Error loading catalog: $e',
@@ -201,12 +194,12 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
           children: [
             // ── Mode tabs ────────────────────────────────────────────────
             Container(
-              color: const Color(0xFF0F1D40),
+              color: DesignTokens.brandPrimary,
               child: TabBar(
                 controller: _tabCtrl,
-                labelColor: const Color(0xFF0EBE7E),
+                labelColor: DesignTokens.brandAccent,
                 unselectedLabelColor: Colors.white38,
-                indicatorColor: const Color(0xFF0EBE7E),
+                indicatorColor: DesignTokens.brandAccent,
                 indicatorWeight: 2,
                 labelStyle: const TextStyle(
                     fontSize: 12, fontWeight: FontWeight.w700),
@@ -411,7 +404,7 @@ class _ProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF0A1220),
+      color: DesignTokens.brandPrimary,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +448,7 @@ class _ProductGrid extends StatelessWidget {
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(
-                            color: Color(0xFF0EBE7E))),
+                            color: DesignTokens.brandAccent)),
                   ),
                 ),
               ),
@@ -511,12 +504,12 @@ class _ProductGrid extends StatelessWidget {
                       width: 90,
                       decoration: BoxDecoration(
                         color: isSel
-                            ? const Color(0xFF0EBE7E).withValues(alpha: 0.15)
+                            ? DesignTokens.brandAccent.withValues(alpha: 0.15)
                             : Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSel
-                              ? const Color(0xFF0EBE7E)
+                              ? DesignTokens.brandAccent
                               : Colors.white10,
                           width: isSel ? 1.5 : 1,
                         ),
@@ -548,7 +541,7 @@ class _ProductGrid extends StatelessWidget {
                                     entry.name,
                                     style: TextStyle(
                                       color: isSel
-                                          ? const Color(0xFF0EBE7E)
+                                          ? DesignTokens.brandAccent
                                           : Colors.white,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w600,
@@ -560,7 +553,7 @@ class _ProductGrid extends StatelessWidget {
                                     'UGX ${_fmt.format(entry.price.round())}',
                                     style: TextStyle(
                                       color: isSel
-                                          ? const Color(0xFF0EBE7E)
+                                          ? DesignTokens.brandAccent
                                           : Colors.white38,
                                       fontSize: 8,
                                     ),
@@ -631,7 +624,7 @@ class _TemplatesMode extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(Icons.touch_app_rounded,
-                    color: Color(0xFF0EBE7E), size: 16),
+                    color: DesignTokens.brandAccent, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -669,7 +662,7 @@ class _TemplatesMode extends StatelessWidget {
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: active
-                          ? const Color(0xFF0EBE7E)
+                          ? DesignTokens.brandAccent
                           : Colors.white.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -776,7 +769,7 @@ class _TemplateCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1D40),
+          color: DesignTokens.brandPrimary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
@@ -797,7 +790,7 @@ class _TemplateCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0EBE7E),
+                          color: DesignTokens.brandAccent,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: const Text('Use →',
@@ -913,7 +906,7 @@ class _AIMode extends ConsumerWidget {
   static const _styles = [
     ('sale',    'Flash Deal',    Icons.flash_on_rounded,          Color(0xFFFF4757)),
     ('new',     'New Arrival',   Icons.fiber_new_rounded,         Color(0xFF3B82F6)),
-    ('promo',   'Special Offer', Icons.local_offer_rounded,       Color(0xFFF59E0B)),
+    ('promo',   'Special Offer', Icons.local_offer_rounded,       DesignTokens.warning),
     ('story',   'Brand Story',   Icons.auto_stories_rounded,      Color(0xFF8B5CF6)),
     ('minimal', 'Premium',       Icons.diamond_outlined,          Color(0xFF64748B)),
     ('whatsapp','WhatsApp',      Icons.chat_rounded,              Color(0xFF25D366)),
@@ -1017,7 +1010,7 @@ class _AIMode extends ConsumerWidget {
                 decoration: BoxDecoration(
                   gradient: canGenerate
                       ? const LinearGradient(
-                          colors: [Color(0xFF0EBE7E), Color(0xFF059669)])
+                          colors: [DesignTokens.brandAccent, DesignTokens.success])
                       : null,
                   color: canGenerate
                       ? null
@@ -1088,7 +1081,7 @@ class _AIMode extends ConsumerWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor:
-                      AlwaysStoppedAnimation(Color(0xFF0EBE7E))),
+                      AlwaysStoppedAnimation(DesignTokens.brandAccent)),
               ),
             ),
           ),
@@ -1116,14 +1109,24 @@ class _AIMode extends ConsumerWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (_, i) {
                   final ad = ads[i] as Map<String, dynamic>;
-                  final item = entries.cast<AdCatalogEntry?>()
-                      .firstWhere((e) => e?.id == selectedId,
-                          orElse: () => entries.isNotEmpty ? entries.first : null)
-                      ?.toItem();
+                  final adProductId = ad['product_id'] as int?;
+                  final adServiceId = ad['service_id'] as int?;
+                  final adRemoteId = adProductId ?? adServiceId;
+                  final byAd = entries.cast<AdCatalogEntry?>().firstWhere(
+                    (e) => e?.remoteId == adRemoteId && e?.isService == (adServiceId != null),
+                    orElse: () => null,
+                  );
+                  final entry = byAd ??
+                      entries.cast<AdCatalogEntry?>().firstWhere(
+                        (e) => e?.id == selectedId,
+                        orElse: () => entries.isNotEmpty ? entries.first : null,
+                      );
+                  final item = entry?.toItem();
                   if (item == null) return const SizedBox.shrink();
                   return _AIAdCard(
                     ad: ad,
                     item: item,
+                    isService: entry?.isService ?? false,
                     onDelete: () => onDeleteAd(ad['id']),
                     onRefresh: onRefresh,
                   );
@@ -1148,21 +1151,21 @@ class _LlmBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+        color: DesignTokens.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+            color: DesignTokens.warning.withValues(alpha: 0.3)),
       ),
       child: const Row(
         children: [
           Icon(Icons.warning_amber_rounded,
-              color: Color(0xFFF59E0B), size: 18),
+              color: DesignTokens.warning, size: 18),
           SizedBox(width: 8),
           Expanded(
             child: Text(
               'AI generation is offline — use Template Ads instead.',
               style: TextStyle(
-                  color: Color(0xFFF59E0B), fontSize: 11),
+                  color: DesignTokens.warning, fontSize: 11),
             ),
           ),
         ],
@@ -1214,12 +1217,14 @@ class _AIAdCard extends ConsumerStatefulWidget {
   const _AIAdCard({
     required this.ad,
     required this.item,
+    this.isService = false,
     required this.onDelete,
     required this.onRefresh,
   });
 
   final Map<String, dynamic> ad;
   final Item item;
+  final bool isService;
   final VoidCallback onDelete;
   final VoidCallback onRefresh;
 
@@ -1232,32 +1237,6 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
 
   Map<String, dynamic> get ad => widget.ad;
   Item get item => widget.item;
-
-  String _buildCaption() {
-    final copy = ad['ad_copy'] as Map? ?? {};
-    final sharing = copy['sharing_caption']?.toString() ?? '';
-    final hashtags = copy['hashtags'];
-    final tagStr = hashtags is List
-        ? hashtags.map((h) => h.toString()).join(' ')
-        : '#Soko24';
-
-    if (sharing.isNotEmpty) return '$sharing\n\n$tagStr\n\nsoko24.co';
-
-    final parts = <String>[];
-    final headline = copy['headline']?.toString() ?? '';
-    final sub = copy['subheadline']?.toString() ?? '';
-    final sp = copy['selling_point']?.toString() ?? '';
-    final price = copy['price_display']?.toString() ?? '';
-    final cta = copy['cta_text']?.toString() ?? '';
-    if (headline.isNotEmpty) parts.add(headline);
-    if (sub.isNotEmpty) parts.add(sub);
-    if (sp.isNotEmpty) parts.add('✓ $sp');
-    if (price.isNotEmpty) parts.add('💰 $price');
-    if (cta.isNotEmpty) parts.add('\n👉 $cta');
-    parts.add('\n$tagStr');
-    parts.add('soko24.co');
-    return parts.join('\n');
-  }
 
   Future<void> _shareAd() async {
     final styleKey = ad['template_style'] as String? ?? '';
@@ -1292,14 +1271,35 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
           if (!mounted) return;
           await Navigator.of(context).push(MaterialPageRoute(
             fullscreenDialog: true,
-            builder: (_) => StudioShareSheet(adFile: file, template: tpl, kit: kit),
+            builder: (_) => StudioShareSheet(
+              adFile: file,
+              template: tpl,
+              kit: kit,
+              initialProduct: item,
+              isService: widget.isService,
+              exportTitle: item.name,
+            ),
           ));
           return;
         }
       }
     } catch (_) {}
-    // Fallback: text-only share
-    await Share.shareXFiles([], text: _buildCaption());
+    // Fallback: text-only share with correct product details
+    final kit = ref.read(brandKitProvider);
+    final link = await resolveProductShareLink(
+      product: item,
+      kit: kit,
+      api: ref.read(sellerApiProvider),
+      isService: widget.isService,
+    );
+    final caption = buildShareCaption(
+      kit: kit,
+      templateName: ad['name'] as String? ?? 'AI Ad',
+      details: const StudioShareDetails(),
+      product: item,
+      productLink: link,
+    );
+    await Share.share(caption);
   }
 
   @override
@@ -1309,21 +1309,21 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
     final styleColors = <String, Color>{
       'sale': const Color(0xFFFF4757),
       'new': const Color(0xFF3B82F6),
-      'promo': const Color(0xFFF59E0B),
+      'promo': DesignTokens.warning,
       'story': const Color(0xFF8B5CF6),
       'minimal': const Color(0xFF64748B),
       'whatsapp': const Color(0xFF25D366),
       'booking': const Color(0xFF14B8A6),
       'catalog': const Color(0xFF6366F1),
     };
-    final accent = styleColors[styleKey] ?? const Color(0xFF0EBE7E);
+    final accent = styleColors[styleKey] ?? DesignTokens.brandAccent;
 
     final isPending = status == 'pending' || status == 'generating';
     final isFailed = status == 'failed';
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1D40),
+        color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
@@ -1360,7 +1360,7 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
                       valueColor: AlwaysStoppedAnimation(
-                          Color(0xFFF59E0B)),
+                          DesignTokens.warning),
                     ),
                   )
                 else if (isFailed)
@@ -1368,7 +1368,7 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                       color: Colors.redAccent, size: 16)
                 else
                   const Icon(Icons.check_circle_outline_rounded,
-                      color: Color(0xFF0EBE7E), size: 16),
+                      color: DesignTokens.brandAccent, size: 16),
               ],
             ),
           ),
@@ -1409,6 +1409,10 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                 canvasJson: ad['canvas_json'] as String,
                 styleName: ad['style_label'] as String? ?? '',
                 item: item,
+                variableContext: StudioVariableContext(
+                  kit: ref.read(brandKitProvider),
+                  product: item,
+                ),
               ),
             ),
 
@@ -1456,7 +1460,7 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                   _ActionBtn(
                     icon: Icons.edit_rounded,
                     label: 'Edit',
-                    color: const Color(0xFF0EBE7E),
+                    color: DesignTokens.brandAccent,
                     onTap: () {
                       final canvasJson = ad['canvas_json'] as String?;
                       if (canvasJson == null || canvasJson.length < 5) return;
@@ -1579,11 +1583,13 @@ class _CanvasThumbnail extends StatelessWidget {
     required this.canvasJson,
     required this.styleName,
     required this.item,
+    this.variableContext,
   });
 
   final String canvasJson;
   final String styleName;
   final Item item;
+  final StudioVariableContext? variableContext;
 
   @override
   Widget build(BuildContext context) {
@@ -1597,7 +1603,7 @@ class _CanvasThumbnail extends StatelessWidget {
       );
       return AspectRatio(
         aspectRatio: tpl.aspectRatio,
-        child: CanvasPreview(template: tpl),
+        child: CanvasPreview(template: tpl, variableContext: variableContext),
       );
     } catch (_) {
       return const SizedBox.shrink();

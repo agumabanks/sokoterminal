@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/onboarding/onboarding_controller.dart';
+import '../../core/theme/design_tokens.dart';
 
 class PaymentConfigScreen extends ConsumerStatefulWidget {
   const PaymentConfigScreen({super.key});
@@ -220,7 +221,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
         border: value ? Border.all(color: Colors.black, width: 2) : null,
       ),
@@ -230,7 +231,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
         secondary: Icon(icon, color: value ? Colors.black : Colors.grey[500]),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
-        activeColor: Colors.black,
+        activeThumbColor: Colors.black,
       ),
     );
   }
@@ -244,7 +245,7 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: DesignTokens.canvasParchment,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextFormField(
@@ -306,10 +307,12 @@ class _PaymentConfigScreenState extends ConsumerState<PaymentConfigScreen> {
     if (value is num) return value != 0;
     if (value is String) {
       final normalized = value.trim().toLowerCase();
-      if (normalized == 'true' || normalized == '1' || normalized == 'yes')
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
         return true;
-      if (normalized == 'false' || normalized == '0' || normalized == 'no')
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
         return false;
+      }
     }
     return null;
   }

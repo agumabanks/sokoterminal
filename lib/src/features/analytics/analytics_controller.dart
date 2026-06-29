@@ -110,12 +110,8 @@ class AnalyticsNotifier extends StateNotifier<AnalyticsState> {
             .toList()
           ..sort((a, b) => b.revenue.compareTo(a.revenue));
 
-    // 3. Inventory Value
-    final items = await db.allProducts();
-    double invValue = 0;
-    for (final item in items) {
-      invValue += (item.stockQty * item.price);
-    }
+    // 3. Inventory Value (SQL-level aggregation)
+    final invValue = await db.totalInventoryValue();
 
     state = state.copyWith(
       dailySales: dailyData,

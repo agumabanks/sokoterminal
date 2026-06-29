@@ -246,7 +246,7 @@ class _BookingCard extends StatelessWidget {
     Color statusColor;
     switch (status.toLowerCase()) {
       case 'confirmed':
-        statusColor = Colors.blue;
+        statusColor = DesignTokens.info;
         break;
       case 'completed':
         statusColor = DesignTokens.brandAccent;
@@ -256,7 +256,7 @@ class _BookingCard extends StatelessWidget {
         statusColor = DesignTokens.grayMedium;
         break;
       default:
-        statusColor = Colors.orange;
+        statusColor = DesignTokens.warning;
     }
 
     return GestureDetector(

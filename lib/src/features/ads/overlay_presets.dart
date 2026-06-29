@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/theme/design_tokens.dart';
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -42,8 +43,8 @@ class OverlayLayer {
     this.primaryText = '',
     this.secondaryText = '',
     this.tertiaryText = '',
-    this.bgColor = const Color(0xFF0F1D40),
-    this.accentColor = const Color(0xFF0EBE7E),
+    this.bgColor = DesignTokens.brandPrimary,
+    this.accentColor = DesignTokens.brandAccent,
     this.textColor = Colors.white,
     this.opacity = 1.0,
     this.fontFamily = 'Inter',
@@ -428,7 +429,7 @@ class OverlayRenderer extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: const Color(0xFF0EBE7E),
+                    color: DesignTokens.brandAccent,
                     width: 2,
                   ),
                 ),

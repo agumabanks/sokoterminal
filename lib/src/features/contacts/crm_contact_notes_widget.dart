@@ -50,12 +50,12 @@ class CrmNote {
 // ─── Note type config ─────────────────────────────────────────────────────────
 
 const _noteTypes = [
-  (value: 'note',     label: 'Note',      icon: Icons.notes_outlined,               color: Color(0xFF0F1D40)),
-  (value: 'call',     label: 'Call',      icon: Icons.call_outlined,                color: Color(0xFF0EBE7E)),
-  (value: 'visit',    label: 'Visit',     icon: Icons.store_outlined,               color: Color(0xFF4299E1)),
-  (value: 'sale',     label: 'Sale',      icon: Icons.receipt_long_outlined,        color: Color(0xFF38A169)),
-  (value: 'news',     label: 'News',      icon: Icons.campaign_outlined,            color: Color(0xFFF6AD55)),
-  (value: 'reminder', label: 'Reminder',  icon: Icons.alarm_outlined,               color: Color(0xFFE53E3E)),
+  (value: 'note',     label: 'Note',      icon: Icons.notes_outlined,               color: DesignTokens.brandPrimary),
+  (value: 'call',     label: 'Call',      icon: Icons.call_outlined,                color: DesignTokens.brandAccent),
+  (value: 'visit',    label: 'Visit',     icon: Icons.store_outlined,               color: DesignTokens.info),
+  (value: 'sale',     label: 'Sale',      icon: Icons.receipt_long_outlined,        color: DesignTokens.success),
+  (value: 'news',     label: 'News',      icon: Icons.campaign_outlined,            color: DesignTokens.warning),
+  (value: 'reminder', label: 'Reminder',  icon: Icons.alarm_outlined,               color: DesignTokens.error),
   (value: 'whatsapp', label: 'WhatsApp',  icon: Icons.chat_bubble_outline_rounded,  color: Color(0xFF25D366)),
 ];
 

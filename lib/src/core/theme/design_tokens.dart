@@ -9,8 +9,8 @@ import 'package:google_fonts/google_fonts.dart';
 /// clarity = trust and speed = delight.
 ///
 /// Rules:
-///   • Brand green (#0EBE7E) is the ONLY CTA color — treat it like Nike black.
-///   • Brand navy (#0F1D40) lives on AppBars and dark surfaces only.
+///   • Brand teal (#0EBE7E) is the ONLY CTA color — treat it like Nike black.
+///   • Premium black (#000000) lives on AppBars, headers, and dark surfaces only.
 ///   • Everything else: ink + canvas + cloud. No decorative gradients, ever.
 ///   • Pill radius for all buttons (full = 999). Card radius 14px (Apple lg).
 ///   • Negative letter-spacing on display + headline (Apple feel).
@@ -20,9 +20,10 @@ class DesignTokens {
   DesignTokens._();
 
   // ─── BRAND ────────────────────────────────────────────────────────────────
-  // Treat like Nike black — primary action only. Never decorative.
-  static const Color brandPrimary = Color(0xFF0F1D40); // dark navy — AppBar, dark surfaces
-  static const Color brandAccent  = Color(0xFF0EBE7E); // hero green — every CTA
+  // Premium monochrome black + teal accent. Primary black is reserved for
+  // AppBars, headers, and high-contrast chrome; teal is reserved for CTAs.
+  static const Color brandPrimary = Color(0xFF000000); // premium black — AppBar, dark surfaces
+  static const Color brandAccent  = Color(0xFF0EBE7E); // teal — every CTA
 
   // Derived tints (backgrounds only — never on text unless disabled state)
   static const Color brandAccentSubtle = Color(0xFFE8FBF3); // 5% green tint bg
@@ -30,10 +31,10 @@ class DesignTokens {
   static const Color brandAccentDim    = Color(0x1A0EBE7E); // 10% alpha — selected chip bg
 
   // ─── CANVAS ───────────────────────────────────────────────────────────────
-  // Apple-style: pure white + off-white parchment. Zero blue tint.
+  // Clean monochrome: pure white surfaces, warm gray section backgrounds.
   static const Color canvas         = Color(0xFFFFFFFF); // pure surface
-  static const Color canvasParchment = Color(0xFFF5F5F7); // section backgrounds (Apple parchment)
-  static const Color canvasCloud     = Color(0xFFF5F5F5); // card image bg, chip bg (Nike soft-cloud)
+  static const Color canvasParchment = Color(0xFFF7F7F7); // section backgrounds
+  static const Color canvasCloud     = Color(0xFFF0F0F0); // card image bg, chip bg
 
   // Legacy aliases — kept for backward compat with existing widget refs
   static const Color surface         = canvasParchment;
@@ -46,8 +47,8 @@ class DesignTokens {
   static const Color surfaceGrouped   = canvasParchment;
 
   // ─── INK ──────────────────────────────────────────────────────────────────
-  // Nike: ink is the only "color" — all text, icons, primary CTA on light surfaces.
-  static const Color ink          = Color(0xFF111111); // primary text / dark CTA
+  // Pure black ink for primary text and monochrome CTA on light surfaces.
+  static const Color ink          = Color(0xFF000000); // primary text / dark CTA
   static const Color inkSubtle    = Color(0xFF3C3C43); // secondary text
   static const Color inkMuted     = Color(0xFF6E6E73); // tertiary — metadata, captions
   static const Color inkDisabled  = Color(0xFFAEAEB2); // disabled / placeholder

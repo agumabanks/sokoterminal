@@ -1,72 +1,132 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Composite the Soko24 logo watermark onto exported ad PNGs for free/trial sellers.
+import 'brand_kit_screen.dart';
+import 'studio_watermark_settings.dart';
+
+/// Composite the Soko24 (or business) logo watermark onto exported ad PNGs.
 Future<Uint8List> applySokoWatermark(
   Uint8List pngBytes, {
-  double opacity = 0.42,
-  double scale = 0.14,
+  required WatermarkSettings settings,
+  BrandKit? brandKit,
 }) async {
+  if (!settings.enabled) return pngBytes;
+  if (pngBytes.isEmpty) throw StateError('Cannot watermark empty PNG bytes');
+
   final baseCodec = await ui.instantiateImageCodec(pngBytes);
   final baseFrame = await baseCodec.getNextFrame();
   final baseImage = baseFrame.image;
 
-  final logoBytes =
-      (await rootBundle.load('assets/images/app_logo.png')).buffer.asUint8List();
+  final logoBytes = await _loadWatermarkBytes(
+    settings: settings,
+    brandKit: brandKit,
+  );
+  if (logoBytes.isEmpty) throw StateError('Cannot decode empty watermark bytes');
+
   final logoCodec = await ui.instantiateImageCodec(logoBytes);
   final logoFrame = await logoCodec.getNextFrame();
   final logoImage = logoFrame.image;
 
   final canvasW = baseImage.width.toDouble();
   final canvasH = baseImage.height.toDouble();
-  final logoW = canvasW * scale;
+  final logoW = canvasW * settings.scale;
   final logoH = logoImage.height * (logoW / logoImage.width);
   final margin = canvasW * 0.04;
 
+  final dst = switch (settings.position) {
+    WatermarkPosition.topLeft => ui.Rect.fromLTWH(margin, margin, logoW, logoH),
+    WatermarkPosition.topRight =>
+      ui.Rect.fromLTWH(canvasW - logoW - margin, margin, logoW, logoH),
+    WatermarkPosition.bottomLeft =>
+      ui.Rect.fromLTWH(margin, canvasH - logoH - margin, logoW, logoH),
+    WatermarkPosition.bottomRight => ui.Rect.fromLTWH(
+        canvasW - logoW - margin,
+        canvasH - logoH - margin,
+        logoW,
+        logoH,
+      ),
+    WatermarkPosition.center => ui.Rect.fromLTWH(
+        (canvasW - logoW) / 2,
+        (canvasH - logoH) / 2,
+        logoW,
+        logoH,
+      ),
+  };
+
+  final blendMode = watermarkBlendMode(settings.blendMode) ?? ui.BlendMode.modulate;
+
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder);
-  final paint = ui.Paint();
 
-  canvas.drawImage(baseImage, ui.Offset.zero, paint);
+  // Draw base image.
+  canvas.drawImage(baseImage, ui.Offset.zero, ui.Paint());
 
-  final dst = ui.Rect.fromLTWH(
-    canvasW - logoW - margin,
-    canvasH - logoH - margin,
-    logoW,
-    logoH,
-  );
+  // Draw watermark with the chosen blend mode + opacity.
+  final watermarkPaint = ui.Paint()
+    ..colorFilter = ui.ColorFilter.mode(
+      Colors.white.withValues(alpha: settings.opacity),
+      blendMode,
+    )
+    ..filterQuality = ui.FilterQuality.high;
 
-  paint.color = ui.Color.fromRGBO(255, 255, 255, opacity);
-  paint.blendMode = ui.BlendMode.modulate;
-
-  canvas.saveLayer(dst, ui.Paint());
   canvas.drawImageRect(
     logoImage,
     ui.Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble()),
     dst,
-    ui.Paint()..filterQuality = ui.FilterQuality.high,
+    watermarkPaint,
   );
-  canvas.drawRect(
-    dst,
-    ui.Paint()
-      ..color = ui.Color.fromRGBO(14, 190, 126, opacity * 0.35)
-      ..blendMode = ui.BlendMode.srcATop,
-  );
-  canvas.restore();
 
   final picture = recorder.endRecording();
   final watermarked = await picture.toImage(baseImage.width, baseImage.height);
-  final byteData =
-      await watermarked.toByteData(format: ui.ImageByteFormat.png);
+  final byteData = await watermarked.toByteData(format: ui.ImageByteFormat.png);
 
   baseImage.dispose();
   logoImage.dispose();
   watermarked.dispose();
 
   return byteData!.buffer.asUint8List();
+}
+
+Future<Uint8List> _loadWatermarkBytes({
+  required WatermarkSettings settings,
+  BrandKit? brandKit,
+}) async {
+  String source = 'assets/images/app_logo.png';
+
+  if (settings.useBusinessLogo && brandKit != null && brandKit.hasLogo) {
+    source = watermarkAssetPath(settings: settings, brandKit: brandKit);
+  }
+
+  try {
+    if (source.startsWith('assets/')) {
+      return (await rootBundle.load(source)).buffer.asUint8List();
+    }
+
+    if (source.startsWith('http://') || source.startsWith('https://')) {
+      final response = await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
+          responseType: ResponseType.bytes,
+        ),
+      ).get<List<int>>(source);
+      final data = response.data;
+      if (data == null || data.isEmpty) throw StateError('Empty logo response');
+      return Uint8List.fromList(data);
+    }
+
+    // Treat as local file path.
+    final file = File(source);
+    if (!file.existsSync()) throw StateError('Logo file not found: $source');
+    return file.readAsBytes();
+  } catch (_) {
+    // Always fall back to the bundled Soko logo.
+    return (await rootBundle.load('assets/images/app_logo.png')).buffer.asUint8List();
+  }
 }
 
 Future<File> writeWatermarkedPng(File source, Uint8List bytes) async {

@@ -110,10 +110,12 @@ class ServiceGridTile extends StatelessWidget {
     super.key,
     required this.service,
     required this.onTap,
+    this.onDesignInStudio,
   });
 
   final Service service;
   final VoidCallback onTap;
+  final VoidCallback? onDesignInStudio;
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +146,34 @@ class ServiceGridTile extends StatelessWidget {
                     height: double.infinity,
                     borderRadius: 0,
                   ),
+                  if (onDesignInStudio != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Tooltip(
+                        message: 'Design in Studio',
+                        child: GestureDetector(
+                          onTap: () {
+                            Haptics.selection();
+                            onDesignInStudio!();
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: DesignTokens.brandPrimary,
+                              shape: BoxShape.circle,
+                              boxShadow: DesignTokens.shadowSm,
+                            ),
+                            child: const Icon(
+                              Icons.design_services_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -205,11 +235,13 @@ class ServiceLineTile extends StatefulWidget {
     required this.service,
     required this.onTap,
     this.onTogglePublish,
+    this.onDesignInStudio,
   });
 
   final Service service;
   final VoidCallback onTap;
   final ValueChanged<bool>? onTogglePublish;
+  final VoidCallback? onDesignInStudio;
 
   @override
   State<ServiceLineTile> createState() => _ServiceLineTileState();
@@ -307,6 +339,24 @@ class _ServiceLineTileState extends State<ServiceLineTile> {
                       ],
                     ),
                   ),
+                  if (widget.onDesignInStudio != null) ...[
+                    const SizedBox(width: DesignTokens.spaceSm),
+                    Tooltip(
+                      message: 'Design in Studio',
+                      child: GestureDetector(
+                        onTap: () {
+                          Haptics.selection();
+                          widget.onDesignInStudio!();
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: const Icon(
+                          Icons.design_services_rounded,
+                          color: DesignTokens.brandPrimary,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (widget.onTogglePublish != null) ...[
                     const SizedBox(width: DesignTokens.spaceSm),
                     _ServiceLiveToggle(

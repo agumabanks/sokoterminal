@@ -10,6 +10,8 @@ import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
+import '../../core/util/comma_number_formatter.dart';
+import '../../core/util/formatters.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/bottom_sheet_modal.dart';
 
@@ -197,7 +199,7 @@ class ProductVariantsScreen extends ConsumerWidget {
 
     final variantCtrl = TextEditingController(text: editing?.variant ?? '');
     final priceCtrl = TextEditingController(
-      text: editing != null ? editing.price.toStringAsFixed(0) : '',
+      text: editing != null ? editing.price.toInt().formatCommas() : '',
     );
     final stockCtrl = TextEditingController(
       text: editing != null ? editing.stockQty.toString() : '0',
@@ -228,10 +230,10 @@ class ProductVariantsScreen extends ConsumerWidget {
                   child: AppInput(
                     controller: priceCtrl,
                     label: 'Price (UGX) *',
-                    hint: '5000',
+                    hint: '5,000',
                     prefixIcon: Icons.attach_money,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    inputFormatters: const [CommaNumberFormatter()],
                     onChanged: (_) {},
                   ),
                 ),
@@ -294,7 +296,9 @@ class ProductVariantsScreen extends ConsumerWidget {
         }
       }
 
-      final price = double.tryParse(priceCtrl.text.trim());
+      final price = double.tryParse(
+        CommaNumberFormatter.unformat(priceCtrl.text.trim()),
+      );
       if (price == null || price <= 0) {
         _toast(context, 'Enter a valid variant price.');
         return;
@@ -501,7 +505,7 @@ class _VariantTile extends StatelessWidget {
         title: Text(label, style: DesignTokens.textBodyBold),
         subtitle: Text(
           [
-            'Price UGX ${stock.price.toStringAsFixed(0)}',
+            'Price ${stock.price.toUgx()}',
             'Stock ${stock.stockQty}',
             if (sku.isNotEmpty) 'SKU $sku',
           ].join(' • '),

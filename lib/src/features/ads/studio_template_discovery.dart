@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/telemetry/telemetry.dart';
 import 'ad_templates.dart';
 import 'business_hub_config.dart';
 import 'business_hub_templates.dart';
@@ -45,7 +48,7 @@ List<TemplateDiscoverySection> localTemplateDiscoveryFallback() {
           'tpl_whatsapp',
           'tpl_sale_bold',
           'tpl_story',
-          'gen_hero_sale_sq_1',
+          'gen_hero_sale_pin',
         ],
       'top_picks' => [
           'hub_logo_monogram',
@@ -100,7 +103,12 @@ final templateDiscoveryProvider =
           .where((s) => s.templateIds.isNotEmpty)
           .toList();
     }
-  } catch (_) {}
+  } catch (e, st) {
+    final telemetry = Telemetry.instance;
+    if (telemetry != null) {
+      unawaited(telemetry.recordError(e, st, hint: 'studio_template_discovery'));
+    }
+  }
   return localTemplateDiscoveryFallback();
 });
 
@@ -116,6 +124,11 @@ class TemplateUseRecorder {
   Future<void> record(String templateId) async {
     try {
       await _api.recordStudioTemplateUse(templateId);
-    } catch (_) {}
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'studio_record_template_use'));
+      }
+    }
   }
 }

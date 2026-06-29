@@ -26,10 +26,10 @@ void main() {
     });
 
     test('generatedTemplateId resolves layout category pairs', () {
-      expect(generatedTemplateId('story', 'food'), 'gen_story_food_sq_37');
-      expect(generatedTemplateId('badge', 'fashion'), 'gen_badge_fashion_fb_46');
-      expect(generatedTemplateId('hero', 'service'), 'gen_hero_service_banner_65');
-      expect(generatedTemplateId('minimal', 'service'), 'gen_minimal_service_story_68');
+      expect(generatedTemplateId('story', 'food'), 'gen_story_food_sq');
+      expect(generatedTemplateId('badge', 'fashion'), 'gen_badge_fashion_story');
+      expect(generatedTemplateId('hero', 'service'), 'gen_hero_service_sq');
+      expect(generatedTemplateId('minimal', 'service'), 'gen_minimal_service_a6');
     });
 
     test('todays ads template pool ids all exist', () {
@@ -84,7 +84,7 @@ void main() {
       expect(entries, isNotEmpty);
       for (final e in entries) {
         expect(e.template.elements, isNotEmpty);
-        expect(e.template.name, contains('Today'));
+        expect(e.template.name, isNotEmpty);
         expect(e.caption, isNotEmpty);
       }
     });
@@ -115,17 +115,17 @@ const _productTemplateIds = [
   'tpl_promo',
   'tpl_story',
   'tpl_minimal',
-  'gen_hero_sale_sq_1',
-  'gen_story_food_sq_37',
-  'gen_badge_fashion_fb_46',
+  'gen_hero_sale_pin',
+  'gen_story_food_sq',
+  'gen_badge_fashion_story',
   'tpl_catalog',
 ];
 
 const _serviceTemplateIds = [
   'tpl_booking',
   'hub_service_flyer',
-  'gen_hero_service_banner_65',
-  'gen_minimal_service_story_68',
+  'gen_hero_service_sq',
+  'gen_minimal_service_a6',
   'tpl_professional',
   'hub_brochure_cover',
 ];

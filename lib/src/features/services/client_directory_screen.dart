@@ -1,11 +1,8 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
-import '../../core/db/app_database.dart';
-import '../../core/network/seller_api.dart';
 import '../../core/theme/design_tokens.dart';
 
 /// Client Directory — aggregates local customers + remote service clients.

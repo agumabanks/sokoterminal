@@ -12,7 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/theme/design_tokens.dart';
 import 'ad_templates.dart';
+import 'studio_editor_launcher.dart';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -177,7 +179,7 @@ class _BrandKitNotifier extends StateNotifier<BrandKit> {
           tagline:
               state.tagline.isEmpty ? seeded.tagline : state.tagline,
           logoNetworkUrl:
-              state.logoNetworkUrl == null ? seeded.logoNetworkUrl : state.logoNetworkUrl,
+              state.logoNetworkUrl ?? seeded.logoNetworkUrl,
           phone: state.phone.isEmpty ? seeded.phone : state.phone,
           location: state.location.isEmpty ? seeded.location : state.location,
           seededFromShop: true,
@@ -329,11 +331,33 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen>
 
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              await launchFullStudioWebForBrandKit(
+                context,
+                ref,
+                openPanel: 'brand-kit',
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.brandPrimary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(44),
+            ),
+            icon: const Icon(Icons.design_services_rounded, size: 18),
+            label: const Text(
+              'Design in Studio',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
         TabBar(
           controller: _tc,
-          labelColor: const Color(0xFF0EBE7E),
+          labelColor: DesignTokens.brandAccent,
           unselectedLabelColor: Colors.white38,
-          indicatorColor: const Color(0xFF0EBE7E),
+          indicatorColor: DesignTokens.brandAccent,
           indicatorWeight: 2,
           labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           tabs: const [
@@ -420,7 +444,7 @@ class _IdentityTab extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: kit.hasLogo
-                          ? const Color(0xFF0EBE7E)
+                          ? DesignTokens.brandAccent
                           : Colors.white12,
                       width: kit.hasLogo ? 2 : 1,
                     ),
@@ -439,20 +463,20 @@ class _IdentityTab extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 9),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0EBE7E).withValues(alpha: 0.15),
+                          color: DesignTokens.brandAccent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: const Color(0xFF0EBE7E).withValues(alpha: 0.4)),
+                              color: DesignTokens.brandAccent.withValues(alpha: 0.4)),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.upload_rounded,
-                                color: Color(0xFF0EBE7E), size: 16),
+                                color: DesignTokens.brandAccent, size: 16),
                             SizedBox(width: 8),
                             Text('Upload Logo',
                                 style: TextStyle(
-                                    color: Color(0xFF0EBE7E),
+                                    color: DesignTokens.brandAccent,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),
                           ],
@@ -551,12 +575,12 @@ class _IdentityTab extends StatelessWidget {
                 const Row(
                   children: [
                     Icon(Icons.warning_amber_rounded,
-                        color: Color(0xFFFBBF24), size: 13),
+                        color: DesignTokens.warning, size: 13),
                     SizedBox(width: 5),
                     Text(
                       'Add your WhatsApp to enable CTA on all templates',
                       style: TextStyle(
-                          color: Color(0xFFFBBF24), fontSize: 10),
+                          color: DesignTokens.warning, fontSize: 10),
                     ),
                   ],
                 ),
@@ -628,18 +652,18 @@ class _IdentityTab extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0EBE7E)
+                            color: DesignTokens.brandAccent
                                 .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(
-                              color: const Color(0xFF0EBE7E)
+                              color: DesignTokens.brandAccent
                                   .withValues(alpha: 0.3),
                             ),
                           ),
                           child: Text(
                             v.$1,
                             style: const TextStyle(
-                              color: Color(0xFF0EBE7E),
+                              color: DesignTokens.brandAccent,
                               fontSize: 10,
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.w600,
@@ -663,16 +687,16 @@ class _IdentityTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0EBE7E).withValues(alpha: 0.08),
+            color: DesignTokens.brandAccent.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: const Color(0xFF0EBE7E).withValues(alpha: 0.2)),
+                color: DesignTokens.brandAccent.withValues(alpha: 0.2)),
           ),
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.auto_awesome_rounded,
-                  color: Color(0xFF0EBE7E), size: 18),
+                  color: DesignTokens.brandAccent, size: 18),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -846,12 +870,12 @@ class _FontPicker extends StatelessWidget {
           style = GoogleFonts.getFont(pkgName,
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: isSel ? const Color(0xFF0EBE7E) : Colors.white);
+              color: isSel ? DesignTokens.brandAccent : Colors.white);
         } catch (_) {
           style = TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: isSel ? const Color(0xFF0EBE7E) : Colors.white);
+              color: isSel ? DesignTokens.brandAccent : Colors.white);
         }
 
         return GestureDetector(
@@ -860,11 +884,11 @@ class _FontPicker extends StatelessWidget {
             width: 90,
             decoration: BoxDecoration(
               color: isSel
-                  ? const Color(0xFF0EBE7E).withValues(alpha: 0.12)
+                  ? DesignTokens.brandAccent.withValues(alpha: 0.12)
                   : Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSel ? const Color(0xFF0EBE7E) : Colors.white10,
+                color: isSel ? DesignTokens.brandAccent : Colors.white10,
               ),
             ),
             padding: const EdgeInsets.all(8),
@@ -876,7 +900,7 @@ class _FontPicker extends StatelessWidget {
                 Text(
                   name,
                   style: TextStyle(
-                      color: isSel ? const Color(0xFF0EBE7E) : Colors.white38,
+                      color: isSel ? DesignTokens.brandAccent : Colors.white38,
                       fontSize: 8,
                       fontWeight: FontWeight.w500),
                   maxLines: 1,
@@ -1131,7 +1155,7 @@ class _ColorSlot extends StatelessWidget {
   void _showPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F1D40),
+      backgroundColor: DesignTokens.brandPrimary,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _ColorPickerSheet(
@@ -1252,7 +1276,7 @@ class _DarkField extends StatelessWidget {
               borderSide: const BorderSide(color: Colors.white12)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF0EBE7E))),
+              borderSide: const BorderSide(color: DesignTokens.brandAccent)),
         ),
       );
 }
@@ -1264,6 +1288,6 @@ Color parseKitColor(String hex) {
     if (hex.length == 6) hex = 'FF$hex';
     return Color(int.parse(hex, radix: 16));
   } catch (_) {
-    return const Color(0xFF0F1D40);
+    return DesignTokens.brandPrimary;
   }
 }

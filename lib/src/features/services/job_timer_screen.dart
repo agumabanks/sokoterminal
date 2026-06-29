@@ -10,7 +10,6 @@ import '../../core/app_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
-import '../../widgets/bottom_sheet_modal.dart';
 import '../checkout/cart_controller.dart';
 import '../checkout/checkout_screen.dart';
 
@@ -199,10 +198,12 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
           service: service,
           variantPrice: charge > 0 ? charge : null,
         );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-        );
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+          );
+        }
         return;
       }
     }

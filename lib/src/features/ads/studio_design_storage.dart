@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/network/seller_api.dart';
+import '../../core/telemetry/telemetry.dart';
 import 'ad_templates.dart';
 
 /// Sanaa cloud basic tier — 2 GB per seller.
@@ -118,8 +120,12 @@ class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
         syncing: false,
         lastSyncedAt: DateTime.now(),
       );
-    } catch (_) {
+    } catch (e, st) {
       state = state.copyWith(syncing: false);
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'studio_refresh_cloud'));
+      }
     }
   }
 
@@ -135,20 +141,32 @@ class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
       await _storage.pushToCloud(template);
       await refreshCloud();
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'studio_save_design_cloud'));
+      }
       return false;
     }
   }
 
-  Future<void> deleteDesign(String id) async {
+  Future<bool> deleteDesign(String id) async {
     await _storage.deleteLocal(id);
+    var cloudOk = true;
     try {
       await _storage.deleteFromCloud(id);
-    } catch (_) {}
+    } catch (e, st) {
+      cloudOk = false;
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'studio_delete_design_cloud'));
+      }
+    }
     state = state.copyWith(
       designs: state.designs.where((d) => d.id != id).toList(),
     );
     await refreshCloud();
+    return cloudOk;
   }
 }
 
@@ -190,7 +208,12 @@ class StudioDesignStorage {
       try {
         final raw = await file.readAsString();
         designs.add(AdTemplate.fromJson(jsonDecode(raw) as Map<String, dynamic>));
-      } catch (_) {}
+      } catch (e, st) {
+        final telemetry = Telemetry.instance;
+        if (telemetry != null) {
+          unawaited(telemetry.recordError(e, st, hint: 'studio_load_local_design'));
+        }
+      }
     }
     return designs;
   }
@@ -227,7 +250,12 @@ class StudioDesignStorage {
         final tpl = AdTemplate.fromJson(map);
         cloud.add(tpl);
         await saveLocal(tpl);
-      } catch (_) {}
+      } catch (e, st) {
+        final telemetry = Telemetry.instance;
+        if (telemetry != null) {
+          unawaited(telemetry.recordError(e, st, hint: 'studio_pull_cloud_design'));
+        }
+      }
     }
 
     if (cloud.isEmpty) return loadLocalDesigns();
@@ -254,7 +282,12 @@ class StudioDesignStorage {
           Map<String, dynamic>.from(body['data'] as Map),
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      final telemetry = Telemetry.instance;
+      if (telemetry != null) {
+        unawaited(telemetry.recordError(e, st, hint: 'studio_fetch_cloud_quota'));
+      }
+    }
     return StudioCloudQuota.fallback;
   }
 }

@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_providers.dart';
+import '../../core/theme/design_tokens.dart';
 
 class ConnectivityGuard {
   static Future<bool> check(
@@ -17,7 +18,7 @@ class ConnectivityGuard {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('This action requires an active internet connection.'),
-          backgroundColor: Colors.orange,
+          backgroundColor: DesignTokens.warning,
         ),
       );
     }

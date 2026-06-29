@@ -294,9 +294,11 @@ class BookingDetailSheet extends ConsumerWidget {
       });
       unawaited(sync.syncNow());
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reschedule queued')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reschedule queued')),
+        );
+      }
     }
   }
 
@@ -315,9 +317,11 @@ class BookingDetailSheet extends ConsumerWidget {
         ? await db.getServiceByRemoteId(serviceRemoteId)
         : await db.getServiceById(offeringId);
     if (service == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Service not found locally. Sync first.')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Service not found locally. Sync first.')),
+        );
+      }
       return;
     }
     final price = double.tryParse(booking['price']?.toString() ?? '') ?? 0;
@@ -424,8 +428,8 @@ class _StatusChip extends StatelessWidget {
     Color fg;
     switch (normalized) {
       case 'confirmed':
-        bg = Colors.blue.shade50;
-        fg = Colors.blue.shade800;
+        bg = DesignTokens.canvasCloud;
+        fg = DesignTokens.info;
         break;
       case 'completed':
         bg = Colors.green.shade50;

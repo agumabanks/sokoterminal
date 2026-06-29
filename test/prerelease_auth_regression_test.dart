@@ -68,6 +68,86 @@ void main() {
       expect(persistedTokenUseIndex, greaterThan(persistIndex));
     });
 
+    test('auth controller no longer schedules a periodic token refresh', () {
+      final source =
+          File('lib/src/features/auth/auth_controller.dart').readAsStringSync();
+
+      expect(
+        source.contains('_scheduleTokenRefresh'),
+        isFalse,
+        reason: 'Proactive periodic refresh was removed because Sanctum '
+            'tokens do not expire and the refresh endpoint deletes tokens',
+      );
+      expect(
+        source.contains('Timer.periodic'),
+        isFalse,
+        reason: 'No periodic timer should be used for token refresh',
+      );
+      expect(
+        source.contains('Future<bool> refreshToken()'),
+        isTrue,
+        reason: 'Manual/foreground refreshToken() must still exist',
+      );
+    });
+
+    test('login and quick PIN support remember_device flag', () {
+      final source =
+          File('lib/src/features/auth/auth_controller.dart').readAsStringSync();
+
+      expect(
+        source.contains('bool rememberDevice = false'),
+        isTrue,
+        reason: 'login() and loginWithQuickPin() must accept rememberDevice',
+      );
+      expect(
+        source.contains("'remember_me': rememberDevice,"),
+        isTrue,
+        reason: 'Seller password login must send remember_me to backend',
+      );
+      expect(
+        source.contains("'remember_me': rememberDevice,"),
+        isTrue,
+        reason: 'PIN login must send remember_me to backend',
+      );
+      expect(
+        source.contains('Future<void> _persistTokenMeta('),
+        isTrue,
+        reason: 'Token expiry and remember flag must be persisted together',
+      );
+    });
+
+    test('secure storage exposes remember-device and token-expiry keys', () {
+      final source =
+          File('lib/src/core/storage/secure_storage.dart').readAsStringSync();
+
+      expect(
+        source.contains('remember_device'),
+        isTrue,
+        reason: 'Remember-device flag must be stored',
+      );
+      expect(
+        source.contains('access_token_expires_at'),
+        isTrue,
+        reason: 'Token expiry must be stored for offline validation',
+      );
+    });
+
+    test('splash screen rejects locally expired tokens before sync', () {
+      final source =
+          File('lib/src/features/splash/splash_screen.dart').readAsStringSync();
+
+      expect(
+        source.contains('readAccessTokenExpiresAt'),
+        isTrue,
+        reason: 'Splash must read the stored token expiry',
+      );
+      expect(
+        source.contains('DateTime.now().toUtc().isAfter(expiresAt)'),
+        isTrue,
+        reason: 'Splash must reject tokens whose expiry has passed',
+      );
+    });
+
     test('phone fallback retries seller password login with multiple UG variants', () {
       final source =
           File('lib/src/features/auth/auth_controller.dart').readAsStringSync();

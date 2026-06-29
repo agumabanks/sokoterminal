@@ -104,8 +104,9 @@ class AnalyticsScreen extends ConsumerWidget {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index < 0 || index >= state.dailySales.length)
+                        if (index < 0 || index >= state.dailySales.length) {
                           return const Text('');
+                        }
                         final date = state.dailySales[index].date;
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),

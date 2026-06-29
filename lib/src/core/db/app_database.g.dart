@@ -352,6 +352,17 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _taxRateMeta = const VerificationMeta(
+    'taxRate',
+  );
+  @override
+  late final GeneratedColumn<double> taxRate = GeneratedColumn<double>(
+    'tax_rate',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -410,6 +421,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     refundable,
     cashOnDelivery,
     lowStockWarning,
+    taxRate,
     updatedAt,
     synced,
   ];
@@ -654,6 +666,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         ),
       );
     }
+    if (data.containsKey('tax_rate')) {
+      context.handle(
+        _taxRateMeta,
+        taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -799,6 +817,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.int,
         data['${effectivePrefix}low_stock_warning'],
       ),
+      taxRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tax_rate'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -848,6 +870,7 @@ class Item extends DataClass implements Insertable<Item> {
   final bool refundable;
   final bool cashOnDelivery;
   final int? lowStockWarning;
+  final double? taxRate;
   final DateTime updatedAt;
   final bool synced;
   const Item({
@@ -882,6 +905,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.refundable,
     required this.cashOnDelivery,
     this.lowStockWarning,
+    this.taxRate,
     required this.updatedAt,
     required this.synced,
   });
@@ -963,6 +987,9 @@ class Item extends DataClass implements Insertable<Item> {
     if (!nullToAbsent || lowStockWarning != null) {
       map['low_stock_warning'] = Variable<int>(lowStockWarning);
     }
+    if (!nullToAbsent || taxRate != null) {
+      map['tax_rate'] = Variable<double>(taxRate);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['synced'] = Variable<bool>(synced);
     return map;
@@ -1037,6 +1064,9 @@ class Item extends DataClass implements Insertable<Item> {
       lowStockWarning: lowStockWarning == null && nullToAbsent
           ? const Value.absent()
           : Value(lowStockWarning),
+      taxRate: taxRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(taxRate),
       updatedAt: Value(updatedAt),
       synced: Value(synced),
     );
@@ -1079,6 +1109,7 @@ class Item extends DataClass implements Insertable<Item> {
       refundable: serializer.fromJson<bool>(json['refundable']),
       cashOnDelivery: serializer.fromJson<bool>(json['cashOnDelivery']),
       lowStockWarning: serializer.fromJson<int?>(json['lowStockWarning']),
+      taxRate: serializer.fromJson<double?>(json['taxRate']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       synced: serializer.fromJson<bool>(json['synced']),
     );
@@ -1118,6 +1149,7 @@ class Item extends DataClass implements Insertable<Item> {
       'refundable': serializer.toJson<bool>(refundable),
       'cashOnDelivery': serializer.toJson<bool>(cashOnDelivery),
       'lowStockWarning': serializer.toJson<int?>(lowStockWarning),
+      'taxRate': serializer.toJson<double?>(taxRate),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'synced': serializer.toJson<bool>(synced),
     };
@@ -1155,6 +1187,7 @@ class Item extends DataClass implements Insertable<Item> {
     bool? refundable,
     bool? cashOnDelivery,
     Value<int?> lowStockWarning = const Value.absent(),
+    Value<double?> taxRate = const Value.absent(),
     DateTime? updatedAt,
     bool? synced,
   }) => Item(
@@ -1195,6 +1228,7 @@ class Item extends DataClass implements Insertable<Item> {
     lowStockWarning: lowStockWarning.present
         ? lowStockWarning.value
         : this.lowStockWarning,
+    taxRate: taxRate.present ? taxRate.value : this.taxRate,
     updatedAt: updatedAt ?? this.updatedAt,
     synced: synced ?? this.synced,
   );
@@ -1263,6 +1297,7 @@ class Item extends DataClass implements Insertable<Item> {
       lowStockWarning: data.lowStockWarning.present
           ? data.lowStockWarning.value
           : this.lowStockWarning,
+      taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       synced: data.synced.present ? data.synced.value : this.synced,
     );
@@ -1302,6 +1337,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('refundable: $refundable, ')
           ..write('cashOnDelivery: $cashOnDelivery, ')
           ..write('lowStockWarning: $lowStockWarning, ')
+          ..write('taxRate: $taxRate, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced')
           ..write(')'))
@@ -1341,6 +1377,7 @@ class Item extends DataClass implements Insertable<Item> {
     refundable,
     cashOnDelivery,
     lowStockWarning,
+    taxRate,
     updatedAt,
     synced,
   ]);
@@ -1379,6 +1416,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.refundable == this.refundable &&
           other.cashOnDelivery == this.cashOnDelivery &&
           other.lowStockWarning == this.lowStockWarning &&
+          other.taxRate == this.taxRate &&
           other.updatedAt == this.updatedAt &&
           other.synced == this.synced);
 }
@@ -1415,6 +1453,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> refundable;
   final Value<bool> cashOnDelivery;
   final Value<int?> lowStockWarning;
+  final Value<double?> taxRate;
   final Value<DateTime> updatedAt;
   final Value<bool> synced;
   final Value<int> rowid;
@@ -1450,6 +1489,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.refundable = const Value.absent(),
     this.cashOnDelivery = const Value.absent(),
     this.lowStockWarning = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1486,6 +1526,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.refundable = const Value.absent(),
     this.cashOnDelivery = const Value.absent(),
     this.lowStockWarning = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1523,6 +1564,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<bool>? refundable,
     Expression<bool>? cashOnDelivery,
     Expression<int>? lowStockWarning,
+    Expression<double>? taxRate,
     Expression<DateTime>? updatedAt,
     Expression<bool>? synced,
     Expression<int>? rowid,
@@ -1559,6 +1601,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (refundable != null) 'refundable': refundable,
       if (cashOnDelivery != null) 'cash_on_delivery': cashOnDelivery,
       if (lowStockWarning != null) 'low_stock_warning': lowStockWarning,
+      if (taxRate != null) 'tax_rate': taxRate,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (synced != null) 'synced': synced,
       if (rowid != null) 'rowid': rowid,
@@ -1597,6 +1640,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<bool>? refundable,
     Value<bool>? cashOnDelivery,
     Value<int?>? lowStockWarning,
+    Value<double?>? taxRate,
     Value<DateTime>? updatedAt,
     Value<bool>? synced,
     Value<int>? rowid,
@@ -1633,6 +1677,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       refundable: refundable ?? this.refundable,
       cashOnDelivery: cashOnDelivery ?? this.cashOnDelivery,
       lowStockWarning: lowStockWarning ?? this.lowStockWarning,
+      taxRate: taxRate ?? this.taxRate,
       updatedAt: updatedAt ?? this.updatedAt,
       synced: synced ?? this.synced,
       rowid: rowid ?? this.rowid,
@@ -1735,6 +1780,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (lowStockWarning.present) {
       map['low_stock_warning'] = Variable<int>(lowStockWarning.value);
     }
+    if (taxRate.present) {
+      map['tax_rate'] = Variable<double>(taxRate.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1781,6 +1829,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('refundable: $refundable, ')
           ..write('cashOnDelivery: $cashOnDelivery, ')
           ..write('lowStockWarning: $lowStockWarning, ')
+          ..write('taxRate: $taxRate, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced, ')
           ..write('rowid: $rowid')
@@ -12116,6 +12165,57 @@ class $BusinessProfilesTable extends BusinessProfiles
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _taxEnabledMeta = const VerificationMeta(
+    'taxEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> taxEnabled = GeneratedColumn<bool>(
+    'tax_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("tax_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _taxRateMeta = const VerificationMeta(
+    'taxRate',
+  );
+  @override
+  late final GeneratedColumn<double> taxRate = GeneratedColumn<double>(
+    'tax_rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _taxLabelMeta = const VerificationMeta(
+    'taxLabel',
+  );
+  @override
+  late final GeneratedColumn<String> taxLabel = GeneratedColumn<String>(
+    'tax_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('VAT'),
+  );
+  static const VerificationMeta _taxInclusionModeMeta = const VerificationMeta(
+    'taxInclusionMode',
+  );
+  @override
+  late final GeneratedColumn<String> taxInclusionMode = GeneratedColumn<String>(
+    'tax_inclusion_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('exclusive'),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -12175,6 +12275,10 @@ class $BusinessProfilesTable extends BusinessProfiles
     receiptPaymentMethodsJson,
     deliveryProfileJson,
     verificationStatus,
+    taxEnabled,
+    taxRate,
+    taxLabel,
+    taxInclusionMode,
     updatedAt,
     synced,
   ];
@@ -12449,6 +12553,33 @@ class $BusinessProfilesTable extends BusinessProfiles
         ),
       );
     }
+    if (data.containsKey('tax_enabled')) {
+      context.handle(
+        _taxEnabledMeta,
+        taxEnabled.isAcceptableOrUnknown(data['tax_enabled']!, _taxEnabledMeta),
+      );
+    }
+    if (data.containsKey('tax_rate')) {
+      context.handle(
+        _taxRateMeta,
+        taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta),
+      );
+    }
+    if (data.containsKey('tax_label')) {
+      context.handle(
+        _taxLabelMeta,
+        taxLabel.isAcceptableOrUnknown(data['tax_label']!, _taxLabelMeta),
+      );
+    }
+    if (data.containsKey('tax_inclusion_mode')) {
+      context.handle(
+        _taxInclusionModeMeta,
+        taxInclusionMode.isAcceptableOrUnknown(
+          data['tax_inclusion_mode']!,
+          _taxInclusionModeMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -12598,6 +12729,22 @@ class $BusinessProfilesTable extends BusinessProfiles
         DriftSqlType.int,
         data['${effectivePrefix}verification_status'],
       )!,
+      taxEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}tax_enabled'],
+      )!,
+      taxRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tax_rate'],
+      )!,
+      taxLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tax_label'],
+      )!,
+      taxInclusionMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tax_inclusion_mode'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -12648,6 +12795,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
   final String? receiptPaymentMethodsJson;
   final String? deliveryProfileJson;
   final int verificationStatus;
+  final bool taxEnabled;
+  final double taxRate;
+  final String taxLabel;
+  final String taxInclusionMode;
   final DateTime updatedAt;
   final bool synced;
   const BusinessProfile({
@@ -12683,6 +12834,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     this.receiptPaymentMethodsJson,
     this.deliveryProfileJson,
     required this.verificationStatus,
+    required this.taxEnabled,
+    required this.taxRate,
+    required this.taxLabel,
+    required this.taxInclusionMode,
     required this.updatedAt,
     required this.synced,
   });
@@ -12777,6 +12932,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       map['delivery_profile_json'] = Variable<String>(deliveryProfileJson);
     }
     map['verification_status'] = Variable<int>(verificationStatus);
+    map['tax_enabled'] = Variable<bool>(taxEnabled);
+    map['tax_rate'] = Variable<double>(taxRate);
+    map['tax_label'] = Variable<String>(taxLabel);
+    map['tax_inclusion_mode'] = Variable<String>(taxInclusionMode);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['synced'] = Variable<bool>(synced);
     return map;
@@ -12867,6 +13026,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
           ? const Value.absent()
           : Value(deliveryProfileJson),
       verificationStatus: Value(verificationStatus),
+      taxEnabled: Value(taxEnabled),
+      taxRate: Value(taxRate),
+      taxLabel: Value(taxLabel),
+      taxInclusionMode: Value(taxInclusionMode),
       updatedAt: Value(updatedAt),
       synced: Value(synced),
     );
@@ -12924,6 +13087,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
         json['deliveryProfileJson'],
       ),
       verificationStatus: serializer.fromJson<int>(json['verificationStatus']),
+      taxEnabled: serializer.fromJson<bool>(json['taxEnabled']),
+      taxRate: serializer.fromJson<double>(json['taxRate']),
+      taxLabel: serializer.fromJson<String>(json['taxLabel']),
+      taxInclusionMode: serializer.fromJson<String>(json['taxInclusionMode']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       synced: serializer.fromJson<bool>(json['synced']),
     );
@@ -12970,6 +13137,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       ),
       'deliveryProfileJson': serializer.toJson<String?>(deliveryProfileJson),
       'verificationStatus': serializer.toJson<int>(verificationStatus),
+      'taxEnabled': serializer.toJson<bool>(taxEnabled),
+      'taxRate': serializer.toJson<double>(taxRate),
+      'taxLabel': serializer.toJson<String>(taxLabel),
+      'taxInclusionMode': serializer.toJson<String>(taxInclusionMode),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'synced': serializer.toJson<bool>(synced),
     };
@@ -13008,6 +13179,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     Value<String?> receiptPaymentMethodsJson = const Value.absent(),
     Value<String?> deliveryProfileJson = const Value.absent(),
     int? verificationStatus,
+    bool? taxEnabled,
+    double? taxRate,
+    String? taxLabel,
+    String? taxInclusionMode,
     DateTime? updatedAt,
     bool? synced,
   }) => BusinessProfile(
@@ -13065,6 +13240,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
         ? deliveryProfileJson.value
         : this.deliveryProfileJson,
     verificationStatus: verificationStatus ?? this.verificationStatus,
+    taxEnabled: taxEnabled ?? this.taxEnabled,
+    taxRate: taxRate ?? this.taxRate,
+    taxLabel: taxLabel ?? this.taxLabel,
+    taxInclusionMode: taxInclusionMode ?? this.taxInclusionMode,
     updatedAt: updatedAt ?? this.updatedAt,
     synced: synced ?? this.synced,
   );
@@ -13148,6 +13327,14 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
       verificationStatus: data.verificationStatus.present
           ? data.verificationStatus.value
           : this.verificationStatus,
+      taxEnabled: data.taxEnabled.present
+          ? data.taxEnabled.value
+          : this.taxEnabled,
+      taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
+      taxLabel: data.taxLabel.present ? data.taxLabel.value : this.taxLabel,
+      taxInclusionMode: data.taxInclusionMode.present
+          ? data.taxInclusionMode.value
+          : this.taxInclusionMode,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       synced: data.synced.present ? data.synced.value : this.synced,
     );
@@ -13188,6 +13375,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
           ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
           ..write('deliveryProfileJson: $deliveryProfileJson, ')
           ..write('verificationStatus: $verificationStatus, ')
+          ..write('taxEnabled: $taxEnabled, ')
+          ..write('taxRate: $taxRate, ')
+          ..write('taxLabel: $taxLabel, ')
+          ..write('taxInclusionMode: $taxInclusionMode, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced')
           ..write(')'))
@@ -13228,6 +13419,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
     receiptPaymentMethodsJson,
     deliveryProfileJson,
     verificationStatus,
+    taxEnabled,
+    taxRate,
+    taxLabel,
+    taxInclusionMode,
     updatedAt,
     synced,
   ]);
@@ -13267,6 +13462,10 @@ class BusinessProfile extends DataClass implements Insertable<BusinessProfile> {
           other.receiptPaymentMethodsJson == this.receiptPaymentMethodsJson &&
           other.deliveryProfileJson == this.deliveryProfileJson &&
           other.verificationStatus == this.verificationStatus &&
+          other.taxEnabled == this.taxEnabled &&
+          other.taxRate == this.taxRate &&
+          other.taxLabel == this.taxLabel &&
+          other.taxInclusionMode == this.taxInclusionMode &&
           other.updatedAt == this.updatedAt &&
           other.synced == this.synced);
 }
@@ -13304,6 +13503,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
   final Value<String?> receiptPaymentMethodsJson;
   final Value<String?> deliveryProfileJson;
   final Value<int> verificationStatus;
+  final Value<bool> taxEnabled;
+  final Value<double> taxRate;
+  final Value<String> taxLabel;
+  final Value<String> taxInclusionMode;
   final Value<DateTime> updatedAt;
   final Value<bool> synced;
   final Value<int> rowid;
@@ -13340,6 +13543,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     this.receiptPaymentMethodsJson = const Value.absent(),
     this.deliveryProfileJson = const Value.absent(),
     this.verificationStatus = const Value.absent(),
+    this.taxEnabled = const Value.absent(),
+    this.taxRate = const Value.absent(),
+    this.taxLabel = const Value.absent(),
+    this.taxInclusionMode = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -13377,6 +13584,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     this.receiptPaymentMethodsJson = const Value.absent(),
     this.deliveryProfileJson = const Value.absent(),
     this.verificationStatus = const Value.absent(),
+    this.taxEnabled = const Value.absent(),
+    this.taxRate = const Value.absent(),
+    this.taxLabel = const Value.absent(),
+    this.taxInclusionMode = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.synced = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -13415,6 +13626,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     Expression<String>? receiptPaymentMethodsJson,
     Expression<String>? deliveryProfileJson,
     Expression<int>? verificationStatus,
+    Expression<bool>? taxEnabled,
+    Expression<double>? taxRate,
+    Expression<String>? taxLabel,
+    Expression<String>? taxInclusionMode,
     Expression<DateTime>? updatedAt,
     Expression<bool>? synced,
     Expression<int>? rowid,
@@ -13462,6 +13677,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
       if (deliveryProfileJson != null)
         'delivery_profile_json': deliveryProfileJson,
       if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (taxEnabled != null) 'tax_enabled': taxEnabled,
+      if (taxRate != null) 'tax_rate': taxRate,
+      if (taxLabel != null) 'tax_label': taxLabel,
+      if (taxInclusionMode != null) 'tax_inclusion_mode': taxInclusionMode,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (synced != null) 'synced': synced,
       if (rowid != null) 'rowid': rowid,
@@ -13501,6 +13720,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     Value<String?>? receiptPaymentMethodsJson,
     Value<String?>? deliveryProfileJson,
     Value<int>? verificationStatus,
+    Value<bool>? taxEnabled,
+    Value<double>? taxRate,
+    Value<String>? taxLabel,
+    Value<String>? taxInclusionMode,
     Value<DateTime>? updatedAt,
     Value<bool>? synced,
     Value<int>? rowid,
@@ -13542,6 +13765,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
           receiptPaymentMethodsJson ?? this.receiptPaymentMethodsJson,
       deliveryProfileJson: deliveryProfileJson ?? this.deliveryProfileJson,
       verificationStatus: verificationStatus ?? this.verificationStatus,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      taxRate: taxRate ?? this.taxRate,
+      taxLabel: taxLabel ?? this.taxLabel,
+      taxInclusionMode: taxInclusionMode ?? this.taxInclusionMode,
       updatedAt: updatedAt ?? this.updatedAt,
       synced: synced ?? this.synced,
       rowid: rowid ?? this.rowid,
@@ -13657,6 +13884,18 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
     if (verificationStatus.present) {
       map['verification_status'] = Variable<int>(verificationStatus.value);
     }
+    if (taxEnabled.present) {
+      map['tax_enabled'] = Variable<bool>(taxEnabled.value);
+    }
+    if (taxRate.present) {
+      map['tax_rate'] = Variable<double>(taxRate.value);
+    }
+    if (taxLabel.present) {
+      map['tax_label'] = Variable<String>(taxLabel.value);
+    }
+    if (taxInclusionMode.present) {
+      map['tax_inclusion_mode'] = Variable<String>(taxInclusionMode.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -13704,6 +13943,10 @@ class BusinessProfilesCompanion extends UpdateCompanion<BusinessProfile> {
           ..write('receiptPaymentMethodsJson: $receiptPaymentMethodsJson, ')
           ..write('deliveryProfileJson: $deliveryProfileJson, ')
           ..write('verificationStatus: $verificationStatus, ')
+          ..write('taxEnabled: $taxEnabled, ')
+          ..write('taxRate: $taxRate, ')
+          ..write('taxLabel: $taxLabel, ')
+          ..write('taxInclusionMode: $taxInclusionMode, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('synced: $synced, ')
           ..write('rowid: $rowid')
@@ -14112,6 +14355,18 @@ class $LedgerEntriesTable extends LedgerEntries
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _taxRateMeta = const VerificationMeta(
+    'taxRate',
+  );
+  @override
+  late final GeneratedColumn<double> taxRate = GeneratedColumn<double>(
+    'tax_rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _totalMeta = const VerificationMeta('total');
   @override
   late final GeneratedColumn<double> total = GeneratedColumn<double>(
@@ -14155,6 +14410,17 @@ class $LedgerEntriesTable extends LedgerEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -14180,10 +14446,12 @@ class $LedgerEntriesTable extends LedgerEntries
     subtotal,
     discount,
     tax,
+    taxRate,
     total,
     note,
     synced,
     remoteAck,
+    remoteId,
     createdAt,
   ];
   @override
@@ -14274,6 +14542,12 @@ class $LedgerEntriesTable extends LedgerEntries
         tax.isAcceptableOrUnknown(data['tax']!, _taxMeta),
       );
     }
+    if (data.containsKey('tax_rate')) {
+      context.handle(
+        _taxRateMeta,
+        taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta),
+      );
+    }
     if (data.containsKey('total')) {
       context.handle(
         _totalMeta,
@@ -14296,6 +14570,12 @@ class $LedgerEntriesTable extends LedgerEntries
       context.handle(
         _remoteAckMeta,
         remoteAck.isAcceptableOrUnknown(data['remote_ack']!, _remoteAckMeta),
+      );
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
       );
     }
     if (data.containsKey('created_at')) {
@@ -14357,6 +14637,10 @@ class $LedgerEntriesTable extends LedgerEntries
         DriftSqlType.double,
         data['${effectivePrefix}tax'],
       )!,
+      taxRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tax_rate'],
+      )!,
       total: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}total'],
@@ -14372,6 +14656,10 @@ class $LedgerEntriesTable extends LedgerEntries
       remoteAck: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}remote_ack'],
+      ),
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_id'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -14398,10 +14686,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
   final double subtotal;
   final double discount;
   final double tax;
+  final double taxRate;
   final double total;
   final String? note;
   final bool synced;
   final String? remoteAck;
+  final String? remoteId;
   final DateTime createdAt;
   const LedgerEntry({
     required this.id,
@@ -14415,10 +14705,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     required this.subtotal,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.total,
     this.note,
     required this.synced,
     this.remoteAck,
+    this.remoteId,
     required this.createdAt,
   });
   @override
@@ -14445,6 +14737,7 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     map['subtotal'] = Variable<double>(subtotal);
     map['discount'] = Variable<double>(discount);
     map['tax'] = Variable<double>(tax);
+    map['tax_rate'] = Variable<double>(taxRate);
     map['total'] = Variable<double>(total);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -14452,6 +14745,9 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     map['synced'] = Variable<bool>(synced);
     if (!nullToAbsent || remoteAck != null) {
       map['remote_ack'] = Variable<String>(remoteAck);
+    }
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -14480,12 +14776,16 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       subtotal: Value(subtotal),
       discount: Value(discount),
       tax: Value(tax),
+      taxRate: Value(taxRate),
       total: Value(total),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       synced: Value(synced),
       remoteAck: remoteAck == null && nullToAbsent
           ? const Value.absent()
           : Value(remoteAck),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
       createdAt: Value(createdAt),
     );
   }
@@ -14507,10 +14807,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       subtotal: serializer.fromJson<double>(json['subtotal']),
       discount: serializer.fromJson<double>(json['discount']),
       tax: serializer.fromJson<double>(json['tax']),
+      taxRate: serializer.fromJson<double>(json['taxRate']),
       total: serializer.fromJson<double>(json['total']),
       note: serializer.fromJson<String?>(json['note']),
       synced: serializer.fromJson<bool>(json['synced']),
       remoteAck: serializer.fromJson<String?>(json['remoteAck']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -14529,10 +14831,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       'subtotal': serializer.toJson<double>(subtotal),
       'discount': serializer.toJson<double>(discount),
       'tax': serializer.toJson<double>(tax),
+      'taxRate': serializer.toJson<double>(taxRate),
       'total': serializer.toJson<double>(total),
       'note': serializer.toJson<String?>(note),
       'synced': serializer.toJson<bool>(synced),
       'remoteAck': serializer.toJson<String?>(remoteAck),
+      'remoteId': serializer.toJson<String?>(remoteId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -14549,10 +14853,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     double? subtotal,
     double? discount,
     double? tax,
+    double? taxRate,
     double? total,
     Value<String?> note = const Value.absent(),
     bool? synced,
     Value<String?> remoteAck = const Value.absent(),
+    Value<String?> remoteId = const Value.absent(),
     DateTime? createdAt,
   }) => LedgerEntry(
     id: id ?? this.id,
@@ -14570,10 +14876,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     subtotal: subtotal ?? this.subtotal,
     discount: discount ?? this.discount,
     tax: tax ?? this.tax,
+    taxRate: taxRate ?? this.taxRate,
     total: total ?? this.total,
     note: note.present ? note.value : this.note,
     synced: synced ?? this.synced,
     remoteAck: remoteAck.present ? remoteAck.value : this.remoteAck,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
     createdAt: createdAt ?? this.createdAt,
   );
   LedgerEntry copyWithCompanion(LedgerEntriesCompanion data) {
@@ -14597,10 +14905,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       discount: data.discount.present ? data.discount.value : this.discount,
       tax: data.tax.present ? data.tax.value : this.tax,
+      taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
       total: data.total.present ? data.total.value : this.total,
       note: data.note.present ? data.note.value : this.note,
       synced: data.synced.present ? data.synced.value : this.synced,
       remoteAck: data.remoteAck.present ? data.remoteAck.value : this.remoteAck,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -14619,10 +14929,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
           ..write('subtotal: $subtotal, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
+          ..write('taxRate: $taxRate, ')
           ..write('total: $total, ')
           ..write('note: $note, ')
           ..write('synced: $synced, ')
           ..write('remoteAck: $remoteAck, ')
+          ..write('remoteId: $remoteId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -14641,10 +14953,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
     subtotal,
     discount,
     tax,
+    taxRate,
     total,
     note,
     synced,
     remoteAck,
+    remoteId,
     createdAt,
   );
   @override
@@ -14662,10 +14976,12 @@ class LedgerEntry extends DataClass implements Insertable<LedgerEntry> {
           other.subtotal == this.subtotal &&
           other.discount == this.discount &&
           other.tax == this.tax &&
+          other.taxRate == this.taxRate &&
           other.total == this.total &&
           other.note == this.note &&
           other.synced == this.synced &&
           other.remoteAck == this.remoteAck &&
+          other.remoteId == this.remoteId &&
           other.createdAt == this.createdAt);
 }
 
@@ -14681,10 +14997,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
   final Value<double> subtotal;
   final Value<double> discount;
   final Value<double> tax;
+  final Value<double> taxRate;
   final Value<double> total;
   final Value<String?> note;
   final Value<bool> synced;
   final Value<String?> remoteAck;
+  final Value<String?> remoteId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const LedgerEntriesCompanion({
@@ -14699,10 +15017,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     this.subtotal = const Value.absent(),
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.total = const Value.absent(),
     this.note = const Value.absent(),
     this.synced = const Value.absent(),
     this.remoteAck = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -14718,10 +15038,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     this.subtotal = const Value.absent(),
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.total = const Value.absent(),
     this.note = const Value.absent(),
     this.synced = const Value.absent(),
     this.remoteAck = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : idempotencyKey = Value(idempotencyKey),
@@ -14738,10 +15060,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     Expression<double>? subtotal,
     Expression<double>? discount,
     Expression<double>? tax,
+    Expression<double>? taxRate,
     Expression<double>? total,
     Expression<String>? note,
     Expression<bool>? synced,
     Expression<String>? remoteAck,
+    Expression<String>? remoteId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -14757,10 +15081,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
       if (subtotal != null) 'subtotal': subtotal,
       if (discount != null) 'discount': discount,
       if (tax != null) 'tax': tax,
+      if (taxRate != null) 'tax_rate': taxRate,
       if (total != null) 'total': total,
       if (note != null) 'note': note,
       if (synced != null) 'synced': synced,
       if (remoteAck != null) 'remote_ack': remoteAck,
+      if (remoteId != null) 'remote_id': remoteId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -14778,10 +15104,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     Value<double>? subtotal,
     Value<double>? discount,
     Value<double>? tax,
+    Value<double>? taxRate,
     Value<double>? total,
     Value<String?>? note,
     Value<bool>? synced,
     Value<String?>? remoteAck,
+    Value<String?>? remoteId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -14797,10 +15125,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
       subtotal: subtotal ?? this.subtotal,
       discount: discount ?? this.discount,
       tax: tax ?? this.tax,
+      taxRate: taxRate ?? this.taxRate,
       total: total ?? this.total,
       note: note ?? this.note,
       synced: synced ?? this.synced,
       remoteAck: remoteAck ?? this.remoteAck,
+      remoteId: remoteId ?? this.remoteId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -14842,6 +15172,9 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     if (tax.present) {
       map['tax'] = Variable<double>(tax.value);
     }
+    if (taxRate.present) {
+      map['tax_rate'] = Variable<double>(taxRate.value);
+    }
     if (total.present) {
       map['total'] = Variable<double>(total.value);
     }
@@ -14853,6 +15186,9 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
     }
     if (remoteAck.present) {
       map['remote_ack'] = Variable<String>(remoteAck.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -14877,10 +15213,12 @@ class LedgerEntriesCompanion extends UpdateCompanion<LedgerEntry> {
           ..write('subtotal: $subtotal, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
+          ..write('taxRate: $taxRate, ')
           ..write('total: $total, ')
           ..write('note: $note, ')
           ..write('synced: $synced, ')
           ..write('remoteAck: $remoteAck, ')
+          ..write('remoteId: $remoteId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -15011,6 +15349,18 @@ class $LedgerLinesTable extends LedgerLines
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _taxRateMeta = const VerificationMeta(
+    'taxRate',
+  );
+  @override
+  late final GeneratedColumn<double> taxRate = GeneratedColumn<double>(
+    'tax_rate',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _lineTotalMeta = const VerificationMeta(
     'lineTotal',
   );
@@ -15034,6 +15384,7 @@ class $LedgerLinesTable extends LedgerLines
     unitPrice,
     discount,
     tax,
+    taxRate,
     lineTotal,
   ];
   @override
@@ -15113,6 +15464,12 @@ class $LedgerLinesTable extends LedgerLines
         tax.isAcceptableOrUnknown(data['tax']!, _taxMeta),
       );
     }
+    if (data.containsKey('tax_rate')) {
+      context.handle(
+        _taxRateMeta,
+        taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta),
+      );
+    }
     if (data.containsKey('line_total')) {
       context.handle(
         _lineTotalMeta,
@@ -15170,6 +15527,10 @@ class $LedgerLinesTable extends LedgerLines
         DriftSqlType.double,
         data['${effectivePrefix}tax'],
       )!,
+      taxRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tax_rate'],
+      )!,
       lineTotal: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}line_total'],
@@ -15194,6 +15555,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
   final double unitPrice;
   final double discount;
   final double tax;
+  final double taxRate;
   final double lineTotal;
   const LedgerLine({
     required this.id,
@@ -15206,6 +15568,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
     required this.unitPrice,
     required this.discount,
     required this.tax,
+    required this.taxRate,
     required this.lineTotal,
   });
   @override
@@ -15227,6 +15590,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
     map['unit_price'] = Variable<double>(unitPrice);
     map['discount'] = Variable<double>(discount);
     map['tax'] = Variable<double>(tax);
+    map['tax_rate'] = Variable<double>(taxRate);
     map['line_total'] = Variable<double>(lineTotal);
     return map;
   }
@@ -15249,6 +15613,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
       unitPrice: Value(unitPrice),
       discount: Value(discount),
       tax: Value(tax),
+      taxRate: Value(taxRate),
       lineTotal: Value(lineTotal),
     );
   }
@@ -15269,6 +15634,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
       unitPrice: serializer.fromJson<double>(json['unitPrice']),
       discount: serializer.fromJson<double>(json['discount']),
       tax: serializer.fromJson<double>(json['tax']),
+      taxRate: serializer.fromJson<double>(json['taxRate']),
       lineTotal: serializer.fromJson<double>(json['lineTotal']),
     );
   }
@@ -15286,6 +15652,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
       'unitPrice': serializer.toJson<double>(unitPrice),
       'discount': serializer.toJson<double>(discount),
       'tax': serializer.toJson<double>(tax),
+      'taxRate': serializer.toJson<double>(taxRate),
       'lineTotal': serializer.toJson<double>(lineTotal),
     };
   }
@@ -15301,6 +15668,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
     double? unitPrice,
     double? discount,
     double? tax,
+    double? taxRate,
     double? lineTotal,
   }) => LedgerLine(
     id: id ?? this.id,
@@ -15313,6 +15681,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
     unitPrice: unitPrice ?? this.unitPrice,
     discount: discount ?? this.discount,
     tax: tax ?? this.tax,
+    taxRate: taxRate ?? this.taxRate,
     lineTotal: lineTotal ?? this.lineTotal,
   );
   LedgerLine copyWithCompanion(LedgerLinesCompanion data) {
@@ -15327,6 +15696,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
       unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
       discount: data.discount.present ? data.discount.value : this.discount,
       tax: data.tax.present ? data.tax.value : this.tax,
+      taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
       lineTotal: data.lineTotal.present ? data.lineTotal.value : this.lineTotal,
     );
   }
@@ -15344,6 +15714,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
+          ..write('taxRate: $taxRate, ')
           ..write('lineTotal: $lineTotal')
           ..write(')'))
         .toString();
@@ -15361,6 +15732,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
     unitPrice,
     discount,
     tax,
+    taxRate,
     lineTotal,
   );
   @override
@@ -15377,6 +15749,7 @@ class LedgerLine extends DataClass implements Insertable<LedgerLine> {
           other.unitPrice == this.unitPrice &&
           other.discount == this.discount &&
           other.tax == this.tax &&
+          other.taxRate == this.taxRate &&
           other.lineTotal == this.lineTotal);
 }
 
@@ -15391,6 +15764,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
   final Value<double> unitPrice;
   final Value<double> discount;
   final Value<double> tax;
+  final Value<double> taxRate;
   final Value<double> lineTotal;
   const LedgerLinesCompanion({
     this.id = const Value.absent(),
@@ -15403,6 +15777,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
     this.unitPrice = const Value.absent(),
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.lineTotal = const Value.absent(),
   });
   LedgerLinesCompanion.insert({
@@ -15416,6 +15791,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
     required double unitPrice,
     this.discount = const Value.absent(),
     this.tax = const Value.absent(),
+    this.taxRate = const Value.absent(),
     required double lineTotal,
   }) : entryId = Value(entryId),
        title = Value(title),
@@ -15433,6 +15809,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
     Expression<double>? unitPrice,
     Expression<double>? discount,
     Expression<double>? tax,
+    Expression<double>? taxRate,
     Expression<double>? lineTotal,
   }) {
     return RawValuesInsertable({
@@ -15446,6 +15823,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
       if (unitPrice != null) 'unit_price': unitPrice,
       if (discount != null) 'discount': discount,
       if (tax != null) 'tax': tax,
+      if (taxRate != null) 'tax_rate': taxRate,
       if (lineTotal != null) 'line_total': lineTotal,
     });
   }
@@ -15461,6 +15839,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
     Value<double>? unitPrice,
     Value<double>? discount,
     Value<double>? tax,
+    Value<double>? taxRate,
     Value<double>? lineTotal,
   }) {
     return LedgerLinesCompanion(
@@ -15474,6 +15853,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
       unitPrice: unitPrice ?? this.unitPrice,
       discount: discount ?? this.discount,
       tax: tax ?? this.tax,
+      taxRate: taxRate ?? this.taxRate,
       lineTotal: lineTotal ?? this.lineTotal,
     );
   }
@@ -15511,6 +15891,9 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
     if (tax.present) {
       map['tax'] = Variable<double>(tax.value);
     }
+    if (taxRate.present) {
+      map['tax_rate'] = Variable<double>(taxRate.value);
+    }
     if (lineTotal.present) {
       map['line_total'] = Variable<double>(lineTotal.value);
     }
@@ -15530,6 +15913,7 @@ class LedgerLinesCompanion extends UpdateCompanion<LedgerLine> {
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
           ..write('tax: $tax, ')
+          ..write('taxRate: $taxRate, ')
           ..write('lineTotal: $lineTotal')
           ..write(')'))
         .toString();
@@ -18701,6 +19085,17 @@ class $QuotationsTable extends Quotations
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -18712,6 +19107,7 @@ class $QuotationsTable extends Quotations
     status,
     notes,
     synced,
+    remoteId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -18783,6 +19179,12 @@ class $QuotationsTable extends Quotations
         synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
       );
     }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
+    }
     return context;
   }
 
@@ -18828,6 +19230,10 @@ class $QuotationsTable extends Quotations
         DriftSqlType.bool,
         data['${effectivePrefix}synced'],
       )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_id'],
+      ),
     );
   }
 
@@ -18847,6 +19253,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
   final String status;
   final String? notes;
   final bool synced;
+  final String? remoteId;
   const Quotation({
     required this.id,
     this.customerId,
@@ -18857,6 +19264,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
     required this.status,
     this.notes,
     required this.synced,
+    this.remoteId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -18876,6 +19284,9 @@ class Quotation extends DataClass implements Insertable<Quotation> {
       map['notes'] = Variable<String>(notes);
     }
     map['synced'] = Variable<bool>(synced);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
+    }
     return map;
   }
 
@@ -18896,6 +19307,9 @@ class Quotation extends DataClass implements Insertable<Quotation> {
           ? const Value.absent()
           : Value(notes),
       synced: Value(synced),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
     );
   }
 
@@ -18914,6 +19328,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
       status: serializer.fromJson<String>(json['status']),
       notes: serializer.fromJson<String?>(json['notes']),
       synced: serializer.fromJson<bool>(json['synced']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
     );
   }
   @override
@@ -18929,6 +19344,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
       'status': serializer.toJson<String>(status),
       'notes': serializer.toJson<String?>(notes),
       'synced': serializer.toJson<bool>(synced),
+      'remoteId': serializer.toJson<String?>(remoteId),
     };
   }
 
@@ -18942,6 +19358,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
     String? status,
     Value<String?> notes = const Value.absent(),
     bool? synced,
+    Value<String?> remoteId = const Value.absent(),
   }) => Quotation(
     id: id ?? this.id,
     customerId: customerId.present ? customerId.value : this.customerId,
@@ -18952,6 +19369,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
     status: status ?? this.status,
     notes: notes.present ? notes.value : this.notes,
     synced: synced ?? this.synced,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
   );
   Quotation copyWithCompanion(QuotationsCompanion data) {
     return Quotation(
@@ -18970,6 +19388,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
       status: data.status.present ? data.status.value : this.status,
       notes: data.notes.present ? data.notes.value : this.notes,
       synced: data.synced.present ? data.synced.value : this.synced,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
     );
   }
 
@@ -18984,7 +19403,8 @@ class Quotation extends DataClass implements Insertable<Quotation> {
           ..write('totalAmount: $totalAmount, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
-          ..write('synced: $synced')
+          ..write('synced: $synced, ')
+          ..write('remoteId: $remoteId')
           ..write(')'))
         .toString();
   }
@@ -19000,6 +19420,7 @@ class Quotation extends DataClass implements Insertable<Quotation> {
     status,
     notes,
     synced,
+    remoteId,
   );
   @override
   bool operator ==(Object other) =>
@@ -19013,7 +19434,8 @@ class Quotation extends DataClass implements Insertable<Quotation> {
           other.totalAmount == this.totalAmount &&
           other.status == this.status &&
           other.notes == this.notes &&
-          other.synced == this.synced);
+          other.synced == this.synced &&
+          other.remoteId == this.remoteId);
 }
 
 class QuotationsCompanion extends UpdateCompanion<Quotation> {
@@ -19026,6 +19448,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
   final Value<String> status;
   final Value<String?> notes;
   final Value<bool> synced;
+  final Value<String?> remoteId;
   final Value<int> rowid;
   const QuotationsCompanion({
     this.id = const Value.absent(),
@@ -19037,6 +19460,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
     this.synced = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   QuotationsCompanion.insert({
@@ -19049,6 +19473,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
     this.synced = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : number = Value(number),
        totalAmount = Value(totalAmount);
@@ -19062,6 +19487,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
     Expression<String>? status,
     Expression<String>? notes,
     Expression<bool>? synced,
+    Expression<String>? remoteId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -19074,6 +19500,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
       if (status != null) 'status': status,
       if (notes != null) 'notes': notes,
       if (synced != null) 'synced': synced,
+      if (remoteId != null) 'remote_id': remoteId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -19088,6 +19515,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
     Value<String>? status,
     Value<String?>? notes,
     Value<bool>? synced,
+    Value<String?>? remoteId,
     Value<int>? rowid,
   }) {
     return QuotationsCompanion(
@@ -19100,6 +19528,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
       status: status ?? this.status,
       notes: notes ?? this.notes,
       synced: synced ?? this.synced,
+      remoteId: remoteId ?? this.remoteId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -19134,6 +19563,9 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
     if (synced.present) {
       map['synced'] = Variable<bool>(synced.value);
     }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -19152,6 +19584,7 @@ class QuotationsCompanion extends UpdateCompanion<Quotation> {
           ..write('status: $status, ')
           ..write('notes: $notes, ')
           ..write('synced: $synced, ')
+          ..write('remoteId: $remoteId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -25660,6 +26093,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<bool> refundable,
       Value<bool> cashOnDelivery,
       Value<int?> lowStockWarning,
+      Value<double?> taxRate,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -25697,6 +26131,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<bool> refundable,
       Value<bool> cashOnDelivery,
       Value<int?> lowStockWarning,
+      Value<double?> taxRate,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -25959,6 +26394,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get lowStockWarning => $composableBuilder(
     column: $table.lowStockWarning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26262,6 +26702,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -26406,6 +26851,9 @@ class $$ItemsTableAnnotationComposer
     column: $table.lowStockWarning,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get taxRate =>
+      $composableBuilder(column: $table.taxRate, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -26604,6 +27052,7 @@ class $$ItemsTableTableManager
                 Value<bool> refundable = const Value.absent(),
                 Value<bool> cashOnDelivery = const Value.absent(),
                 Value<int?> lowStockWarning = const Value.absent(),
+                Value<double?> taxRate = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -26639,6 +27088,7 @@ class $$ItemsTableTableManager
                 refundable: refundable,
                 cashOnDelivery: cashOnDelivery,
                 lowStockWarning: lowStockWarning,
+                taxRate: taxRate,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -26676,6 +27126,7 @@ class $$ItemsTableTableManager
                 Value<bool> refundable = const Value.absent(),
                 Value<bool> cashOnDelivery = const Value.absent(),
                 Value<int?> lowStockWarning = const Value.absent(),
+                Value<double?> taxRate = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -26711,6 +27162,7 @@ class $$ItemsTableTableManager
                 refundable: refundable,
                 cashOnDelivery: cashOnDelivery,
                 lowStockWarning: lowStockWarning,
+                taxRate: taxRate,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -35648,6 +36100,10 @@ typedef $$BusinessProfilesTableCreateCompanionBuilder =
       Value<String?> receiptPaymentMethodsJson,
       Value<String?> deliveryProfileJson,
       Value<int> verificationStatus,
+      Value<bool> taxEnabled,
+      Value<double> taxRate,
+      Value<String> taxLabel,
+      Value<String> taxInclusionMode,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -35686,6 +36142,10 @@ typedef $$BusinessProfilesTableUpdateCompanionBuilder =
       Value<String?> receiptPaymentMethodsJson,
       Value<String?> deliveryProfileJson,
       Value<int> verificationStatus,
+      Value<bool> taxEnabled,
+      Value<double> taxRate,
+      Value<String> taxLabel,
+      Value<String> taxInclusionMode,
       Value<DateTime> updatedAt,
       Value<bool> synced,
       Value<int> rowid,
@@ -35857,6 +36317,26 @@ class $$BusinessProfilesTableFilterComposer
 
   ColumnFilters<int> get verificationStatus => $composableBuilder(
     column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get taxEnabled => $composableBuilder(
+    column: $table.taxEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taxLabel => $composableBuilder(
+    column: $table.taxLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get taxInclusionMode => $composableBuilder(
+    column: $table.taxInclusionMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -36040,6 +36520,26 @@ class $$BusinessProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get taxEnabled => $composableBuilder(
+    column: $table.taxEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taxLabel => $composableBuilder(
+    column: $table.taxLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get taxInclusionMode => $composableBuilder(
+    column: $table.taxInclusionMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -36202,6 +36702,22 @@ class $$BusinessProfilesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get taxEnabled => $composableBuilder(
+    column: $table.taxEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get taxRate =>
+      $composableBuilder(column: $table.taxRate, builder: (column) => column);
+
+  GeneratedColumn<String> get taxLabel =>
+      $composableBuilder(column: $table.taxLabel, builder: (column) => column);
+
+  GeneratedColumn<String> get taxInclusionMode => $composableBuilder(
+    column: $table.taxInclusionMode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -36278,6 +36794,10 @@ class $$BusinessProfilesTableTableManager
                 Value<String?> receiptPaymentMethodsJson = const Value.absent(),
                 Value<String?> deliveryProfileJson = const Value.absent(),
                 Value<int> verificationStatus = const Value.absent(),
+                Value<bool> taxEnabled = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
+                Value<String> taxLabel = const Value.absent(),
+                Value<String> taxInclusionMode = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -36314,6 +36834,10 @@ class $$BusinessProfilesTableTableManager
                 receiptPaymentMethodsJson: receiptPaymentMethodsJson,
                 deliveryProfileJson: deliveryProfileJson,
                 verificationStatus: verificationStatus,
+                taxEnabled: taxEnabled,
+                taxRate: taxRate,
+                taxLabel: taxLabel,
+                taxInclusionMode: taxInclusionMode,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -36352,6 +36876,10 @@ class $$BusinessProfilesTableTableManager
                 Value<String?> receiptPaymentMethodsJson = const Value.absent(),
                 Value<String?> deliveryProfileJson = const Value.absent(),
                 Value<int> verificationStatus = const Value.absent(),
+                Value<bool> taxEnabled = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
+                Value<String> taxLabel = const Value.absent(),
+                Value<String> taxInclusionMode = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -36388,6 +36916,10 @@ class $$BusinessProfilesTableTableManager
                 receiptPaymentMethodsJson: receiptPaymentMethodsJson,
                 deliveryProfileJson: deliveryProfileJson,
                 verificationStatus: verificationStatus,
+                taxEnabled: taxEnabled,
+                taxRate: taxRate,
+                taxLabel: taxLabel,
+                taxInclusionMode: taxInclusionMode,
                 updatedAt: updatedAt,
                 synced: synced,
                 rowid: rowid,
@@ -36592,10 +37124,12 @@ typedef $$LedgerEntriesTableCreateCompanionBuilder =
       Value<double> subtotal,
       Value<double> discount,
       Value<double> tax,
+      Value<double> taxRate,
       Value<double> total,
       Value<String?> note,
       Value<bool> synced,
       Value<String?> remoteAck,
+      Value<String?> remoteId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -36612,10 +37146,12 @@ typedef $$LedgerEntriesTableUpdateCompanionBuilder =
       Value<double> subtotal,
       Value<double> discount,
       Value<double> tax,
+      Value<double> taxRate,
       Value<double> total,
       Value<String?> note,
       Value<bool> synced,
       Value<String?> remoteAck,
+      Value<String?> remoteId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -36774,6 +37310,11 @@ class $$LedgerEntriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get total => $composableBuilder(
     column: $table.total,
     builder: (column) => ColumnFilters(column),
@@ -36791,6 +37332,11 @@ class $$LedgerEntriesTableFilterComposer
 
   ColumnFilters<String> get remoteAck => $composableBuilder(
     column: $table.remoteAck,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -36968,6 +37514,11 @@ class $$LedgerEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get total => $composableBuilder(
     column: $table.total,
     builder: (column) => ColumnOrderings(column),
@@ -36985,6 +37536,11 @@ class $$LedgerEntriesTableOrderingComposer
 
   ColumnOrderings<String> get remoteAck => $composableBuilder(
     column: $table.remoteAck,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -37102,6 +37658,9 @@ class $$LedgerEntriesTableAnnotationComposer
   GeneratedColumn<double> get tax =>
       $composableBuilder(column: $table.tax, builder: (column) => column);
 
+  GeneratedColumn<double> get taxRate =>
+      $composableBuilder(column: $table.taxRate, builder: (column) => column);
+
   GeneratedColumn<double> get total =>
       $composableBuilder(column: $table.total, builder: (column) => column);
 
@@ -37113,6 +37672,9 @@ class $$LedgerEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get remoteAck =>
       $composableBuilder(column: $table.remoteAck, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -37282,10 +37844,12 @@ class $$LedgerEntriesTableTableManager
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
                 Value<double> total = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<String?> remoteAck = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LedgerEntriesCompanion(
@@ -37300,10 +37864,12 @@ class $$LedgerEntriesTableTableManager
                 subtotal: subtotal,
                 discount: discount,
                 tax: tax,
+                taxRate: taxRate,
                 total: total,
                 note: note,
                 synced: synced,
                 remoteAck: remoteAck,
+                remoteId: remoteId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -37320,10 +37886,12 @@ class $$LedgerEntriesTableTableManager
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
                 Value<double> total = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<String?> remoteAck = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LedgerEntriesCompanion.insert(
@@ -37338,10 +37906,12 @@ class $$LedgerEntriesTableTableManager
                 subtotal: subtotal,
                 discount: discount,
                 tax: tax,
+                taxRate: taxRate,
                 total: total,
                 note: note,
                 synced: synced,
                 remoteAck: remoteAck,
+                remoteId: remoteId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -37515,6 +38085,7 @@ typedef $$LedgerLinesTableCreateCompanionBuilder =
       required double unitPrice,
       Value<double> discount,
       Value<double> tax,
+      Value<double> taxRate,
       required double lineTotal,
     });
 typedef $$LedgerLinesTableUpdateCompanionBuilder =
@@ -37529,6 +38100,7 @@ typedef $$LedgerLinesTableUpdateCompanionBuilder =
       Value<double> unitPrice,
       Value<double> discount,
       Value<double> tax,
+      Value<double> taxRate,
       Value<double> lineTotal,
     });
 
@@ -37634,6 +38206,11 @@ class $$LedgerLinesTableFilterComposer
 
   ColumnFilters<double> get tax => $composableBuilder(
     column: $table.tax,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -37756,6 +38333,11 @@ class $$LedgerLinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get taxRate => $composableBuilder(
+    column: $table.taxRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get lineTotal => $composableBuilder(
     column: $table.lineTotal,
     builder: (column) => ColumnOrderings(column),
@@ -37860,6 +38442,9 @@ class $$LedgerLinesTableAnnotationComposer
 
   GeneratedColumn<double> get tax =>
       $composableBuilder(column: $table.tax, builder: (column) => column);
+
+  GeneratedColumn<double> get taxRate =>
+      $composableBuilder(column: $table.taxRate, builder: (column) => column);
 
   GeneratedColumn<double> get lineTotal =>
       $composableBuilder(column: $table.lineTotal, builder: (column) => column);
@@ -37972,6 +38557,7 @@ class $$LedgerLinesTableTableManager
                 Value<double> unitPrice = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
                 Value<double> lineTotal = const Value.absent(),
               }) => LedgerLinesCompanion(
                 id: id,
@@ -37984,6 +38570,7 @@ class $$LedgerLinesTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 tax: tax,
+                taxRate: taxRate,
                 lineTotal: lineTotal,
               ),
           createCompanionCallback:
@@ -37998,6 +38585,7 @@ class $$LedgerLinesTableTableManager
                 required double unitPrice,
                 Value<double> discount = const Value.absent(),
                 Value<double> tax = const Value.absent(),
+                Value<double> taxRate = const Value.absent(),
                 required double lineTotal,
               }) => LedgerLinesCompanion.insert(
                 id: id,
@@ -38010,6 +38598,7 @@ class $$LedgerLinesTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 tax: tax,
+                taxRate: taxRate,
                 lineTotal: lineTotal,
               ),
           withReferenceMapper: (p0) => p0
@@ -40645,6 +41234,7 @@ typedef $$QuotationsTableCreateCompanionBuilder =
       Value<String> status,
       Value<String?> notes,
       Value<bool> synced,
+      Value<String?> remoteId,
       Value<int> rowid,
     });
 typedef $$QuotationsTableUpdateCompanionBuilder =
@@ -40658,6 +41248,7 @@ typedef $$QuotationsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String?> notes,
       Value<bool> synced,
+      Value<String?> remoteId,
       Value<int> rowid,
     });
 
@@ -40752,6 +41343,11 @@ class $$QuotationsTableFilterComposer
 
   ColumnFilters<bool> get synced => $composableBuilder(
     column: $table.synced,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -40853,6 +41449,11 @@ class $$QuotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CustomersTableOrderingComposer get customerId {
     final $$CustomersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -40913,6 +41514,9 @@ class $$QuotationsTableAnnotationComposer
 
   GeneratedColumn<bool> get synced =>
       $composableBuilder(column: $table.synced, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
 
   $$CustomersTableAnnotationComposer get customerId {
     final $$CustomersTableAnnotationComposer composer = $composerBuilder(
@@ -41000,6 +41604,7 @@ class $$QuotationsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotationsCompanion(
                 id: id,
@@ -41011,6 +41616,7 @@ class $$QuotationsTableTableManager
                 status: status,
                 notes: notes,
                 synced: synced,
+                remoteId: remoteId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -41024,6 +41630,7 @@ class $$QuotationsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
+                Value<String?> remoteId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotationsCompanion.insert(
                 id: id,
@@ -41035,6 +41642,7 @@ class $$QuotationsTableTableManager
                 status: status,
                 notes: notes,
                 synced: synced,
+                remoteId: remoteId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

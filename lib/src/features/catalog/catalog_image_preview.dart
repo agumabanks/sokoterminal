@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/db/app_database.dart';
 import '../../widgets/offline_cached_image.dart';
 import 'catalog_template.dart';
+import '../../core/theme/design_tokens.dart';
 
 /// Social-media-friendly catalog preview rendered off-screen for PNG export.
 ///
@@ -65,7 +66,7 @@ class CatalogImagePreview extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F1D40), Color(0xFF1A2E5A)],
+          colors: [DesignTokens.brandPrimary, Color(0xFF1A2E5A)],
         ),
       ),
       child: Column(
@@ -197,7 +198,7 @@ class CatalogImagePreview extends StatelessWidget {
       width: width,
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: DesignTokens.canvasCloud,
         border: Border(top: BorderSide(color: Colors.grey.shade300)),
       ),
       child: Column(
@@ -209,7 +210,7 @@ class CatalogImagePreview extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F1D40),
+                    color: DesignTokens.brandPrimary,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -251,7 +252,7 @@ class CatalogImagePreview extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF0EBE7E),
+                  color: DesignTokens.brandAccent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -317,10 +318,10 @@ class _FooterAction extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F1D40).withValues(alpha: 0.08),
+            color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: const Color(0xFF0F1D40), size: 22),
+          child: Icon(icon, color: DesignTokens.brandPrimary, size: 22),
         ),
         const SizedBox(height: 6),
         Text(
@@ -416,7 +417,7 @@ class _StoryLayout extends StatelessWidget {
     return Container(
       width: width,
       padding: EdgeInsets.all(padding),
-      color: const Color(0xFF0F1D40),
+      color: DesignTokens.brandPrimary,
       child: Column(
         children: entries.map((e) => _StoryCard(entry: e, width: width - padding * 2)).toList(),
       ),
@@ -440,7 +441,7 @@ class _MinimalLayout extends StatelessWidget {
     return Container(
       width: width,
       padding: EdgeInsets.all(padding),
-      color: const Color(0xFFFAFAFA),
+      color: DesignTokens.canvasCloud,
       child: Column(
         children: entries.map((e) => _MinimalCard(entry: e, width: width - padding * 2)).toList(),
       ),
@@ -460,7 +461,7 @@ class _HeroCard extends StatelessWidget {
     return Container(
       width: width,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: DesignTokens.canvasCloud,
         borderRadius: BorderRadius.circular(24),
       ),
       clipBehavior: Clip.antiAlias,
@@ -473,7 +474,7 @@ class _HeroCard extends StatelessWidget {
             child: Container(
               width: width,
               height: width * 0.55,
-              color: const Color(0xFFEEEEEE),
+              color: DesignTokens.canvasCloud,
               child: entry.imageUrl != null && entry.imageUrl!.trim().isNotEmpty
                   ? OfflineCachedImage(
                       imageUrl: entry.imageUrl!.trim(),
@@ -486,7 +487,7 @@ class _HeroCard extends StatelessWidget {
                         entry.isService ? 'SERVICE' : 'PRODUCT',
                         style: const TextStyle(
                           fontSize: 18,
-                          color: Color(0xFF999999),
+                          color: DesignTokens.inkMuted,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -524,7 +525,7 @@ class _HeroCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1A2E),
+                          color: DesignTokens.brandPrimary,
                           height: 1.2,
                         ),
                       ),
@@ -540,12 +541,12 @@ class _HeroCard extends StatelessWidget {
                       if (entry.unit != null)
                         Text(
                           'per ${entry.unit}',
-                          style: const TextStyle(fontSize: 16, color: Color(0xFF999999)),
+                          style: const TextStyle(fontSize: 16, color: DesignTokens.inkMuted),
                         ),
                       if (entry.duration != null)
                         Text(
                           '${entry.duration} min',
-                          style: const TextStyle(fontSize: 16, color: Color(0xFF999999)),
+                          style: const TextStyle(fontSize: 16, color: DesignTokens.inkMuted),
                         ),
                     ],
                   ),
@@ -569,7 +570,7 @@ class _GridCard extends StatelessWidget {
     return Container(
       width: width,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: DesignTokens.canvasCloud,
         borderRadius: BorderRadius.circular(20),
       ),
       clipBehavior: Clip.antiAlias,
@@ -581,7 +582,7 @@ class _GridCard extends StatelessWidget {
             child: Container(
               width: width,
               height: width * 0.9,
-              color: const Color(0xFFEEEEEE),
+              color: DesignTokens.canvasCloud,
               child: entry.imageUrl != null && entry.imageUrl!.trim().isNotEmpty
                   ? OfflineCachedImage(
                       imageUrl: entry.imageUrl!.trim(),
@@ -594,7 +595,7 @@ class _GridCard extends StatelessWidget {
                         entry.isService ? 'SERVICE' : 'PRODUCT',
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF999999),
+                          color: DesignTokens.inkMuted,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -630,7 +631,7 @@ class _GridCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A2E),
+                    color: DesignTokens.brandPrimary,
                     height: 1.3,
                   ),
                 ),
@@ -646,12 +647,12 @@ class _GridCard extends StatelessWidget {
                 if (entry.unit != null)
                   Text(
                     'per ${entry.unit}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                    style: const TextStyle(fontSize: 12, color: DesignTokens.inkMuted),
                   ),
                 if (entry.duration != null)
                   Text(
                     '${entry.duration} min',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF999999)),
+                    style: const TextStyle(fontSize: 12, color: DesignTokens.inkMuted),
                   ),
               ],
             ),
@@ -685,7 +686,7 @@ class _StoryCard extends StatelessWidget {
               Container(
                 width: width,
                 height: width * 0.75,
-                color: const Color(0xFFEEEEEE),
+                color: DesignTokens.canvasCloud,
                 child: entry.imageUrl != null && entry.imageUrl!.trim().isNotEmpty
                     ? OfflineCachedImage(
                         imageUrl: entry.imageUrl!.trim(),
@@ -698,7 +699,7 @@ class _StoryCard extends StatelessWidget {
                           entry.isService ? 'SERVICE' : 'PRODUCT',
                           style: const TextStyle(
                             fontSize: 16,
-                            color: Color(0xFF999999),
+                            color: DesignTokens.inkMuted,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -738,7 +739,7 @@ class _StoryCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0EBE7E),
+                          color: DesignTokens.brandAccent,
                         ),
                       ),
                     ],
@@ -771,7 +772,7 @@ class _MinimalCard extends StatelessWidget {
             child: Container(
               width: width * 0.42,
               height: width * 0.42,
-              color: const Color(0xFFEEEEEE),
+              color: DesignTokens.canvasCloud,
               child: entry.imageUrl != null && entry.imageUrl!.trim().isNotEmpty
                   ? OfflineCachedImage(
                       imageUrl: entry.imageUrl!.trim(),
@@ -784,7 +785,7 @@ class _MinimalCard extends StatelessWidget {
                         entry.isService ? 'SERVICE' : 'PRODUCT',
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF999999),
+                          color: DesignTokens.inkMuted,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -818,7 +819,7 @@ class _MinimalCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A2E),
+                    color: DesignTokens.brandPrimary,
                     height: 1.2,
                   ),
                 ),
@@ -834,12 +835,12 @@ class _MinimalCard extends StatelessWidget {
                 if (entry.unit != null)
                   Text(
                     'per ${entry.unit}',
-                    style: const TextStyle(fontSize: 15, color: Color(0xFF999999)),
+                    style: const TextStyle(fontSize: 15, color: DesignTokens.inkMuted),
                   ),
                 if (entry.duration != null)
                   Text(
                     '${entry.duration} min',
-                    style: const TextStyle(fontSize: 15, color: Color(0xFF999999)),
+                    style: const TextStyle(fontSize: 15, color: DesignTokens.inkMuted),
                   ),
               ],
             ),

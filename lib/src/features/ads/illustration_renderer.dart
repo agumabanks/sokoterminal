@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import 'ad_templates.dart';
 
 /// Renders vector-style illustration elements by [assetId].
 class IllustrationRenderer extends StatelessWidget {

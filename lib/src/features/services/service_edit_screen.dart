@@ -21,9 +21,15 @@ import '../../core/util/service_pricing_utils.dart';
 import '../../core/util/service_publish_utils.dart';
 import 'service_categories_provider.dart';
 import 'service_package_tiers_section.dart';
+import '../bnpl/models/bnpl_seller_status.dart';
+import '../bnpl/models/service_bnpl_payload.dart';
+import '../bnpl/providers/bnpl_seller_status_provider.dart';
+import '../bnpl/providers/service_bnpl_provider.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/html_editor.dart';
+import '../ads/studio_editor_launcher.dart';
+import '../items/gallery_picker_screen.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../../widgets/service_description_article.dart';
 
@@ -46,6 +52,37 @@ const _serviceTypes = <String, String>{
   'onsite': 'On-site',
   'hybrid': 'Hybrid',
 };
+
+/// Helper to unify remote and local gallery items in the service editor grid.
+class _GalleryItem {
+  const _GalleryItem._({
+    required this.isRemote,
+    required this.index,
+    this.remoteUrl,
+    this.localFile,
+  });
+
+  factory _GalleryItem.remote(String url, int index) {
+    return _GalleryItem._(
+      isRemote: true,
+      index: index,
+      remoteUrl: url,
+    );
+  }
+
+  factory _GalleryItem.local(File file, int index) {
+    return _GalleryItem._(
+      isRemote: false,
+      index: index,
+      localFile: file,
+    );
+  }
+
+  final bool isRemote;
+  final int index;
+  final String? remoteUrl;
+  final File? localFile;
+}
 
 /// Full-screen service create/edit form — mirrors the product editor UX.
 class ServiceEditScreen extends ConsumerStatefulWidget {
@@ -83,10 +120,17 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
   bool _publishOnline = true;
   bool _isSaving = false;
 
+  // BNPL
+  bool _bnplEnabled = false;
+  final _bnplMinCtrl = TextEditingController();
+  final _bnplMaxCtrl = TextEditingController();
+  final _bnplInstallmentCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _hydrateFromExisting();
+    unawaited(_loadBnplSettingsIfNeeded());
   }
 
   void _hydrateFromExisting() {
@@ -142,6 +186,31 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     }
   }
 
+  Future<void> _loadBnplSettingsIfNeeded() async {
+    final serviceId = widget.existingService?.remoteId;
+    if (serviceId == null) return;
+
+    try {
+      final payload = await ref.read(serviceBnplProvider(serviceId).future);
+      if (payload == null || !mounted) return;
+
+      setState(() {
+        _bnplEnabled = payload.enabled;
+        _bnplMinCtrl.text = payload.minOrderAmount != null
+            ? CommaNumberFormatter.format(payload.minOrderAmount!.toStringAsFixed(0))
+            : '';
+        _bnplMaxCtrl.text = payload.maxOrderAmount != null
+            ? CommaNumberFormatter.format(payload.maxOrderAmount!.toStringAsFixed(0))
+            : '';
+        _bnplInstallmentCtrl.text = payload.installmentCount != null
+            ? payload.installmentCount.toString()
+            : '';
+      });
+    } catch (_) {
+      // Best effort — backend may not have the endpoint yet.
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -150,6 +219,9 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     _priceCtrl.dispose();
     _costCtrl.dispose();
     _durationCtrl.dispose();
+    _bnplMinCtrl.dispose();
+    _bnplMaxCtrl.dispose();
+    _bnplInstallmentCtrl.dispose();
     super.dispose();
   }
 
@@ -162,7 +234,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
           CommaNumberFormatter.unformat(_priceCtrl.text.trim()),
         ) ??
         0;
-    return title.isNotEmpty && price > 0 && !_isSaving;
+    return title.isNotEmpty &&
+        price > 0 &&
+        _publishChecklistComplete &&
+        !_isSaving;
   }
 
   bool get _publishChecklistComplete =>
@@ -226,17 +301,47 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     final ok = await _requestImagePermission(camera: false);
     if (!ok || !mounted) return;
 
-    final picker = ImagePicker();
-    final images = await picker.pickMultiImage(imageQuality: 95);
-    if (images.isEmpty || !mounted) return;
-
-    final files = <File>[];
-    for (final x in images) {
-      final cropped = await cropProductImage(File(x.path));
-      if (cropped != null) files.add(cropped);
-    }
-    if (files.isEmpty || !mounted) return;
+    final files = await Navigator.push<List<File>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const GalleryPickerScreen(),
+      ),
+    );
+    if (files == null || files.isEmpty || !mounted) return;
     setState(() => _galleryFiles.addAll(files));
+  }
+
+  Future<void> _designCoverInStudio() async {
+    final title = _titleCtrl.text.trim();
+    final price = double.tryParse(
+      CommaNumberFormatter.unformat(_priceCtrl.text.trim()),
+    );
+    final tempService = Service(
+      id: widget.existingService?.id ?? const Uuid().v4(),
+      title: title.isEmpty ? 'New Service' : title,
+      price: price ?? 0,
+      publishedOnline: _publishOnline,
+      updatedAt: DateTime.now().toUtc(),
+      synced: false,
+      imageUrl: _coverUrl,
+      category: _categoryName,
+      remoteId: widget.existingService?.remoteId,
+    );
+    final file = await launchStudioForService(
+      context,
+      ref,
+      service: tempService,
+    );
+    if (file != null && mounted) {
+      setState(() {
+        _coverFile = file;
+        _coverUrl = file.path;
+        _coverUploadId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cover designed in Studio')),
+      );
+    }
   }
 
   void _removeCover() {
@@ -341,10 +446,19 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             ListTile(
               leading: const Icon(Icons.collections_outlined),
               title: const Text('Add gallery photos'),
-              subtitle: const Text('Showcase multiple angles'),
+              subtitle: const Text('Grid multi-select from device'),
               onTap: () {
                 Navigator.pop(context);
                 unawaited(_pickGalleryImages());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome_rounded, color: DesignTokens.brandAccent),
+              title: const Text('Design cover in Studio'),
+              subtitle: const Text('Create a promo image with your service details'),
+              onTap: () {
+                Navigator.pop(context);
+                unawaited(_designCoverInStudio());
               },
             ),
             if (_hasCover)
@@ -472,6 +586,28 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
         opType: opType,
       );
       unawaited(sync.syncCatalogImmediately());
+
+      // Push BNPL settings to the server when editing an already-synced service.
+      final serviceId = service?.remoteId;
+      if (serviceId != null) {
+        try {
+          final bnplPayload = ServiceBnplPayload(
+            enabled: _bnplEnabled,
+            minOrderAmount: _bnplMinCtrl.text.isEmpty
+                ? null
+                : double.tryParse(CommaNumberFormatter.unformat(_bnplMinCtrl.text)),
+            maxOrderAmount: _bnplMaxCtrl.text.isEmpty
+                ? null
+                : double.tryParse(CommaNumberFormatter.unformat(_bnplMaxCtrl.text)),
+            installmentCount: _bnplInstallmentCtrl.text.isEmpty
+                ? null
+                : int.tryParse(CommaNumberFormatter.unformat(_bnplInstallmentCtrl.text)),
+          );
+          await ref.read(sellerApiProvider).updateServiceBnpl(serviceId, bnplPayload);
+        } catch (e) {
+          debugPrint('[ServiceEditScreen] BNPL update failed: $e');
+        }
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -505,6 +641,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final narrow = screenWidth < 380;
+    final bnplStatus = ref.watch(bnplSellerStatusProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: DesignTokens.surfaceGrouped,
@@ -635,6 +772,13 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                       ],
                     ],
                   ),
+                ),
+                const SizedBox(height: 8),
+                _buildSection(
+                  icon: Icons.payments_outlined,
+                  title: 'Sanaa Finance BNPL',
+                  subtitle: 'Let buyers pay later',
+                  child: _buildBnplSection(bnplStatus),
                 ),
                 const SizedBox(height: 8),
                 _buildSection(
@@ -846,100 +990,139 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
 
   Widget _buildGalleryStrip() {
     final total = _galleryUrls.length + _galleryFiles.length;
+    final items = <_GalleryItem>[];
+    for (var i = 0; i < _galleryUrls.length; i++) {
+      items.add(_GalleryItem.remote(_galleryUrls[i], i));
+    }
+    for (var i = 0; i < _galleryFiles.length; i++) {
+      items.add(_GalleryItem.local(_galleryFiles[i], i));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Gallery photos', style: DesignTokens.textSmallBold),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Gallery photos', style: DesignTokens.textSmallBold),
+              if (total > 0)
+                Text('$total added', style: DesignTokens.textSmall),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 80,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: total + 1,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1,
+            ),
+            itemCount: items.length + 1,
             itemBuilder: (context, i) {
-              if (i == total) {
+              if (i == items.length) {
                 return GestureDetector(
                   onTap: _pickGalleryImages,
                   child: Container(
-                    width: 70,
                     decoration: BoxDecoration(
                       border: Border.all(
                         color: DesignTokens.brandPrimary.withValues(alpha: 0.4),
                       ),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                       color: DesignTokens.brandPrimary.withValues(alpha: 0.04),
                     ),
-                    child: const Icon(Icons.add, color: DesignTokens.brandPrimary),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add, color: DesignTokens.brandPrimary),
+                        SizedBox(height: 4),
+                        Text(
+                          'Add',
+                          style: TextStyle(
+                            color: DesignTokens.brandPrimary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
-              final isRemote = i < _galleryUrls.length;
-              final fileIndex = i - _galleryUrls.length;
+
+              final item = items[i];
               return GestureDetector(
-                onLongPress: () {
-                  if (isRemote) {
-                    _setGalleryUrlAsCover(i);
-                  } else {
-                    _setGalleryFileAsCover(fileIndex);
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Set as main photo'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                },
+                onTap: () => _showGalleryItemMenu(item),
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
                     Container(
-                      width: 70,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isRemote
+                          color: item.isRemote
                               ? DesignTokens.brandAccent.withValues(alpha: 0.6)
                               : DesignTokens.hairline,
                           width: 2,
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: isRemote
+                        borderRadius: BorderRadius.circular(8),
+                        child: item.isRemote
                             ? OfflineCachedImage(
-                                imageUrl: _galleryUrls[i],
-                                width: 70,
-                                height: 80,
+                                imageUrl: item.remoteUrl!,
                                 fit: BoxFit.cover,
                                 errorWidget: const SizedBox(),
                               )
                             : Image.file(
-                                _galleryFiles[fileIndex],
-                                width: 70,
-                                height: 80,
+                                item.localFile!,
                                 fit: BoxFit.cover,
                               ),
                       ),
                     ),
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: GestureDetector(
-                        onTap: () => isRemote
-                            ? _removeGalleryUrl(i)
-                            : _removeGalleryFile(fileIndex),
+                    if (!item.isRemote)
+                      Positioned(
+                        top: 6,
+                        left: 6,
                         child: Container(
-                          padding: const EdgeInsets.all(2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DesignTokens.warning,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Pending',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => item.isRemote
+                            ? _removeGalleryUrl(item.index)
+                            : _removeGalleryFile(item.index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
                             color: Colors.black54,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Colors.white),
                         ),
                       ),
                     ),
@@ -950,6 +1133,86 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showGalleryItemMenu(_GalleryItem item) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.preview_outlined),
+              title: const Text('Preview'),
+              onTap: () {
+                Navigator.pop(context);
+                _previewImage(item);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_outlined,
+                  color: DesignTokens.brandPrimary),
+              title: const Text('Set as main photo'),
+              onTap: () {
+                Navigator.pop(context);
+                if (item.isRemote) {
+                  _setGalleryUrlAsCover(item.index);
+                } else {
+                  _setGalleryFileAsCover(item.index);
+                }
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: DesignTokens.error),
+              title: Text('Remove', style: TextStyle(color: DesignTokens.error)),
+              onTap: () {
+                Navigator.pop(context);
+                item.isRemote
+                    ? _removeGalleryUrl(item.index)
+                    : _removeGalleryFile(item.index);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _previewImage(_GalleryItem item) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              child: item.isRemote
+                  ? OfflineCachedImage(
+                      imageUrl: item.remoteUrl!,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      height: double.infinity,
+                    )
+                  : Image.file(item.localFile!, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1243,7 +1506,12 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
           Switch.adaptive(
             value: _publishOnline,
             activeTrackColor: DesignTokens.brandAccent,
-            onChanged: (value) => setState(() => _publishOnline = value),
+            onChanged: (value) => setState(() {
+              _publishOnline = value;
+              if (value) {
+                _moderationStatus = 'pending';
+              }
+            }),
           ),
         ],
       ),
@@ -1271,6 +1539,97 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBnplSection(BnplSellerStatus? status) {
+    final active = status?.isActive ?? false;
+    final disabledHint = status == null
+        ? 'Loading BNPL status…'
+        : switch (status.status) {
+            'pending' => 'Enrollment pending — BNPL will unlock once approved.',
+            'suspended' => 'BNPL access is suspended.',
+            'active' => null,
+            _ => 'Request Sanaa Finance BNPL enrollment to enable this option.',
+          };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Allow BNPL / Pay Later',
+                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    active
+                        ? 'Customers can buy now and pay later for this service'
+                        : (disabledHint ?? 'Enable BNPL to use this option'),
+                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: _bnplEnabled,
+              onChanged: active
+                  ? (value) => setState(() => _bnplEnabled = value)
+                  : (_) {},
+              activeTrackColor: DesignTokens.brandAccent,
+              activeThumbColor: DesignTokens.brandAccent,
+            ),
+          ],
+        ),
+        if (!active && disabledHint != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            disabledHint,
+            style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+          ),
+        ],
+        if (active && _bnplEnabled) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: AppInput(
+                  controller: _bnplMinCtrl,
+                  label: 'Min order amount (UGX)',
+                  hint: '10,000',
+                  prefixIcon: Icons.arrow_downward_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppInput(
+                  controller: _bnplMaxCtrl,
+                  label: 'Max order amount (UGX)',
+                  hint: '500,000',
+                  prefixIcon: Icons.arrow_upward_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AppInput(
+            controller: _bnplInstallmentCtrl,
+            label: 'Installment count (optional)',
+            hint: 'e.g. 3',
+            prefixIcon: Icons.calendar_today_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: const [CommaNumberFormatter()],
+          ),
+        ],
+      ],
     );
   }
 

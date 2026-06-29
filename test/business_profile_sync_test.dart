@@ -145,6 +145,10 @@ void main() {
           '{"cash":true,"bank_transfer":true,"mobile_money":true}',
       deliveryProfileJson: '{"enabled":true,"pricing_mode":"flat"}',
       verificationStatus: 0,
+      taxEnabled: false,
+      taxRate: 0,
+      taxLabel: 'VAT',
+      taxInclusionMode: 'exclusive',
       updatedAt: DateTime.utc(2026, 3, 7),
       synced: true,
     );

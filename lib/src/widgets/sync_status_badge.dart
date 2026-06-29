@@ -113,54 +113,6 @@ class SyncStatusBadge extends ConsumerWidget {
     );
   }
 
-  Color _getBackgroundColor(SyncStatus status) {
-    switch (status) {
-      case SyncStatus.synced:
-        return DesignTokens.success.withValues(alpha: 0.15);
-      case SyncStatus.pending:
-      case SyncStatus.syncing:
-        return DesignTokens.warning.withValues(alpha: 0.15);
-      case SyncStatus.failed:
-        return DesignTokens.error.withValues(alpha: 0.15);
-    }
-  }
-
-  Color _getTextColor(SyncStatus status) {
-    switch (status) {
-      case SyncStatus.synced:
-        return DesignTokens.success;
-      case SyncStatus.pending:
-      case SyncStatus.syncing:
-        return DesignTokens.warning;
-      case SyncStatus.failed:
-        return DesignTokens.error;
-    }
-  }
-
-  Widget _getIcon(SyncStatus status) {
-    switch (status) {
-      case SyncStatus.synced:
-        return Icon(Icons.cloud_done, size: 16, color: DesignTokens.success);
-      case SyncStatus.pending:
-        return Icon(
-          Icons.cloud_upload_outlined,
-          size: 16,
-          color: DesignTokens.warning,
-        );
-      case SyncStatus.syncing:
-        return SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation(DesignTokens.warning),
-          ),
-        );
-      case SyncStatus.failed:
-        return Icon(Icons.cloud_off, size: 16, color: DesignTokens.error);
-    }
-  }
-
   void _showSyncDetails(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,

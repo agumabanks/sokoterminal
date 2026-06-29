@@ -2,7 +2,6 @@ import '../../core/util/haptics.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -587,7 +586,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     _ActionChip(
                       icon: Icons.message,
                       label: 'SMS',
-                      color: Colors.blue,
+                      color: DesignTokens.info,
                       onTap: () {
                         Navigator.pop(context);
                         launchUrl(Uri.parse('sms:${contact.phone}'));
@@ -961,7 +960,7 @@ class _ContactsStatusArea extends StatelessWidget {
         key: const ValueKey('denied'),
         child: _ContactPreviewCard(
           icon: Icons.lock_outline,
-          iconColor: Colors.amber,
+          iconColor: DesignTokens.warning,
           title: 'Contacts access disabled',
           subtitle: 'Enable in Settings to sync your phone contacts.',
           ctaText: 'Open Settings',
@@ -1659,7 +1658,7 @@ class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
                     _ActionChip(
                       icon: Icons.message,
                       label: 'SMS',
-                      color: Colors.blue,
+                      color: DesignTokens.info,
                       onTap: () => launchUrl(Uri.parse('sms:$primaryPhone')),
                     ),
                 ],
@@ -2367,7 +2366,7 @@ Color _getAvatarColor(String name) {
 }
 
 const _avatarColors = [
-  Color(0xFF0EBE7E),
-  Color(0xFF4299E1),
-  Color(0xFFF6AD55),
+  DesignTokens.brandAccent,
+  DesignTokens.info,
+  DesignTokens.warning,
 ];

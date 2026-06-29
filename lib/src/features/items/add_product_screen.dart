@@ -16,8 +16,13 @@ import '../../core/util/comma_number_formatter.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
+import '../bnpl/models/bnpl_seller_status.dart';
+import '../bnpl/models/product_bnpl_payload.dart';
+import '../bnpl/providers/bnpl_seller_status_provider.dart';
+import '../bnpl/providers/product_bnpl_provider.dart';
 import '../../widgets/html_editor.dart';
 import '../../widgets/offline_cached_image.dart';
+import 'gallery_picker_screen.dart';
 import 'product_form_controller.dart';
 import 'product_variants_screen.dart';
 
@@ -55,15 +60,34 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   final _tagsCtrl = TextEditingController();
   final _shippingDaysCtrl = TextEditingController();
   final _shippingFeeCtrl = TextEditingController();
+  final _taxRateCtrl = TextEditingController();
+  final _bnplMinCtrl = TextEditingController();
+  final _bnplMaxCtrl = TextEditingController();
+  final _bnplInstallmentCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _populateFromExisting();
-      unawaited(_hydrateFromServerIfNeeded());
-      if (widget.startPublishOnline) {
-        unawaited(ref.read(productFormProvider.notifier).setPublishOnline(true));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        _populateFromExisting();
+        unawaited(_hydrateFromServerIfNeeded());
+        unawaited(_loadBnplSettingsIfNeeded());
+        await ref.read(productFormProvider.notifier).loadBusinessTaxSettings();
+        final state = ref.read(productFormProvider);
+        if (state.taxRate.isNotEmpty) {
+          _taxRateCtrl.text = state.taxRate;
+        }
+        if (widget.startPublishOnline) {
+          unawaited(ref.read(productFormProvider.notifier).setPublishOnline(true));
+        }
+      } catch (e, st) {
+        debugPrint('[AddProductScreen] initState error: $e\n$st');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading product form: $e')),
+          );
+        }
       }
     });
   }
@@ -84,6 +108,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     _tagsCtrl.dispose();
     _shippingDaysCtrl.dispose();
     _shippingFeeCtrl.dispose();
+    _taxRateCtrl.dispose();
+    _bnplMinCtrl.dispose();
+    _bnplMaxCtrl.dispose();
+    _bnplInstallmentCtrl.dispose();
     super.dispose();
   }
 
@@ -135,6 +163,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ctrl.setShippingFee(_shippingFeeCtrl.text);
     ctrl.setRefundable(item.refundable);
     ctrl.setCashOnDelivery(item.cashOnDelivery);
+    if (item.taxRate != null && item.taxRate! > 0) {
+      _taxRateCtrl.text = CommaNumberFormatter.format(item.taxRate!.toStringAsFixed(0));
+      ctrl.setTaxRate(_taxRateCtrl.text);
+    }
     if (item.publishedOnline) unawaited(ctrl.setPublishOnline(true));
 
     // Images
@@ -307,6 +339,37 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
   }
 
+  // ─── BNPL settings from server ─────────────────────────────────────────────
+
+  Future<void> _loadBnplSettingsIfNeeded() async {
+    final productId = widget.existingItem?.remoteId;
+    if (productId == null) return;
+
+    try {
+      final payload = await ref.read(productBnplProvider(productId).future);
+      if (payload == null || !mounted) return;
+
+      final ctrl = ref.read(productFormProvider.notifier);
+      ctrl.setBnplEnabled(payload.enabled);
+
+      _bnplMinCtrl.text = payload.minOrderAmount != null
+          ? CommaNumberFormatter.format(payload.minOrderAmount!.toStringAsFixed(0))
+          : '';
+      _bnplMaxCtrl.text = payload.maxOrderAmount != null
+          ? CommaNumberFormatter.format(payload.maxOrderAmount!.toStringAsFixed(0))
+          : '';
+      _bnplInstallmentCtrl.text = payload.installmentCount != null
+          ? payload.installmentCount.toString()
+          : '';
+
+      ctrl.setBnplMinOrderAmount(_bnplMinCtrl.text);
+      ctrl.setBnplMaxOrderAmount(_bnplMaxCtrl.text);
+      ctrl.setBnplInstallmentCount(_bnplInstallmentCtrl.text);
+    } catch (_) {
+      // Best effort — backend may not have the endpoint yet.
+    }
+  }
+
   // ─── Save ──────────────────────────────────────────────────────────────────
 
   bool _isSaving = false;
@@ -317,8 +380,21 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
     final state = ref.read(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
+    debugPrint('[AddProductScreen] save pressed. canSubmit=${state.canSubmit}, '
+        'basic=${state.isBasicInfoValid}, category=${state.isCategoryValid}, '
+        'pricing=${state.isPricingValid}, discount=${state.isDiscountValid}, '
+        'extras=${state.isExtrasValid}, online=${state.isOnlineDetailsValid}, '
+        'images=${state.isImagesValid}');
     if (!state.canSubmit) {
       _isSaving = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_getValidationHint(state) ?? 'Please complete all required fields'),
+            backgroundColor: DesignTokens.warning,
+          ),
+        );
+      }
       return;
     }
 
@@ -401,6 +477,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         refundable: Value(state.refundable),
         cashOnDelivery: Value(state.cashOnDelivery),
         lowStockWarning: Value(int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning))),
+        taxRate: state.taxRate.isNotEmpty
+            ? Value(double.tryParse(CommaNumberFormatter.unformat(state.taxRate)))
+            : const Value.absent(),
         synced: const Value(false),
       );
 
@@ -437,12 +516,36 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             'cash_on_delivery': state.cashOnDelivery ? 1 : 0,
             if (state.lowStockWarning.isNotEmpty)
               'low_stock_quantity': int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning)),
+            if (state.taxRate.isNotEmpty)
+              'tax_rate': double.tryParse(CommaNumberFormatter.unformat(state.taxRate)),
             if (finalSku.isNotEmpty) 'sku': finalSku,
             if (state.cost.isNotEmpty)
               'purchase_price': double.tryParse(CommaNumberFormatter.unformat(state.cost)),
           },
         );
         unawaited(sync.syncCatalogImmediately());
+
+        // Push BNPL settings to the server when editing an already-synced item.
+        final remoteId = widget.existingItem?.remoteId;
+        if (remoteId != null) {
+          try {
+            final bnplPayload = ProductBnplPayload(
+              enabled: state.bnplEnabled,
+              minOrderAmount: state.bnplMinOrderAmount.isEmpty
+                  ? null
+                  : double.tryParse(CommaNumberFormatter.unformat(state.bnplMinOrderAmount)),
+              maxOrderAmount: state.bnplMaxOrderAmount.isEmpty
+                  ? null
+                  : double.tryParse(CommaNumberFormatter.unformat(state.bnplMaxOrderAmount)),
+              installmentCount: state.bnplInstallmentCount.isEmpty
+                  ? null
+                  : int.tryParse(CommaNumberFormatter.unformat(state.bnplInstallmentCount)),
+            );
+            await ref.read(sellerApiProvider).updateProductBnpl(remoteId, bnplPayload);
+          } catch (e) {
+            debugPrint('[AddProductScreen] BNPL update failed: $e');
+          }
+        }
       } catch (e) {
         _isSaving = false;
         ctrl.setSubmitting(false);
@@ -454,6 +557,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         return;
       }
 
+      debugPrint('[AddProductScreen] product saved: id=$id, name=${state.name.trim()}');
       if (mounted) {
         ctrl.reset();
         Navigator.pop(context, true);
@@ -484,6 +588,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
+    final bnplStatusAsync = ref.watch(bnplSellerStatusProvider);
 
     return Scaffold(
       backgroundColor: DesignTokens.surfaceGrouped,
@@ -529,6 +634,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   ),
                   const SizedBox(height: 8),
                 ],
+
+                // BNPL settings
+                _buildFormSection(
+                  icon: Icons.payments_outlined,
+                  title: 'Sanaa Finance BNPL',
+                  subtitle: 'Let buyers pay later',
+                  child: _buildBnplSection(
+                    state,
+                    ctrl,
+                    bnplStatusAsync.valueOrNull,
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 // 6. Variants (editing only, feature-flagged)
                 if (widget.existingItem != null &&
@@ -824,10 +942,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             _photoOptionTile(
               icon: Icons.collections_outlined,
               label: 'Add gallery photos',
-              subtitle: 'Showcase multiple angles',
-              onTap: () {
+              subtitle: 'Grid multi-select from device',
+              onTap: () async {
                 Navigator.pop(context);
-                ctrl.pickGalleryImages();
+                final files = await Navigator.push<List<File>>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const GalleryPickerScreen(),
+                  ),
+                );
+                if (files != null && files.isNotEmpty) {
+                  ctrl.addGalleryFiles(files);
+                }
               },
             ),
           ],
@@ -893,8 +1019,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           final fileIndex = i - state.galleryUrls.length;
           return GestureDetector(
             onLongPress: () {
-              if (isRemote) ctrl.setGalleryUrlAsThumbnail(i);
-              else ctrl.setGalleryFileAsThumbnail(fileIndex);
+              if (isRemote) {
+                ctrl.setGalleryUrlAsThumbnail(i);
+              } else {
+                ctrl.setGalleryFileAsThumbnail(fileIndex);
+              }
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Set as main photo'), duration: Duration(seconds: 1)),
               );
@@ -1018,7 +1147,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           else
             Switch.adaptive(
               value: state.publishOnline,
-              activeColor: DesignTokens.brandAccent,
+              activeTrackColor: DesignTokens.brandAccent,
+              activeThumbColor: DesignTokens.brandAccent,
               onChanged: (v) => ctrl.setPublishOnline(v),
             ),
         ],
@@ -1070,7 +1200,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: DesignTokens.hairline),
           Padding(
             padding: const EdgeInsets.all(16),
             child: child,
@@ -1414,6 +1544,45 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           onChanged: ctrl.setLowStockWarning,
         ),
 
+        if (state.taxEnabled) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: DesignTokens.surfaceGrouped,
+              borderRadius: DesignTokens.borderRadiusMd,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.account_balance_outlined,
+                        color: DesignTokens.brandPrimary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${state.taxLabel} Tax',
+                      style: DesignTokens.textBodyBold,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                AppInput(
+                  controller: _taxRateCtrl,
+                  label: '${state.taxLabel} rate (%)',
+                  hint: '18',
+                  prefixIcon: Icons.percent,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                  onChanged: ctrl.setTaxRate,
+                ),
+                const SizedBox(height: 8),
+                _buildTaxInclusionHint(state),
+              ],
+            ),
+          ),
+        ],
+
         if (remoteConfig.ffProductVariantsEditor && widget.existingItem == null) ...[
           const SizedBox(height: 16),
           Container(
@@ -1556,10 +1725,89 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
-            activeColor: DesignTokens.brandAccent,
+            activeTrackColor: DesignTokens.brandAccent,
+            activeThumbColor: DesignTokens.brandAccent,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBnplSection(
+    ProductFormState state,
+    ProductFormController ctrl,
+    BnplSellerStatus? status,
+  ) {
+    final active = status?.isActive ?? false;
+    final disabledHint = status == null
+        ? 'Loading BNPL status…'
+        : switch (status.status) {
+            'pending' => 'Enrollment pending — BNPL will unlock once approved.',
+            'suspended' => 'BNPL access is suspended.',
+            'active' => null,
+            _ => 'Request Sanaa Finance BNPL enrollment to enable this option.',
+          };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSwitchTile(
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Allow BNPL / Pay Later',
+          subtitle: active
+              ? 'Customers can buy now and pay later for this product'
+              : (disabledHint ?? 'Enable BNPL to use this option'),
+          value: state.bnplEnabled,
+          onChanged: active ? ctrl.setBnplEnabled : (_) {},
+        ),
+        if (!active && disabledHint != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            disabledHint,
+            style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+          ),
+        ],
+        if (active && state.bnplEnabled) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: AppInput(
+                  controller: _bnplMinCtrl,
+                  label: 'Min order amount (UGX)',
+                  hint: '10,000',
+                  prefixIcon: Icons.arrow_downward_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                  onChanged: ctrl.setBnplMinOrderAmount,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppInput(
+                  controller: _bnplMaxCtrl,
+                  label: 'Max order amount (UGX)',
+                  hint: '500,000',
+                  prefixIcon: Icons.arrow_upward_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                  onChanged: ctrl.setBnplMaxOrderAmount,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AppInput(
+            controller: _bnplInstallmentCtrl,
+            label: 'Installment count (optional)',
+            hint: 'e.g. 3',
+            prefixIcon: Icons.calendar_today_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: const [CommaNumberFormatter()],
+            onChanged: ctrl.setBnplInstallmentCount,
+          ),
+        ],
+      ],
     );
   }
 
@@ -1671,6 +1919,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   String? _getValidationHint(ProductFormState state) {
     if (state.name.trim().isEmpty) return 'Enter a product name to continue';
+    if (state.unit.trim().isEmpty) return 'Enter a unit of measure (e.g. pc, kg)';
     if (!state.isCategoryValid) return 'Select a category for marketplace listing';
     if (!state.isPricingValid) return 'Enter a valid selling price and stock quantity';
     if (!state.isDiscountValid) {
@@ -1686,6 +1935,28 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
     if (!state.isImagesValid) return 'Add a product photo for marketplace listing';
     return null;
+  }
+
+  Widget _buildTaxInclusionHint(ProductFormState state) {
+    final isInclusive = state.taxInclusionMode == 'inclusive';
+    return Row(
+      children: [
+        Icon(
+          isInclusive ? Icons.check_circle_outline : Icons.add_circle_outline,
+          size: 14,
+          color: DesignTokens.grayMedium,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            isInclusive
+                ? 'Price includes ${state.taxLabel}. Tax is shown on receipts.'
+                : 'Price excludes ${state.taxLabel}. Tax is added at checkout.',
+            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+          ),
+        ),
+      ],
+    );
   }
 
   // ─── Pickers ───────────────────────────────────────────────────────────────
