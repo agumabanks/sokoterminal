@@ -48,6 +48,9 @@ import 'features/profile/seller_profile_edit_screen.dart';
 import 'features/profile/shop_info_screen.dart';
 import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
+import 'features/money/evening_close_screen.dart';
+import 'features/madeni/madeni_screen.dart';
+import 'features/madeni/morning_briefing_screen.dart';
 import 'features/payment_links/payment_links_screen.dart';
 import 'features/marketing/marketing_generator_screen.dart';
 import 'features/marketing/marketing_hub_screen.dart';
@@ -733,6 +736,30 @@ final routerProvider = Provider<GoRouter>((ref) {
                     pageBuilder: (context, state) => _buildPage(
                       state: state,
                       child: const VideoAdScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'evening-close',
+                    name: 'evening-close',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const EveningCloseScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'morning-briefing',
+                    name: 'morning-briefing',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const MorningBriefingScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'madeni',
+                    name: 'madeni',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const MadeniScreen(),
                     ),
                   ),
                   GoRoute(

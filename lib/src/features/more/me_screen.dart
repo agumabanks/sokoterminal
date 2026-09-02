@@ -212,6 +212,7 @@ class _MeScreenState extends ConsumerState<MeScreen> {
       _ToolItem(Icons.sms_outlined, 'Bulk SMS', '/home/more/bulk-sms'),
       _ToolItem(Icons.store_mall_directory_outlined, 'Shop Settings', '/home/more/shop-info'),
       _ToolItem(Icons.account_balance_wallet_outlined, 'Wallet', '/home/more/wallet'),
+      _ToolItem(Icons.menu_book_outlined, 'Madeni Ledger', '/home/more/madeni'),
       _ToolItem(Icons.verified_user_outlined, 'Verification', '/home/more/verification'),
       _ToolItem(Icons.settings_applications_outlined, 'App Settings', '/home/more/settings'),
       _ToolItem(Icons.bar_chart_outlined, 'Reports', '/home/more/reports'),

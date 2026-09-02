@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_min_gpl/return_code.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -85,7 +83,6 @@ class MarketingSticker {
   ];
 }
 
-/// Animated text overlay for video using FFmpeg drawtext
 class AnimatedTextOverlay {
   static String buildAnimatedDrawtext({
     required String text,
@@ -138,119 +135,114 @@ class AnimatedTextOverlay {
   }
 }
 
-/// Video Ad Builder with Stickers and Animated Text
-class VideoAdBuilderWithStickers {
-  static const double perImage = 5.0;
-
-  static String buildCommand({
-    required List<String> imagePaths,
-    required String musicPath,
-    required String fontPath,
-    required String productName,
-    required String price,
-    required String outputPath,
-    String? stickerText,
-    String animation = 'fade',
+class StickerOverlayRenderer {
+  static Widget renderSticker(
+    MarketingSticker sticker, {
+    double scale = 1.0,
   }) {
-    const w = 1080, h = 1920, fps = 30;
-    const fadeDur = 0.5;
-
-    final inputs = imagePaths
-        .map((p) => "-loop 1 -t $perImage -i '$p'")
-        .join(' ');
-
-    final scaleFilters = List.generate(imagePaths.length, (i) =>
-        "[$i:v]scale=$w:$h:force_original_aspect_ratio=decrease,"
-        "pad=$w:$h:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=$fps[v$i]"
-    ).join(';');
-
-    final offset1 = perImage - fadeDur;
-    final offset2 = offset1 + perImage - fadeDur;
-    final totalDur = offset2 + perImage - fadeDur;
-
-    String stickerFilter;
-    if (stickerText != null && stickerText.isNotEmpty) {
-      final nameOverlay = AnimatedTextOverlay.buildAnimatedDrawtext(
-        text: productName,
-        fontPath: fontPath,
-        fontSize: 72,
-        color: 'white',
-        borderColor: 'black',
-        borderWidth: 4,
-        position: 'bottom',
-        animation: animation,
-        startTime: 0.5,
-        duration: 4,
-      );
-      final priceOverlay = AnimatedTextOverlay.buildAnimatedDrawtext(
-        text: price,
-        fontPath: fontPath,
-        fontSize: 96,
-        color: '#FFD700',
-        borderColor: 'black',
-        borderWidth: 4,
-        position: 'bottom',
-        animation: 'pop',
-        startTime: 1.0,
-        duration: 3.5,
-      );
-      stickerFilter = ";[v2]$nameOverlay[x3];[x3]$priceOverlay[vout]";
-    } else {
-      stickerFilter = ";[v2]drawtext=fontfile='$fontPath':text='$productName':fontsize=72:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-380[x3];[x3]drawtext=fontfile='$fontPath':text='$price':fontsize=96:fontcolor=#FFD700:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-260[vout]";
-    }
-
-    final filter = "$scaleFilters;"
-        "[v0][v1]xfade=transition=fade:duration=$fadeDur:offset=$offset1[x1];"
-        "[x1][v2]xfade=transition=fade:duration=$fadeDur:offset=$offset2[x2]"
-        "$stickerFilter";
-
-    return "-y $inputs -i '$musicPath' "
-        "-filter_complex \"$filter\" "
-        "-map \"[vout]\" -map ${imagePaths.length}:a "
-        "-c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p "
-        "-c:a aac -b:a 128k -shortest -t ${totalDur.ceil()} "
-        "'$outputPath'";
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 12 * scale,
+        vertical: 6 * scale,
+      ),
+      decoration: BoxDecoration(
+        color: sticker.color,
+        borderRadius: BorderRadius.circular(20 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        sticker.text,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 14 * scale,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
   }
 
-  static Future<bool> generate({
-    required List<String> imagePaths,
-    required String musicPath,
-    required String fontPath,
-    required String productName,
-    required String price,
-    required String outputPath,
-    String? stickerText,
-    String animation = 'fade',
-    required void Function(double progress) onProgress,
-  }) async {
-    final cmd = buildCommand(
-      imagePaths: imagePaths,
-      musicPath: musicPath,
-      fontPath: fontPath,
-      productName: productName,
-      price: price,
-      outputPath: outputPath,
-      stickerText: stickerText,
-      animation: animation,
+  static Widget renderBadge(
+    MarketingSticker sticker, {
+    double size = 80,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: sticker.color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              sticker.emoji,
+              style: TextStyle(fontSize: size * 0.3),
+            ),
+            Text(
+              sticker.text.replaceAll(sticker.emoji, '').trim(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: size * 0.13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+  }
 
-    final totalMs = (imagePaths.length * perImage * 1000).toInt();
-    final session = await FFmpegKit.executeAsync(
-      cmd,
-      null,
-      null,
-      (stats) {
-        final progress = (stats.getTime() / totalMs).clamp(0.0, 1.0);
-        onProgress(progress);
-      },
+  static Widget renderBanner(
+    MarketingSticker sticker, {
+    double width = double.infinity,
+    double height = 40,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: sticker.color,
+        borderRadius: BorderRadius.circular(height / 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          sticker.text,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: height * 0.4,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
     );
-
-    final returnCode = await session.getReturnCode();
-    return ReturnCode.isSuccess(returnCode);
   }
 }
 
-/// Share Helper
 class ShareHelper {
   static Future<void> shareImage(String path, {String? text}) async {
     await Share.shareXFiles(
@@ -288,7 +280,6 @@ class ShareHelper {
   }
 }
 
-/// Sticker Palette Widget
 class StickerPalette extends StatelessWidget {
   const StickerPalette({
     super.key,

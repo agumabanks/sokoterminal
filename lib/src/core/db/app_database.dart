@@ -249,6 +249,53 @@ class SyncCursors extends Table {
   Set<Column<Object>>? get primaryKey => {key};
 }
 
+// ─── Madeni Ledger (Customer Debts) ───────────────────────────────────────
+
+class MadeniEntries extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get customerId => text().nullable().references(Customers, #id)();
+  TextColumn get customerName => text()();
+  TextColumn get customerPhone => text().nullable()();
+  TextColumn get description => text()();
+  RealColumn get amount => real()();
+  RealColumn get amountPaid => real().withDefault(const Constant(0))();
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get dueDate => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  TextColumn get remoteId => text().nullable()();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class MadeniPayments extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get entryId => text().references(MadeniEntries, #id, onDelete: KeyAction.cascade)();
+  RealColumn get amount => real()();
+  TextColumn get method => text()();
+  TextColumn get externalRef => text().nullable()();
+  DateTimeColumn get paidAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+class SupplierDebts extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get supplierId => text().nullable()();
+  TextColumn get supplierName => text()();
+  TextColumn get description => text()();
+  RealColumn get amount => real()();
+  RealColumn get amountPaid => real().withDefault(const Constant(0))();
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  DateTimeColumn get dueDate => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
 class CachedOrders extends Table {
   IntColumn get orderId => integer()();
   TextColumn get payloadJson => text()();
@@ -703,6 +750,9 @@ class AvailabilityExceptions extends Table {
     SyncOps,
     PrintJobs,
     SyncCursors,
+    MadeniEntries,
+    MadeniPayments,
+    SupplierDebts,
     CachedOrders,
     CachedServiceBookings,
     InventoryLogs,
@@ -749,7 +799,7 @@ class AppDatabase extends _$AppDatabase {
       AppDatabase._internal;
 
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 39;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -944,6 +994,12 @@ class AppDatabase extends _$AppDatabase {
       await migrator.addColumn(quotations, quotations.remoteId);
       await migrator.addColumn(ledgerEntries, ledgerEntries.remoteId);
     }
+    if (from < 39) {
+      // Madeni Ledger (customer debts)
+      await migrator.createTable(madeniEntries);
+      await migrator.createTable(madeniPayments);
+      await migrator.createTable(supplierDebts);
+    }
   }
 
   // Expense Categories
@@ -1013,6 +1069,127 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> updateItemFields(String id, ItemsCompanion companion) async {
     await (update(items)..where((tbl) => tbl.id.equals(id))).write(companion);
+  }
+
+  // ─── Madeni Ledger (Customer Debts) ──────────────────────────────────────
+
+  Stream<List<MadeniEntry>> watchMadeniEntries() =>
+      (select(madeniEntries)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+
+  Stream<List<MadeniEntry>> watchMadeniEntriesForCustomer(String customerId) =>
+      (select(madeniEntries)
+            ..where((t) => t.customerId.equals(customerId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .watch();
+
+  Future<void> addMadeniEntry({
+    String? customerId,
+    required String customerName,
+    String? customerPhone,
+    required String description,
+    required double amount,
+    DateTime? dueDate,
+  }) async {
+    await into(madeniEntries).insert(
+      MadeniEntriesCompanion.insert(
+        customerId: customerId != null ? Value(customerId) : const Value.absent(),
+        customerName: customerName,
+        customerPhone: customerPhone != null ? Value(customerPhone) : const Value.absent(),
+        description: description,
+        amount: amount,
+        dueDate: dueDate != null ? Value(dueDate) : const Value.absent(),
+      ),
+    );
+  }
+
+  Future<void> updateMadeniEntry(
+    String id,
+    MadeniEntriesCompanion companion,
+  ) async {
+    await (update(madeniEntries)..where((t) => t.id.equals(id))).write(companion);
+  }
+
+  Future<void> deleteMadeniEntry(String id) async {
+    await (delete(madeniEntries)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<MadeniEntry?> getMadeniEntryById(String id) =>
+      (select(madeniEntries)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<void> recordMadeniPayment({
+    required String entryId,
+    required double amount,
+    String method = 'cash',
+    String? externalRef,
+  }) async {
+    await transaction(() async {
+      await into(madeniPayments).insert(
+        MadeniPaymentsCompanion.insert(
+          entryId: entryId,
+          amount: amount,
+          method: method,
+          externalRef: externalRef != null ? Value(externalRef) : const Value.absent(),
+        ),
+      );
+      final entry = await (select(madeniEntries)
+            ..where((t) => t.id.equals(entryId)))
+          .getSingle();
+      final newPaid = entry.amountPaid + amount;
+      final newStatus = newPaid >= entry.amount
+          ? 'paid'
+          : newPaid > 0
+              ? 'partial'
+              : entry.status;
+      await (update(madeniEntries)..where((t) => t.id.equals(entryId)))
+          .write(MadeniEntriesCompanion(
+        amountPaid: Value(newPaid),
+        status: Value(newStatus),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ));
+    });
+  }
+
+  Stream<List<MadeniPayment>> watchMadeniPayments(String entryId) =>
+      (select(madeniPayments)
+            ..where((t) => t.entryId.equals(entryId))
+            ..orderBy([(t) => OrderingTerm.desc(t.paidAt)]))
+          .watch();
+
+  Future<List<MadeniPayment>> getMadeniPayments(String entryId) =>
+      (select(madeniPayments)..where((t) => t.entryId.equals(entryId))).get();
+
+  // ─── Supplier Debts ────────────────────────────────────────────────────────
+
+  Stream<List<SupplierDebt>> watchSupplierDebts() =>
+      (select(supplierDebts)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+
+  Future<void> addSupplierDebt({
+    String? supplierId,
+    required String supplierName,
+    required String description,
+    required double amount,
+    DateTime? dueDate,
+  }) async {
+    await into(supplierDebts).insert(
+      SupplierDebtsCompanion.insert(
+        supplierId: supplierId != null ? Value(supplierId) : const Value.absent(),
+        supplierName: supplierName,
+        description: description,
+        amount: amount,
+        dueDate: dueDate != null ? Value(dueDate) : const Value.absent(),
+      ),
+    );
+  }
+
+  Future<void> updateSupplierDebt(
+    String id,
+    SupplierDebtsCompanion companion,
+  ) async {
+    await (update(supplierDebts)..where((t) => t.id.equals(id))).write(companion);
+  }
+
+  Future<void> deleteSupplierDebt(String id) async {
+    await (delete(supplierDebts)..where((t) => t.id.equals(id))).go();
   }
 
   Future<void> markItemSynced(String id) async {
