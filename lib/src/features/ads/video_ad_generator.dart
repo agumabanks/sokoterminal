@@ -9,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 ///
 /// Generates short video ads from product images with:
 /// - Fade transitions
-/// - Text overlays (product name, price)
+/// - Animated text overlays (product name, price, stickers)
 /// - Background music
 /// - Vertical format (9:16) for WhatsApp Status/Reels
 class VideoAdGenerator {
@@ -40,7 +40,7 @@ class VideoAdGenerator {
         .replaceAll(',', '\\,');
   }
 
-  /// Build FFmpeg command for slideshow video
+  /// Build FFmpeg command for slideshow video with animated text
   static String buildCommand({
     required List<String> imagePaths,
     required String musicPath,
@@ -48,6 +48,8 @@ class VideoAdGenerator {
     required String productName,
     required String price,
     required String outputPath,
+    String? stickerText,
+    String animation = 'fade',
   }) {
     final name = escapeDrawtext(productName);
     final priceTxt = escapeDrawtext(price);
@@ -76,13 +78,34 @@ class VideoAdGenerator {
         buffer.write(";");
         buffer.write("[x1][v2]xfade=transition=fade:duration=$_fadeDuration:offset=$offset2[x2]");
         buffer.write(";");
-        buffer.write("[x2]drawtext=fontfile='$fontPath':text='$name':fontsize=72:");
-        buffer.write("fontcolor=white:borderw=4:bordercolor=black:");
-        buffer.write("x=(w-text_w)/2:y=h-380[x3]");
+        // Animated text overlays
+        final nameOverlay = _buildAnimatedDrawtext(
+          text: name,
+          fontPath: fontPath,
+          fontSize: 72,
+          color: 'white',
+          borderColor: 'black',
+          borderWidth: 4,
+          position: 'bottom',
+          animation: animation,
+          startTime: 0.5,
+          duration: 4,
+        );
+        buffer.write("[x2]$nameOverlay[x3]");
         buffer.write(";");
-        buffer.write("[x3]drawtext=fontfile='$fontPath':text='$priceTxt':fontsize=96:");
-        buffer.write("fontcolor=#FFD700:borderw=4:bordercolor=black:");
-        buffer.write("x=(w-text_w)/2:y=h-260[vout]");
+        final priceOverlay = _buildAnimatedDrawtext(
+          text: priceTxt,
+          fontPath: fontPath,
+          fontSize: 96,
+          color: '#FFD700',
+          borderColor: 'black',
+          borderWidth: 4,
+          position: 'bottom',
+          animation: 'pop',
+          startTime: 1.0,
+          duration: 3.5,
+        );
+        buffer.write("[x3]$priceOverlay[vout]");
       }
     } else {
       // Single image
@@ -107,6 +130,45 @@ class VideoAdGenerator {
         "'$outputPath'";
   }
 
+  /// Build animated drawtext filter
+  static String _buildAnimatedDrawtext({
+    required String text,
+    required String fontPath,
+    required double fontSize,
+    required String color,
+    required String borderColor,
+    required double borderWidth,
+    required String position,
+    String animation = 'fade',
+    double startTime = 0,
+    double duration = 3,
+  }) {
+    final x = '(w-text_w)/2';
+    final y = position == 'top'
+        ? 'h*0.08'
+        : position == 'center'
+            ? '(h-text_h)/2'
+            : 'h*0.75';
+
+    String enableExpr = "between(t,$startTime,${startTime + duration})";
+
+    switch (animation) {
+      case 'fade':
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:alpha='if(lt(t,$startTime),0,if(lt(t,${startTime + 0.5}),(t-$startTime)/0.5,if(lt(t,${startTime + duration - 0.5}),1,(${startTime + duration}-t)/0.5)))':enable='$enableExpr'";
+      case 'slideup':
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y-$y*if(lt(t,$startTime),1,if(lt(t,${startTime + 0.4}),(1-(t-$startTime)/0.4),0)):enable='$enableExpr'";
+      case 'slideleft':
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x-(w+text_w)*if(lt(t,$startTime),1,if(lt(t,${startTime + 0.4}),(1-(t-$startTime)/0.4),0)):y=$y:enable='$enableExpr'";
+      case 'pop':
+        final scaleExpr = "if(lt(t,$startTime),0,if(lt(t,${startTime + 0.3}),1.5-0.5*(${startTime + 0.3}-t)/0.3,1))";
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize*$scaleExpr:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:enable='$enableExpr'";
+      case 'bounce':
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y+100*abs(sin(3.14159*(t-$startTime)))*if(lt(t,$startTime),0,if(gt(t,${startTime + 2}),0,1)):enable='$enableExpr'";
+      default:
+        return "drawtext=fontfile='$fontPath':text='$text':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:alpha='if(lt(t,$startTime),0,if(lt(t,${startTime + 0.3}),(t-$startTime)/0.3,1))':enable='$enableExpr'";
+    }
+  }
+
   /// Generate video ad
   static Future<bool> generate({
     required List<String> imagePaths,
@@ -115,6 +177,8 @@ class VideoAdGenerator {
     required String productName,
     required String price,
     required String outputPath,
+    String? stickerText,
+    String animation = 'fade',
     required void Function(double progress) onProgress,
   }) async {
     final cmd = buildCommand(
@@ -124,6 +188,8 @@ class VideoAdGenerator {
       productName: productName,
       price: price,
       outputPath: outputPath,
+      stickerText: stickerText,
+      animation: animation,
     );
 
     final totalMs = (imagePaths.length * _perImageSeconds * 1000).toInt();
