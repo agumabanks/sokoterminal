@@ -35,7 +35,7 @@ const sellerQuickActions = <SellerQuickAction>[
   SellerQuickAction(
     id: 'marketing',
     label: 'Marketing',
-    subtitle: 'AI content generator',
+    subtitle: 'Stickers, video, content',
     icon: Icons.auto_awesome_outlined,
     color: DesignTokens.brandAccent,
   ),

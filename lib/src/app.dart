@@ -50,6 +50,7 @@ import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
 import 'features/payment_links/payment_links_screen.dart';
 import 'features/marketing/marketing_generator_screen.dart';
+import 'features/marketing/marketing_hub_screen.dart';
 import 'features/wallet/seller_wallet_screen.dart';
 import 'features/bnpl/bnpl_settings_screen.dart';
 // import 'features/auctions/auctions_screen.dart';
@@ -727,8 +728,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ],
                   ),
                   GoRoute(
+                    path: 'video-ad',
+                    name: 'video-ad',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const VideoAdScreen(),
+                    ),
+                  ),
+                  GoRoute(
                     path: 'marketing',
                     name: 'marketing',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const MarketingHubScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'marketing-content',
+                    name: 'marketing-content',
                     pageBuilder: (context, state) => _buildPage(
                       state: state,
                       child: const MarketingGeneratorScreen(),
