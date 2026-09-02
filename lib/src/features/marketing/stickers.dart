@@ -10,10 +10,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme/design_tokens.dart';
 
 /// Marketing Stickers & Overlays — 10/10 quality for catalog and video
-///
-/// Instagram-style stickers that composite onto catalog images and video frames.
-
-// ─── Sticker Definitions ────────────────────────────────────────────────────
 
 class MarketingSticker {
   const MarketingSticker({
@@ -31,7 +27,6 @@ class MarketingSticker {
   final Color color;
 
   static List<MarketingSticker> get all => [
-    // Sale
     MarketingSticker(id: 'shop_now', text: '🛒 SHOP NOW', emoji: '🛒', category: 'Sale', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'on_sale', text: '🔥 ON SALE', emoji: '🔥', category: 'Sale', color: Color(0xFFe63946)),
     MarketingSticker(id: 'big_sale', text: '🏷️ BIG SALE', emoji: '🏷️', category: 'Sale', color: Color(0xFFfbbf24)),
@@ -43,39 +38,30 @@ class MarketingSticker {
     MarketingSticker(id: 'price_drop', text: '📉 PRICE DROP', emoji: '📉', category: 'Sale', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'limited_time', text: '⏰ LIMITED TIME', emoji: '⏰', category: 'Sale', color: Color(0xFFe63946)),
     MarketingSticker(id: 'buy_one_get_one', text: '🎁 BUY 1 GET 1', emoji: '🎁', category: 'Sale', color: Color(0xFF0EBE7E)),
-    // Delivery
     MarketingSticker(id: 'free_delivery', text: '🚚 FREE DELIVERY', emoji: '🚚', category: 'Delivery', color: Color(0xFF0EBE7E)),
-    MarketingSticker(id: 'same_day', text: '⚡ SAME DAY DELIVERY', emoji: '⚡', category: 'Delivery', color: Color(0xFF0EBE7E)),
-    // New
     MarketingSticker(id: 'new_arrival', text: '✨ NEW ARRIVAL', emoji: '✨', category: 'New', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'just_in', text: '🆕 JUST IN', emoji: '🆕', category: 'New', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'fresh_stock', text: '📦 FRESH STOCK', emoji: '📦', category: 'New', color: Color(0xFF0EBE7E)),
-    // Trend
     MarketingSticker(id: 'trending', text: '📈 TRENDING', emoji: '📈', category: 'Trend', color: Color(0xFFe63946)),
     MarketingSticker(id: 'hot_item', text: '🔥 HOT ITEM', emoji: '🔥', category: 'Trend', color: Color(0xFFe63946)),
     MarketingSticker(id: 'bestseller', text: '⭐ BESTSELLER', emoji: '⭐', category: 'Trend', color: Color(0xFFfbbf24)),
     MarketingSticker(id: 'top_rated', text: '🏆 TOP RATED', emoji: '🏆', category: 'Trend', color: Color(0xFFfbbf24)),
-    // Urgency
     MarketingSticker(id: 'limited_stock', text: '⚠️ LIMITED STOCK', emoji: '⚠️', category: 'Urgency', color: Color(0xFFe63946)),
     MarketingSticker(id: 'last_few', text: '🔴 LAST FEW', emoji: '🔴', category: 'Urgency', color: Color(0xFFe63946)),
     MarketingSticker(id: 'selling_fast', text: '💨 SELLING FAST', emoji: '💨', category: 'Urgency', color: Color(0xFFe63946)),
     MarketingSticker(id: 'while_stocks_last', text: '⏳ WHILE STOCKS LAST', emoji: '⏳', category: 'Urgency', color: Color(0xFFe63946)),
-    // Premium
     MarketingSticker(id: 'exclusive', text: '💎 EXCLUSIVE', emoji: '💎', category: 'Premium', color: Color(0xFFfbbf24)),
     MarketingSticker(id: 'premium', text: '👑 PREMIUM', emoji: '👑', category: 'Premium', color: Color(0xFFfbbf24)),
-    // Trust
     MarketingSticker(id: 'quality', text: '✅ QUALITY', emoji: '✅', category: 'Trust', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'verified', text: '✓ VERIFIED', emoji: '✓', category: 'Trust', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'genuine', text: '🔒 GENUINE', emoji: '🔒', category: 'Trust', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'authentic', text: '💯 AUTHENTIC', emoji: '💯', category: 'Trust', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'warranty', text: '🛡️ WARRANTY', emoji: '🛡️', category: 'Trust', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'returnable', text: '↩️ RETURNABLE', emoji: '↩️', category: 'Trust', color: Color(0xFF0EBE7E)),
-    // Payment
     MarketingSticker(id: 'cash_on_delivery', text: '💵 CASH ON DELIVERY', emoji: '💵', category: 'Payment', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'mobile_money', text: '📱 MOBILE MONEY', emoji: '📱', category: 'Payment', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'installments', text: '💳 INSTALLMENTS', emoji: '💳', category: 'Payment', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'bnpl', text: '🏦 BNPL', emoji: '🏦', category: 'Payment', color: Color(0xFF0EBE7E)),
-    // CTA
     MarketingSticker(id: 'contact_us', text: '📞 CONTACT US', emoji: '📞', category: 'CTA', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'dm_to_order', text: '💬 DM TO ORDER', emoji: '💬', category: 'CTA', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'link_in_bio', text: '🔗 LINK IN BIO', emoji: '🔗', category: 'CTA', color: Color(0xFF0EBE7E)),
@@ -85,14 +71,12 @@ class MarketingSticker {
     MarketingSticker(id: 'whatsapp_order', text: '📲 WHATSAPP TO ORDER', emoji: '📲', category: 'CTA', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'call_now', text: '📞 CALL NOW', emoji: '📞', category: 'CTA', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'visit_shop', text: '🏪 VISIT OUR SHOP', emoji: '🏪', category: 'CTA', color: Color(0xFF0EBE7E)),
-    // Social
     MarketingSticker(id: 'follow_us', text: '👥 FOLLOW US', emoji: '👥', category: 'Social', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'tag_friends', text: '🏷️ TAG A FRIEND', emoji: '🏷️', category: 'Social', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'share_post', text: '📤 SHARE THIS POST', emoji: '📤', category: 'Social', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'comment_below', text: '💬 COMMENT BELOW', emoji: '💬', category: 'Social', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'save_post', text: '🔖 SAVE THIS POST', emoji: '🔖', category: 'Social', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'double_tap', text: '❤️ DOUBLE TAP IF YOU LOVE IT', emoji: '❤️', category: 'Social', color: Color(0xFFe63946)),
-    // Location
     MarketingSticker(id: 'uganda', text: '🇺🇬 UGANDA', emoji: '🇺🇬', category: 'Location', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'kampala', text: '📍 KAMPALA', emoji: '📍', category: 'Location', color: Color(0xFF0EBE7E)),
     MarketingSticker(id: 'east_africa', text: '🌍 EAST AFRICA', emoji: '🌍', category: 'Location', color: Color(0xFF0EBE7E)),
@@ -101,123 +85,8 @@ class MarketingSticker {
   ];
 }
 
-// ─── Sticker Overlay Renderer ───────────────────────────────────────────────
-
-class StickerOverlayRenderer {
-  /// Renders a sticker as a Flutter widget for compositing
-  static Widget renderSticker(
-    MarketingSticker sticker, {
-    double scale = 1.0,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 12 * scale,
-        vertical: 6 * scale,
-      ),
-      decoration: BoxDecoration(
-        color: sticker.color,
-        borderRadius: BorderRadius.circular(20 * scale),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Text(
-        sticker.text,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 14 * scale,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  /// Renders a circular badge sticker
-  static Widget renderBadge(
-    MarketingSticker sticker, {
-    double size = 80,
-  }) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: sticker.color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              sticker.emoji,
-              style: TextStyle(fontSize: size * 0.3),
-            ),
-            Text(
-              sticker.text.replaceAll(sticker.emoji, '').trim(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Renders a banner sticker
-  static Widget renderBanner(
-    MarketingSticker sticker, {
-    double width = double.infinity,
-    double height = 40,
-  }) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: sticker.color,
-        borderRadius: BorderRadius.circular(height / 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Text(
-          sticker.text,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: height * 0.4,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Animated Text for Video ────────────────────────────────────────────────
-
+/// Animated text overlay for video using FFmpeg drawtext
 class AnimatedTextOverlay {
-  /// FFmpeg drawtext filter with animation
   static String buildAnimatedDrawtext({
     required String text,
     required String fontPath,
@@ -225,8 +94,8 @@ class AnimatedTextOverlay {
     required String color,
     required String borderColor,
     required double borderWidth,
-    required String position, // 'top', 'center', 'bottom'
-    String animation = 'fade', // 'fade', 'slideup', 'slideleft', 'pop', 'bounce'
+    required String position,
+    String animation = 'fade',
     double startTime = 0,
     double duration = 3,
     double canvasWidth = 1080,
@@ -240,14 +109,11 @@ class AnimatedTextOverlay {
             ? '(h-text_h)/2'
             : 'h*0.75';
 
-    // Animation expressions
     String enableExpr = "between(t,$startTime,${startTime + duration})";
-    String alphaExpr = '1';
 
     switch (animation) {
       case 'fade':
-        alphaExpr = "if(lt(t,$startTime),0,if(lt(t,${startTime + 0.5}),(t-$startTime)/0.5,if(lt(t,${startTime + duration - 0.5}),1,(${startTime + duration}-t)/0.5)))";
-        break;
+        return "drawtext=fontfile='$fontPath':text='$escaped':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:alpha='if(lt(t,$startTime),0,if(lt(t,${startTime + 0.5}),(t-$startTime)/0.5,if(lt(t,${startTime + duration - 0.5}),1,(${startTime + duration}-t)/0.5)))':enable='$enableExpr'";
       case 'slideup':
         return "drawtext=fontfile='$fontPath':text='$escaped':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y-$y*if(lt(t,$startTime),1,if(lt(t,${startTime + 0.4}),(1-(t-$startTime)/0.4),0)):enable='$enableExpr'";
       case 'slideleft':
@@ -258,10 +124,8 @@ class AnimatedTextOverlay {
       case 'bounce':
         return "drawtext=fontfile='$fontPath':text='$escaped':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y+100*abs(sin(3.14159*(t-$startTime)))*if(lt(t,$startTime),0,if(gt(t,${startTime + 2}),0,1)):enable='$enableExpr'";
       default:
-        alphaExpr = "if(lt(t,$startTime),0,if(lt(t,${startTime + 0.3}),(t-$startTime)/0.3,1))";
+        return "drawtext=fontfile='$fontPath':text='$escaped':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:alpha='if(lt(t,$startTime),0,if(lt(t,${startTime + 0.3}),(t-$startTime)/0.3,1))':enable='$enableExpr'";
     }
-
-    return "drawtext=fontfile='$fontPath':text='$escaped':fontsize=$fontSize:fontcolor=$color:borderw=$borderWidth:bordercolor=$borderColor:x=$x:y=$y:alpha='$alphaExpr':enable='$enableExpr'";
   }
 
   static String _escapeDrawtext(String text) {
@@ -274,8 +138,7 @@ class AnimatedTextOverlay {
   }
 }
 
-// ─── Video Ad Builder with Stickers ────────────────────────────────────────
-
+/// Video Ad Builder with Stickers and Animated Text
 class VideoAdBuilderWithStickers {
   static const double perImage = 5.0;
 
@@ -290,7 +153,7 @@ class VideoAdBuilderWithStickers {
     String animation = 'fade',
   }) {
     const w = 1080, h = 1920, fps = 30;
-    const perImage = 5.0, fadeDur = 0.5;
+    const fadeDur = 0.5;
 
     final inputs = imagePaths
         .map((p) => "-loop 1 -t $perImage -i '$p'")
@@ -305,8 +168,7 @@ class VideoAdBuilderWithStickers {
     final offset2 = offset1 + perImage - fadeDur;
     final totalDur = offset2 + perImage - fadeDur;
 
-    // Build sticker overlay
-    String stickerFilter = '';
+    String stickerFilter;
     if (stickerText != null && stickerText.isNotEmpty) {
       final nameOverlay = AnimatedTextOverlay.buildAnimatedDrawtext(
         text: productName,
@@ -334,7 +196,7 @@ class VideoAdBuilderWithStickers {
       );
       stickerFilter = ";[v2]$nameOverlay[x3];[x3]$priceOverlay[vout]";
     } else {
-      stickerFilter = ';[v2]drawtext=fontfile=\'$fontPath\':text=\'$productName\':fontsize=72:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-380[x3];[x3]drawtext=fontfile=\'$fontPath\':text=\'$price\':fontsize=96:fontcolor=#FFD700:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-260[vout]';
+      stickerFilter = ";[v2]drawtext=fontfile='$fontPath':text='$productName':fontsize=72:fontcolor=white:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-380[x3];[x3]drawtext=fontfile='$fontPath':text='$price':fontsize=96:fontcolor=#FFD700:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h-260[vout]";
     }
 
     final filter = "$scaleFilters;"
@@ -388,8 +250,7 @@ class VideoAdBuilderWithStickers {
   }
 }
 
-// ─── Share Helper ───────────────────────────────────────────────────────────
-
+/// Share Helper
 class ShareHelper {
   static Future<void> shareImage(String path, {String? text}) async {
     await Share.shareXFiles(
@@ -427,8 +288,7 @@ class ShareHelper {
   }
 }
 
-// ─── Sticker Palette Widget ─────────────────────────────────────────────────
-
+/// Sticker Palette Widget
 class StickerPalette extends StatelessWidget {
   const StickerPalette({
     super.key,
