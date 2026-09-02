@@ -113,17 +113,22 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               ),
               _InfoRow(
                 'Delivery Status',
-                order.normalizedDeliveryStatus.toUpperCase().replaceAll('_', ' '),
+                order.normalizedDeliveryStatus.toUpperCase().replaceAll(
+                  '_',
+                  ' ',
+                ),
                 isBadge: true,
                 color: _getStatusColor(order.normalizedDeliveryStatus),
               ),
               _InfoRow(
                 'Payment Method',
-                order.displayPaymentMethod.isEmpty ? '-' : order.displayPaymentMethod,
+                order.displayPaymentMethod.isEmpty
+                    ? '-'
+                    : order.displayPaymentMethod,
               ),
               _InfoRow(
                 'Shipping Cost',
-                (order.shippingCost ?? 'UGX 0').toString(),
+                (order.shippingCost ?? '0 /=').toString(),
               ),
               if (order.sokoDeliveryRequest != null)
                 _InfoRow(
@@ -197,10 +202,13 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                     onPressed: () => _showStatusModal(context, order),
                   ),
                 ),
-                const SizedBox(width: DesignTokens.spaceSm + DesignTokens.spaceXs),
+                const SizedBox(
+                  width: DesignTokens.spaceSm + DesignTokens.spaceXs,
+                ),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: order.canRequestSokoDelivery && !_requestingSokoDelivery
+                    onPressed:
+                        order.canRequestSokoDelivery && !_requestingSokoDelivery
                         ? _requestSokoDelivery
                         : null,
                     icon: _requestingSokoDelivery
@@ -283,10 +291,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('x${item.quantity}', style: DesignTokens.textSmall),
-                Text(
-                  item.lineTotal.toUgx(),
-                  style: DesignTokens.textMono,
-                ),
+                Text(item.lineTotal.toUgx(), style: DesignTokens.textMono),
               ],
             ),
           );
@@ -306,7 +311,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
         child: Column(
           children: rows.map((row) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: DesignTokens.spaceSm + DesignTokens.spaceXs),
+              padding: const EdgeInsets.only(
+                bottom: DesignTokens.spaceSm + DesignTokens.spaceXs,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -370,7 +377,8 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
       isScrollControlled: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + DesignTokens.spaceMd,
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom + DesignTokens.spaceMd,
           left: DesignTokens.spaceMd,
           right: DesignTokens.spaceMd,
           top: DesignTokens.spaceMd,

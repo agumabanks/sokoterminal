@@ -30,7 +30,8 @@ class CreativeLibraryPanel extends ConsumerStatefulWidget {
   final String currentBackground;
   final Item? product;
   final ValueChanged<CanvasElement> onInsert;
-  final void Function(List<CanvasElement> elements, String background) onInsertGroup;
+  final void Function(List<CanvasElement> elements, String background)
+  onInsertGroup;
   final ValueChanged<String> onApplyBackground;
 
   @override
@@ -64,7 +65,9 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
     if (asset.isPremium && !canPremium) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Upgrade to Growth/Pro to unlock premium creative assets ✨'),
+          content: Text(
+            'Upgrade to Growth/Pro to unlock premium creative assets ✨',
+          ),
         ),
       );
       return;
@@ -76,7 +79,10 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
   Widget build(BuildContext context) {
     final ent = ref.watch(studioEntitlementsProvider);
     final canPremium = _canUsePremium(ent);
-    final magic = magicLayoutsForCanvas(widget.canvasWidth, widget.canvasHeight);
+    final magic = magicLayoutsForCanvas(
+      widget.canvasWidth,
+      widget.canvasHeight,
+    );
 
     return Container(
       color: DesignTokens.brandPrimary,
@@ -87,8 +93,11 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded,
-                    color: DesignTokens.brandAccent, size: 16),
+                const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: DesignTokens.brandAccent,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
                 const Text(
                   'CREATIVE LIBRARY',
@@ -102,8 +111,10 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
                 const Spacer(),
                 if (!canPremium)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFd4af37).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(999),
@@ -126,7 +137,10 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
             unselectedLabelColor: Colors.white38,
             indicatorColor: DesignTokens.brandAccent,
             indicatorWeight: 2,
-            labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+            labelStyle: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
             tabs: const [
               Tab(text: '✨ Magic'),
               Tab(text: 'Overlays'),
@@ -148,7 +162,9 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
                     if (layout.isPremium && !canPremium) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Premium magic layouts need a Pro plan'),
+                          content: Text(
+                            'Premium magic layouts need a Pro plan',
+                          ),
                         ),
                       );
                       return;
@@ -161,13 +177,13 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
                   canvasHeight: widget.canvasHeight,
                   product: widget.product,
                   canPremium: canPremium,
-                  onInsert: (elements) => widget.onInsertGroup(
-                    elements,
-                    widget.currentBackground,
-                  ),
+                  onInsert: (elements) =>
+                      widget.onInsertGroup(elements, widget.currentBackground),
                 ),
                 _AssetGrid(
-                  assets: variableWordPresets.where((a) => !a.isPremium).toList(),
+                  assets: variableWordPresets
+                      .where((a) => !a.isPremium)
+                      .toList(),
                   onTap: (a) => _tryInsert(a, canPremium),
                 ),
                 _AssetGrid(
@@ -179,11 +195,15 @@ class _CreativeLibraryPanelState extends ConsumerState<CreativeLibraryPanel>
                   onTap: (a) => _tryInsert(a, canPremium),
                 ),
                 _AssetGrid(
-                  assets: illustrationAssets.where((a) => !a.isPremium).toList(),
+                  assets: illustrationAssets
+                      .where((a) => !a.isPremium)
+                      .toList(),
                   onTap: (a) => _tryInsert(a, canPremium),
                 ),
                 _AssetGrid(
-                  assets: allCreativeAssets().where((a) => a.isPremium).toList(),
+                  assets: allCreativeAssets()
+                      .where((a) => a.isPremium)
+                      .toList(),
                   onTap: (a) => _tryInsert(a, canPremium),
                   showPremiumLock: !canPremium,
                 ),
@@ -244,8 +264,11 @@ class _MagicGrid extends StatelessWidget {
                     Text(l.emoji, style: const TextStyle(fontSize: 22)),
                     if (locked) ...[
                       const Spacer(),
-                      Icon(Icons.lock_rounded,
-                          size: 14, color: Colors.white.withValues(alpha: 0.5)),
+                      Icon(
+                        Icons.lock_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
                     ],
                   ],
                 ),
@@ -311,12 +334,17 @@ class _AssetGrid extends StatelessWidget {
                 if (a.emoji != null)
                   Text(a.emoji!, style: const TextStyle(fontSize: 28))
                 else if (a.icon != null)
-                  Icon(a.icon,
-                      color: parseHexColor(a.element.fill ?? '#ffffff'),
-                      size: 28)
+                  Icon(
+                    a.icon,
+                    color: parseHexColor(a.element.fill ?? '#ffffff'),
+                    size: 28,
+                  )
                 else
-                  const Icon(Icons.category_rounded,
-                      color: Colors.white38, size: 24),
+                  const Icon(
+                    Icons.category_rounded,
+                    color: Colors.white38,
+                    size: 24,
+                  ),
                 const SizedBox(height: 6),
                 Text(
                   a.label,
@@ -332,7 +360,11 @@ class _AssetGrid extends StatelessWidget {
                 if (showPremiumLock || a.isPremium)
                   const Padding(
                     padding: EdgeInsets.only(top: 4),
-                    child: Icon(Icons.lock_rounded, size: 10, color: Color(0xFFd4af37)),
+                    child: Icon(
+                      Icons.lock_rounded,
+                      size: 10,
+                      color: Color(0xFFd4af37),
+                    ),
                   ),
               ],
             ),
@@ -395,8 +427,10 @@ class _OverlaysGridState extends ConsumerState<_OverlaysGrid> {
               return GestureDetector(
                 onTap: () => setState(() => _category = chip.$1),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: selected
                         ? DesignTokens.brandAccent.withValues(alpha: 0.25)
@@ -411,19 +445,22 @@ class _OverlaysGridState extends ConsumerState<_OverlaysGrid> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(chip.$3,
-                          size: 12,
-                          color: selected
-                              ? DesignTokens.brandAccent
-                              : Colors.white54),
+                      Icon(
+                        chip.$3,
+                        size: 12,
+                        color: selected
+                            ? DesignTokens.brandAccent
+                            : Colors.white54,
+                      ),
                       const SizedBox(width: 5),
                       Text(
                         chip.$2,
                         style: TextStyle(
                           color: selected ? Colors.white : Colors.white70,
                           fontSize: 10,
-                          fontWeight:
-                              selected ? FontWeight.w800 : FontWeight.w600,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                         ),
                       ),
                     ],
@@ -448,7 +485,8 @@ class _OverlaysGridState extends ConsumerState<_OverlaysGrid> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
-                            'Upgrade to Growth/Pro to unlock premium overlays ✨'),
+                          'Upgrade to Growth/Pro to unlock premium overlays ✨',
+                        ),
                       ),
                     );
                     return;
@@ -477,8 +515,7 @@ class _OverlaysGridState extends ConsumerState<_OverlaysGrid> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(o.emoji,
-                          style: const TextStyle(fontSize: 28)),
+                      Text(o.emoji, style: const TextStyle(fontSize: 28)),
                       const SizedBox(height: 6),
                       Text(
                         o.label,
@@ -495,8 +532,11 @@ class _OverlaysGridState extends ConsumerState<_OverlaysGrid> {
                       if (locked)
                         const Padding(
                           padding: EdgeInsets.only(top: 4),
-                          child: Icon(Icons.lock_rounded,
-                              size: 10, color: Color(0xFFd4af37)),
+                          child: Icon(
+                            Icons.lock_rounded,
+                            size: 10,
+                            color: Color(0xFFd4af37),
+                          ),
                         ),
                     ],
                   ),

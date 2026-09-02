@@ -19,13 +19,37 @@ class AlignmentBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _ABtn(Icons.align_horizontal_left_rounded, 'Left', () => onAlign(AlignMode.left)),
-          _ABtn(Icons.align_horizontal_center_rounded, 'Center', () => onAlign(AlignMode.centerH)),
-          _ABtn(Icons.align_horizontal_right_rounded, 'Right', () => onAlign(AlignMode.right)),
+          _ABtn(
+            Icons.align_horizontal_left_rounded,
+            'Left',
+            () => onAlign(AlignMode.left),
+          ),
+          _ABtn(
+            Icons.align_horizontal_center_rounded,
+            'Center',
+            () => onAlign(AlignMode.centerH),
+          ),
+          _ABtn(
+            Icons.align_horizontal_right_rounded,
+            'Right',
+            () => onAlign(AlignMode.right),
+          ),
           Container(width: 1, height: 20, color: Colors.white12),
-          _ABtn(Icons.align_vertical_top_rounded, 'Top', () => onAlign(AlignMode.top)),
-          _ABtn(Icons.align_vertical_center_rounded, 'Middle', () => onAlign(AlignMode.centerV)),
-          _ABtn(Icons.align_vertical_bottom_rounded, 'Bottom', () => onAlign(AlignMode.bottom)),
+          _ABtn(
+            Icons.align_vertical_top_rounded,
+            'Top',
+            () => onAlign(AlignMode.top),
+          ),
+          _ABtn(
+            Icons.align_vertical_center_rounded,
+            'Middle',
+            () => onAlign(AlignMode.centerV),
+          ),
+          _ABtn(
+            Icons.align_vertical_bottom_rounded,
+            'Bottom',
+            () => onAlign(AlignMode.bottom),
+          ),
         ],
       ),
     );
@@ -40,13 +64,13 @@ class _ABtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: label,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Icon(icon, color: Colors.white54, size: 18),
-          ),
-        ),
-      );
+    message: label,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Icon(icon, color: Colors.white54, size: 18),
+      ),
+    ),
+  );
 }

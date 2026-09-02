@@ -166,7 +166,8 @@ class NotificationsController extends StateNotifier<NotificationsState> {
             title: n.title,
             body: n.body,
             channelId: _channelForNotification(n),
-            payload: FcmNavigation.routeForMessageData(n.data) ??
+            payload:
+                FcmNavigation.routeForMessageData(n.data) ??
                 '/home/notifications',
           ),
         );

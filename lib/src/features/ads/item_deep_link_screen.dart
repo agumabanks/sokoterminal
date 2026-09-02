@@ -77,13 +77,15 @@ class _ItemDeepLinkScreenState extends ConsumerState<ItemDeepLinkScreen> {
     } else {
       page = ProductPreviewScreen(itemId: id);
     }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => page),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => page));
   }
 
   Future<void> _openWeb() async {
-    final path = widget.isService ? '/s/${widget.remoteId}' : '/p/${widget.remoteId}';
+    final path = widget.isService
+        ? '/s/${widget.remoteId}'
+        : '/p/${widget.remoteId}';
     final uri = Uri.parse('https://soko24.co$path');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -109,7 +111,9 @@ class _ItemDeepLinkScreenState extends ConsumerState<ItemDeepLinkScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Icon(
-            widget.isService ? Icons.design_services_outlined : Icons.inventory_2_outlined,
+            widget.isService
+                ? Icons.design_services_outlined
+                : Icons.inventory_2_outlined,
             size: 64,
             color: DesignTokens.brandAccent,
           ),
@@ -124,7 +128,9 @@ class _ItemDeepLinkScreenState extends ConsumerState<ItemDeepLinkScreen> {
             Text(
               _price!.toUgx(),
               textAlign: TextAlign.center,
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.inkMuted),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.inkMuted,
+              ),
             ),
           ],
           const SizedBox(height: 24),
@@ -140,7 +146,9 @@ class _ItemDeepLinkScreenState extends ConsumerState<ItemDeepLinkScreen> {
               backgroundColor: DesignTokens.brandAccent,
               foregroundColor: DesignTokens.canvas,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Open in browser'),
           ),

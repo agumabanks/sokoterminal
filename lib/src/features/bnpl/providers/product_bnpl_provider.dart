@@ -7,14 +7,12 @@ import '../models/product_bnpl_payload.dart';
 ///
 /// Falls back to `null` when the backend endpoint is unavailable so that the
 /// editor can safely show default (disabled) settings.
-final productBnplProvider =
-    FutureProvider.family.autoDispose<ProductBnplPayload?, int>(
-  (ref, productId) async {
-    final api = ref.watch(sellerApiProvider);
-    try {
-      return await api.getProductBnpl(productId);
-    } catch (_) {
-      return null;
-    }
-  },
-);
+final productBnplProvider = FutureProvider.family
+    .autoDispose<ProductBnplPayload?, int>((ref, productId) async {
+      final api = ref.watch(sellerApiProvider);
+      try {
+        return await api.getProductBnpl(productId);
+      } catch (_) {
+        return null;
+      }
+    });

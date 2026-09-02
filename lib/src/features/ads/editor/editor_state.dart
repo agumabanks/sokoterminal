@@ -37,7 +37,9 @@ class EditorState {
   CanvasElement? get selected => selectedId == null
       ? null
       : template.elements.cast<CanvasElement?>().firstWhere(
-          (e) => e?.id == selectedId, orElse: () => null);
+          (e) => e?.id == selectedId,
+          orElse: () => null,
+        );
 
   List<CanvasElement> get sortedElements =>
       [...template.elements]..sort((a, b) => a.zIndex.compareTo(b.zIndex));
@@ -51,26 +53,33 @@ class EditorState {
     bool? showGrid,
     bool? snapEnabled,
     Set<String>? multiSelected,
-  }) =>
-      EditorState(
-        template: template ?? this.template,
-        selectedId: selectedId == kSentinel ? this.selectedId : selectedId as String?,
-        activeSize: activeSize == kSentinel ? this.activeSize : activeSize as AdSize?,
-        undoStack: undoStack ?? this.undoStack,
-        redoStack: redoStack ?? this.redoStack,
-        showGrid: showGrid ?? this.showGrid,
-        snapEnabled: snapEnabled ?? this.snapEnabled,
-        multiSelected: multiSelected ?? this.multiSelected,
-      );
+  }) => EditorState(
+    template: template ?? this.template,
+    selectedId: selectedId == kSentinel
+        ? this.selectedId
+        : selectedId as String?,
+    activeSize: activeSize == kSentinel
+        ? this.activeSize
+        : activeSize as AdSize?,
+    undoStack: undoStack ?? this.undoStack,
+    redoStack: redoStack ?? this.redoStack,
+    showGrid: showGrid ?? this.showGrid,
+    snapEnabled: snapEnabled ?? this.snapEnabled,
+    multiSelected: multiSelected ?? this.multiSelected,
+  );
 }
 
 class EditorNotifier extends StateNotifier<EditorState> {
   EditorNotifier(AdTemplate initial)
-      : super(EditorState(
+    : super(
+        EditorState(
           template: initial,
           activeSize: findAdSizeFor(initial.canvasWidth, initial.canvasHeight),
-          undoStack: [(initial, findAdSizeFor(initial.canvasWidth, initial.canvasHeight))],
-        ));
+          undoStack: [
+            (initial, findAdSizeFor(initial.canvasWidth, initial.canvasHeight)),
+          ],
+        ),
+      );
 
   void _commit(AdTemplate next, {Object? activeSize = kSentinel}) {
     final undo = [...state.undoStack, (state.template, state.activeSize)];
@@ -84,21 +93,21 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   AdTemplate _rebuildTemplate(List<CanvasElement> elements) => AdTemplate(
-        id: state.template.id,
-        name: state.template.name,
-        category: state.template.category,
-        canvasWidth: state.template.canvasWidth,
-        canvasHeight: state.template.canvasHeight,
-        background: state.template.background,
-        elements: elements,
-        previewColors: state.template.previewColors,
-        tags: state.template.tags,
-        industry: state.template.industry,
-        season: state.template.season,
-        complexity: state.template.complexity,
-        suggestedCaption: state.template.suggestedCaption,
-        marketingGoal: state.template.marketingGoal,
-      );
+    id: state.template.id,
+    name: state.template.name,
+    category: state.template.category,
+    canvasWidth: state.template.canvasWidth,
+    canvasHeight: state.template.canvasHeight,
+    background: state.template.background,
+    elements: elements,
+    previewColors: state.template.previewColors,
+    tags: state.template.tags,
+    industry: state.template.industry,
+    season: state.template.season,
+    complexity: state.template.complexity,
+    suggestedCaption: state.template.suggestedCaption,
+    marketingGoal: state.template.marketingGoal,
+  );
 
   void undo() {
     if (state.undoStack.length <= 1) return;
@@ -135,7 +144,8 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void updateElement(CanvasElement el) {
     final elements = [
-      for (final e in state.template.elements) if (e.id == el.id) el else e,
+      for (final e in state.template.elements)
+        if (e.id == el.id) el else e,
     ];
     _commit(_rebuildTemplate(elements));
   }
@@ -151,8 +161,11 @@ class EditorNotifier extends StateNotifier<EditorState> {
   }
 
   void deleteElement(String id) {
-    _commit(_rebuildTemplate(
-        state.template.elements.where((e) => e.id != id).toList()));
+    _commit(
+      _rebuildTemplate(
+        state.template.elements.where((e) => e.id != id).toList(),
+      ),
+    );
     state = state.copyWith(selectedId: kSentinel);
   }
 
@@ -164,19 +177,36 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final el = state.selected;
     if (el == null) return;
     final id = 'el_${DateTime.now().millisecondsSinceEpoch}';
-    addElement(CanvasElement(
-      id: id, type: el.type, text: el.text, src: el.src,
-      x: el.x + 30, y: el.y + 30,
-      width: el.width, height: el.height,
-      fontSize: el.fontSize, fontWeight: el.fontWeight, fontFamily: el.fontFamily,
-      fill: el.fill, align: el.align, cornerRadius: el.cornerRadius,
-      opacity: el.opacity, textDecoration: el.textDecoration,
-      rotation: el.rotation, zIndex: el.zIndex + 1,
-      letterSpacing: el.letterSpacing, lineHeight: el.lineHeight,
-      shadowColor: el.shadowColor, shadowDx: el.shadowDx,
-      shadowDy: el.shadowDy, shadowBlur: el.shadowBlur,
-      strokeColor: el.strokeColor, strokeWidth: el.strokeWidth,
-    ));
+    addElement(
+      CanvasElement(
+        id: id,
+        type: el.type,
+        text: el.text,
+        src: el.src,
+        x: el.x + 30,
+        y: el.y + 30,
+        width: el.width,
+        height: el.height,
+        fontSize: el.fontSize,
+        fontWeight: el.fontWeight,
+        fontFamily: el.fontFamily,
+        fill: el.fill,
+        align: el.align,
+        cornerRadius: el.cornerRadius,
+        opacity: el.opacity,
+        textDecoration: el.textDecoration,
+        rotation: el.rotation,
+        zIndex: el.zIndex + 1,
+        letterSpacing: el.letterSpacing,
+        lineHeight: el.lineHeight,
+        shadowColor: el.shadowColor,
+        shadowDx: el.shadowDx,
+        shadowDy: el.shadowDy,
+        shadowBlur: el.shadowBlur,
+        strokeColor: el.strokeColor,
+        strokeWidth: el.strokeWidth,
+      ),
+    );
   }
 
   void bringForward() {
@@ -232,19 +262,24 @@ class EditorNotifier extends StateNotifier<EditorState> {
 
   void setBackground(String hex) {
     _commit(_rebuildTemplate(state.template.elements));
-    _commit(AdTemplate(
-      id: state.template.id, name: state.template.name,
-      category: state.template.category,
-      canvasWidth: state.template.canvasWidth, canvasHeight: state.template.canvasHeight,
-      background: hex, elements: state.template.elements,
-      previewColors: state.template.previewColors,
-      tags: state.template.tags,
-      industry: state.template.industry,
-      season: state.template.season,
-      complexity: state.template.complexity,
-      suggestedCaption: state.template.suggestedCaption,
-      marketingGoal: state.template.marketingGoal,
-    ));
+    _commit(
+      AdTemplate(
+        id: state.template.id,
+        name: state.template.name,
+        category: state.template.category,
+        canvasWidth: state.template.canvasWidth,
+        canvasHeight: state.template.canvasHeight,
+        background: hex,
+        elements: state.template.elements,
+        previewColors: state.template.previewColors,
+        tags: state.template.tags,
+        industry: state.template.industry,
+        season: state.template.season,
+        complexity: state.template.complexity,
+        suggestedCaption: state.template.suggestedCaption,
+        marketingGoal: state.template.marketingGoal,
+      ),
+    );
   }
 
   void applyMagicLayout(String background, List<CanvasElement> elements) {
@@ -260,22 +295,24 @@ class EditorNotifier extends StateNotifier<EditorState> {
           preservePosition: true,
         ).copyWith(zIndex: maxZ + i + 1),
     ];
-    _commit(AdTemplate(
-      id: state.template.id,
-      name: state.template.name,
-      category: state.template.category,
-      canvasWidth: state.template.canvasWidth,
-      canvasHeight: state.template.canvasHeight,
-      background: background,
-      elements: [...state.template.elements, ...stamped],
-      previewColors: state.template.previewColors,
-      tags: state.template.tags,
-      industry: state.template.industry,
-      season: state.template.season,
-      complexity: state.template.complexity,
-      suggestedCaption: state.template.suggestedCaption,
-      marketingGoal: state.template.marketingGoal,
-    ));
+    _commit(
+      AdTemplate(
+        id: state.template.id,
+        name: state.template.name,
+        category: state.template.category,
+        canvasWidth: state.template.canvasWidth,
+        canvasHeight: state.template.canvasHeight,
+        background: background,
+        elements: [...state.template.elements, ...stamped],
+        previewColors: state.template.previewColors,
+        tags: state.template.tags,
+        industry: state.template.industry,
+        season: state.template.season,
+        complexity: state.template.complexity,
+        suggestedCaption: state.template.suggestedCaption,
+        marketingGoal: state.template.marketingGoal,
+      ),
+    );
   }
 
   void alignSelected(AlignMode mode, {CanvasElement? relTo}) {
@@ -286,12 +323,18 @@ class EditorNotifier extends StateNotifier<EditorState> {
     final ref = relTo;
     double? nx, ny;
     switch (mode) {
-      case AlignMode.left:   nx = ref?.x ?? 0;
-      case AlignMode.centerH: nx = (ref != null ? ref.x + ref.width / 2 : cw / 2) - el.width / 2;
-      case AlignMode.right:  nx = (ref != null ? ref.x + ref.width : cw) - el.width;
-      case AlignMode.top:    ny = ref?.y ?? 0;
-      case AlignMode.centerV: ny = (ref != null ? ref.y + ref.height / 2 : ch / 2) - el.height / 2;
-      case AlignMode.bottom: ny = (ref != null ? ref.y + ref.height : ch) - el.height;
+      case AlignMode.left:
+        nx = ref?.x ?? 0;
+      case AlignMode.centerH:
+        nx = (ref != null ? ref.x + ref.width / 2 : cw / 2) - el.width / 2;
+      case AlignMode.right:
+        nx = (ref != null ? ref.x + ref.width : cw) - el.width;
+      case AlignMode.top:
+        ny = ref?.y ?? 0;
+      case AlignMode.centerV:
+        ny = (ref != null ? ref.y + ref.height / 2 : ch / 2) - el.height / 2;
+      case AlignMode.bottom:
+        ny = (ref != null ? ref.y + ref.height : ch) - el.height;
     }
     updateElement(el.copyWith(x: nx ?? el.x, y: ny ?? el.y));
   }
@@ -300,18 +343,24 @@ class EditorNotifier extends StateNotifier<EditorState> {
   void toggleSnap() => state = state.copyWith(snapEnabled: !state.snapEnabled);
 
   void renameTemplate(String name) {
-    _commit(AdTemplate(
-      id: state.template.id, name: name, category: state.template.category,
-      canvasWidth: state.template.canvasWidth, canvasHeight: state.template.canvasHeight,
-      background: state.template.background, elements: state.template.elements,
-      previewColors: state.template.previewColors,
-      tags: state.template.tags,
-      industry: state.template.industry,
-      season: state.template.season,
-      complexity: state.template.complexity,
-      suggestedCaption: state.template.suggestedCaption,
-      marketingGoal: state.template.marketingGoal,
-    ));
+    _commit(
+      AdTemplate(
+        id: state.template.id,
+        name: name,
+        category: state.template.category,
+        canvasWidth: state.template.canvasWidth,
+        canvasHeight: state.template.canvasHeight,
+        background: state.template.background,
+        elements: state.template.elements,
+        previewColors: state.template.previewColors,
+        tags: state.template.tags,
+        industry: state.template.industry,
+        season: state.template.season,
+        complexity: state.template.complexity,
+        suggestedCaption: state.template.suggestedCaption,
+        marketingGoal: state.template.marketingGoal,
+      ),
+    );
   }
 
   /// Resizes the canvas to [size] and uniformly scales every element so the
@@ -319,7 +368,9 @@ class EditorNotifier extends StateNotifier<EditorState> {
   /// Elements that fall outside the new canvas remain in the model.
   void resizeToSize(AdSize size) {
     final tpl = state.template;
-    if (tpl.canvasWidth == size.width && tpl.canvasHeight == size.height) return;
+    if (tpl.canvasWidth == size.width && tpl.canvasHeight == size.height) {
+      return;
+    }
     final scaled = scaleTemplateToSize(tpl, size);
     _commit(scaled, activeSize: size);
   }
@@ -329,5 +380,5 @@ enum AlignMode { left, centerH, right, top, centerV, bottom }
 
 final editorProvider =
     StateNotifierProvider.family<EditorNotifier, EditorState, AdTemplate>(
-  (ref, tpl) => EditorNotifier(tpl),
-);
+      (ref, tpl) => EditorNotifier(tpl),
+    );

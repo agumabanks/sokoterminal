@@ -104,7 +104,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
+              child: _GlowBlob(
+                color: _accent.withValues(alpha: 0.16),
+                size: 420,
+              ),
             ),
             Positioned(
               bottom: -160,
@@ -375,7 +378,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       fillColor: Colors.transparent,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 8),
-        child: Icon(icon, color: Colors.white.withValues(alpha: 0.35), size: 22),
+        child: Icon(
+          icon,
+          color: Colors.white.withValues(alpha: 0.35),
+          size: 22,
+        ),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       labelText: label,
@@ -473,7 +480,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   fontWeight: FontWeight.w600,
                 ),
                 hintText: '706272481',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.18)),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.18),
+                ),
               ),
               onFieldSubmitted: (_) => _passFocus.requestFocus(),
               validator: (value) {

@@ -54,12 +54,7 @@ const _aida = CopyFramework(
     'Every item is checked, packed with care, and delivered to your door. Satisfaction guaranteed.',
     'Join hundreds of happy customers who trust us for quality and speed.',
   ],
-  ctas: [
-    'Shop Now',
-    'Order Today',
-    'Grab Yours',
-    'Buy Now',
-  ],
+  ctas: ['Shop Now', 'Order Today', 'Grab Yours', 'Buy Now'],
 );
 
 // ---------------------------------------------------------------------------
@@ -84,12 +79,7 @@ const _pas = CopyFramework(
     'No more disappointment. Every order is quality-checked and delivered fast across Uganda.',
     'Say goodbye to overpriced, low-quality goods. Experience the difference with us.',
   ],
-  ctas: [
-    'Fix It Now',
-    'Get the Solution',
-    'Shop Smarter',
-    'Try Us Today',
-  ],
+  ctas: ['Fix It Now', 'Get the Solution', 'Shop Smarter', 'Try Us Today'],
 );
 
 // ---------------------------------------------------------------------------
@@ -112,11 +102,7 @@ const _fab = CopyFramework(
     '✓ Top-grade materials → Longer lasting\n✓ Fast local delivery → Save time\n✓ Friendly support → Peace of mind',
     '✓ Carefully selected → No regrets\n✓ Affordable pricing → More value\n✓ Easy ordering → Stress-free shopping',
   ],
-  ctas: [
-    'See the Benefits',
-    'Order Now',
-    'Shop Smart',
-  ],
+  ctas: ['See the Benefits', 'Order Now', 'Shop Smart'],
 );
 
 // ---------------------------------------------------------------------------
@@ -139,11 +125,7 @@ const socialProofFramework = CopyFramework(
     '"Best purchase I\'ve made this year!" — Sarah, Kampala\n\n"Fast delivery and amazing quality." — John, Entebbe',
     'Trusted by families, businesses, and students across Uganda.',
   ],
-  ctas: [
-    'Join Them',
-    'Shop Like They Do',
-    'See Why They Love Us',
-  ],
+  ctas: ['Join Them', 'Shop Like They Do', 'See Why They Love Us'],
 );
 
 // ---------------------------------------------------------------------------
@@ -166,12 +148,7 @@ const _scarcity = CopyFramework(
     'Limited stock available. Secure yours before someone else does.',
     'High demand, limited supply. Order now to avoid disappointment.',
   ],
-  ctas: [
-    'Claim Yours',
-    'Buy Before It\'s Gone',
-    'Secure Now',
-    'Hurry — Order',
-  ],
+  ctas: ['Claim Yours', 'Buy Before It\'s Gone', 'Secure Now', 'Hurry — Order'],
 );
 
 // ---------------------------------------------------------------------------
@@ -194,11 +171,7 @@ const _story = CopyFramework(
     'What began as a passion for quality has grown into a trusted brand. Every item we sell carries that same spirit.',
     'We believe every customer deserves the best. That\'s why we handpick, inspect, and deliver with care.',
   ],
-  ctas: [
-    'Be Part of the Story',
-    'Shop Our Journey',
-    'Experience It',
-  ],
+  ctas: ['Be Part of the Story', 'Shop Our Journey', 'Experience It'],
 );
 
 // ---------------------------------------------------------------------------
@@ -222,11 +195,7 @@ const welcomeFramework = CopyFramework(
     'At {{BUSINESS}}, we believe in quality, trust, and fast service. Every order is handled with care.',
     'From Kampala to every corner of Uganda — we deliver happiness to your doorstep.',
   ],
-  ctas: [
-    'Explore Our Shop',
-    'See What We Offer',
-    'Visit Us',
-  ],
+  ctas: ['Explore Our Shop', 'See What We Offer', 'Visit Us'],
 );
 
 const contactFramework = CopyFramework(
@@ -238,19 +207,12 @@ const contactFramework = CopyFramework(
     'Visit {{BUSINESS}} Today',
     'Let\'s Connect',
   ],
-  subheadlines: [
-    '{{LOCATION}}',
-    'Easy to reach. Always happy to help.',
-  ],
+  subheadlines: ['{{LOCATION}}', 'Easy to reach. Always happy to help.'],
   bodies: [
     '📍 {{LOCATION}}\n📞 {{PHONE}}\n💬 {{WHATSAPP}}\n🌐 {{CTA_LINK}}',
     'Have questions? Reach out anytime. We\'re here to help you find exactly what you need.',
   ],
-  ctas: [
-    'Call Now',
-    'WhatsApp Us',
-    'Get Directions',
-  ],
+  ctas: ['Call Now', 'WhatsApp Us', 'Get Directions'],
 );
 
 const trustFramework = CopyFramework(
@@ -269,11 +231,7 @@ const trustFramework = CopyFramework(
   bodies: [
     '✓ Every item inspected before shipping\n✓ Fast delivery across Uganda\n✓ Friendly customer support\n✓ Money-back guarantee',
   ],
-  ctas: [
-    'Shop with Confidence',
-    'Trust Us Today',
-    'Our Guarantee',
-  ],
+  ctas: ['Shop with Confidence', 'Trust Us Today', 'Our Guarantee'],
 );
 
 const referralFramework = CopyFramework(
@@ -292,11 +250,7 @@ const referralFramework = CopyFramework(
   bodies: [
     'Tell your friends about {{BUSINESS}} and enjoy exclusive perks. The more you share, the more you earn.',
   ],
-  ctas: [
-    'Share Now',
-    'Refer Friends',
-    'Get My Link',
-  ],
+  ctas: ['Share Now', 'Refer Friends', 'Get My Link'],
 );
 
 // ---------------------------------------------------------------------------

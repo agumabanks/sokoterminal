@@ -30,7 +30,8 @@ class CreativeOverlay {
     required BrandKit kit,
     required StudioVariableContext? context,
     Item? product,
-  }) build;
+  })
+  build;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,19 +86,18 @@ CanvasElement _overlayFigure({
   double? cornerRadius,
   double opacity = 1.0,
   String? groupId,
-}) =>
-    CanvasElement(
-      id: id,
-      type: 'figure',
-      x: x,
-      y: y,
-      width: width,
-      height: height,
-      fill: fill,
-      cornerRadius: cornerRadius,
-      opacity: opacity,
-      groupId: groupId,
-    );
+}) => CanvasElement(
+  id: id,
+  type: 'figure',
+  x: x,
+  y: y,
+  width: width,
+  height: height,
+  fill: fill,
+  cornerRadius: cornerRadius,
+  opacity: opacity,
+  groupId: groupId,
+);
 
 CanvasElement _overlayText({
   required String id,
@@ -115,25 +115,24 @@ CanvasElement _overlayText({
   String? shadowColor,
   double shadowBlur = 6,
   double opacity = 1.0,
-}) =>
-    CanvasElement(
-      id: id,
-      type: 'text',
-      text: text,
-      x: x,
-      y: y,
-      width: width,
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      fontFamily: fontFamily,
-      fill: fill,
-      align: align,
-      groupId: groupId,
-      letterSpacing: letterSpacing,
-      shadowColor: shadowColor,
-      shadowBlur: shadowBlur,
-      opacity: opacity,
-    );
+}) => CanvasElement(
+  id: id,
+  type: 'text',
+  text: text,
+  x: x,
+  y: y,
+  width: width,
+  fontSize: fontSize,
+  fontWeight: fontWeight,
+  fontFamily: fontFamily,
+  fill: fill,
+  align: align,
+  groupId: groupId,
+  letterSpacing: letterSpacing,
+  shadowColor: shadowColor,
+  shadowBlur: shadowBlur,
+  opacity: opacity,
+);
 
 // ---------------------------------------------------------------------------
 // Builders

@@ -160,7 +160,9 @@ class _BusinessDetailsEnhancedScreenState
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
                                   ),
-                                  side: const BorderSide(color: DesignTokens.info),
+                                  side: const BorderSide(
+                                    color: DesignTokens.info,
+                                  ),
                                   foregroundColor: DesignTokens.info,
                                 ),
                               ),

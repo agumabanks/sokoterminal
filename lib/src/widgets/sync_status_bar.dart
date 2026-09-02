@@ -76,10 +76,7 @@ class _PulsingErrorBarState extends State<_PulsingErrorBar>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _controller.drive(Tween<double>(begin: 0.4, end: 1.0)),
-      child: Container(
-        height: 2,
-        color: DesignTokens.error,
-      ),
+      child: Container(height: 2, color: DesignTokens.error),
     );
   }
 }

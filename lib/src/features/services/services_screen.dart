@@ -10,6 +10,8 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/service_publish_utils.dart';
 import '../../widgets/sync_status_badge.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/loading_state.dart';
 import '../ads/ad_templates.dart';
 import '../ads/brand_kit_screen.dart';
 import '../ads/studio_editor_launcher.dart';
@@ -22,6 +24,7 @@ import 'service_edit_screen.dart';
 import 'service_insights_screen.dart';
 import 'service_detail_screen.dart';
 import 'service_tile_widgets.dart';
+
 const _servicesViewModeKey = 'services_view_mode';
 
 class ServicesScreen extends ConsumerStatefulWidget {
@@ -47,7 +50,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
     final saved = prefs.getString(_servicesViewModeKey);
     if (!mounted || saved == null) return;
     setState(() {
-      _viewMode = saved == 'grid' ? ServicesViewMode.grid : ServicesViewMode.list;
+      _viewMode = saved == 'grid'
+          ? ServicesViewMode.grid
+          : ServicesViewMode.list;
     });
   }
 
@@ -79,23 +84,23 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
 
     final db = ref.read(appDatabaseProvider);
     final sync = ref.read(syncServiceProvider);
-    final next = service.toCompanion(true).copyWith(
-      publishedOnline: Value(value),
-      moderationStatus: value
-          ? const Value.absent()
-          : const Value(null),
-      synced: const Value(false),
-      updatedAt: Value(DateTime.now().toUtc()),
-    );
+    final next = service
+        .toCompanion(true)
+        .copyWith(
+          publishedOnline: Value(value),
+          moderationStatus: value ? const Value.absent() : const Value(null),
+          synced: const Value(false),
+          updatedAt: Value(DateTime.now().toUtc()),
+        );
     final payload = buildServiceSyncPayload(
       service.copyWith(
         publishedOnline: value,
-        moderationStatus: value
-            ? const Value.absent()
-            : const Value(null),
+        moderationStatus: value ? const Value.absent() : const Value(null),
       ),
     );
-    final opType = service.remoteId == null ? 'service_create' : 'service_update';
+    final opType = service.remoteId == null
+        ? 'service_create'
+        : 'service_update';
     try {
       await db.saveServiceAndEnqueueSync(
         service: next,
@@ -115,7 +120,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                 : 'Service moved to draft',
           ),
           backgroundColor: DesignTokens.brandAccent,
-          duration: value ? const Duration(seconds: 5) : const Duration(seconds: 3),
+          duration: value
+              ? const Duration(seconds: 5)
+              : const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -159,11 +166,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
   }
 
   Future<void> _designInStudio(Service service) async {
-    final file = await launchStudioForService(
-      context,
-      ref,
-      service: service,
-    );
+    final file = await launchStudioForService(context, ref, service: service);
     if (file != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -292,7 +295,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
-                          onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                          onChanged: (v) =>
+                              setState(() => _searchQuery = v.toLowerCase()),
                           style: DesignTokens.textBody,
                           decoration: InputDecoration(
                             hintText: 'Search services',
@@ -300,7 +304,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                               color: DesignTokens.textTertiary,
                             ),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -317,10 +323,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                       ),
                     ),
                     const SizedBox(width: DesignTokens.spaceSm),
-                    _ViewModeToggle(
-                      mode: _viewMode,
-                      onChanged: _setViewMode,
-                    ),
+                    _ViewModeToggle(mode: _viewMode, onChanged: _setViewMode),
                   ],
                 ),
               ],
@@ -358,7 +361,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                     ),
                     Expanded(
                       child: RefreshIndicator(
-                        onRefresh: () => ref.read(syncServiceProvider).pullSellerServices(),
+                        onRefresh: () =>
+                            ref.read(syncServiceProvider).pullSellerServices(),
                         child: _viewMode == ServicesViewMode.grid
                             ? GridView.builder(
                                 padding: const EdgeInsets.symmetric(
@@ -368,11 +372,11 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                                 cacheExtent: 640,
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: DesignTokens.spaceSm,
-                                  crossAxisSpacing: DesignTokens.spaceSm,
-                                  childAspectRatio: 0.78,
-                                ),
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: DesignTokens.spaceSm,
+                                      crossAxisSpacing: DesignTokens.spaceSm,
+                                      childAspectRatio: 0.78,
+                                    ),
                                 itemCount: filtered.length,
                                 itemBuilder: (context, index) {
                                   final service = filtered[index];
@@ -412,8 +416,12 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                   ],
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              loading: () => const LoadingState(label: 'Opening services…'),
+              error: (e, _) => ErrorState(
+                message:
+                    'Your saved services are safe. Try opening them again.',
+                onRetry: () => ref.invalidate(servicesStreamProvider),
+              ),
             ),
           ),
         ],
@@ -446,9 +454,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
       case 'sync':
         await ref.read(syncServiceProvider).pullSellerServices();
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Services synced')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Services synced')));
         }
     }
   }
@@ -459,14 +467,10 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
       MaterialPageRoute(builder: (_) => const ServiceEditScreen()),
     );
   }
-
 }
 
 class _ServicesFilterBar extends StatelessWidget {
-  const _ServicesFilterBar({
-    required this.filter,
-    required this.onChanged,
-  });
+  const _ServicesFilterBar({required this.filter, required this.onChanged});
 
   final ServicesFilter filter;
   final ValueChanged<ServicesFilter> onChanged;
@@ -559,10 +563,7 @@ class _ServicesFilterSegment extends StatelessWidget {
 }
 
 class _ViewModeToggle extends StatelessWidget {
-  const _ViewModeToggle({
-    required this.mode,
-    required this.onChanged,
-  });
+  const _ViewModeToggle({required this.mode, required this.onChanged});
 
   final ServicesViewMode mode;
   final ValueChanged<ServicesViewMode> onChanged;
@@ -574,9 +575,8 @@ class _ViewModeToggle extends StatelessWidget {
       color: DesignTokens.surfaceRaised,
       borderRadius: DesignTokens.borderRadiusFull,
       child: InkWell(
-        onTap: () => onChanged(
-          isGrid ? ServicesViewMode.list : ServicesViewMode.grid,
-        ),
+        onTap: () =>
+            onChanged(isGrid ? ServicesViewMode.list : ServicesViewMode.grid),
         borderRadius: DesignTokens.borderRadiusFull,
         splashFactory: NoSplash.splashFactory,
         child: Container(

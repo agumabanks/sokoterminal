@@ -17,7 +17,8 @@ class ServiceCalendarScreen extends ConsumerStatefulWidget {
   const ServiceCalendarScreen({super.key});
 
   @override
-  ConsumerState<ServiceCalendarScreen> createState() => _ServiceCalendarScreenState();
+  ConsumerState<ServiceCalendarScreen> createState() =>
+      _ServiceCalendarScreenState();
 }
 
 class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
@@ -33,11 +34,17 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
 
   DateTime _startOfWeek(DateTime d) {
     final weekday = d.weekday; // 1=Mon
-    return DateTime(d.year, d.month, d.day).subtract(Duration(days: weekday - 1));
+    return DateTime(
+      d.year,
+      d.month,
+      d.day,
+    ).subtract(Duration(days: weekday - 1));
   }
 
-  void _prevWeek() => setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
-  void _nextWeek() => setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
+  void _prevWeek() =>
+      setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
+  void _nextWeek() =>
+      setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
   void _goToday() => setState(() => _weekStart = _startOfWeek(DateTime.now()));
 
   void _showBookingDetail(Map<String, dynamic> booking) {
@@ -75,12 +82,7 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
         title: const Text('Schedule'),
-        actions: [
-          TextButton(
-            onPressed: _goToday,
-            child: const Text('Today'),
-          ),
-        ],
+        actions: [TextButton(onPressed: _goToday, child: const Text('Today'))],
       ),
       body: Column(
         children: [
@@ -110,11 +112,14 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
 
           // Day headers
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd),
+            padding: const EdgeInsets.symmetric(
+              horizontal: DesignTokens.spaceMd,
+            ),
             child: Row(
               children: List.generate(7, (i) {
                 final day = _weekStart.add(Duration(days: i));
-                final isToday = day.year == DateTime.now().year &&
+                final isToday =
+                    day.year == DateTime.now().year &&
                     day.month == DateTime.now().month &&
                     day.day == DateTime.now().day;
                 return Expanded(
@@ -123,7 +128,9 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isToday ? DesignTokens.brandAccent.withValues(alpha: 0.1) : null,
+                        color: isToday
+                            ? DesignTokens.brandAccent.withValues(alpha: 0.1)
+                            : null,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -133,7 +140,9 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: isToday ? DesignTokens.brandAccent : DesignTokens.grayMedium,
+                              color: isToday
+                                  ? DesignTokens.brandAccent
+                                  : DesignTokens.grayMedium,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -142,7 +151,9 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: isToday ? DesignTokens.brandAccent : DesignTokens.textPrimary,
+                              color: isToday
+                                  ? DesignTokens.brandAccent
+                                  : DesignTokens.textPrimary,
                             ),
                           ),
                         ],
@@ -158,13 +169,19 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
           // Booking cards by day
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: DesignTokens.spaceMd),
+              padding: const EdgeInsets.symmetric(
+                horizontal: DesignTokens.spaceMd,
+              ),
               children: List.generate(7, (i) {
                 final day = _weekStart.add(Duration(days: i));
                 final bookings = byDay[day] ?? [];
                 bookings.sort((a, b) {
-                  final aStart = DateTime.tryParse(a['scheduled_start']?.toString() ?? '');
-                  final bStart = DateTime.tryParse(b['scheduled_start']?.toString() ?? '');
+                  final aStart = DateTime.tryParse(
+                    a['scheduled_start']?.toString() ?? '',
+                  );
+                  final bStart = DateTime.tryParse(
+                    b['scheduled_start']?.toString() ?? '',
+                  );
                   if (aStart == null || bStart == null) return 0;
                   return aStart.compareTo(bStart);
                 });
@@ -175,7 +192,9 @@ class _ServiceCalendarScreenState extends ConsumerState<ServiceCalendarScreen> {
                     if (i > 0) const SizedBox(height: 12),
                     Text(
                       _dateFormat.format(day),
-                      style: DesignTokens.textSmallBold.copyWith(color: DesignTokens.grayMedium),
+                      style: DesignTokens.textSmallBold.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     if (bookings.isEmpty)
@@ -230,15 +249,17 @@ class _BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = (booking['offering'] is Map
+    final title =
+        (booking['offering'] is Map
             ? booking['offering']['title']?.toString()
             : null) ??
         'Booking';
-    final customer = (booking['user'] is Map
-            ? booking['user']['name']?.toString()
-            : null) ??
+    final customer =
+        (booking['user'] is Map ? booking['user']['name']?.toString() : null) ??
         'Customer';
-    final start = DateTime.tryParse(booking['scheduled_start']?.toString() ?? '');
+    final start = DateTime.tryParse(
+      booking['scheduled_start']?.toString() ?? '',
+    );
     final end = DateTime.tryParse(booking['scheduled_end']?.toString() ?? '');
     final price = double.tryParse(booking['price']?.toString() ?? '') ?? 0;
     final status = booking['status']?.toString() ?? 'pending';
@@ -282,11 +303,20 @@ class _BookingCard extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
-                      Text(customer, style: const TextStyle(fontSize: 13, color: DesignTokens.grayMedium)),
+                      Text(
+                        customer,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
                       if (start != null && end != null)
                         Text(
                           '${timeFormat.format(start)} — ${timeFormat.format(end)}',
-                          style: const TextStyle(fontSize: 12, color: DesignTokens.grayMedium),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: DesignTokens.grayMedium,
+                          ),
                         ),
                     ],
                   ),
@@ -295,7 +325,10 @@ class _BookingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(999),
@@ -311,8 +344,11 @@ class _BookingCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'UGX ${price.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                      '${price.toStringAsFixed(0)} /=',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),

@@ -21,8 +21,9 @@ class ServiceCategoryOption {
   final String? parentName;
   final String? slug;
 
-  String get displayLabel =>
-      parentName != null && parentName!.isNotEmpty ? '$parentName › $name' : name;
+  String get displayLabel => parentName != null && parentName!.isNotEmpty
+      ? '$parentName › $name'
+      : name;
 }
 
 List<ServiceCategoryOption> _parseCategories(dynamic body) {
@@ -30,63 +31,59 @@ List<ServiceCategoryOption> _parseCategories(dynamic body) {
   final data = body['data'];
   if (data is! List) return const [];
 
-  return data
-      .whereType<Map>()
-      .expand((parent) {
-        final parentId = int.tryParse(parent['id']?.toString() ?? '');
-        final parentName = parent['name']?.toString() ?? '';
-        if (parentId == null) return const <ServiceCategoryOption>[];
+  return data.whereType<Map>().expand((parent) {
+    final parentId = int.tryParse(parent['id']?.toString() ?? '');
+    final parentName = parent['name']?.toString() ?? '';
+    if (parentId == null) return const <ServiceCategoryOption>[];
 
-        final children = parent['children'];
-        if (children is List && children.isNotEmpty) {
-          return children.whereType<Map>().map((child) {
-            final childId = int.tryParse(child['id']?.toString() ?? '');
-            if (childId == null) return null;
-            return ServiceCategoryOption(
-              id: childId,
-              name: child['name']?.toString() ?? 'Category',
-              parentId: parentId,
-              parentName: parentName,
-              slug: child['slug']?.toString(),
-            );
-          }).whereType<ServiceCategoryOption>();
-        }
+    final children = parent['children'];
+    if (children is List && children.isNotEmpty) {
+      return children.whereType<Map>().map((child) {
+        final childId = int.tryParse(child['id']?.toString() ?? '');
+        if (childId == null) return null;
+        return ServiceCategoryOption(
+          id: childId,
+          name: child['name']?.toString() ?? 'Category',
+          parentId: parentId,
+          parentName: parentName,
+          slug: child['slug']?.toString(),
+        );
+      }).whereType<ServiceCategoryOption>();
+    }
 
-        return [
-          ServiceCategoryOption(
-            id: parentId,
-            name: parentName.isNotEmpty ? parentName : 'Category',
-            slug: parent['slug']?.toString(),
-          ),
-        ];
-      })
-      .toList()
-    ..sort((a, b) => a.displayLabel.compareTo(b.displayLabel));
+    return [
+      ServiceCategoryOption(
+        id: parentId,
+        name: parentName.isNotEmpty ? parentName : 'Category',
+        slug: parent['slug']?.toString(),
+      ),
+    ];
+  }).toList()..sort((a, b) => a.displayLabel.compareTo(b.displayLabel));
 }
 
 final serviceCategoriesProvider =
     FutureProvider.autoDispose<List<ServiceCategoryOption>>((ref) async {
-  final api = ref.read(sellerApiProvider);
-  final prefs = ref.read(sharedPreferencesProvider);
+      final api = ref.read(sellerApiProvider);
+      final prefs = ref.read(sharedPreferencesProvider);
 
-  try {
-    final res = await api.fetchServiceCategories();
-    final body = res.data;
-    final categories = _parseCategories(body);
-    // Cache the raw payload so category selection works offline next time.
-    if (body is Map) {
-      await prefs.setString(_kServiceCategoriesCacheKey, jsonEncode(body));
-    }
-    return categories;
-  } catch (e) {
-    final cached = prefs.getString(_kServiceCategoriesCacheKey);
-    if (cached != null && cached.isNotEmpty) {
       try {
-        return _parseCategories(jsonDecode(cached));
-      } catch (_) {
-        // Fall through to empty list if cached JSON is corrupt.
+        final res = await api.fetchServiceCategories();
+        final body = res.data;
+        final categories = _parseCategories(body);
+        // Cache the raw payload so category selection works offline next time.
+        if (body is Map) {
+          await prefs.setString(_kServiceCategoriesCacheKey, jsonEncode(body));
+        }
+        return categories;
+      } catch (e) {
+        final cached = prefs.getString(_kServiceCategoriesCacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          try {
+            return _parseCategories(jsonDecode(cached));
+          } catch (_) {
+            // Fall through to empty list if cached JSON is corrupt.
+          }
+        }
+        return const [];
       }
-    }
-    return const [];
-  }
-});
+    });

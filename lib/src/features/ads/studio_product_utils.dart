@@ -17,7 +17,7 @@ class StudioShareDetails {
     this.includePhone = true,
     this.includeBusiness = true,
     this.includeLocation = true,
-    this.includeTagline = true,
+    this.includeTagline = false,
     this.includeCategory = false,
     this.includeHashtags = true,
   });
@@ -44,24 +44,23 @@ class StudioShareDetails {
     bool? includeTagline,
     bool? includeCategory,
     bool? includeHashtags,
-  }) =>
-      StudioShareDetails(
-        includeProductName: includeProductName ?? this.includeProductName,
-        includePrice: includePrice ?? this.includePrice,
-        includeProductLink: includeProductLink ?? this.includeProductLink,
-        includeWhatsapp: includeWhatsapp ?? this.includeWhatsapp,
-        includePhone: includePhone ?? this.includePhone,
-        includeBusiness: includeBusiness ?? this.includeBusiness,
-        includeLocation: includeLocation ?? this.includeLocation,
-        includeTagline: includeTagline ?? this.includeTagline,
-        includeCategory: includeCategory ?? this.includeCategory,
-        includeHashtags: includeHashtags ?? this.includeHashtags,
-      );
+  }) => StudioShareDetails(
+    includeProductName: includeProductName ?? this.includeProductName,
+    includePrice: includePrice ?? this.includePrice,
+    includeProductLink: includeProductLink ?? this.includeProductLink,
+    includeWhatsapp: includeWhatsapp ?? this.includeWhatsapp,
+    includePhone: includePhone ?? this.includePhone,
+    includeBusiness: includeBusiness ?? this.includeBusiness,
+    includeLocation: includeLocation ?? this.includeLocation,
+    includeTagline: includeTagline ?? this.includeTagline,
+    includeCategory: includeCategory ?? this.includeCategory,
+    includeHashtags: includeHashtags ?? this.includeHashtags,
+  );
 }
 
 String formatUgPrice(num price) {
   final fmt = NumberFormat('#,###', 'en_US');
-  return 'UGX ${fmt.format(price.round())}';
+  return '${fmt.format(price.round())} /=';
 }
 
 /// Strikethrough "was" price when the catalog item has a discount.
@@ -75,10 +74,7 @@ String formatProductWasPrice(Item product) {
   return 'Was ${formatUgPrice(product.price + discount)}';
 }
 
-OverlayBrandContext overlayContextFrom({
-  required BrandKit kit,
-  Item? product,
-}) {
+OverlayBrandContext overlayContextFrom({required BrandKit kit, Item? product}) {
   return OverlayBrandContext(
     businessName: kit.businessName,
     tagline: kit.tagline,
@@ -122,8 +118,8 @@ Future<String> resolveProductShareLink({
 }) async {
   final remoteId = product?.remoteId;
   if (remoteId != null) {
-    if (isService) return 'https://soko24.co/s/$remoteId';
-    return 'https://soko24.co/p/$remoteId';
+    if (isService) return 'https://www.soko24.co/s/$remoteId';
+    return 'https://www.soko24.co/p/$remoteId';
   }
 
   if (product?.remoteId != null && api != null && !isService) {
@@ -137,7 +133,7 @@ Future<String> resolveProductShareLink({
           if (link != null && link.isNotEmpty) return normalizeShareUrl(link);
           final slug = payload['slug']?.toString();
           if (slug != null && slug.isNotEmpty) {
-            return 'https://soko24.co/product/$slug';
+            return 'https://www.soko24.co/product/$slug';
           }
         }
       }
@@ -148,50 +144,78 @@ Future<String> resolveProductShareLink({
   return 'https://soko24.co';
 }
 
+String resolveServiceShareLink({
+  required Service? service,
+  required BrandKit kit,
+}) {
+  final slug = service?.slug?.trim();
+  if (slug != null && slug.isNotEmpty) {
+    return 'https://www.soko24.co/service/$slug';
+  }
+  if (service?.remoteId != null) {
+    return 'https://www.soko24.co/service/${service!.remoteId}';
+  }
+  if (kit.website.isNotEmpty) return normalizeShareUrl(kit.website);
+  return 'https://www.soko24.co';
+}
+
 String buildShareCaption({
   required BrandKit kit,
   required String templateName,
   required StudioShareDetails details,
   Item? product,
+  Service? service,
   String? productLink,
 }) {
   final buf = StringBuffer();
+  final offerName = product?.name ?? service?.title;
+  final offerPrice = product?.price ?? service?.price;
+  final offerCategory = product?.categoryName ?? service?.category;
+  final offerDescription = plainOfferDescription(
+    product?.description ?? service?.summary ?? service?.description,
+  );
 
-  // Opening line: business + optional tagline, written like a person would post.
-  if (details.includeBusiness && kit.businessName.isNotEmpty) {
-    if (kit.tagline.isNotEmpty && details.includeTagline) {
-      buf.writeln('${kit.businessName} — ${kit.tagline}');
-    } else {
-      buf.writeln(kit.businessName);
-    }
-    buf.writeln();
-  } else if (details.includeTagline && kit.tagline.isNotEmpty) {
-    buf.writeln(kit.tagline);
-    buf.writeln();
-  }
-
-  // Product / service pitch
-  if (details.includeProductName && product != null) {
-    buf.write(product.name);
+  // Lead with the actual offer. Internal template names must never leak into
+  // customer-facing campaign copy.
+  if (details.includeProductName && offerName != null) {
+    buf.write(offerName);
     if (details.includeCategory &&
-        product.categoryName != null &&
-        product.categoryName!.isNotEmpty) {
-      buf.write(' (${product.categoryName})');
+        offerCategory != null &&
+        offerCategory.isNotEmpty) {
+      buf.write(' ($offerCategory)');
     }
     buf.writeln();
-  } else {
-    buf.writeln(templateName);
   }
 
-  if (details.includePrice && product != null) {
-    buf.writeln('Price: ${formatUgPrice(product.price)}${formatProductWasPrice(product).isNotEmpty ? ' (${formatProductWasPrice(product)})' : ''}');
+  if (details.includePrice && offerPrice != null) {
+    buf.writeln(
+      'Price: ${formatUgPrice(offerPrice)}${product != null && formatProductWasPrice(product).isNotEmpty ? ' (${formatProductWasPrice(product)})' : ''}',
+    );
   }
 
+  if (offerDescription.isNotEmpty) {
+    buf.writeln();
+    buf.writeln(offerDescription);
+  }
+
+  if (offerName != null) {
+    buf.writeln();
+  }
+
+  // The seller is the clear source of the offer.
+  if (details.includeBusiness && kit.businessName.isNotEmpty) {
+    buf.writeln('Available from ${kit.businessName}');
+  }
+  if (details.includeTagline && kit.tagline.isNotEmpty) {
+    buf.writeln(kit.tagline);
+  }
   if (details.includeLocation && kit.location.isNotEmpty) {
-    buf.writeln('Location: ${kit.location}');
+    buf.writeln(kit.location);
   }
 
-  if (details.includeProductLink && productLink != null && productLink.isNotEmpty) {
+  if (details.includeProductLink &&
+      productLink != null &&
+      productLink.isNotEmpty) {
     buf.writeln();
     buf.writeln('View / order: $productLink');
   }
@@ -203,16 +227,35 @@ String buildShareCaption({
     buf.writeln('Call: ${kit.phone}');
   }
 
+  // End with the marketplace promise, after the offer and seller identity.
+  buf.writeln();
+  buf.writeln('Discover trusted products and services on Soko24.');
+  buf.writeln('Buy with confidence.');
+
   if (details.includeHashtags) {
     buf.writeln();
     final tags = <String>['Soko24'];
     final bizTag = kit.businessName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
     if (bizTag.isNotEmpty && bizTag.length > 2) tags.add(bizTag);
-    if (product?.categoryName?.isNotEmpty == true) {
-      tags.add(product!.categoryName!.replaceAll(RegExp(r'\s+'), ''));
-    }
     buf.write(tags.map((t) => '#$t').join(' '));
   }
 
   return buf.toString().trim();
+}
+
+String plainOfferDescription(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return '';
+  var value = raw
+      .replaceAll(RegExp(r'<[^>]*>'), ' ')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  const maxLength = 240;
+  if (value.length > maxLength) {
+    value = '${value.substring(0, maxLength).trimRight()}…';
+  }
+  return value;
 }

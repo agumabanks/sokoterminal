@@ -1,4 +1,3 @@
-
 import 'package:flutter/services.dart';
 
 /// Centralized haptic feedback — the app's physical voice.

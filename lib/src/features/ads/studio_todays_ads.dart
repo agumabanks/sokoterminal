@@ -58,10 +58,18 @@ List<TodaysAdEntry> buildTodaysAds({
   );
 
   // Limit to a manageable daily feed: 4 product + 2 service + 2 business + 1 seasonal max
-  final productAds = packages.where((p) => p.source == SmartAdSource.product).take(4);
-  final serviceAds = packages.where((p) => p.source == SmartAdSource.service).take(2);
-  final businessAds = packages.where((p) => p.source == SmartAdSource.businessInfo).take(2);
-  final seasonalAds = packages.where((p) => p.source == SmartAdSource.seasonal).take(1);
+  final productAds = packages
+      .where((p) => p.source == SmartAdSource.product)
+      .take(4);
+  final serviceAds = packages
+      .where((p) => p.source == SmartAdSource.service)
+      .take(2);
+  final businessAds = packages
+      .where((p) => p.source == SmartAdSource.businessInfo)
+      .take(2);
+  final seasonalAds = packages
+      .where((p) => p.source == SmartAdSource.seasonal)
+      .take(1);
 
   final selected = <SmartAdPackage>[
     ...productAds,

@@ -211,11 +211,18 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(line.description,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  line.description,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text('${line.unitPrice.toUgx()} each',
-                    style: DesignTokens.textSmall),
+                Text(
+                  '${line.unitPrice.toUgx()} each',
+                  style: DesignTokens.textSmall,
+                ),
               ],
             ),
           ),
@@ -224,15 +231,18 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
               GestureDetector(
                 onTap: () {
                   if (line.quantity > 1) {
-                    setState(() => _lines[index] = QuotationLineItem(
-                      description: line.description,
-                      quantity: line.quantity - 1,
-                      unitPrice: line.unitPrice,
-                    ));
+                    setState(
+                      () => _lines[index] = QuotationLineItem(
+                        description: line.description,
+                        quantity: line.quantity - 1,
+                        unitPrice: line.unitPrice,
+                      ),
+                    );
                   }
                 },
                 child: Container(
-                  width: 28, height: 28,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
@@ -242,33 +252,54 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Text('${line.quantity}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: Text(
+                  '${line.quantity}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ),
               GestureDetector(
-                onTap: () => setState(() => _lines[index] = QuotationLineItem(
-                  description: line.description,
-                  quantity: line.quantity + 1,
-                  unitPrice: line.unitPrice,
-                )),
+                onTap: () => setState(
+                  () => _lines[index] = QuotationLineItem(
+                    description: line.description,
+                    quantity: line.quantity + 1,
+                    unitPrice: line.unitPrice,
+                  ),
+                ),
                 child: Container(
-                  width: 28, height: 28,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     color: DesignTokens.brandAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.add, size: 16, color: DesignTokens.brandAccent),
+                  child: const Icon(
+                    Icons.add,
+                    size: 16,
+                    color: DesignTokens.brandAccent,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text((line.unitPrice * line.quantity).toUgx(),
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              Text(
+                (line.unitPrice * line.quantity).toUgx(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: () => setState(() => _lines.removeAt(index)),
-            child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+            child: const Icon(
+              Icons.close_rounded,
+              color: Colors.redAccent,
+              size: 20,
+            ),
           ),
         ],
       ),
@@ -297,23 +328,37 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
         builder: (ctx, setModal) {
           final filteredItems = query.isEmpty
               ? allItems
-              : allItems.where((i) =>
-                  i.name.toLowerCase().contains(query.toLowerCase()) ||
-                  (i.categoryName?.toLowerCase().contains(query.toLowerCase()) ?? false))
-                .toList();
+              : allItems
+                    .where(
+                      (i) =>
+                          i.name.toLowerCase().contains(query.toLowerCase()) ||
+                          (i.categoryName?.toLowerCase().contains(
+                                query.toLowerCase(),
+                              ) ??
+                              false),
+                    )
+                    .toList();
 
           final filteredServices = query.isEmpty
               ? allServices
-              : allServices.where((s) =>
-                  s.title.toLowerCase().contains(query.toLowerCase()) ||
-                  (s.category?.toLowerCase().contains(query.toLowerCase()) ?? false))
-                .toList();
+              : allServices
+                    .where(
+                      (s) =>
+                          s.title.toLowerCase().contains(query.toLowerCase()) ||
+                          (s.category?.toLowerCase().contains(
+                                query.toLowerCase(),
+                              ) ??
+                              false),
+                    )
+                    .toList();
 
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.80,
             decoration: BoxDecoration(
               color: DesignTokens.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
             ),
             child: Column(
               children: [
@@ -321,7 +366,8 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 Center(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: Colors.black12,
                       borderRadius: BorderRadius.circular(2),
@@ -367,7 +413,8 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                           : 'Search services…',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
@@ -431,34 +478,41 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(
                     item.imageUrl!,
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
                         const Icon(Icons.inventory_2_rounded),
                   ),
                 )
               : const Icon(Icons.inventory_2_rounded),
-          title: Text(item.name,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(
+            item.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text(
             '${item.categoryName ?? 'General'} · ${item.price.toUgx()}',
             style: DesignTokens.textSmall,
           ),
           trailing: IconButton(
-            icon: const Icon(Icons.add_circle_rounded,
-                color: DesignTokens.brandAccent),
+            icon: const Icon(
+              Icons.add_circle_rounded,
+              color: DesignTokens.brandAccent,
+            ),
             onPressed: () {
               setState(() {
-                _lines.add(QuotationLineItem(
-                  description: item.name,
-                  quantity: 1,
-                  unitPrice: item.price,
-                ));
+                _lines.add(
+                  QuotationLineItem(
+                    description: item.name,
+                    quantity: 1,
+                    unitPrice: item.price,
+                  ),
+                );
               });
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${item.name} added')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('${item.name} added')));
             },
           ),
         );
@@ -480,34 +534,41 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                   borderRadius: BorderRadius.circular(6),
                   child: Image.network(
                     svc.imageUrl!,
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
                         const Icon(Icons.room_service_rounded),
                   ),
                 )
               : const Icon(Icons.room_service_rounded),
-          title: Text(svc.title,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          title: Text(
+            svc.title,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text(
             '${svc.category ?? 'Service'} · ${svc.price.toUgx()}',
             style: DesignTokens.textSmall,
           ),
           trailing: IconButton(
-            icon: const Icon(Icons.add_circle_rounded,
-                color: DesignTokens.brandAccent),
+            icon: const Icon(
+              Icons.add_circle_rounded,
+              color: DesignTokens.brandAccent,
+            ),
             onPressed: () {
               setState(() {
-                _lines.add(QuotationLineItem(
-                  description: svc.title,
-                  quantity: 1,
-                  unitPrice: svc.price,
-                ));
+                _lines.add(
+                  QuotationLineItem(
+                    description: svc.title,
+                    quantity: 1,
+                    unitPrice: svc.price,
+                  ),
+                );
               });
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${svc.title} added')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('${svc.title} added')));
             },
           ),
         );
@@ -521,9 +582,7 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
 
   Future<void> _selectCustomer() async {
     final db = ref.read(appDatabaseProvider);
-    final customers = await db
-        .select(db.customers)
-        .get();
+    final customers = await db.select(db.customers).get();
     if (!mounted) return;
 
     String query = '';
@@ -539,16 +598,24 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
         builder: (ctx, setModal) {
           final filtered = query.isEmpty
               ? customers
-              : customers.where((c) =>
-                  c.name.toLowerCase().contains(query.toLowerCase()) ||
-                  (c.phone?.toLowerCase().contains(query.toLowerCase()) ?? false))
-                .toList();
+              : customers
+                    .where(
+                      (c) =>
+                          c.name.toLowerCase().contains(query.toLowerCase()) ||
+                          (c.phone?.toLowerCase().contains(
+                                query.toLowerCase(),
+                              ) ??
+                              false),
+                    )
+                    .toList();
 
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.75,
             decoration: BoxDecoration(
               color: DesignTokens.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
             ),
             child: Column(
               children: [
@@ -556,7 +623,8 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                 Center(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: Colors.black12,
                       borderRadius: BorderRadius.circular(2),
@@ -590,17 +658,25 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: DesignTokens.brandPrimary.withValues(alpha: 0.05),
+                        color: DesignTokens.brandPrimary.withValues(
+                          alpha: 0.05,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: DesignTokens.brandPrimary.withValues(alpha: 0.15),
+                          color: DesignTokens.brandPrimary.withValues(
+                            alpha: 0.15,
+                          ),
                         ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('New Contact',
-                              style: DesignTokens.textBodyBold.copyWith(fontSize: 13)),
+                          Text(
+                            'New Contact',
+                            style: DesignTokens.textBodyBold.copyWith(
+                              fontSize: 13,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextField(
                             controller: nameCtrl,
@@ -610,7 +686,9 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -623,7 +701,9 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -643,12 +723,11 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                                   synced: const Value(false),
                                 ),
                               );
-                              final newCustomer =
-                                  await db.getCustomerById(newId);
+                              final newCustomer = await db.getCustomerById(
+                                newId,
+                              );
                               if (newCustomer != null && mounted) {
-                                setState(
-                                  () => _selectedCustomer = newCustomer,
-                                );
+                                setState(() => _selectedCustomer = newCustomer);
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text('$name added')),
@@ -670,9 +749,9 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                       hintText: 'Search by name or phone…',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 10),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
@@ -683,8 +762,11 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.people_outline,
-                                  size: 48, color: DesignTokens.grayMedium),
+                              Icon(
+                                Icons.people_outline,
+                                size: 48,
+                                color: DesignTokens.grayMedium,
+                              ),
                               const SizedBox(height: 12),
                               Text(
                                 customers.isEmpty
@@ -716,9 +798,12 @@ class _QuotationCreatorState extends ConsumerState<QuotationCreator> {
                                   ),
                                 ),
                               ),
-                              title: Text(c.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
+                              title: Text(
+                                c.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               subtitle: c.phone?.isNotEmpty == true
                                   ? Text(c.phone!)
                                   : null,

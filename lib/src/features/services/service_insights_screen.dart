@@ -12,7 +12,8 @@ class ServiceInsightsScreen extends ConsumerStatefulWidget {
   const ServiceInsightsScreen({super.key});
 
   @override
-  ConsumerState<ServiceInsightsScreen> createState() => _ServiceInsightsScreenState();
+  ConsumerState<ServiceInsightsScreen> createState() =>
+      _ServiceInsightsScreenState();
 }
 
 class _ServiceInsightsScreenState extends ConsumerState<ServiceInsightsScreen> {
@@ -47,24 +48,30 @@ class _ServiceInsightsScreenState extends ConsumerState<ServiceInsightsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () async {
-                await ref.read(serviceBookingsControllerProvider.notifier).load();
-                await ref.read(serviceInsightsControllerProvider.notifier).load();
+                await ref
+                    .read(serviceBookingsControllerProvider.notifier)
+                    .load();
+                await ref
+                    .read(serviceInsightsControllerProvider.notifier)
+                    .load();
               },
               child: ListView(
                 padding: DesignTokens.paddingScreen,
                 children: [
-                  if (state.error != null)
-                    _ErrorCard(message: state.error!),
+                  if (state.error != null) _ErrorCard(message: state.error!),
                   if (state.bookings.isEmpty)
                     _EmptyInsightsState(
                       onCreateBooking: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const BookingCreateScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const BookingCreateScreen(),
+                        ),
                       ),
                     )
                   else
                     _RevenueHeadline(state: state),
-                  if (state.bookings.isNotEmpty && state.thisWeekBookings > 0) ...[
+                  if (state.bookings.isNotEmpty &&
+                      state.thisWeekBookings > 0) ...[
                     const SizedBox(height: 20),
                     _SectionTitle('This Week Revenue'),
                     const SizedBox(height: 8),
@@ -81,11 +88,13 @@ class _ServiceInsightsScreenState extends ConsumerState<ServiceInsightsScreen> {
                     if (state.topServices.isNotEmpty) ...[
                       _SectionTitle('Top Services'),
                       const SizedBox(height: 8),
-                      ...state.topServices.map((s) => _ServiceRow(
-                        title: s['title'] as String,
-                        count: s['count'] as int,
-                        revenue: s['revenue'] as double,
-                      )),
+                      ...state.topServices.map(
+                        (s) => _ServiceRow(
+                          title: s['title'] as String,
+                          count: s['count'] as int,
+                          revenue: s['revenue'] as double,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 24),
                     _CompletionRateCard(
@@ -107,7 +116,7 @@ class _RevenueHeadline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0);
+    final fmt = NumberFormat("#,##0 '/='");
     final change = state.weekOverWeekRevenueChange;
     final isPositive = change >= 0;
 
@@ -116,12 +125,20 @@ class _RevenueHeadline extends StatelessWidget {
       children: [
         Text(
           'This Week',
-          style: TextStyle(fontSize: 14, color: DesignTokens.grayMedium, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 14,
+            color: DesignTokens.grayMedium,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           fmt.format(state.thisWeekRevenue),
-          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w700, color: DesignTokens.brandPrimary),
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w700,
+            color: DesignTokens.brandPrimary,
+          ),
         ),
         const SizedBox(height: 4),
         Row(
@@ -129,7 +146,9 @@ class _RevenueHeadline extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: isPositive ? DesignTokens.brandAccent.withValues(alpha: 0.15) : DesignTokens.error.withValues(alpha: 0.15),
+                color: isPositive
+                    ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                    : DesignTokens.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -137,14 +156,19 @@ class _RevenueHeadline extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isPositive ? DesignTokens.brandAccent : DesignTokens.error,
+                  color: isPositive
+                      ? DesignTokens.brandAccent
+                      : DesignTokens.error,
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Text(
               '${state.thisWeekBookings} bookings',
-              style: const TextStyle(fontSize: 13, color: DesignTokens.grayMedium),
+              style: const TextStyle(
+                fontSize: 13,
+                color: DesignTokens.grayMedium,
+              ),
             ),
           ],
         ),
@@ -168,9 +192,7 @@ class _DailyRevenueChart extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: DesignTokens.grayLight),
         ),
-        child: const Center(
-          child: Text('No data yet'),
-        ),
+        child: const Center(child: Text('No data yet')),
       );
     }
     final maxVal = data.reduce((a, b) => a > b ? a : b);
@@ -189,19 +211,33 @@ class _DailyRevenueChart extends StatelessWidget {
           gridData: const FlGridData(show: false),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (v, meta) {
                   final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
                   final idx = v.toInt();
-                  if (idx < 0 || idx >= days.length) return const SizedBox.shrink();
+                  if (idx < 0 || idx >= days.length) {
+                    return const SizedBox.shrink();
+                  }
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(days[idx], style: const TextStyle(fontSize: 11, color: DesignTokens.grayMedium)),
+                    child: Text(
+                      days[idx],
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: DesignTokens.grayMedium,
+                      ),
+                    ),
                   );
                 },
               ),
@@ -214,7 +250,9 @@ class _DailyRevenueChart extends StatelessWidget {
                 BarChartRodData(
                   toY: data[i],
                   width: 18,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(4),
+                  ),
                   color: i == DateTime.now().weekday - 1
                       ? DesignTokens.brandAccent
                       : DesignTokens.brandPrimary.withValues(alpha: 0.3),
@@ -243,34 +281,49 @@ class _StatusBreakdown extends StatelessWidget {
     ];
 
     return Row(
-      children: items.map((item) => Expanded(
-        child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              children: [
-                Text(
-                  '${item.count}',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      children: items
+          .map(
+            (item) => Expanded(
+              child: Card(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: item.color, shape: BoxShape.circle),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${item.count}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: item.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.label,
-                  style: const TextStyle(fontSize: 11, color: DesignTokens.grayMedium),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      )).toList(),
+          )
+          .toList(),
     );
   }
 }
@@ -294,7 +347,9 @@ class _UpcomingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: DesignTokens.brandAccent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: DesignTokens.brandAccent.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: DesignTokens.brandAccent.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
@@ -310,7 +365,10 @@ class _UpcomingCard extends StatelessWidget {
                 ),
                 const Text(
                   'Keep your calendar filled',
-                  style: TextStyle(fontSize: 12, color: DesignTokens.grayMedium),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: DesignTokens.grayMedium,
+                  ),
                 ),
               ],
             ),
@@ -322,7 +380,11 @@ class _UpcomingCard extends StatelessWidget {
 }
 
 class _ServiceRow extends StatelessWidget {
-  const _ServiceRow({required this.title, required this.count, required this.revenue});
+  const _ServiceRow({
+    required this.title,
+    required this.count,
+    required this.revenue,
+  });
   final String title;
   final int count;
   final double revenue;
@@ -337,14 +399,26 @@ class _ServiceRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text('$count ${count == 1 ? 'booking' : 'bookings'}', style: const TextStyle(fontSize: 12, color: DesignTokens.grayMedium)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '$count ${count == 1 ? 'booking' : 'bookings'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: DesignTokens.grayMedium,
+                  ),
+                ),
               ],
             ),
           ),
           Text(
-            'UGX ${revenue.toStringAsFixed(0)}',
-            style: const TextStyle(fontWeight: FontWeight.w600, color: DesignTokens.brandPrimary),
+            '${revenue.toStringAsFixed(0)} /=',
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: DesignTokens.brandPrimary,
+            ),
           ),
         ],
       ),
@@ -353,7 +427,10 @@ class _ServiceRow extends StatelessWidget {
 }
 
 class _CompletionRateCard extends StatelessWidget {
-  const _CompletionRateCard({required this.rate, required this.cancellationRate});
+  const _CompletionRateCard({
+    required this.rate,
+    required this.cancellationRate,
+  });
   final double rate;
   final double cancellationRate;
 
@@ -366,7 +443,10 @@ class _CompletionRateCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Performance', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'Performance',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -383,19 +463,30 @@ class _CompletionRateCard extends StatelessWidget {
                               value: rate / 100,
                               strokeWidth: 8,
                               backgroundColor: DesignTokens.grayLight,
-                              valueColor: const AlwaysStoppedAnimation(DesignTokens.brandAccent),
+                              valueColor: const AlwaysStoppedAnimation(
+                                DesignTokens.brandAccent,
+                              ),
                             ),
                             Center(
                               child: Text(
                                 '${rate.toStringAsFixed(0)}%',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Completion', style: TextStyle(fontSize: 12, color: DesignTokens.grayMedium)),
+                      const Text(
+                        'Completion',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -412,19 +503,30 @@ class _CompletionRateCard extends StatelessWidget {
                               value: cancellationRate / 100,
                               strokeWidth: 8,
                               backgroundColor: DesignTokens.grayLight,
-                              valueColor: const AlwaysStoppedAnimation(DesignTokens.error),
+                              valueColor: const AlwaysStoppedAnimation(
+                                DesignTokens.error,
+                              ),
                             ),
                             Center(
                               child: Text(
                                 '${cancellationRate.toStringAsFixed(0)}%',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Cancellation', style: TextStyle(fontSize: 12, color: DesignTokens.grayMedium)),
+                      const Text(
+                        'Cancellation',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -464,7 +566,11 @@ class _EmptyInsightsState extends StatelessWidget {
             color: DesignTokens.brandAccent.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.trending_up, size: 40, color: DesignTokens.brandAccent),
+          child: const Icon(
+            Icons.trending_up,
+            size: 40,
+            color: DesignTokens.brandAccent,
+          ),
         ),
         const SizedBox(height: 20),
         const Text(
@@ -489,7 +595,9 @@ class _EmptyInsightsState extends StatelessWidget {
             backgroundColor: DesignTokens.brandAccent,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
         const SizedBox(height: 40),

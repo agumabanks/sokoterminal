@@ -25,26 +25,26 @@ class GraphicsWorkspace extends ConsumerWidget {
   final Future<void> Function(AdTemplate) onEditTemplate;
 
   StudioVariableContext _variableContext() => StudioVariableContext(
-        kit: kit,
-        product: selectedItem,
-        productLink: selectedItem != null
-            ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
-            : kit.website,
-      );
+    kit: kit,
+    product: selectedItem,
+    productLink: selectedItem != null
+        ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
+        : kit.website,
+  );
 
   AdTemplate _previewTemplate(AdTemplate template) => template.applyProduct(
-        productName: selectedItem?.name ?? kit.businessName,
-        priceFormatted: selectedItem != null
-            ? 'UGX ${selectedItem!.price.toStringAsFixed(0)}'
-            : '',
-        imageUrl: selectedItem?.imageUrl ?? kit.logoNetworkUrl ?? '',
-        whatsappNumber: kit.whatsapp,
-        phoneNumber: kit.phone,
-        businessName: kit.businessName,
-        location: kit.location,
-        shopUrl: kit.website.isNotEmpty ? kit.website : 'soko24.co',
-        tagline: kit.tagline,
-      );
+    productName: selectedItem?.name ?? kit.businessName,
+    priceFormatted: selectedItem != null
+        ? '${selectedItem!.price.toStringAsFixed(0)} /='
+        : '',
+    imageUrl: selectedItem?.imageUrl ?? kit.logoNetworkUrl ?? '',
+    whatsappNumber: kit.whatsapp,
+    phoneNumber: kit.phone,
+    businessName: kit.businessName,
+    location: kit.location,
+    shopUrl: kit.website.isNotEmpty ? kit.website : 'soko24.co',
+    tagline: kit.tagline,
+  );
 
   Future<void> _openHub(BuildContext context, BusinessHubType hub) async {
     Haptics.selection();
@@ -158,7 +158,10 @@ class _QuickStartRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const quickIds = ['logo', 'menu', 'business_card', 'invoice'];
-    final hubs = quickIds.map(hubTypeById).whereType<BusinessHubType>().toList();
+    final hubs = quickIds
+        .map(hubTypeById)
+        .whereType<BusinessHubType>()
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +188,10 @@ class _QuickStartRow extends StatelessWidget {
               final hub = hubs[i];
               return ActionChip(
                 label: Text(hub.label),
-                avatar: Text(hub.emoji ?? '✦', style: const TextStyle(fontSize: 12)),
+                avatar: Text(
+                  hub.emoji ?? '✦',
+                  style: const TextStyle(fontSize: 12),
+                ),
                 onPressed: () => onHubTap(hub),
               );
             },
@@ -209,7 +215,10 @@ class _CategoryRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hubs = category.hubIds.map(hubTypeById).whereType<BusinessHubType>().toList();
+    final hubs = category.hubIds
+        .map(hubTypeById)
+        .whereType<BusinessHubType>()
+        .toList();
     if (hubs.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -304,7 +313,10 @@ class _HubGradientCard extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(hub.emoji ?? '✦', style: const TextStyle(fontSize: 28)),
+                          Text(
+                            hub.emoji ?? '✦',
+                            style: const TextStyle(fontSize: 28),
+                          ),
                           const SizedBox(height: 8),
                           Icon(hub.icon, color: hub.accent, size: 22),
                         ],

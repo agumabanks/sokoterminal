@@ -42,6 +42,7 @@ class HtmlEditor extends StatefulWidget {
   final bool allowExpand;
   final bool showCharCount;
   final HtmlEditorMode initialMode;
+
   /// When true, tapping Rich opens the fullscreen editor instead of embedding
   /// a WebView inside a parent scroll view (recommended on POS / narrow screens).
   final bool richOpensFullscreen;
@@ -215,15 +216,16 @@ class HtmlEditorState extends State<HtmlEditor> {
     setState(() {});
   }
 
-  int get _charCount => (_mode == HtmlEditorMode.plain
-          ? _plainCtrl.text
-          : _html.plainText)
-      .trim()
-      .length;
+  int get _charCount =>
+      (_mode == HtmlEditorMode.plain ? _plainCtrl.text : _html.plainText)
+          .trim()
+          .length;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _focused ? DesignTokens.brandAccent : DesignTokens.hairline;
+    final borderColor = _focused
+        ? DesignTokens.brandAccent
+        : DesignTokens.hairline;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -289,10 +291,7 @@ class HtmlEditorState extends State<HtmlEditor> {
                   ),
                 ),
               if (widget.showCharCount)
-                Text(
-                  '$_charCount characters',
-                  style: DesignTokens.textCaption,
-                ),
+                Text('$_charCount characters', style: DesignTokens.textCaption),
             ],
           ),
         ],
@@ -357,8 +356,11 @@ class _RichFormattingBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              const Icon(Icons.format_paint_outlined,
-                  size: 18, color: DesignTokens.brandAccent),
+              const Icon(
+                Icons.format_paint_outlined,
+                size: 18,
+                color: DesignTokens.brandAccent,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -610,8 +612,16 @@ class _HtmlEditorFullscreenPageState extends State<_HtmlEditorFullscreenPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SegmentedButton<int>(
               segments: const [
-                ButtonSegment(value: 0, label: Text('Edit'), icon: Icon(Icons.edit_note)),
-                ButtonSegment(value: 1, label: Text('Preview'), icon: Icon(Icons.visibility_outlined)),
+                ButtonSegment(
+                  value: 0,
+                  label: Text('Edit'),
+                  icon: Icon(Icons.edit_note),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  label: Text('Preview'),
+                  icon: Icon(Icons.visibility_outlined),
+                ),
               ],
               selected: {_tabIndex},
               onSelectionChanged: (value) {

@@ -10,7 +10,9 @@ class ConnectivityGuard {
     bool showMessage = true,
     BuildContext? context,
   }) async {
-    final messenger = context == null ? null : ScaffoldMessenger.maybeOf(context);
+    final messenger = context == null
+        ? null
+        : ScaffoldMessenger.maybeOf(context);
     final connectivity = await Connectivity().checkConnectivity();
     final isOnline = connectivity.any((r) => r != ConnectivityResult.none);
 
@@ -39,8 +41,7 @@ class ConnectivityGuard {
     }
 
     try {
-      await Connectivity()
-          .onConnectivityChanged
+      await Connectivity().onConnectivityChanged
           .firstWhere(
             (results) => results.any((r) => r != ConnectivityResult.none),
           )

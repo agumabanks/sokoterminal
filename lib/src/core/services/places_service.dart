@@ -101,7 +101,8 @@ class PlacesService {
     return 'https://maps.googleapis.com/maps/api/staticmap'
         '?center=$lat,$lng'
         '&zoom=$clampedZoom'
-        '&size=$clampedSize' 'x$clampedSize'
+        '&size=$clampedSize'
+        'x$clampedSize'
         '&maptype=roadmap'
         '&markers=color:0x6C63FF|$lat,$lng'
         '&key=$_apiKey';

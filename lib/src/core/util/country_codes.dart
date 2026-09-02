@@ -149,7 +149,9 @@ Future<CountryCode?> showCountryPickerBottomSheet(
                 final country = eastAfricanCountryCodes[index];
                 final isSelected = country.code == current.code;
                 return Material(
-                  color: isSelected ? DesignTokens.canvasCloud : Colors.transparent,
+                  color: isSelected
+                      ? DesignTokens.canvasCloud
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
                     onTap: () => Navigator.pop(context, country),

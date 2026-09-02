@@ -91,7 +91,9 @@ class _StudioOnboardingOverlayState
                     decoration: BoxDecoration(
                       color: theme.surfaceElevated,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.accent.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: theme.accent.withValues(alpha: 0.5),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: theme.accent.withValues(alpha: 0.25),
@@ -161,13 +163,17 @@ class _StudioOnboardingOverlayState
                               onPressed: _next,
                               style: TextButton.styleFrom(
                                 foregroundColor: theme.accent,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                               child: Text(
                                 isLast ? 'Got it' : 'Next',
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],

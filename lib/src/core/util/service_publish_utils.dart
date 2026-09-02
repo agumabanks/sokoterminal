@@ -13,8 +13,10 @@ Map<String, dynamic> buildServiceSyncPayload(Service service) {
     'local_id': service.id,
     if (service.remoteId != null) 'remote_id': service.remoteId,
     'title': service.title,
-    if ((service.summary ?? '').trim().isNotEmpty) 'summary': service.summary!.trim(),
-    if (description != null && description.isNotEmpty) 'description': description,
+    if ((service.summary ?? '').trim().isNotEmpty)
+      'summary': service.summary!.trim(),
+    if (description != null && description.isNotEmpty)
+      'description': description,
     'base_price': service.price,
     if (service.cost != null) 'purchase_price': service.cost,
     if (service.categoryId != null) 'category_id': service.categoryId,
@@ -43,7 +45,10 @@ bool isServicePublishReady(Service service) {
       description.plainText.trim().length >= 20;
 }
 
-String? servicePublishBlockReason(Service service, {required bool wantsPublish}) {
+String? servicePublishBlockReason(
+  Service service, {
+  required bool wantsPublish,
+}) {
   if (!wantsPublish) return null;
   if (service.categoryId == null) {
     return 'Choose a category before going live';
@@ -79,16 +84,12 @@ String servicePublishSnackbarMessage({
 }
 
 class ServiceModerationUpdate {
-  const ServiceModerationUpdate({
-    this.moderationStatus,
-    this.publishedOnline,
-  });
+  const ServiceModerationUpdate({this.moderationStatus, this.publishedOnline});
 
   final String? moderationStatus;
   final bool? publishedOnline;
 
-  bool get hasChanges =>
-      moderationStatus != null || publishedOnline != null;
+  bool get hasChanges => moderationStatus != null || publishedOnline != null;
 }
 
 bool parsePublishedFlag(dynamic raw) {
@@ -111,7 +112,9 @@ ServiceModerationUpdate parseServiceModerationFromApiResponse(
 
   return ServiceModerationUpdate(
     moderationStatus: moderationStatus ?? (pendingApproval ? 'pending' : null),
-    publishedOnline: publishedRaw != null ? parsePublishedFlag(publishedRaw) : null,
+    publishedOnline: publishedRaw != null
+        ? parsePublishedFlag(publishedRaw)
+        : null,
   );
 }
 

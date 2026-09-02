@@ -29,7 +29,6 @@ import '../../widgets/app_button.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/html_editor.dart';
 import '../ads/studio_editor_launcher.dart';
-import '../items/gallery_picker_screen.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../../widgets/service_description_article.dart';
 
@@ -63,19 +62,11 @@ class _GalleryItem {
   });
 
   factory _GalleryItem.remote(String url, int index) {
-    return _GalleryItem._(
-      isRemote: true,
-      index: index,
-      remoteUrl: url,
-    );
+    return _GalleryItem._(isRemote: true, index: index, remoteUrl: url);
   }
 
   factory _GalleryItem.local(File file, int index) {
-    return _GalleryItem._(
-      isRemote: false,
-      index: index,
-      localFile: file,
-    );
+    return _GalleryItem._(isRemote: false, index: index, localFile: file);
   }
 
   final bool isRemote;
@@ -149,16 +140,20 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
         : '7 days';
     _moderationStatus = service.moderationStatus;
     _pricingTiers = decodePricingPackages(service.pricingPackages);
-    _priceCtrl.text = CommaNumberFormatter.format(service.price.toStringAsFixed(0));
+    _priceCtrl.text = CommaNumberFormatter.format(
+      service.price.toStringAsFixed(0),
+    );
     if (service.cost != null) {
-      _costCtrl.text = CommaNumberFormatter.format(service.cost!.toStringAsFixed(0));
+      _costCtrl.text = CommaNumberFormatter.format(
+        service.cost!.toStringAsFixed(0),
+      );
     }
     if (service.durationMinutes != null) {
-      _durationCtrl.text =
-          CommaNumberFormatter.format(service.durationMinutes!.toString());
+      _durationCtrl.text = CommaNumberFormatter.format(
+        service.durationMinutes!.toString(),
+      );
     }
-    _descriptionHtml =
-        normalizeServiceDescriptionHtml(service.description);
+    _descriptionHtml = normalizeServiceDescriptionHtml(service.description);
     _coverUrl = service.imageUrl;
     _coverUploadId = service.coverUploadId;
     _publishOnline = service.publishedOnline;
@@ -197,10 +192,14 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
       setState(() {
         _bnplEnabled = payload.enabled;
         _bnplMinCtrl.text = payload.minOrderAmount != null
-            ? CommaNumberFormatter.format(payload.minOrderAmount!.toStringAsFixed(0))
+            ? CommaNumberFormatter.format(
+                payload.minOrderAmount!.toStringAsFixed(0),
+              )
             : '';
         _bnplMaxCtrl.text = payload.maxOrderAmount != null
-            ? CommaNumberFormatter.format(payload.maxOrderAmount!.toStringAsFixed(0))
+            ? CommaNumberFormatter.format(
+                payload.maxOrderAmount!.toStringAsFixed(0),
+              )
             : '';
         _bnplInstallmentCtrl.text = payload.installmentCount != null
             ? payload.installmentCount.toString()
@@ -230,7 +229,8 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
 
   bool get _canSave {
     final title = _titleCtrl.text.trim();
-    final price = double.tryParse(
+    final price =
+        double.tryParse(
           CommaNumberFormatter.unformat(_priceCtrl.text.trim()),
         ) ??
         0;
@@ -298,16 +298,17 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
   }
 
   Future<void> _pickGalleryImages() async {
-    final ok = await _requestImagePermission(camera: false);
-    if (!ok || !mounted) return;
-
-    final files = await Navigator.push<List<File>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const GalleryPickerScreen(),
-      ),
+    final picked = await ImagePicker().pickMultiImage(
+      imageQuality: 95,
     );
-    if (files == null || files.isEmpty || !mounted) return;
+    if (picked.isEmpty || !mounted) return;
+
+    final files = <File>[];
+    for (final image in picked) {
+      final cropped = await cropProductImage(File(image.path));
+      if (cropped != null) files.add(cropped);
+    }
+    if (files.isEmpty || !mounted) return;
     setState(() => _galleryFiles.addAll(files));
   }
 
@@ -338,9 +339,9 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
         _coverUrl = file.path;
         _coverUploadId = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cover designed in Studio')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cover designed in Studio')));
     }
   }
 
@@ -453,9 +454,14 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.auto_awesome_rounded, color: DesignTokens.brandAccent),
+              leading: const Icon(
+                Icons.auto_awesome_rounded,
+                color: DesignTokens.brandAccent,
+              ),
               title: const Text('Design cover in Studio'),
-              subtitle: const Text('Create a promo image with your service details'),
+              subtitle: const Text(
+                'Create a promo image with your service details',
+              ),
               onTap: () {
                 Navigator.pop(context);
                 unawaited(_designCoverInStudio());
@@ -464,7 +470,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             if (_hasCover)
               ListTile(
                 leading: Icon(Icons.delete_outline, color: DesignTokens.error),
-                title: Text('Remove main photo', style: TextStyle(color: DesignTokens.error)),
+                title: Text(
+                  'Remove main photo',
+                  style: TextStyle(color: DesignTokens.error),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _removeCover();
@@ -498,10 +507,12 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
 
     final pendingGalleryPaths = _galleryFiles.map((f) => f.path).toList();
     final combinedGalleryUrls = [..._galleryUrls, ...pendingGalleryPaths];
-    final galleryJson =
-        combinedGalleryUrls.isNotEmpty ? jsonEncode(combinedGalleryUrls) : null;
-    final galleryIdsJson =
-        _galleryUploadIds.isNotEmpty ? jsonEncode(_galleryUploadIds) : null;
+    final galleryJson = combinedGalleryUrls.isNotEmpty
+        ? jsonEncode(combinedGalleryUrls)
+        : null;
+    final galleryIdsJson = _galleryUploadIds.isNotEmpty
+        ? jsonEncode(_galleryUploadIds)
+        : null;
     final pricingPackagesJson = encodePricingPackages(_pricingTiers);
     final packagesForApi = pricingPackagesForApi(_pricingTiers);
 
@@ -526,7 +537,9 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     };
 
     try {
-      final opType = service?.remoteId != null ? 'service_update' : 'service_create';
+      final opType = service?.remoteId != null
+          ? 'service_update'
+          : 'service_create';
       final payload = service?.remoteId != null
           ? {...syncPayload, 'remote_id': service!.remoteId}
           : syncPayload;
@@ -559,26 +572,28 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                   ? Value(galleryIdsJson)
                   : const Value.absent(),
             )
-          : service.toCompanion(true).copyWith(
-              title: Value(title),
-              price: Value(price),
-              cost: cost != null ? Value(cost) : const Value(null),
-              summary: Value(summary.isEmpty ? null : summary),
-              categoryId: Value(_categoryId),
-              category: Value(_categoryName),
-              serviceType: Value(_serviceType),
-              deliveryTimeframe: Value(_deliveryTimeframe),
-              pricingPackages: Value(pricingPackagesJson),
-              description: Value(description.isEmpty ? null : description),
-              durationMinutes: Value(durationMinutes),
-              publishedOnline: Value(_publishOnline),
-              synced: const Value(false),
-              updatedAt: Value(DateTime.now().toUtc()),
-              imageUrl: Value(coverUrl),
-              coverUploadId: Value(_coverUploadId),
-              galleryUrls: Value(galleryJson),
-              galleryUploadIds: Value(galleryIdsJson),
-            );
+          : service
+                .toCompanion(true)
+                .copyWith(
+                  title: Value(title),
+                  price: Value(price),
+                  cost: cost != null ? Value(cost) : const Value(null),
+                  summary: Value(summary.isEmpty ? null : summary),
+                  categoryId: Value(_categoryId),
+                  category: Value(_categoryName),
+                  serviceType: Value(_serviceType),
+                  deliveryTimeframe: Value(_deliveryTimeframe),
+                  pricingPackages: Value(pricingPackagesJson),
+                  description: Value(description.isEmpty ? null : description),
+                  durationMinutes: Value(durationMinutes),
+                  publishedOnline: Value(_publishOnline),
+                  synced: const Value(false),
+                  updatedAt: Value(DateTime.now().toUtc()),
+                  imageUrl: Value(coverUrl),
+                  coverUploadId: Value(_coverUploadId),
+                  galleryUrls: Value(galleryJson),
+                  galleryUploadIds: Value(galleryIdsJson),
+                );
 
       await db.saveServiceAndEnqueueSync(
         service: companion,
@@ -595,15 +610,23 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             enabled: _bnplEnabled,
             minOrderAmount: _bnplMinCtrl.text.isEmpty
                 ? null
-                : double.tryParse(CommaNumberFormatter.unformat(_bnplMinCtrl.text)),
+                : double.tryParse(
+                    CommaNumberFormatter.unformat(_bnplMinCtrl.text),
+                  ),
             maxOrderAmount: _bnplMaxCtrl.text.isEmpty
                 ? null
-                : double.tryParse(CommaNumberFormatter.unformat(_bnplMaxCtrl.text)),
+                : double.tryParse(
+                    CommaNumberFormatter.unformat(_bnplMaxCtrl.text),
+                  ),
             installmentCount: _bnplInstallmentCtrl.text.isEmpty
                 ? null
-                : int.tryParse(CommaNumberFormatter.unformat(_bnplInstallmentCtrl.text)),
+                : int.tryParse(
+                    CommaNumberFormatter.unformat(_bnplInstallmentCtrl.text),
+                  ),
           );
-          await ref.read(sellerApiProvider).updateServiceBnpl(serviceId, bnplPayload);
+          await ref
+              .read(sellerApiProvider)
+              .updateServiceBnpl(serviceId, bnplPayload);
         } catch (e) {
           debugPrint('[ServiceEditScreen] BNPL update failed: $e');
         }
@@ -612,7 +635,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e'), backgroundColor: DesignTokens.error),
+          SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
         );
       }
       return;
@@ -712,7 +738,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                           children: [
                             AppInput(
                               controller: _priceCtrl,
-                              label: 'Selling price (UGX)',
+                              label: 'Selling price (/=)',
                               hint: '150,000',
                               prefixIcon: Icons.payments_outlined,
                               keyboardType: TextInputType.number,
@@ -736,7 +762,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                             Expanded(
                               child: AppInput(
                                 controller: _priceCtrl,
-                                label: 'Selling price (UGX)',
+                                label: 'Selling price (/=)',
                                 hint: '150,000',
                                 prefixIcon: Icons.payments_outlined,
                                 keyboardType: TextInputType.number,
@@ -760,7 +786,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                       const SizedBox(height: 16),
                       AppInput(
                         controller: _costCtrl,
-                        label: 'Cost / buying price (UGX)',
+                        label: 'Cost / buying price (/=)',
                         hint: 'Optional',
                         prefixIcon: Icons.shopping_bag_outlined,
                         keyboardType: TextInputType.number,
@@ -876,7 +902,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black45,
                     borderRadius: DesignTokens.borderRadiusFull,
@@ -884,11 +913,18 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.edit_outlined, size: 14, color: Colors.white),
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         isSynced ? 'Change photo' : 'Tap to change photo',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -938,11 +974,18 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.add_photo_alternate_outlined, size: 40, color: DesignTokens.inkMuted),
+        Icon(
+          Icons.add_photo_alternate_outlined,
+          size: 40,
+          color: DesignTokens.inkMuted,
+        ),
         const SizedBox(height: 8),
         Text('Add service photo', style: DesignTokens.textBodyBold),
         const SizedBox(height: 4),
-        Text('Tap to shoot, choose, or add gallery', style: DesignTokens.textSmall),
+        Text(
+          'Tap to shoot, choose, or add gallery',
+          style: DesignTokens.textSmall,
+        ),
       ],
     );
   }
@@ -961,8 +1004,11 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.collections_outlined,
-                color: DesignTokens.brandPrimary, size: 20),
+            const Icon(
+              Icons.collections_outlined,
+              color: DesignTokens.brandPrimary,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1079,10 +1125,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                                 fit: BoxFit.cover,
                                 errorWidget: const SizedBox(),
                               )
-                            : Image.file(
-                                item.localFile!,
-                                fit: BoxFit.cover,
-                              ),
+                            : Image.file(item.localFile!, fit: BoxFit.cover),
                       ),
                     ),
                     if (!item.isRemote)
@@ -1121,8 +1164,11 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                             color: Colors.black54,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.close,
-                              size: 14, color: Colors.white),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -1155,8 +1201,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_outlined,
-                  color: DesignTokens.brandPrimary),
+              leading: const Icon(
+                Icons.photo_outlined,
+                color: DesignTokens.brandPrimary,
+              ),
               title: const Text('Set as main photo'),
               onTap: () {
                 Navigator.pop(context);
@@ -1169,7 +1217,10 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             ),
             ListTile(
               leading: Icon(Icons.delete_outline, color: DesignTokens.error),
-              title: Text('Remove', style: TextStyle(color: DesignTokens.error)),
+              title: Text(
+                'Remove',
+                style: TextStyle(color: DesignTokens.error),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 item.isRemote
@@ -1228,7 +1279,11 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.hourglass_top_outlined, color: DesignTokens.warning, size: 20),
+          const Icon(
+            Icons.hourglass_top_outlined,
+            color: DesignTokens.warning,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1287,12 +1342,14 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     );
   }
 
-  void _showCategoryPicker(AsyncValue<List<ServiceCategoryOption>> categoriesAsync) {
+  void _showCategoryPicker(
+    AsyncValue<List<ServiceCategoryOption>> categoriesAsync,
+  ) {
     categoriesAsync.when(
       loading: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Loading categories…')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Loading categories…')));
       },
       error: (e, _) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1386,14 +1443,11 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          value: _serviceTypes.containsKey(_serviceType) ? _serviceType : 'virtual',
+          value: _serviceTypes.containsKey(_serviceType)
+              ? _serviceType
+              : 'virtual',
           items: _serviceTypes.entries
-              .map(
-                (e) => DropdownMenuItem(
-                  value: e.key,
-                  child: Text(e.value),
-                ),
-              )
+              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
               .toList(),
           onChanged: (value) {
             if (value == null) return;
@@ -1420,12 +1474,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               ? _deliveryTimeframe
               : _deliveryTimeframes[4],
           items: _deliveryTimeframes
-              .map(
-                (time) => DropdownMenuItem(
-                  value: time,
-                  child: Text(time),
-                ),
-              )
+              .map((time) => DropdownMenuItem(value: time, child: Text(time)))
               .toList(),
           onChanged: (value) {
             if (value == null) return;
@@ -1465,7 +1514,9 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             ),
             child: Icon(
               _publishOnline ? Icons.public_rounded : Icons.store_outlined,
-              color: _publishOnline ? DesignTokens.brandAccent : DesignTokens.inkMuted,
+              color: _publishOnline
+                  ? DesignTokens.brandAccent
+                  : DesignTokens.inkMuted,
             ),
           ),
           const SizedBox(width: 12),
@@ -1478,14 +1529,17 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                 Text(
                   _publishOnline
                       ? (_publishChecklistComplete
-                          ? 'Customers can find and book this service'
-                          : 'Complete the checklist below to go live')
+                            ? 'Customers can find and book this service'
+                            : 'Complete the checklist below to go live')
                       : 'Saved on this device only',
                   style: DesignTokens.textSmall,
                 ),
                 if (_publishOnline) ...[
                   const SizedBox(height: 10),
-                  _publishChecklistRow('Category selected', _categoryId != null),
+                  _publishChecklistRow(
+                    'Category selected',
+                    _categoryId != null,
+                  ),
                   _publishChecklistRow(
                     'Summary (10+ chars)',
                     _summaryCtrl.text.trim().length >= 10,
@@ -1564,13 +1618,17 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                 children: [
                   Text(
                     'Allow BNPL / Pay Later',
-                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+                    style: DesignTokens.textBody.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
                     active
                         ? 'Customers can buy now and pay later for this service'
                         : (disabledHint ?? 'Enable BNPL to use this option'),
-                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ],
               ),
@@ -1589,7 +1647,9 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
           const SizedBox(height: 8),
           Text(
             disabledHint,
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.inkMuted,
+            ),
           ),
         ],
         if (active && _bnplEnabled) ...[
@@ -1599,7 +1659,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               Expanded(
                 child: AppInput(
                   controller: _bnplMinCtrl,
-                  label: 'Min order amount (UGX)',
+                  label: 'Min order amount (/=)',
                   hint: '10,000',
                   prefixIcon: Icons.arrow_downward_outlined,
                   keyboardType: TextInputType.number,
@@ -1610,7 +1670,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               Expanded(
                 child: AppInput(
                   controller: _bnplMaxCtrl,
-                  label: 'Max order amount (UGX)',
+                  label: 'Max order amount (/=)',
                   hint: '500,000',
                   prefixIcon: Icons.arrow_upward_outlined,
                   keyboardType: TextInputType.number,
@@ -1767,7 +1827,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
 
 Future<bool> _requestImagePermission({required bool camera}) async {
   if (!Platform.isAndroid && !Platform.isIOS) return true;
-  final permission = camera ? Permission.camera : Permission.photos;
-  final status = await permission.request();
+  if (!camera) return true;
+  final status = await Permission.camera.request();
   return status.isGranted || status.isLimited;
 }

@@ -771,7 +771,7 @@ class _PackageCard extends StatelessWidget {
           Text(
             pack.amountLabel.isNotEmpty
                 ? pack.amountLabel
-                : 'UGX ${pack.price.toStringAsFixed(0)}',
+                : '${pack.price.toStringAsFixed(0)} /=',
             style: DesignTokens.textBody.copyWith(
               color: DesignTokens.brandAccent,
               fontWeight: FontWeight.w700,

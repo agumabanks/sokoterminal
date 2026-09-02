@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/db/app_database.dart';
 import '../../core/firebase/remote_config_service.dart';
 import '../../core/util/haptics.dart';
-import '../checkout/checkout_screen.dart' show itemsStreamProvider;
+import '../checkout/checkout_screen.dart'
+    show itemsStreamProvider, servicesStreamProvider;
 import '../../widgets/offline_cached_image.dart';
 import 'ad_injector_screen.dart';
 import 'ad_templates.dart';
@@ -98,13 +99,14 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: theme.isMonochrome
-                              ? theme.textPrimary
-                              : null,
+                          color: theme.isMonochrome ? theme.textPrimary : null,
                           gradient: theme.isMonochrome
                               ? null
                               : const LinearGradient(
-                                  colors: [DesignTokens.brandAccent, DesignTokens.success],
+                                  colors: [
+                                    DesignTokens.brandAccent,
+                                    DesignTokens.success,
+                                  ],
                                 ),
                           borderRadius: BorderRadius.circular(7),
                         ),
@@ -132,9 +134,9 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
                         theme: theme,
                         onTap: () {
                           Haptics.selection();
-                          Navigator.of(context).push(
-                            studioPageRoute(const StudioSettingsScreen()),
-                          );
+                          Navigator.of(
+                            context,
+                          ).push(studioPageRoute(const StudioSettingsScreen()));
                         },
                       ),
                       const SizedBox(width: 6),
@@ -146,8 +148,13 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Full Studio',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        child: const Text(
+                          'Full Studio',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -196,10 +203,7 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
                     child: child,
                   ),
                 ),
-                child: KeyedSubtree(
-                  key: ValueKey(_mode),
-                  child: _buildBody(),
-                ),
+                child: KeyedSubtree(key: ValueKey(_mode), child: _buildBody()),
               ),
             ),
           ],
@@ -212,30 +216,30 @@ class _StudioHubShellState extends ConsumerState<StudioHubShell> {
   Widget _buildBody() {
     return switch (_mode) {
       StudioMode.editPhotos => _EditPhotosWorkspace(
-          onCreateCollage: () => _openHubTemplate('hub_collage_grid'),
-          onCreateDesign: widget.onCreateDesign,
-          onOpenInjector: () => setState(() => _mode = StudioMode.injector),
-          onEditPhoto: _editPhotoFlow,
-          onRemoveBackground: _removeBackgroundFlow,
-          onSmInsta: ref.watch(remoteConfigProvider).ffSmInsta
-              ? () => runSmInstaFlow(context, ref)
-              : null,
-        ),
+        onCreateCollage: () => _openHubTemplate('hub_collage_grid'),
+        onCreateDesign: widget.onCreateDesign,
+        onOpenInjector: () => setState(() => _mode = StudioMode.injector),
+        onEditPhoto: _editPhotoFlow,
+        onRemoveBackground: _removeBackgroundFlow,
+        onSmInsta: ref.watch(remoteConfigProvider).ffSmInsta
+            ? () => runSmInstaFlow(context, ref)
+            : null,
+      ),
       StudioMode.templates => _TemplatesWorkspace(
-          selectedItem: widget.selectedItem,
-          kit: widget.kit,
-          onEditTemplate: widget.onEditTemplate,
-          onCreateDesign: widget.onCreateDesign,
-          onOpenInjector: () => setState(() => _mode = StudioMode.injector),
-        ),
+        selectedItem: widget.selectedItem,
+        kit: widget.kit,
+        onEditTemplate: widget.onEditTemplate,
+        onCreateDesign: widget.onCreateDesign,
+        onOpenInjector: () => setState(() => _mode = StudioMode.injector),
+      ),
       StudioMode.graphics => GraphicsWorkspace(
-          kit: widget.kit,
-          selectedItem: widget.selectedItem,
-          onEditTemplate: widget.onEditTemplate,
-        ),
+        kit: widget.kit,
+        selectedItem: widget.selectedItem,
+        onEditTemplate: widget.onEditTemplate,
+      ),
       StudioMode.creators => _CreatorsWorkspace(
-          onEditTemplate: widget.onEditTemplate,
-        ),
+        onEditTemplate: widget.onEditTemplate,
+      ),
       StudioMode.injector => const AdInjectorScreen(),
       StudioMode.campaigns => const MarketingDashboardScreen(),
     };
@@ -339,8 +343,9 @@ class _ModePicker extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           icon: Icon(Icons.expand_more_rounded, color: accent, size: 22),
           items: StudioMode.values.map((m) {
-            final itemAccent =
-                theme.isMonochrome ? theme.textPrimary : m.accent;
+            final itemAccent = theme.isMonochrome
+                ? theme.textPrimary
+                : m.accent;
             return DropdownMenuItem(
               value: m,
               child: Row(
@@ -510,8 +515,8 @@ class _StudioUsageStats extends ConsumerWidget {
               thisWeek > 0
                   ? 'You shared $thisWeek ad${thisWeek == 1 ? '' : 's'} this week'
                   : totalShares > 0
-                      ? '$totalShares ad${totalShares == 1 ? '' : 's'} shared all time'
-                      : 'Create your first ad — track shares here',
+                  ? '$totalShares ad${totalShares == 1 ? '' : 's'} shared all time'
+                  : 'Create your first ad — track shares here',
               style: TextStyle(
                 color: theme.textSecondary,
                 fontSize: 10,
@@ -617,16 +622,18 @@ class _EditPhotosWorkspace extends StatelessWidget {
         const SizedBox(height: 20),
         ...tools
             .where((t) => t.onTap != null)
-            .map((t) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _ToolTile(
-                    icon: t.icon,
-                    label: t.label,
-                    subtitle: t.sub,
-                    accent: t.color,
-                    onTap: t.onTap!,
-                  ),
-                )),
+            .map(
+              (t) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ToolTile(
+                  icon: t.icon,
+                  label: t.label,
+                  subtitle: t.sub,
+                  accent: t.color,
+                  onTap: t.onTap!,
+                ),
+              ),
+            ),
       ],
     );
   }
@@ -677,20 +684,28 @@ class _ToolTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
-                    Text(subtitle,
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.45),
-                            fontSize: 12)),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.white.withValues(alpha: 0.3)),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
             ],
           ),
         ),
@@ -835,11 +850,20 @@ class _DiscoveryScroll extends ConsumerWidget {
           return;
         }
         Item? product;
+        Service? service;
         if (!pkg.isService) {
           final items = ref.read(itemsStreamProvider).valueOrNull ?? [];
           for (final item in items) {
             if (item.id == pkg.itemId) {
               product = item;
+              break;
+            }
+          }
+        } else {
+          final services = ref.read(servicesStreamProvider).valueOrNull ?? [];
+          for (final candidate in services) {
+            if (candidate.id == pkg.itemId) {
+              service = candidate;
               break;
             }
           }
@@ -853,6 +877,8 @@ class _DiscoveryScroll extends ConsumerWidget {
               template: pkg.template,
               kit: kit,
               initialProduct: product,
+              initialService: service,
+              isService: pkg.isService,
               initialCaption: caption,
               exportTitle: pkg.template.name,
               showWatermarkBadge: entitlements.needsSokoWatermark,
@@ -862,9 +888,9 @@ class _DiscoveryScroll extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           rootNav.pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
         }
       }
     }
@@ -917,10 +943,12 @@ class _DiscoveryScroll extends ConsumerWidget {
                   color: theme.isMonochrome ? theme.textPrimary : null,
                   gradient: theme.isMonochrome
                       ? null
-                      : LinearGradient(colors: [
-                          theme.accent,
-                          theme.accent.withValues(alpha: 0.75),
-                        ]),
+                      : LinearGradient(
+                          colors: [
+                            theme.accent,
+                            theme.accent.withValues(alpha: 0.75),
+                          ],
+                        ),
                   borderRadius: BorderRadius.circular(16),
                   border: theme.isMonochrome
                       ? Border.all(color: theme.border)
@@ -974,11 +1002,9 @@ class _DiscoveryScroll extends ConsumerWidget {
             theme: theme,
             onTap: () {
               Haptics.selection();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const BrandKitScreen(),
-                ),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const BrandKitScreen()));
             },
           ),
         ),
@@ -989,12 +1015,13 @@ class _DiscoveryScroll extends ConsumerWidget {
             child: OutlinedButton.icon(
               onPressed: () {
                 Haptics.selection();
-                showStudioTemplateBrowse(
-                  context,
-                  onPick: onEditTemplate,
-                );
+                showStudioTemplateBrowse(context, onPick: onEditTemplate);
               },
-              icon: Icon(Icons.grid_view_rounded, color: theme.textPrimary, size: 18),
+              icon: Icon(
+                Icons.grid_view_rounded,
+                color: theme.textPrimary,
+                size: 18,
+              ),
               label: Text(
                 'Browse ${allStudioTemplates.length}+ templates',
                 style: TextStyle(color: theme.textPrimary, fontSize: 12),
@@ -1062,7 +1089,11 @@ class _DiscoveryScroll extends ConsumerWidget {
                 theme: theme,
                 onTap: (tpl) async {
                   await recorder.record(tpl.id);
-                  unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordTemplateUse());
+                  unawaited(
+                    ref
+                        .read(studioCampaignAnalyticsProvider.notifier)
+                        .recordTemplateUse(),
+                  );
                   await onEditTemplate(tpl);
                 },
               ),
@@ -1079,30 +1110,44 @@ class _DiscoveryScroll extends ConsumerWidget {
                   color: DesignTokens.brandPrimary,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: const Color(0xFF22d3ee).withValues(alpha: 0.3)),
+                    color: const Color(0xFF22d3ee).withValues(alpha: 0.3),
+                  ),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.auto_fix_high_rounded,
-                        color: Color(0xFF22d3ee), size: 28),
+                    Icon(
+                      Icons.auto_fix_high_rounded,
+                      color: Color(0xFF22d3ee),
+                      size: 28,
+                    ),
                     SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Ad Injector',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14)),
-                          Text('Overlay brand on any photo or video',
-                              style: TextStyle(
-                                  color: Colors.white54, fontSize: 11)),
+                          Text(
+                            'Ad Injector',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'Overlay brand on any photo or video',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios_rounded,
-                        color: Colors.white38, size: 14),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white38,
+                      size: 14,
+                    ),
                   ],
                 ),
               ),
@@ -1255,20 +1300,28 @@ class _YourDesignsTab extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.folder_open_rounded,
-                size: 56, color: Colors.white24),
+            const Icon(
+              Icons.folder_open_rounded,
+              size: 56,
+              color: Colors.white24,
+            ),
             const SizedBox(height: 12),
-            const Text('No designs yet',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
+            const Text(
+              'No designs yet',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 6),
             Text(
               'Saved work syncs to Sanaa Cloud (2 GB)\nand your device folder.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -1310,7 +1363,9 @@ class _YourDesignsTab extends ConsumerWidget {
                     if (!ok) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Deleted locally — cloud sync when online'),
+                          content: Text(
+                            'Deleted locally — cloud sync when online',
+                          ),
                         ),
                       );
                     }
@@ -1322,8 +1377,11 @@ class _YourDesignsTab extends ConsumerWidget {
                       color: Colors.red.withValues(alpha: 0.85),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.delete_rounded,
-                        color: Colors.white, size: 13),
+                    child: const Icon(
+                      Icons.delete_rounded,
+                      color: Colors.white,
+                      size: 13,
+                    ),
                   ),
                 ),
               ),
@@ -1396,8 +1454,9 @@ class _AdOfTheDayCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (theme.isMonochrome ? theme.scaffold : Colors.white)
-                          .withValues(alpha: 0.2),
+                      color:
+                          (theme.isMonochrome ? theme.scaffold : Colors.white)
+                              .withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -1414,8 +1473,9 @@ class _AdOfTheDayCard extends StatelessWidget {
                         Text(
                           'Ad of the day',
                           style: TextStyle(
-                            color:
-                                theme.isMonochrome ? theme.scaffold : Colors.white,
+                            color: theme.isMonochrome
+                                ? theme.scaffold
+                                : Colors.white,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1426,8 +1486,11 @@ class _AdOfTheDayCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: (theme.isMonochrome ? theme.scaffold : Colors.white)
-                                .withValues(alpha: 0.85),
+                            color:
+                                (theme.isMonochrome
+                                        ? theme.scaffold
+                                        : Colors.white)
+                                    .withValues(alpha: 0.85),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1468,30 +1531,34 @@ class _AdOfTheDayCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Material(
-                      color: Colors.transparent,
+                      color: theme.accent,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
                         onTap: onShare,
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(
-                              color: (theme.isMonochrome ? theme.scaffold : Colors.white)
-                                  .withValues(alpha: 0.5),
-                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Center(
-                            child: Text(
-                              'Share now',
-                              style: TextStyle(
-                                color:
-                                    theme.isMonochrome ? theme.scaffold : Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.ios_share_rounded,
+                                color: Colors.white,
+                                size: 18,
                               ),
-                            ),
+                              SizedBox(width: 7),
+                              Text(
+                                'Share now',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1568,11 +1635,20 @@ class _TodaysAdsSection extends ConsumerWidget {
         return;
       }
       Item? product;
+      Service? service;
       if (!entry.isService) {
         final items = ref.read(itemsStreamProvider).valueOrNull ?? [];
         for (final item in items) {
           if (item.id == entry.itemId) {
             product = item;
+            break;
+          }
+        }
+      } else {
+        final services = ref.read(servicesStreamProvider).valueOrNull ?? [];
+        for (final candidate in services) {
+          if (candidate.id == entry.itemId) {
+            service = candidate;
             break;
           }
         }
@@ -1588,6 +1664,8 @@ class _TodaysAdsSection extends ConsumerWidget {
             template: entry.template,
             kit: kit,
             initialProduct: product,
+            initialService: service,
+            isService: entry.isService,
             initialCaption: platformCaption ?? entry.caption,
             exportTitle: entry.template.name,
             showWatermarkBadge: entitlements.needsSokoWatermark,
@@ -1597,17 +1675,21 @@ class _TodaysAdsSection extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         rootNav.pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
   }
 
-  Future<String?> _pickPlatformCaption(BuildContext ctx, TodaysAdEntry entry) async {
+  Future<String?> _pickPlatformCaption(
+    BuildContext ctx,
+    TodaysAdEntry entry,
+  ) async {
     final captions = <(String label, String text)>[
       if (entry.whatsappCaption.isNotEmpty) ('WhatsApp', entry.whatsappCaption),
-      if (entry.instagramCaption.isNotEmpty) ('Instagram', entry.instagramCaption),
+      if (entry.instagramCaption.isNotEmpty)
+        ('Instagram', entry.instagramCaption),
       if (entry.facebookCaption.isNotEmpty) ('Facebook', entry.facebookCaption),
       if (entry.xCaption.isNotEmpty) ('X / Twitter', entry.xCaption),
     ];
@@ -1628,41 +1710,63 @@ class _TodaysAdsSection extends ConsumerWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: theme.border, borderRadius: BorderRadius.circular(2)),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Choose caption',
-                style: TextStyle(color: theme.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: theme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 12),
-              ...captions.map((c) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: theme.border),
-                  ),
-                  child: Center(
-                    child: Text(
-                      c.$1[0],
-                      style: TextStyle(color: theme.accent, fontWeight: FontWeight.w800, fontSize: 14),
+              ...captions.map(
+                (c) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: theme.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: theme.border),
+                    ),
+                    child: Center(
+                      child: Text(
+                        c.$1[0],
+                        style: TextStyle(
+                          color: theme.accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
+                  title: Text(
+                    c.$1,
+                    style: TextStyle(
+                      color: theme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    c.$2,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: theme.textMuted, fontSize: 11),
+                  ),
+                  onTap: () => Navigator.pop(ctx, c.$2),
                 ),
-                title: Text(c.$1, style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Text(
-                  c.$2,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: theme.textMuted, fontSize: 11),
-                ),
-                onTap: () => Navigator.pop(ctx, c.$2),
-              )),
+              ),
             ],
           ),
         ),
@@ -1673,8 +1777,7 @@ class _TodaysAdsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final title =
-        entries.length == 1 ? "Today's Ad" : "Today's Ads";
+    final title = entries.length == 1 ? "Today's Ad" : "Today's Ads";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1873,7 +1976,10 @@ class _TodaysAdCard extends StatelessWidget {
                       onTap: onPolish,
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         child: Text(
                           'Polish in Editor',
                           style: TextStyle(
@@ -1952,7 +2058,10 @@ class _SeasonalCampaignStrip extends StatelessWidget {
     final upcoming = upcomingSeasons();
     if (seasons.isEmpty && upcoming.isEmpty) return const SizedBox.shrink();
 
-    final all = [...seasons, ...upcoming.where((u) => !seasons.any((s) => s.id == u.id))];
+    final all = [
+      ...seasons,
+      ...upcoming.where((u) => !seasons.any((s) => s.id == u.id)),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2007,7 +2116,10 @@ class _SeasonalCampaignStrip extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
@@ -2074,7 +2186,14 @@ class _SeasonalCampaignStrip extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 10),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.border, borderRadius: BorderRadius.circular(2))),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -2082,7 +2201,11 @@ class _SeasonalCampaignStrip extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '${season.name} Campaign',
-                        style: TextStyle(color: theme.textPrimary, fontSize: 18, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -2123,7 +2246,10 @@ class _SeasonalCampaignStrip extends StatelessWidget {
                               padding: const EdgeInsets.all(6),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: StudioLazyPreview(template: ad, deferMs: 100),
+                                child: StudioLazyPreview(
+                                  template: ad,
+                                  deferMs: 100,
+                                ),
                               ),
                             ),
                           ),
@@ -2132,7 +2258,11 @@ class _SeasonalCampaignStrip extends StatelessWidget {
                             ad.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: theme.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: theme.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -2149,7 +2279,8 @@ class _SeasonalCampaignStrip extends StatelessWidget {
 }
 
 class StudioTemplateThumb extends StatelessWidget {
-  const StudioTemplateThumb({super.key, 
+  const StudioTemplateThumb({
+    super.key,
     required this.template,
     required this.selectedItem,
     required this.kit,
@@ -2170,7 +2301,7 @@ class StudioTemplateThumb extends StatelessWidget {
     final preview = template.applyProduct(
       productName: selectedItem?.name ?? '',
       priceFormatted: selectedItem != null
-          ? 'UGX ${selectedItem!.price.toStringAsFixed(0)}'
+          ? '${selectedItem!.price.toStringAsFixed(0)} /='
           : '',
       imageUrl: selectedItem?.imageUrl ?? '',
       whatsappNumber: kit.whatsapp,
@@ -2180,8 +2311,8 @@ class StudioTemplateThumb extends StatelessWidget {
       shopUrl: kit.website.isNotEmpty
           ? kit.website
           : selectedItem != null
-              ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
-              : 'soko24.co',
+          ? 'soko24.co/p/${selectedItem!.remoteId ?? selectedItem!.id}'
+          : 'soko24.co',
     );
 
     final content = Column(
@@ -2200,8 +2331,7 @@ class StudioTemplateThumb extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: theme?.textSecondary ??
-                Colors.white.withValues(alpha: 0.8),
+            color: theme?.textSecondary ?? Colors.white.withValues(alpha: 0.8),
             fontSize: expanded ? 12 : 10,
             fontWeight: FontWeight.w500,
           ),
@@ -2246,6 +2376,7 @@ class _BrandKitIndicator extends StatelessWidget {
       total++;
       if (ok) done++;
     }
+
     check(kit.businessName.isNotEmpty);
     check(kit.tagline.isNotEmpty);
     check(kit.hasLogo);
@@ -2271,9 +2402,15 @@ class _BrandKitIndicator extends StatelessWidget {
 
   String get _subtitle {
     final pct = _completeness;
-    if (pct >= 1.0) return 'Your business info powers smarter auto-generated ads.';
-    if (pct >= 0.7) return 'Add the missing details to unlock full auto-ad power.';
-    if (pct >= 0.4) return 'Fill in colors, logo, and contact to improve your designs.';
+    if (pct >= 1.0) {
+      return 'Your business info powers smarter auto-generated ads.';
+    }
+    if (pct >= 0.7) {
+      return 'Add the missing details to unlock full auto-ad power.';
+    }
+    if (pct >= 0.4) {
+      return 'Fill in colors, logo, and contact to improve your designs.';
+    }
     return 'Business name, logo, colors & contacts make ads look pro.';
   }
 
@@ -2283,8 +2420,8 @@ class _BrandKitIndicator extends StatelessWidget {
     final color = pct >= 1.0
         ? DesignTokens.brandAccent
         : pct >= 0.5
-            ? const Color(0xFFfbbf24)
-            : const Color(0xFFef4444);
+        ? const Color(0xFFfbbf24)
+        : const Color(0xFFef4444);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -2388,11 +2525,7 @@ class _StudioCloseBtn extends StatelessWidget {
 }
 
 class _IconBtn extends StatelessWidget {
-  const _IconBtn({
-    required this.icon,
-    required this.onTap,
-    this.theme,
-  });
+  const _IconBtn({required this.icon, required this.onTap, this.theme});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -2433,53 +2566,55 @@ class _ProductPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = selectedItem != null;
     return Tooltip(
-      message: active ? 'Selected product: ${selectedItem!.name}' : 'Pick a product',
+      message: active
+          ? 'Selected product: ${selectedItem!.name}'
+          : 'Pick a product',
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: active
-              ? theme.accent.withValues(alpha: 0.1)
-              : theme.surfaceElevated,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
+          decoration: BoxDecoration(
             color: active
-                ? theme.accent.withValues(alpha: 0.35)
-                : theme.border,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              active
-                  ? Icons.inventory_2_rounded
-                  : Icons.add_circle_outline_rounded,
-              size: 14,
-              color: active ? theme.accent : theme.textMuted,
+                ? theme.accent.withValues(alpha: 0.1)
+                : theme.surfaceElevated,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: active
+                  ? theme.accent.withValues(alpha: 0.35)
+                  : theme.border,
             ),
-            if (active) ...[
-              const SizedBox(width: 4),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 72),
-                child: Text(
-                  selectedItem!.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: theme.accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active
+                    ? Icons.inventory_2_rounded
+                    : Icons.add_circle_outline_rounded,
+                size: 14,
+                color: active ? theme.accent : theme.textMuted,
+              ),
+              if (active) ...[
+                const SizedBox(width: 4),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 72),
+                  child: Text(
+                    selectedItem!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: theme.accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -2513,17 +2648,22 @@ class _ProductPickerSheet extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              const Text('Apply to design',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700)),
+              const Text(
+                'Apply to design',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const Spacer(),
               if (selected != null)
                 TextButton(
                   onPressed: () => onSelect(null),
-                  child: const Text('Clear',
-                      style: TextStyle(color: DesignTokens.brandAccent)),
+                  child: const Text(
+                    'Clear',
+                    style: TextStyle(color: DesignTokens.brandAccent),
+                  ),
                 ),
             ],
           ),
@@ -2533,8 +2673,10 @@ class _ProductPickerSheet extends StatelessWidget {
           data: (list) => list.isEmpty
               ? const Padding(
                   padding: EdgeInsets.all(24),
-                  child: Text('No products yet',
-                      style: TextStyle(color: Colors.white54)),
+                  child: Text(
+                    'No products yet',
+                    style: TextStyle(color: Colors.white54),
+                  ),
                 )
               : SizedBox(
                   height: 160,
@@ -2552,7 +2694,9 @@ class _ProductPickerSheet extends StatelessWidget {
                           width: 110,
                           decoration: BoxDecoration(
                             color: sel
-                                ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                                ? DesignTokens.brandAccent.withValues(
+                                    alpha: 0.15,
+                                  )
                                 : Colors.white.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
@@ -2582,16 +2726,20 @@ class _ProductPickerSheet extends StatelessWidget {
                                     color: Colors.white10,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.inventory_2,
-                                      size: 28, color: Colors.white30),
+                                  child: const Icon(
+                                    Icons.inventory_2,
+                                    size: 28,
+                                    color: Colors.white30,
+                                  ),
                                 ),
                               const SizedBox(height: 8),
                               Text(
                                 item.name,
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500),
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
@@ -2611,8 +2759,10 @@ class _ProductPickerSheet extends StatelessWidget {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Could not load products: $e',
-                style: const TextStyle(color: Colors.white54)),
+            child: Text(
+              'Could not load products: $e',
+              style: const TextStyle(color: Colors.white54),
+            ),
           ),
         ),
         const SizedBox(height: 24),

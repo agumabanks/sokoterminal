@@ -44,14 +44,19 @@ class _StudioDeepLinkLauncherState
     if (!mounted) return;
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
-      unawaited(telemetry.event('studio_deep_link_open', props: {
-        if (widget.productId != null) 'product_id': widget.productId!,
-        if (widget.serviceId != null) 'service_id': widget.serviceId!,
-        if (widget.quotationId != null) 'quotation_id': widget.quotationId!,
-        if (widget.receiptId != null) 'receipt_id': widget.receiptId!,
-        'brand_kit': widget.brandKit,
-        'open_panel': widget.openPanel ?? 'templates',
-      }));
+      unawaited(
+        telemetry.event(
+          'studio_deep_link_open',
+          props: {
+            if (widget.productId != null) 'product_id': widget.productId!,
+            if (widget.serviceId != null) 'service_id': widget.serviceId!,
+            if (widget.quotationId != null) 'quotation_id': widget.quotationId!,
+            if (widget.receiptId != null) 'receipt_id': widget.receiptId!,
+            'brand_kit': widget.brandKit,
+            'open_panel': widget.openPanel ?? 'templates',
+          },
+        ),
+      );
     }
     await launchFullStudioWeb(
       context,

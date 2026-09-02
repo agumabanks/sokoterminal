@@ -8,14 +8,10 @@ String formatPosReceiptNumber(int? number) {
 }
 
 extension PriceExtensions on num {
-  /// Formats a number to UGX with comma separators.
-  /// Example: 1000 -> UGX 1,000
+  /// Formats a number to /= with comma separators.
+  /// Example: 1000 -> 1,000 /=
   String toUgx() {
-    final format = NumberFormat.currency(
-      symbol: 'UGX ',
-      decimalDigits: 0,
-      locale: 'en_US',
-    );
+    final format = NumberFormat("#,##0 '/='", 'en_US');
     return format.format(this);
   }
 

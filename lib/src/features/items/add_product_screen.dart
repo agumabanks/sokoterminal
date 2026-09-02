@@ -22,7 +22,6 @@ import '../bnpl/providers/bnpl_seller_status_provider.dart';
 import '../bnpl/providers/product_bnpl_provider.dart';
 import '../../widgets/html_editor.dart';
 import '../../widgets/offline_cached_image.dart';
-import 'gallery_picker_screen.dart';
 import 'product_form_controller.dart';
 import 'product_variants_screen.dart';
 
@@ -79,7 +78,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           _taxRateCtrl.text = state.taxRate;
         }
         if (widget.startPublishOnline) {
-          unawaited(ref.read(productFormProvider.notifier).setPublishOnline(true));
+          unawaited(
+            ref.read(productFormProvider.notifier).setPublishOnline(true),
+          );
         }
       } catch (e, st) {
         debugPrint('[AddProductScreen] initState error: $e\n$st');
@@ -123,12 +124,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final ctrl = ref.read(productFormProvider.notifier);
     ctrl.setName(item.name);
     _nameCtrl.text = item.name;
-    if (item.categoryId != null) ctrl.setCategory(item.categoryId, item.categoryName);
+    if (item.categoryId != null) {
+      ctrl.setCategory(item.categoryId, item.categoryName);
+    }
     if (item.brandId != null) ctrl.setBrand(item.brandId, item.brandName);
     ctrl.setUnit(item.unit ?? 'pc');
     _weightCtrl.text = item.weight?.toString() ?? '';
     ctrl.setWeight(_weightCtrl.text);
-    _priceCtrl.text = CommaNumberFormatter.format(item.price.toStringAsFixed(0));
+    _priceCtrl.text = CommaNumberFormatter.format(
+      item.price.toStringAsFixed(0),
+    );
     ctrl.setPrice(_priceCtrl.text);
     _costCtrl.text = item.cost != null
         ? CommaNumberFormatter.format(item.cost!.toStringAsFixed(0))
@@ -143,7 +148,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ctrl.setDiscountType(item.discountType ?? 'flat');
     _skuCtrl.text = item.sku ?? '';
     ctrl.setSku(_skuCtrl.text);
-    _minQtyCtrl.text = CommaNumberFormatter.format(item.minPurchaseQty.toString());
+    _minQtyCtrl.text = CommaNumberFormatter.format(
+      item.minPurchaseQty.toString(),
+    );
     ctrl.setMinQty(_minQtyCtrl.text);
     _lowStockCtrl.text = item.lowStockWarning != null
         ? CommaNumberFormatter.format(item.lowStockWarning!.toString())
@@ -164,7 +171,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ctrl.setRefundable(item.refundable);
     ctrl.setCashOnDelivery(item.cashOnDelivery);
     if (item.taxRate != null && item.taxRate! > 0) {
-      _taxRateCtrl.text = CommaNumberFormatter.format(item.taxRate!.toStringAsFixed(0));
+      _taxRateCtrl.text = CommaNumberFormatter.format(
+        item.taxRate!.toStringAsFixed(0),
+      );
       ctrl.setTaxRate(_taxRateCtrl.text);
     }
     if (item.publishedOnline) unawaited(ctrl.setPublishOnline(true));
@@ -173,16 +182,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final thumbRaw = (item.thumbnailUrl ?? item.imageUrl)?.trim();
     final galleryUrlsAll = _decodeStringList(item.galleryUrls);
     final galleryIdsAll = _decodeIntList(item.galleryUploadIds);
-    final remoteCount =
-        galleryIdsAll.length < galleryUrlsAll.length ? galleryIdsAll.length : galleryUrlsAll.length;
+    final remoteCount = galleryIdsAll.length < galleryUrlsAll.length
+        ? galleryIdsAll.length
+        : galleryUrlsAll.length;
     final remoteGalleryUrls = galleryUrlsAll.take(remoteCount).toList();
-    final pendingGalleryFiles =
-        galleryUrlsAll.skip(remoteCount).map((p) => File(p)).where((f) => f.existsSync()).toList();
+    final pendingGalleryFiles = galleryUrlsAll
+        .skip(remoteCount)
+        .map((p) => File(p))
+        .where((f) => f.existsSync())
+        .toList();
 
     File? pendingThumbnailFile;
     String? remoteThumbnailUrl = thumbRaw;
     int? remoteThumbnailId = item.thumbnailUploadId;
-    if (thumbRaw != null && thumbRaw.isNotEmpty && !thumbRaw.startsWith('http')) {
+    if (thumbRaw != null &&
+        thumbRaw.isNotEmpty &&
+        !thumbRaw.startsWith('http')) {
       final f = File(thumbRaw);
       if (f.existsSync()) {
         pendingThumbnailFile = f;
@@ -210,7 +225,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final productId = item.remoteId ?? int.tryParse(item.id);
     if (productId == null) return;
 
-    final needsHydration = item.categoryId == null ||
+    final needsHydration =
+        item.categoryId == null ||
         item.brandId == null ||
         item.unit == null ||
         item.description == null ||
@@ -243,40 +259,64 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final stock = int.tryParse(data['current_stock']?.toString() ?? '');
       final weight = double.tryParse(data['weight']?.toString() ?? '');
       final minQty = int.tryParse(data['min_qty']?.toString() ?? '');
-      final lowStock = int.tryParse(data['low_stock_quantity']?.toString() ?? '');
+      final lowStock = int.tryParse(
+        data['low_stock_quantity']?.toString() ?? '',
+      );
       final discount = double.tryParse(data['discount']?.toString() ?? '');
-      final shippingCost = double.tryParse(data['shipping_cost']?.toString() ?? '');
-      final estShippingDays = int.tryParse(data['est_shipping_days']?.toString() ?? '');
+      final shippingCost = double.tryParse(
+        data['shipping_cost']?.toString() ?? '',
+      );
+      final estShippingDays = int.tryParse(
+        data['est_shipping_days']?.toString() ?? '',
+      );
       final refundable = data['refundable'] == true || data['refundable'] == 1;
-      final cashOnDelivery = data['cash_on_delivery'] == true || data['cash_on_delivery'] == 1;
+      final cashOnDelivery =
+          data['cash_on_delivery'] == true || data['cash_on_delivery'] == 1;
       final published = data['published'] == true || data['published'] == 1;
       final barcode = data['barcode']?.toString();
 
       final rawDiscountType = data['discount_type']?.toString();
-      final localDiscountType =
-          rawDiscountType == null ? null : (rawDiscountType == 'amount' ? 'flat' : rawDiscountType);
+      final localDiscountType = rawDiscountType == null
+          ? null
+          : (rawDiscountType == 'amount' ? 'flat' : rawDiscountType);
 
-      unawaited(db.updateItemFields(
-        item.id,
-        ItemsCompanion(
-          remoteId: Value(productId),
-          categoryId: categoryId != null ? Value(categoryId) : const Value.absent(),
-          brandId: brandId != null ? Value(brandId) : const Value.absent(),
-          unit: unit != null ? Value(unit) : const Value.absent(),
-          weight: weight != null ? Value(weight) : const Value.absent(),
-          minPurchaseQty: minQty != null ? Value(minQty) : const Value.absent(),
-          lowStockWarning: lowStock != null ? Value(lowStock) : const Value.absent(),
-          discount: discount != null ? Value(discount) : const Value.absent(),
-          discountType: localDiscountType != null ? Value(localDiscountType) : const Value.absent(),
-          shippingFee: shippingCost != null ? Value(shippingCost) : const Value.absent(),
-          shippingDays: estShippingDays != null ? Value(estShippingDays) : const Value.absent(),
-          refundable: Value(refundable),
-          cashOnDelivery: Value(cashOnDelivery),
-          barcode: barcode != null ? Value(barcode) : const Value.absent(),
-          tags: tags != null ? Value(tags) : const Value.absent(),
-          description: description != null ? Value(description) : const Value.absent(),
+      unawaited(
+        db.updateItemFields(
+          item.id,
+          ItemsCompanion(
+            remoteId: Value(productId),
+            categoryId: categoryId != null
+                ? Value(categoryId)
+                : const Value.absent(),
+            brandId: brandId != null ? Value(brandId) : const Value.absent(),
+            unit: unit != null ? Value(unit) : const Value.absent(),
+            weight: weight != null ? Value(weight) : const Value.absent(),
+            minPurchaseQty: minQty != null
+                ? Value(minQty)
+                : const Value.absent(),
+            lowStockWarning: lowStock != null
+                ? Value(lowStock)
+                : const Value.absent(),
+            discount: discount != null ? Value(discount) : const Value.absent(),
+            discountType: localDiscountType != null
+                ? Value(localDiscountType)
+                : const Value.absent(),
+            shippingFee: shippingCost != null
+                ? Value(shippingCost)
+                : const Value.absent(),
+            shippingDays: estShippingDays != null
+                ? Value(estShippingDays)
+                : const Value.absent(),
+            refundable: Value(refundable),
+            cashOnDelivery: Value(cashOnDelivery),
+            barcode: barcode != null ? Value(barcode) : const Value.absent(),
+            tags: tags != null ? Value(tags) : const Value.absent(),
+            description: description != null
+                ? Value(description)
+                : const Value.absent(),
+          ),
         ),
-      ));
+      );
 
       if (name != null && name.trim().isNotEmpty) {
         _nameCtrl.text = name;
@@ -294,7 +334,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ctrl.setTags(tags);
       }
       if (unitPrice != null) {
-        _priceCtrl.text = CommaNumberFormatter.format(unitPrice.toStringAsFixed(0));
+        _priceCtrl.text = CommaNumberFormatter.format(
+          unitPrice.toStringAsFixed(0),
+        );
         ctrl.setPrice(_priceCtrl.text);
       }
       if (stock != null) {
@@ -314,16 +356,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ctrl.setLowStockWarning(_lowStockCtrl.text);
       }
       if (discount != null) {
-        _discountCtrl.text = CommaNumberFormatter.format(discount.toStringAsFixed(0));
+        _discountCtrl.text = CommaNumberFormatter.format(
+          discount.toStringAsFixed(0),
+        );
         ctrl.setDiscount(_discountCtrl.text);
       }
       if (localDiscountType != null) ctrl.setDiscountType(localDiscountType);
       if (shippingCost != null) {
-        _shippingFeeCtrl.text = CommaNumberFormatter.format(shippingCost.toStringAsFixed(0));
+        _shippingFeeCtrl.text = CommaNumberFormatter.format(
+          shippingCost.toStringAsFixed(0),
+        );
         ctrl.setShippingFee(_shippingFeeCtrl.text);
       }
       if (estShippingDays != null) {
-        _shippingDaysCtrl.text = CommaNumberFormatter.format(estShippingDays.toString());
+        _shippingDaysCtrl.text = CommaNumberFormatter.format(
+          estShippingDays.toString(),
+        );
         ctrl.setShippingDays(_shippingDaysCtrl.text);
       }
       ctrl.setRefundable(refundable);
@@ -353,10 +401,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       ctrl.setBnplEnabled(payload.enabled);
 
       _bnplMinCtrl.text = payload.minOrderAmount != null
-          ? CommaNumberFormatter.format(payload.minOrderAmount!.toStringAsFixed(0))
+          ? CommaNumberFormatter.format(
+              payload.minOrderAmount!.toStringAsFixed(0),
+            )
           : '';
       _bnplMaxCtrl.text = payload.maxOrderAmount != null
-          ? CommaNumberFormatter.format(payload.maxOrderAmount!.toStringAsFixed(0))
+          ? CommaNumberFormatter.format(
+              payload.maxOrderAmount!.toStringAsFixed(0),
+            )
           : '';
       _bnplInstallmentCtrl.text = payload.installmentCount != null
           ? payload.installmentCount.toString()
@@ -380,17 +432,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
     final state = ref.read(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
-    debugPrint('[AddProductScreen] save pressed. canSubmit=${state.canSubmit}, '
-        'basic=${state.isBasicInfoValid}, category=${state.isCategoryValid}, '
-        'pricing=${state.isPricingValid}, discount=${state.isDiscountValid}, '
-        'extras=${state.isExtrasValid}, online=${state.isOnlineDetailsValid}, '
-        'images=${state.isImagesValid}');
+    debugPrint(
+      '[AddProductScreen] save pressed. canSubmit=${state.canSubmit}, '
+      'basic=${state.isBasicInfoValid}, category=${state.isCategoryValid}, '
+      'pricing=${state.isPricingValid}, discount=${state.isDiscountValid}, '
+      'extras=${state.isExtrasValid}, online=${state.isOnlineDetailsValid}, '
+      'images=${state.isImagesValid}',
+    );
     if (!state.canSubmit) {
       _isSaving = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_getValidationHint(state) ?? 'Please complete all required fields'),
+            content: Text(
+              _getValidationHint(state) ??
+                  'Please complete all required fields',
+            ),
             backgroundColor: DesignTokens.warning,
           ),
         );
@@ -403,18 +460,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       await ctrl.autoGenerateSKU();
       finalSku = ref.read(productFormProvider).sku;
     } else {
-      final skuError = await ctrl.validateSKU(editingItemId: widget.existingItem?.id);
+      final skuError = await ctrl.validateSKU(
+        editingItemId: widget.existingItem?.id,
+      );
       if (skuError != null && mounted) {
         _isSaving = false;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(skuError),
-          backgroundColor: DesignTokens.error,
-          action: SnackBarAction(
-            label: 'Auto-fix',
-            textColor: Colors.white,
-            onPressed: () async => ctrl.autoGenerateSKU(),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(skuError),
+            backgroundColor: DesignTokens.error,
+            action: SnackBarAction(
+              label: 'Auto-fix',
+              textColor: Colors.white,
+              onPressed: () async => ctrl.autoGenerateSKU(),
+            ),
           ),
-        ));
+        );
         return;
       }
     }
@@ -427,10 +488,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final existing = widget.existingItem;
 
       final thumbPathOrUrl = state.thumbnailFile?.path ?? state.thumbnailUrl;
-      final thumbUploadId = state.thumbnailFile != null ? null : state.thumbnailUploadId;
+      final thumbUploadId = state.thumbnailFile != null
+          ? null
+          : state.thumbnailUploadId;
 
-      final pendingGalleryPaths = state.galleryFiles.map((f) => f.path).toList();
-      final combinedGalleryUrls = [...state.galleryUrls, ...pendingGalleryPaths];
+      final pendingGalleryPaths = state.galleryFiles
+          .map((f) => f.path)
+          .toList();
+      final combinedGalleryUrls = [
+        ...state.galleryUrls,
+        ...pendingGalleryPaths,
+      ];
 
       final existingGalleryUrls = _decodeStringList(existing?.galleryUrls);
       final existingGalleryIds = _decodeIntList(existing?.galleryUploadIds);
@@ -447,9 +515,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final companion = ItemsCompanion(
         id: Value(id),
         name: Value(state.name.trim()),
-        price: Value(double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0),
+        price: Value(
+          double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0,
+        ),
         cost: Value(double.tryParse(CommaNumberFormatter.unformat(state.cost))),
-        stockQty: Value(int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0),
+        stockQty: Value(
+          int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0,
+        ),
         sku: Value(finalSku.isNotEmpty ? finalSku : null),
         imageUrl: Value(thumbPathOrUrl),
         publishedOnline: Value(state.publishOnline),
@@ -458,32 +530,56 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         brandId: Value(state.brandId),
         brandName: Value(state.brandName),
         unit: Value(state.unit),
-        weight: Value(double.tryParse(CommaNumberFormatter.unformat(state.weight))),
+        weight: Value(
+          double.tryParse(CommaNumberFormatter.unformat(state.weight)),
+        ),
         minPurchaseQty: Value(int.tryParse(state.minQty) ?? 1),
         tags: Value(state.tags.isNotEmpty ? state.tags : null),
-        description: Value(state.description.isNotEmpty ? state.description : null),
+        description: Value(
+          state.description.isNotEmpty ? state.description : null,
+        ),
         thumbnailUrl: Value(thumbPathOrUrl),
         thumbnailUploadId: Value(thumbUploadId),
         galleryUrls: currentHasGallery || shouldClearGallery
-            ? Value(jsonEncode(currentHasGallery ? combinedGalleryUrls : const <String>[]))
+            ? Value(
+                jsonEncode(
+                  currentHasGallery ? combinedGalleryUrls : const <String>[],
+                ),
+              )
             : const Value.absent(),
         galleryUploadIds: currentHasGallery || shouldClearGallery
-            ? Value(jsonEncode(currentHasGallery ? state.galleryUploadIds : const <int>[]))
+            ? Value(
+                jsonEncode(
+                  currentHasGallery ? state.galleryUploadIds : const <int>[],
+                ),
+              )
             : const Value.absent(),
-        discount: Value(double.tryParse(CommaNumberFormatter.unformat(state.discount))),
+        discount: Value(
+          double.tryParse(CommaNumberFormatter.unformat(state.discount)),
+        ),
         discountType: Value(state.discountType),
-        shippingDays: Value(int.tryParse(CommaNumberFormatter.unformat(state.shippingDays))),
-        shippingFee: Value(double.tryParse(CommaNumberFormatter.unformat(state.shippingFee))),
+        shippingDays: Value(
+          int.tryParse(CommaNumberFormatter.unformat(state.shippingDays)),
+        ),
+        shippingFee: Value(
+          double.tryParse(CommaNumberFormatter.unformat(state.shippingFee)),
+        ),
         refundable: Value(state.refundable),
         cashOnDelivery: Value(state.cashOnDelivery),
-        lowStockWarning: Value(int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning))),
+        lowStockWarning: Value(
+          int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning)),
+        ),
         taxRate: state.taxRate.isNotEmpty
-            ? Value(double.tryParse(CommaNumberFormatter.unformat(state.taxRate)))
+            ? Value(
+                double.tryParse(CommaNumberFormatter.unformat(state.taxRate)),
+              )
             : const Value.absent(),
         synced: const Value(false),
       );
 
-      final opType = widget.existingItem == null ? 'item_create' : 'item_update';
+      final opType = widget.existingItem == null
+          ? 'item_create'
+          : 'item_update';
       final catId = int.tryParse(state.categoryId ?? '');
 
       try {
@@ -492,35 +588,63 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           opType: opType,
           syncPayload: {
             'local_id': id,
-            if (widget.existingItem?.remoteId != null) 'remote_id': widget.existingItem!.remoteId,
+            if (widget.existingItem?.remoteId != null)
+              'remote_id': widget.existingItem!.remoteId,
             'name': state.name.trim(),
-            'unit_price': double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0,
-            'current_stock': int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0,
+            'unit_price':
+                double.tryParse(CommaNumberFormatter.unformat(state.price)) ??
+                0,
+            'current_stock':
+                int.tryParse(CommaNumberFormatter.unformat(state.stock)) ?? 0,
             'published': state.publishOnline ? 1 : 0,
             if (catId != null) 'category_ids': [catId],
             if (catId != null) 'category_id': catId,
             if (state.brandId != null) 'brand_id': int.tryParse(state.brandId!),
             'unit': state.unit.isNotEmpty ? state.unit : 'pc',
-            if (state.weight.isNotEmpty) 'weight': double.tryParse(CommaNumberFormatter.unformat(state.weight)),
-            'min_qty': int.tryParse(CommaNumberFormatter.unformat(state.minQty)) ?? 1,
+            if (state.weight.isNotEmpty)
+              'weight': double.tryParse(
+                CommaNumberFormatter.unformat(state.weight),
+              ),
+            'min_qty':
+                int.tryParse(CommaNumberFormatter.unformat(state.minQty)) ?? 1,
             if (state.tags.isNotEmpty)
-              'tags': state.tags.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+              'tags': state.tags
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList(),
             if (state.description.isNotEmpty) 'description': state.description,
-            'discount': double.tryParse(CommaNumberFormatter.unformat(state.discount)) ?? 0,
-            'discount_type': state.discountType == 'flat' ? 'amount' : 'percent',
+            'discount':
+                double.tryParse(
+                  CommaNumberFormatter.unformat(state.discount),
+                ) ??
+                0,
+            'discount_type': state.discountType == 'flat'
+                ? 'amount'
+                : 'percent',
             if (state.shippingDays.isNotEmpty)
-              'est_shipping_days': int.tryParse(CommaNumberFormatter.unformat(state.shippingDays)),
+              'est_shipping_days': int.tryParse(
+                CommaNumberFormatter.unformat(state.shippingDays),
+              ),
             if (state.shippingFee.isNotEmpty)
-              'shipping_cost': double.tryParse(CommaNumberFormatter.unformat(state.shippingFee)),
+              'shipping_cost': double.tryParse(
+                CommaNumberFormatter.unformat(state.shippingFee),
+              ),
             'refundable': state.refundable ? 1 : 0,
             'cash_on_delivery': state.cashOnDelivery ? 1 : 0,
             if (state.lowStockWarning.isNotEmpty)
-              'low_stock_quantity': int.tryParse(CommaNumberFormatter.unformat(state.lowStockWarning)),
+              'low_stock_quantity': int.tryParse(
+                CommaNumberFormatter.unformat(state.lowStockWarning),
+              ),
             if (state.taxRate.isNotEmpty)
-              'tax_rate': double.tryParse(CommaNumberFormatter.unformat(state.taxRate)),
+              'tax_rate': double.tryParse(
+                CommaNumberFormatter.unformat(state.taxRate),
+              ),
             if (finalSku.isNotEmpty) 'sku': finalSku,
             if (state.cost.isNotEmpty)
-              'purchase_price': double.tryParse(CommaNumberFormatter.unformat(state.cost)),
+              'purchase_price': double.tryParse(
+                CommaNumberFormatter.unformat(state.cost),
+              ),
           },
         );
         unawaited(sync.syncCatalogImmediately());
@@ -533,15 +657,23 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               enabled: state.bnplEnabled,
               minOrderAmount: state.bnplMinOrderAmount.isEmpty
                   ? null
-                  : double.tryParse(CommaNumberFormatter.unformat(state.bnplMinOrderAmount)),
+                  : double.tryParse(
+                      CommaNumberFormatter.unformat(state.bnplMinOrderAmount),
+                    ),
               maxOrderAmount: state.bnplMaxOrderAmount.isEmpty
                   ? null
-                  : double.tryParse(CommaNumberFormatter.unformat(state.bnplMaxOrderAmount)),
+                  : double.tryParse(
+                      CommaNumberFormatter.unformat(state.bnplMaxOrderAmount),
+                    ),
               installmentCount: state.bnplInstallmentCount.isEmpty
                   ? null
-                  : int.tryParse(CommaNumberFormatter.unformat(state.bnplInstallmentCount)),
+                  : int.tryParse(
+                      CommaNumberFormatter.unformat(state.bnplInstallmentCount),
+                    ),
             );
-            await ref.read(sellerApiProvider).updateProductBnpl(remoteId, bnplPayload);
+            await ref
+                .read(sellerApiProvider)
+                .updateProductBnpl(remoteId, bnplPayload);
           } catch (e) {
             debugPrint('[AddProductScreen] BNPL update failed: $e');
           }
@@ -551,33 +683,42 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ctrl.setSubmitting(false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Save failed: $e'), backgroundColor: DesignTokens.error),
+            SnackBar(
+              content: Text('Save failed: $e'),
+              backgroundColor: DesignTokens.error,
+            ),
           );
         }
         return;
       }
 
-      debugPrint('[AddProductScreen] product saved: id=$id, name=${state.name.trim()}');
+      debugPrint(
+        '[AddProductScreen] product saved: id=$id, name=${state.name.trim()}',
+      );
       if (mounted) {
         ctrl.reset();
         Navigator.pop(context, true);
         final message = state.publishOnline
             ? 'Saved — syncing to your online shop…'
             : 'Saved on this device';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(message),
-          backgroundColor: DesignTokens.brandAccent,
-          duration: const Duration(seconds: 3),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: DesignTokens.brandAccent,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
       _isSaving = false;
       ref.read(productFormProvider.notifier).setSubmitting(false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error saving: $e'),
-          backgroundColor: DesignTokens.error,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
+        );
       }
     }
   }
@@ -658,7 +799,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 // Error from permission denial
                 if (state.error != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     child: _buildErrorBanner(state.error!),
                   ),
 
@@ -699,10 +843,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   // ─── Photo Section ─────────────────────────────────────────────────────────
 
-  Widget _buildPhotoSection(ProductFormState state, ProductFormController ctrl) {
-    final hasThumb = state.thumbnailFile != null ||
+  Widget _buildPhotoSection(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
+    final hasThumb =
+        state.thumbnailFile != null ||
         (state.thumbnailUrl != null && state.thumbnailUrl!.isNotEmpty);
-    final isSynced = state.thumbnailUploadId != null ||
+    final isSynced =
+        state.thumbnailUploadId != null ||
         (state.thumbnailUrl?.startsWith('http') == true);
 
     return GestureDetector(
@@ -719,7 +868,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   ? Colors.black
                   : DesignTokens.brandPrimary.withValues(alpha: 0.05),
             ),
-            child: hasThumb ? _buildThumbImage(state) : _buildPhotoPlaceholder(),
+            child: hasThumb
+                ? _buildThumbImage(state)
+                : _buildPhotoPlaceholder(),
           ),
 
           // Gradient overlay at bottom for the "change photo" hint
@@ -750,7 +901,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black45,
                       borderRadius: BorderRadius.circular(20),
@@ -758,7 +912,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.edit_outlined, size: 14, color: Colors.white),
+                        const Icon(
+                          Icons.edit_outlined,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           isSynced ? 'Change photo' : 'Tap to change photo',
@@ -791,7 +949,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   children: [
                     Icon(Icons.check_circle, size: 12, color: Colors.white),
                     SizedBox(width: 4),
-                    Text('Synced', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Synced',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -809,9 +974,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_upload_outlined, size: 12, color: Colors.white),
+                    Icon(
+                      Icons.cloud_upload_outlined,
+                      size: 12,
+                      color: Colors.white,
+                    ),
                     SizedBox(width: 4),
-                    Text('Uploading on sync', style: TextStyle(color: Colors.white, fontSize: 11)),
+                    Text(
+                      'Uploading on sync',
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
@@ -861,7 +1033,12 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
     final f = File(url);
     if (f.existsSync()) {
-      return Image.file(f, width: double.infinity, height: 240, fit: BoxFit.cover);
+      return Image.file(
+        f,
+        width: double.infinity,
+        height: 240,
+        fit: BoxFit.cover,
+      );
     }
     return _buildPhotoPlaceholder();
   }
@@ -886,12 +1063,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         const SizedBox(height: 12),
         Text(
           'Add product photo',
-          style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.brandPrimary),
+          style: DesignTokens.textBodyBold.copyWith(
+            color: DesignTokens.brandPrimary,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           'Tap to shoot or choose from gallery',
-          style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+          style: DesignTokens.textSmall.copyWith(
+            color: DesignTokens.grayMedium,
+          ),
         ),
       ],
     );
@@ -919,7 +1100,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Text('Add Photo', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
+            Text(
+              'Add Photo',
+              style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+            ),
             const SizedBox(height: 16),
             _photoOptionTile(
               icon: Icons.camera_alt_outlined,
@@ -942,18 +1126,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             _photoOptionTile(
               icon: Icons.collections_outlined,
               label: 'Add gallery photos',
-              subtitle: 'Grid multi-select from device',
-              onTap: () async {
+              subtitle: 'Select multiple photos',
+              onTap: () {
                 Navigator.pop(context);
-                final files = await Navigator.push<List<File>>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const GalleryPickerScreen(),
-                  ),
-                );
-                if (files != null && files.isNotEmpty) {
-                  ctrl.addGalleryFiles(files);
-                }
+                ctrl.pickGalleryImages();
               },
             ),
           ],
@@ -978,15 +1154,23 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ),
         child: Icon(icon, color: DesignTokens.brandPrimary, size: 20),
       ),
-      title: Text(label, style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w500)),
-      subtitle: subtitle != null ? Text(subtitle, style: DesignTokens.textSmall) : null,
+      title: Text(
+        label,
+        style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w500),
+      ),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: DesignTokens.textSmall)
+          : null,
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
     );
   }
 
   // Gallery strip (shown below the hero if gallery photos exist)
-  Widget _buildGalleryStrip(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildGalleryStrip(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final total = state.galleryUrls.length + state.galleryFiles.length;
     if (total == 0) return const SizedBox.shrink();
 
@@ -1025,7 +1209,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 ctrl.setGalleryFileAsThumbnail(fileIndex);
               }
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Set as main photo'), duration: Duration(seconds: 1)),
+                const SnackBar(
+                  content: Text('Set as main photo'),
+                  duration: Duration(seconds: 1),
+                ),
               );
             },
             child: Stack(
@@ -1068,8 +1255,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                         : ctrl.removeGalleryImage(fileIndex),
                     child: Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, size: 12, color: Colors.white),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -1083,7 +1277,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   // ─── Marketplace Toggle Card ────────────────────────────────────────────────
 
-  Widget _buildMarketplaceCard(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildMarketplaceCard(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1114,8 +1311,12 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                state.publishOnline ? Icons.public_rounded : Icons.store_outlined,
-                color: state.publishOnline ? DesignTokens.brandAccent : DesignTokens.grayMedium,
+                state.publishOnline
+                    ? Icons.public_rounded
+                    : Icons.store_outlined,
+                color: state.publishOnline
+                    ? DesignTokens.brandAccent
+                    : DesignTokens.grayMedium,
                 size: 22,
               ),
             ),
@@ -1126,19 +1327,25 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  state.publishOnline ? 'Listed on Marketplace' : 'In-Store Only',
+                  state.publishOnline
+                      ? 'Listed on Marketplace'
+                      : 'In-Store Only',
                   style: DesignTokens.textBodyBold,
                 ),
                 Text(
                   state.publishOnline
                       ? 'Visible on soko24.co to all buyers'
                       : 'Only available at point of sale',
-                  style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
                 ),
               ],
             ),
           ),
-          if (state.isLoadingCategories || state.isLoadingBrands || _hydratingRemote)
+          if (state.isLoadingCategories ||
+              state.isLoadingBrands ||
+              _hydratingRemote)
             const SizedBox(
               width: 22,
               height: 22,
@@ -1169,7 +1376,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       decoration: BoxDecoration(
         color: DesignTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DesignTokens.dividerSolid.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: DesignTokens.dividerSolid.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1193,18 +1402,19 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   children: [
                     Text(title, style: DesignTokens.textBodyBold),
                     if (subtitle != null)
-                      Text(subtitle,
-                          style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+                      Text(
+                        subtitle,
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
           ),
           const Divider(height: 1, color: DesignTokens.hairline),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -1212,8 +1422,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   // ─── Product Info Fields ───────────────────────────────────────────────────
 
-  Widget _buildProductInfoFields(ProductFormState state, ProductFormController ctrl) {
-    const units = ['pc', 'kg', 'g', 'set', 'pair', 'pack', 'box', 'dozen', 'liter', 'meter'];
+  Widget _buildProductInfoFields(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
+    const units = [
+      'pc',
+      'kg',
+      'g',
+      'set',
+      'pair',
+      'pack',
+      'box',
+      'dozen',
+      'liter',
+      'meter',
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1240,21 +1464,33 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: units.map((unit) => ChoiceChip(
-            label: Text(unit),
-            selected: state.unit == unit,
-            onSelected: (v) { if (v) ctrl.setUnit(unit); },
-            selectedColor: DesignTokens.brandPrimary.withValues(alpha: 0.15),
-            labelStyle: TextStyle(
-              color: state.unit == unit ? DesignTokens.brandPrimary : DesignTokens.grayDark,
-              fontWeight: state.unit == unit ? FontWeight.w600 : FontWeight.normal,
-            ),
-            side: BorderSide(
-              color: state.unit == unit
-                  ? DesignTokens.brandPrimary.withValues(alpha: 0.5)
-                  : DesignTokens.grayLight,
-            ),
-          )).toList(),
+          children: units
+              .map(
+                (unit) => ChoiceChip(
+                  label: Text(unit),
+                  selected: state.unit == unit,
+                  onSelected: (v) {
+                    if (v) ctrl.setUnit(unit);
+                  },
+                  selectedColor: DesignTokens.brandPrimary.withValues(
+                    alpha: 0.15,
+                  ),
+                  labelStyle: TextStyle(
+                    color: state.unit == unit
+                        ? DesignTokens.brandPrimary
+                        : DesignTokens.grayDark,
+                    fontWeight: state.unit == unit
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: state.unit == unit
+                        ? DesignTokens.brandPrimary.withValues(alpha: 0.5)
+                        : DesignTokens.grayLight,
+                  ),
+                ),
+              )
+              .toList(),
         ),
 
         if (state.publishOnline) ...[
@@ -1291,22 +1527,36 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.add_photo_alternate_outlined,
-                      color: DesignTokens.brandPrimary, size: 20),
+                  Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: DesignTokens.brandPrimary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Add gallery photos',
-                            style: DesignTokens.textBody
-                                .copyWith(color: DesignTokens.brandPrimary, fontWeight: FontWeight.w600)),
-                        Text('Show more angles to attract buyers',
-                            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+                        Text(
+                          'Add gallery photos',
+                          style: DesignTokens.textBody.copyWith(
+                            color: DesignTokens.brandPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Show more angles to attract buyers',
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: DesignTokens.grayMedium,
+                  ),
                 ],
               ),
             ),
@@ -1316,7 +1566,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildCategorySelector(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildCategorySelector(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final hasError = state.categoryId == null && state.publishOnline;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1341,7 +1594,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               children: [
                 Icon(
                   Icons.category_outlined,
-                  color: state.categoryId != null ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                  color: state.categoryId != null
+                      ? DesignTokens.brandPrimary
+                      : DesignTokens.grayMedium,
                   size: 20,
                 ),
                 const SizedBox(width: 10),
@@ -1349,14 +1604,24 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   child: Text(
                     state.categoryName ?? 'Select category',
                     style: DesignTokens.textBody.copyWith(
-                      color: state.categoryName != null ? DesignTokens.textPrimary : DesignTokens.grayMedium,
+                      color: state.categoryName != null
+                          ? DesignTokens.textPrimary
+                          : DesignTokens.grayMedium,
                     ),
                   ),
                 ),
                 if (state.isLoadingCategories)
-                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 else
-                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium, size: 20),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: DesignTokens.grayMedium,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -1373,7 +1638,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  Widget _buildBrandSelector(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildBrandSelector(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1392,7 +1660,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               children: [
                 Icon(
                   Icons.branding_watermark_outlined,
-                  color: state.brandId != null ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                  color: state.brandId != null
+                      ? DesignTokens.brandPrimary
+                      : DesignTokens.grayMedium,
                   size: 20,
                 ),
                 const SizedBox(width: 10),
@@ -1400,19 +1670,33 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   child: Text(
                     state.brandName ?? 'Select brand',
                     style: DesignTokens.textBody.copyWith(
-                      color: state.brandName != null ? DesignTokens.textPrimary : DesignTokens.grayMedium,
+                      color: state.brandName != null
+                          ? DesignTokens.textPrimary
+                          : DesignTokens.grayMedium,
                     ),
                   ),
                 ),
                 if (state.brandId != null)
                   GestureDetector(
                     onTap: () => ctrl.setBrand(null, null),
-                    child: const Icon(Icons.clear, size: 18, color: DesignTokens.grayMedium),
+                    child: const Icon(
+                      Icons.clear,
+                      size: 18,
+                      color: DesignTokens.grayMedium,
+                    ),
                   )
                 else if (state.isLoadingBrands)
-                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 else
-                  const Icon(Icons.chevron_right, color: DesignTokens.grayMedium, size: 20),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: DesignTokens.grayMedium,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -1423,7 +1707,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   // ─── Pricing Fields ────────────────────────────────────────────────────────
 
-  Widget _buildPricingFields(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildPricingFields(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final remoteConfig = ref.read(remoteConfigProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1431,7 +1718,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         // Price — hero field
         AppInput(
           controller: _priceCtrl,
-          label: 'Selling Price (UGX) *',
+          label: 'Selling Price (/=) *',
           hint: '50,000',
           prefixIcon: Icons.attach_money,
           keyboardType: TextInputType.number,
@@ -1444,7 +1731,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             Expanded(
               child: AppInput(
                 controller: _costCtrl,
-                label: 'Buying Price (UGX)',
+                label: 'Buying Price (/=)',
                 hint: '30,000',
                 prefixIcon: Icons.shopping_bag_outlined,
                 keyboardType: TextInputType.number,
@@ -1491,7 +1778,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(value: 'flat', label: Text('UGX')),
+                      ButtonSegment(value: 'flat', label: Text('/=')),
                       ButtonSegment(value: 'percent', label: Text('%')),
                     ],
                     selected: {state.discountType},
@@ -1557,8 +1844,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.account_balance_outlined,
-                        color: DesignTokens.brandPrimary, size: 18),
+                    Icon(
+                      Icons.account_balance_outlined,
+                      color: DesignTokens.brandPrimary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '${state.taxLabel} Tax',
@@ -1583,7 +1873,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           ),
         ],
 
-        if (remoteConfig.ffProductVariantsEditor && widget.existingItem == null) ...[
+        if (remoteConfig.ffProductVariantsEditor &&
+            widget.existingItem == null) ...[
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -1593,12 +1884,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             ),
             child: Row(
               children: [
-                const Icon(Icons.layers_outlined, color: DesignTokens.grayMedium, size: 18),
+                const Icon(
+                  Icons.layers_outlined,
+                  color: DesignTokens.grayMedium,
+                  size: 18,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Variants can be added after saving the product',
-                    style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                    style: DesignTokens.textSmall.copyWith(
+                      color: DesignTokens.grayMedium,
+                    ),
                   ),
                 ),
               ],
@@ -1611,7 +1908,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   // ─── Marketplace Fields ────────────────────────────────────────────────────
 
-  Widget _buildMarketplaceFields(ProductFormState state, ProductFormController ctrl) {
+  Widget _buildMarketplaceFields(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
     final plainDesc = state.description.plainText.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1663,7 +1963,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             Expanded(
               child: AppInput(
                 controller: _shippingFeeCtrl,
-                label: 'Fee (UGX) *',
+                label: 'Fee (/=) *',
                 hint: '0 = free',
                 prefixIcon: Icons.payments_outlined,
                 keyboardType: TextInputType.number,
@@ -1703,22 +2003,40 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: value ? DesignTokens.brandAccent.withValues(alpha: 0.06) : DesignTokens.surfaceGrouped,
+        color: value
+            ? DesignTokens.brandAccent.withValues(alpha: 0.06)
+            : DesignTokens.surfaceGrouped,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: value ? DesignTokens.brandAccent.withValues(alpha: 0.3) : DesignTokens.grayLight,
+          color: value
+              ? DesignTokens.brandAccent.withValues(alpha: 0.3)
+              : DesignTokens.grayLight,
         ),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: value ? DesignTokens.brandAccent : DesignTokens.grayMedium),
+          Icon(
+            icon,
+            size: 20,
+            color: value ? DesignTokens.brandAccent : DesignTokens.grayMedium,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600)),
-                Text(subtitle, style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium)),
+                Text(
+                  title,
+                  style: DesignTokens.textBody.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1764,7 +2082,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           const SizedBox(height: 8),
           Text(
             disabledHint,
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.inkMuted,
+            ),
           ),
         ],
         if (active && state.bnplEnabled) ...[
@@ -1774,7 +2094,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               Expanded(
                 child: AppInput(
                   controller: _bnplMinCtrl,
-                  label: 'Min order amount (UGX)',
+                  label: 'Min order amount (/=)',
                   hint: '10,000',
                   prefixIcon: Icons.arrow_downward_outlined,
                   keyboardType: TextInputType.number,
@@ -1786,7 +2106,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               Expanded(
                 child: AppInput(
                   controller: _bnplMaxCtrl,
-                  label: 'Max order amount (UGX)',
+                  label: 'Max order amount (/=)',
                   hint: '500,000',
                   prefixIcon: Icons.arrow_upward_outlined,
                   keyboardType: TextInputType.number,
@@ -1819,12 +2139,16 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       decoration: BoxDecoration(
         color: DesignTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DesignTokens.dividerSolid.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: DesignTokens.dividerSolid.withValues(alpha: 0.5),
+        ),
       ),
       child: ListTile(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ProductVariantsScreen(itemId: item.id)),
+          MaterialPageRoute(
+            builder: (_) => ProductVariantsScreen(itemId: item.id),
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
@@ -1834,11 +2158,21 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             color: DesignTokens.brandPrimary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.layers_outlined, color: DesignTokens.brandPrimary, size: 20),
+          child: const Icon(
+            Icons.layers_outlined,
+            color: DesignTokens.brandPrimary,
+            size: 20,
+          ),
         ),
-        title: const Text('Variants', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Variants',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         subtitle: const Text('Sizes, colors, and other options'),
-        trailing: const Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: DesignTokens.grayMedium,
+        ),
       ),
     );
   }
@@ -1858,7 +2192,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           const Icon(Icons.lock_outline, color: DesignTokens.error, size: 18),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, style: DesignTokens.textSmall.copyWith(color: DesignTokens.error)),
+            child: Text(
+              message,
+              style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+            ),
           ),
           GestureDetector(
             onTap: () => ref.read(productFormProvider.notifier).clearError(),
@@ -1894,19 +2231,27 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: DesignTokens.warning),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: DesignTokens.warning,
+                    ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         hint,
-                        style: DesignTokens.textSmall.copyWith(color: DesignTokens.warning),
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.warning,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             AppButton(
-              label: widget.existingItem == null ? 'Save Product' : 'Update Product',
+              label: widget.existingItem == null
+                  ? 'Save Product'
+                  : 'Update Product',
               onPressed: state.canSubmit ? _saveProduct : null,
               isLoading: state.isSubmitting,
               expand: true,
@@ -1919,9 +2264,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   String? _getValidationHint(ProductFormState state) {
     if (state.name.trim().isEmpty) return 'Enter a product name to continue';
-    if (state.unit.trim().isEmpty) return 'Enter a unit of measure (e.g. pc, kg)';
-    if (!state.isCategoryValid) return 'Select a category for marketplace listing';
-    if (!state.isPricingValid) return 'Enter a valid selling price and stock quantity';
+    if (state.unit.trim().isEmpty) {
+      return 'Enter a unit of measure (e.g. pc, kg)';
+    }
+    if (!state.isCategoryValid) {
+      return 'Select a category for marketplace listing';
+    }
+    if (!state.isPricingValid) {
+      return 'Enter a valid selling price and stock quantity';
+    }
     if (!state.isDiscountValid) {
       return state.discountType == 'percent'
           ? 'Discount must be less than 100%'
@@ -1929,11 +2280,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
     if (!state.isExtrasValid) return 'Check min qty / shipping fields';
     if (state.publishOnline && !state.isOnlineDetailsValid) {
-      if (state.description.trim().length < 10) return 'Write a description (at least 10 characters)';
+      if (state.description.trim().length < 10) {
+        return 'Write a description (at least 10 characters)';
+      }
       if (state.shippingDaysValue == null) return 'Set delivery days (e.g. 3)';
-      if (state.shippingFeeValue == null) return 'Set delivery fee (0 for free)';
+      if (state.shippingFeeValue == null) {
+        return 'Set delivery fee (0 for free)';
+      }
     }
-    if (!state.isImagesValid) return 'Add a product photo for marketplace listing';
+    if (!state.isImagesValid) {
+      return 'Add a product photo for marketplace listing';
+    }
     return null;
   }
 
@@ -1952,7 +2309,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             isInclusive
                 ? 'Price includes ${state.taxLabel}. Tax is shown on receipts.'
                 : 'Price excludes ${state.taxLabel}. Tax is added at checkout.',
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
           ),
         ),
       ],
@@ -1982,10 +2341,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Row(
                   children: [
-                    Text('Select Category', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
+                    Text(
+                      'Select Category',
+                      style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+                    ),
                     const Spacer(),
                     if (state.isLoadingCategories)
-                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                   ],
                 ),
               ),
@@ -1998,17 +2364,26 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                         itemCount: state.categories.length,
                         itemBuilder: (_, i) {
                           final cat = state.categories[i];
-                          final isSelected = cat['id']?.toString() == state.categoryId;
+                          final isSelected =
+                              cat['id']?.toString() == state.categoryId;
                           return ListTile(
                             leading: Icon(
-                              isSelected ? Icons.check_circle_rounded : Icons.category_outlined,
-                              color: isSelected ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.category_outlined,
+                              color: isSelected
+                                  ? DesignTokens.brandPrimary
+                                  : DesignTokens.grayMedium,
                             ),
                             title: Text(cat['name']?.toString() ?? ''),
                             selected: isSelected,
-                            selectedTileColor: DesignTokens.brandPrimary.withValues(alpha: 0.05),
+                            selectedTileColor: DesignTokens.brandPrimary
+                                .withValues(alpha: 0.05),
                             onTap: () {
-                              ctrl.setCategory(cat['id']?.toString(), cat['name']?.toString());
+                              ctrl.setCategory(
+                                cat['id']?.toString(),
+                                cat['name']?.toString(),
+                              );
                               Navigator.pop(ctx);
                             },
                           );
@@ -2041,7 +2416,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
               _buildSheetHandle(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Text('Select Brand', style: DesignTokens.textHeadline.copyWith(fontSize: 17)),
+                child: Text(
+                  'Select Brand',
+                  style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+                ),
               ),
               const Divider(height: 1),
               Expanded(
@@ -2052,17 +2430,26 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                         itemCount: state.brands.length,
                         itemBuilder: (_, i) {
                           final brand = state.brands[i];
-                          final isSelected = brand['id']?.toString() == state.brandId;
+                          final isSelected =
+                              brand['id']?.toString() == state.brandId;
                           return ListTile(
                             leading: Icon(
-                              isSelected ? Icons.check_circle_rounded : Icons.branding_watermark_outlined,
-                              color: isSelected ? DesignTokens.brandPrimary : DesignTokens.grayMedium,
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.branding_watermark_outlined,
+                              color: isSelected
+                                  ? DesignTokens.brandPrimary
+                                  : DesignTokens.grayMedium,
                             ),
                             title: Text(brand['name']?.toString() ?? ''),
                             selected: isSelected,
-                            selectedTileColor: DesignTokens.brandPrimary.withValues(alpha: 0.05),
+                            selectedTileColor: DesignTokens.brandPrimary
+                                .withValues(alpha: 0.05),
                             onTap: () {
-                              ctrl.setBrand(brand['id']?.toString(), brand['name']?.toString());
+                              ctrl.setBrand(
+                                brand['id']?.toString(),
+                                brand['name']?.toString(),
+                              );
                               Navigator.pop(ctx);
                             },
                           );
@@ -2095,7 +2482,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     try {
       final decoded = jsonDecode(raw.trim());
       if (decoded is List) {
-        return decoded.map((e) => e?.toString() ?? '').where((e) => e.trim().isNotEmpty).toList();
+        return decoded
+            .map((e) => e?.toString() ?? '')
+            .where((e) => e.trim().isNotEmpty)
+            .toList();
       }
     } catch (_) {}
     return const [];
@@ -2106,7 +2496,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     try {
       final decoded = jsonDecode(raw.trim());
       if (decoded is List) {
-        return decoded.map((e) => int.tryParse(e?.toString() ?? '')).whereType<int>().toList();
+        return decoded
+            .map((e) => int.tryParse(e?.toString() ?? ''))
+            .whereType<int>()
+            .toList();
       }
     } catch (_) {}
     return const [];

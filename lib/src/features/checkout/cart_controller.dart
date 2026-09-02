@@ -106,7 +106,9 @@ class CartController extends StateNotifier<CartState> {
   /// Persist current cart state to SQLite so it survives app kills.
   Future<void> _persistCart() async {
     try {
-      if (state.lines.isEmpty && state.notes == null && state.customer == null) {
+      if (state.lines.isEmpty &&
+          state.notes == null &&
+          state.customer == null) {
         await _db.clearActiveCartSale();
         return;
       }
@@ -520,7 +522,7 @@ class CartController extends StateNotifier<CartState> {
     final paid = payments.fold<double>(0, (sum, p) => sum + p.amount);
     if ((paid - total).abs() > 0.01) {
       throw ArgumentError(
-        'Payments must add up to UGX ${total.toStringAsFixed(0)} (got ${paid.toStringAsFixed(0)}).',
+        'Payments must add up to ${total.toStringAsFixed(0)} /= (got ${paid.toStringAsFixed(0)}).',
       );
     }
     if (payments.any((p) => p.amount <= 0)) {
@@ -580,7 +582,9 @@ class CartController extends StateNotifier<CartState> {
     // all inside a single Drift transaction. No race conditions.
     final stockDeltas = state.lines
         .where((l) => l.itemId != null && l.itemId!.isNotEmpty)
-        .map((l) => (itemId: l.itemId!, quantity: l.quantity, variant: l.variant))
+        .map(
+          (l) => (itemId: l.itemId!, quantity: l.quantity, variant: l.variant),
+        )
         .toList();
 
     await _db.checkoutSale(
@@ -607,7 +611,6 @@ class CartController extends StateNotifier<CartState> {
 
     // Post-sale bookkeeping (best-effort; local sale is the source of truth).
     try {
-
       // Create local booking records for service lines (unified booking history)
       for (final line in state.lines) {
         final serviceId = line.serviceId;

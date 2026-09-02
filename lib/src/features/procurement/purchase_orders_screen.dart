@@ -116,7 +116,7 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
               title: Text('PO #${po.id} • ${po.status.toUpperCase()}'),
               subtitle: Text(po.supplierName ?? 'No supplier'),
               trailing: Text(
-                'UGX ${po.totalCost.toStringAsFixed(0)}',
+                '${po.totalCost.toStringAsFixed(0)} /=',
                 style: DesignTokens.textBodyBold,
               ),
             ),

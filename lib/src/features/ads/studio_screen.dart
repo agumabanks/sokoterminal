@@ -23,9 +23,9 @@ import 'studio_theme.dart';
 
 final savedTemplatesProvider =
     StateNotifierProvider<SavedTemplatesNotifier, List<AdTemplate>>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return SavedTemplatesNotifier(prefs);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return SavedTemplatesNotifier(prefs);
+    });
 
 class SavedTemplatesNotifier extends StateNotifier<List<AdTemplate>> {
   SavedTemplatesNotifier(this._prefs) : super([]) {
@@ -37,33 +37,45 @@ class SavedTemplatesNotifier extends StateNotifier<List<AdTemplate>> {
 
   void _load() {
     final raw = _prefs.getStringList(_key) ?? [];
-    state = raw.map((s) {
-      try {
-        final m = jsonDecode(s) as Map<String, dynamic>;
-        return AdTemplate(
-          id: m['id'] as String,
-          name: m['name'] as String,
-          category: m['category'] as String,
-          canvasWidth: (m['canvasWidth'] as num).toDouble(),
-          canvasHeight: (m['canvasHeight'] as num).toDouble(),
-          background: m['background'] as String,
-          elements: (m['elements'] as List)
-              .map((e) => CanvasElement.fromJson(e as Map<String, dynamic>))
-              .toList(),
-        );
-      } catch (e, st) {
-        final telemetry = Telemetry.instance;
-        if (telemetry != null) {
-          unawaited(telemetry.recordError(e, st, hint: 'studio_load_saved_template'));
-        }
-        return null;
-      }
-    }).whereType<AdTemplate>().toList();
+    state = raw
+        .map((s) {
+          try {
+            final m = jsonDecode(s) as Map<String, dynamic>;
+            return AdTemplate(
+              id: m['id'] as String,
+              name: m['name'] as String,
+              category: m['category'] as String,
+              canvasWidth: (m['canvasWidth'] as num).toDouble(),
+              canvasHeight: (m['canvasHeight'] as num).toDouble(),
+              background: m['background'] as String,
+              elements: (m['elements'] as List)
+                  .map((e) => CanvasElement.fromJson(e as Map<String, dynamic>))
+                  .toList(),
+            );
+          } catch (e, st) {
+            final telemetry = Telemetry.instance;
+            if (telemetry != null) {
+              unawaited(
+                telemetry.recordError(
+                  e,
+                  st,
+                  hint: 'studio_load_saved_template',
+                ),
+              );
+            }
+            return null;
+          }
+        })
+        .whereType<AdTemplate>()
+        .toList();
   }
 
   Future<void> save(AdTemplate tpl) async {
     if (state.any((t) => t.id == tpl.id)) {
-      state = [for (final t in state) if (t.id == tpl.id) tpl else t];
+      state = [
+        for (final t in state)
+          if (t.id == tpl.id) tpl else t,
+      ];
     } else {
       state = [...state, tpl];
     }
@@ -76,15 +88,19 @@ class SavedTemplatesNotifier extends StateNotifier<List<AdTemplate>> {
   }
 
   Future<void> _persist() async {
-    final raw = state.map((t) => jsonEncode({
-      'id': t.id,
-      'name': t.name,
-      'category': t.category,
-      'canvasWidth': t.canvasWidth,
-      'canvasHeight': t.canvasHeight,
-      'background': t.background,
-      'elements': t.elements.map((e) => e.toJson()).toList(),
-    })).toList();
+    final raw = state
+        .map(
+          (t) => jsonEncode({
+            'id': t.id,
+            'name': t.name,
+            'category': t.category,
+            'canvasWidth': t.canvasWidth,
+            'canvasHeight': t.canvasHeight,
+            'background': t.background,
+            'elements': t.elements.map((e) => e.toJson()).toList(),
+          }),
+        )
+        .toList();
     await _prefs.setStringList(_key, raw);
   }
 }
@@ -140,7 +156,10 @@ class _StudioScreenState extends ConsumerState<StudioScreen> {
     }
   }
 
-  Future<void> _openFullStudio(Item? selectedItem, {String openPanel = 'smart-ads'}) async {
+  Future<void> _openFullStudio(
+    Item? selectedItem, {
+    String openPanel = 'smart-ads',
+  }) async {
     if (selectedItem == null) return;
     await launchFullStudioWebForProduct(
       context,
@@ -152,11 +171,6 @@ class _StudioScreenState extends ConsumerState<StudioScreen> {
 
   Future<void> _openEditor(AdTemplate tpl) async {
     final item = ref.read(studioProductProvider);
-    await launchStudioEditor(
-      context,
-      ref,
-      template: tpl,
-      product: item,
-    );
+    await launchStudioEditor(context, ref, template: tpl, product: item);
   }
 }

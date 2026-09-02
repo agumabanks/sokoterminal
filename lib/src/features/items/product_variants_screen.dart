@@ -229,7 +229,7 @@ class ProductVariantsScreen extends ConsumerWidget {
                 Expanded(
                   child: AppInput(
                     controller: priceCtrl,
-                    label: 'Price (UGX) *',
+                    label: 'Price (/=) *',
                     hint: '5,000',
                     prefixIcon: Icons.attach_money,
                     keyboardType: TextInputType.number,

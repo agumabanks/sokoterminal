@@ -181,17 +181,17 @@ class _ShiftStatusCard extends ConsumerWidget {
                 children: [
                   _MetricPill(
                     label: 'Opening',
-                    value: 'UGX ${summary.opening.toStringAsFixed(0)}',
+                    value: '${summary.opening.toStringAsFixed(0)} /=',
                   ),
                   const SizedBox(width: DesignTokens.spaceSm),
                   _MetricPill(
                     label: 'Cash sales',
-                    value: 'UGX ${summary.cashSales.toStringAsFixed(0)}',
+                    value: '${summary.cashSales.toStringAsFixed(0)} /=',
                   ),
                   const SizedBox(width: DesignTokens.spaceSm),
                   _MetricPill(
                     label: 'Net in/out',
-                    value: 'UGX ${summary.netMovements.toStringAsFixed(0)}',
+                    value: '${summary.netMovements.toStringAsFixed(0)} /=',
                   ),
                 ],
               );
@@ -203,7 +203,7 @@ class _ShiftStatusCard extends ConsumerWidget {
             builder: (context, snapshot) {
               final expected = snapshot.data?.expected ?? shift!.openingFloat;
               return Text(
-                'Expected cash now: UGX ${expected.toStringAsFixed(0)}',
+                'Expected cash now: ${expected.toStringAsFixed(0)} /=',
                 style: DesignTokens.textBodyLight.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -372,7 +372,7 @@ class _ActionsCard extends ConsumerWidget {
             controller: floatCtrl,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: 'Opening cash (UGX)',
+              labelText: 'Opening cash (/=)',
               prefixIcon: Icon(Icons.money),
             ),
           ),
@@ -471,7 +471,7 @@ class _ActionsCard extends ConsumerWidget {
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Amount (UGX)',
+                  labelText: 'Amount (/=)',
                   prefixIcon: Icon(Icons.money),
                 ),
               ),
@@ -579,7 +579,7 @@ class _ActionsCard extends ConsumerWidget {
             controller: countedCtrl,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: 'Counted cash (UGX)',
+              labelText: 'Counted cash (/=)',
               prefixIcon: Icon(Icons.money),
             ),
           ),
@@ -687,7 +687,7 @@ class _MovementTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'UGX ${movement.amount.toStringAsFixed(0)}',
+              '${movement.amount.toStringAsFixed(0)} /=',
               style: DesignTokens.textBodyBold.copyWith(
                 color: isOut ? DesignTokens.error : DesignTokens.grayDark,
               ),

@@ -11,13 +11,17 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Camera & media: required for product photo upload -->
+    <!-- Camera is used to capture product and service photos. Gallery media is
+         selected through the Android system photo picker and needs no broad
+         storage permission. Explicit removals also prevent library manifests
+         from adding restricted media permissions to the release bundle. -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Android 13+ (API 33+): scoped media permissions -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Android 10–12 (API 29–32): legacy external storage read -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -42,6 +46,11 @@
             android:value="false" />
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
+        <!-- Use Skia for compatibility with older Android Vulkan drivers.
+             Impeller can leave the UI black after a swapchain fence timeout. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
         <activity
             android:name=".MainActivity"
@@ -75,23 +84,6 @@
                 <data android:scheme="https"
                       android:host="soko24.co"
                       android:pathPrefix="/seller" />
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https"
-                      android:host="soko24.co"
-                      android:pathPrefix="/p" />
-                <data android:scheme="https"
-                      android:host="soko24.co"
-                      android:pathPrefix="/s" />
-                <data android:scheme="https"
-                      android:host="soko24.co"
-                      android:pathPrefix="/product" />
-                <data android:scheme="https"
-                      android:host="soko24.co"
-                      android:pathPrefix="/service" />
             </intent-filter>
         </activity>
         <activity

@@ -84,7 +84,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
   Future<void> _startTopup() async {
     final amount = await _promptForInteger(
       title: 'Add money to Sanaa Wallet',
-      hint: 'Enter amount in UGX',
+      hint: 'Enter amount in /=',
       initialValue: '10000',
       minValue: 1000,
     );
@@ -120,7 +120,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
           builder: (_) => SellerWalletPaymentScreen(
             topupId: topupId,
             initialUrl: redirectUrl,
-            amountLabel: 'UGX ${_formatMoney(amount.toDouble())}',
+            amountLabel: '${_formatMoney(amount.toDouble())} /=',
           ),
         ),
       );
@@ -162,7 +162,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sanaa Wallet balance is too low. Need UGX ${_formatMoney(total)}, have UGX ${_formatMoney(wallet.balance)}.',
+            'Sanaa Wallet balance is too low. Need ${_formatMoney(total)} /=, have ${_formatMoney(wallet.balance)} /=.',
           ),
           action: SnackBarAction(label: 'Top up', onPressed: _startTopup),
         ),
@@ -192,7 +192,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Bought $quantity SMS credits. Sanaa Wallet: UGX ${_formatMoney(walletBalance)}, SMS credits: $smsCredits.',
+            'Bought $quantity SMS credits. Sanaa Wallet: ${_formatMoney(walletBalance)} /=, SMS credits: $smsCredits.',
           ),
         ),
       );
@@ -228,7 +228,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sanaa Wallet balance is too low. Need UGX ${_formatMoney(amount)}, have UGX ${_formatMoney(wallet.balance)}.',
+            'Sanaa Wallet balance is too low. Need ${_formatMoney(amount)} /=, have ${_formatMoney(wallet.balance)} /=.',
           ),
           action: SnackBarAction(label: 'Top up', onPressed: _startTopup),
         ),
@@ -241,7 +241,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
       builder: (context) => AlertDialog(
         title: Text('Activate ${product.label}?'),
         content: Text(
-          'This will charge UGX ${_formatMoney(amount)} from Sanaa Wallet for one month of ${product.label}.',
+          'This will charge ${_formatMoney(amount)} /= from Sanaa Wallet for one month of ${product.label}.',
         ),
         actions: [
           TextButton(
@@ -287,7 +287,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${plan['name'] ?? product.label} is active. Sanaa Wallet balance: UGX ${_formatMoney(walletBalance)}.',
+            '${plan['name'] ?? product.label} is active. Sanaa Wallet balance: ${_formatMoney(walletBalance)} /=.',
           ),
         ),
       );
@@ -371,17 +371,6 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _busy ? null : _startTopup,
-        icon: _busy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.add_card_outlined),
-        label: const Text('Add money'),
-      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -408,8 +397,6 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                 onTopUp: _startTopup,
               ),
               const SizedBox(height: DesignTokens.spaceLg),
-              const _BnplWalletCard(),
-              const SizedBox(height: DesignTokens.spaceLg),
               if (wallet.subscription != null) ...[
                 _WalletSectionCard(
                   title: 'Current subscription',
@@ -422,30 +409,15 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                 const SizedBox(height: DesignTokens.spaceLg),
               ],
               _WalletSectionCard(
-                title: 'Spend from Sanaa Wallet',
-                trailing: Flexible(
-                  child: Text(
-                    'Offline POS keeps working. Top-up requires internet.',
-                    style: DesignTokens.textSmall,
-                    textAlign: TextAlign.right,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                title: 'Pay for seller tools',
                 child: Column(
                   children: [
                     _PurchaseTile(
                       title: 'SMS credits',
                       subtitle:
-                          'UGX ${_formatMoney(wallet.smsCatalog?.unitPrice ?? 30)} per credit. Current balance: $_smsCreditBalance.',
+                          '$_smsCreditBalance available • ${_formatMoney(wallet.smsCatalog?.unitPrice ?? 30)} /= each',
                       trailingLabel: 'Buy now',
                       onPressed: _busy ? null : _buySmsCredits,
-                    ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    _InfoStrip(
-                      icon: Icons.auto_awesome_outlined,
-                      text:
-                          'Sanaa Wallet is the shared spend account for seller add-ons. SMS credits are live now, and subscription payments can plug into the same balance without a second payment flow.',
                     ),
                     if (wallet.subscriptionPlans.isNotEmpty) ...[
                       const SizedBox(height: DesignTokens.spaceSm),
@@ -471,6 +443,8 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              const _BnplWalletCard(),
               if (wallet.pendingTopups.isNotEmpty) ...[
                 const SizedBox(height: DesignTokens.spaceLg),
                 _WalletSectionCard(
@@ -481,7 +455,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                           (topup) => ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(Icons.hourglass_top_outlined),
-                            title: Text('UGX ${_formatMoney(topup.amount)}'),
+                            title: Text('${_formatMoney(topup.amount)} /='),
                             subtitle: Text(
                               topup.statusMessage ?? topup.status.toUpperCase(),
                             ),
@@ -529,7 +503,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                                 title: Text(_reasonLabel(item.reason)),
                                 subtitle: Text(_compactTime(item.createdAt)),
                                 trailing: Text(
-                                  '${item.amount >= 0 ? '+' : '-'}UGX ${_formatMoney(item.amount.abs())}',
+                                  '${item.amount >= 0 ? '+' : '-'}${_formatMoney(item.amount.abs())} /=',
                                   style: DesignTokens.textBody.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -580,7 +554,7 @@ class _WalletHero extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceXs),
           Text(
-            'UGX ${_formatMoney(wallet.balance)}',
+            '${_formatMoney(wallet.balance)} /=',
             style: DesignTokens.textTitle.copyWith(
               color: Colors.white,
               fontSize: 30,
@@ -588,40 +562,53 @@ class _WalletHero extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
-            'Use one Sanaa Wallet for terminal purchases. The backend stays authoritative, and the terminal only spends after the wallet confirms.',
+            'One balance for SMS credits, seller plans, and business tools.',
             style: DesignTokens.textSmall.copyWith(color: Colors.white),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 360;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FilledButton.icon(
-                    onPressed: onTopUp,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: DesignTokens.brandPrimary,
+          Wrap(
+            spacing: DesignTokens.spaceSm,
+            runSpacing: DesignTokens.spaceSm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: onTopUp,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: DesignTokens.brandPrimary,
+                ),
+                icon: const Icon(Icons.add_card_outlined),
+                label: const Text('Add money'),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: DesignTokens.borderRadiusFull,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.sms_outlined,
+                      size: 17,
+                      color: Colors.white,
                     ),
-                    icon: const Icon(Icons.add_card_outlined),
-                    label: const Text('Add money'),
-                  ),
-                  if (!isNarrow) const SizedBox(height: DesignTokens.spaceSm),
-                  if (isNarrow)
-                    const SizedBox(height: DesignTokens.spaceXs)
-                  else
-                    Chip(
-                      avatar: const Icon(Icons.sms_outlined, size: 18, color: Colors.white),
-                      label: Text('SMS credits: $smsCreditBalance'),
-                      backgroundColor: Colors.white.withValues(alpha: 0.16),
-                      labelStyle: DesignTokens.textSmall.copyWith(
+                    const SizedBox(width: 6),
+                    Text(
+                      '$smsCreditBalance SMS credits',
+                      style: DesignTokens.textSmall.copyWith(
                         color: Colors.white,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                ],
-              );
-            },
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -704,7 +691,9 @@ class _PurchaseTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w700),
+                    style: DesignTokens.textBody.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(subtitle, style: DesignTokens.textSmall),
@@ -712,10 +701,7 @@ class _PurchaseTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton(
-              onPressed: onPressed,
-              child: Text(trailingLabel),
-            ),
+            FilledButton(onPressed: onPressed, child: Text(trailingLabel)),
           ],
         ),
       ),
@@ -757,16 +743,32 @@ class _BnplWalletCard extends ConsumerWidget {
     final statusAsync = ref.watch(bnplSellerStatusProvider);
     final status = statusAsync.valueOrNull;
     final (icon, color, label) = switch (status?.status) {
-      'active' => (Icons.check_circle_outline, DesignTokens.success, 'BNPL active'),
-      'pending' => (Icons.hourglass_top_outlined, DesignTokens.warning, 'BNPL pending'),
-      'suspended' => (Icons.block_outlined, DesignTokens.error, 'BNPL suspended'),
-      _ => (Icons.account_balance_wallet_outlined, DesignTokens.grayMedium, 'Sanaa Finance BNPL'),
+      'active' => (
+        Icons.check_circle_outline,
+        DesignTokens.success,
+        'BNPL active',
+      ),
+      'pending' => (
+        Icons.hourglass_top_outlined,
+        DesignTokens.warning,
+        'BNPL pending',
+      ),
+      'suspended' => (
+        Icons.block_outlined,
+        DesignTokens.error,
+        'BNPL suspended',
+      ),
+      _ => (
+        Icons.account_balance_wallet_outlined,
+        DesignTokens.grayMedium,
+        'Sanaa Finance BNPL',
+      ),
     };
 
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const BnplSettingsScreen()),
-      ),
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const BnplSettingsScreen())),
       child: Container(
         padding: DesignTokens.paddingLg,
         decoration: BoxDecoration(
@@ -792,7 +794,9 @@ class _BnplWalletCard extends ConsumerWidget {
                 children: [
                   Text(
                     label,
-                    style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w700),
+                    style: DesignTokens.textBody.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(

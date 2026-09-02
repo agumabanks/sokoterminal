@@ -32,7 +32,13 @@ class TopBar extends ConsumerWidget {
   final AdTemplate template;
   final AdSize? activeSize;
   final bool canUndo, canRedo, showGrid, snapEnabled, isBusy;
-  final VoidCallback onUndo, onRedo, onToggleGrid, onToggleSnap, onSave, onShare, onSaveAs;
+  final VoidCallback onUndo,
+      onRedo,
+      onToggleGrid,
+      onToggleSnap,
+      onSave,
+      onShare,
+      onSaveAs;
   final ValueChanged<AdSize> onResize;
 
   @override
@@ -45,13 +51,16 @@ class TopBar extends ConsumerWidget {
         : '${template.canvasWidth.toInt()}×${template.canvasHeight.toInt()}';
     return Container(
       color: kSurface,
-      padding: EdgeInsets.fromLTRB(4, topPad + 2, 8, 8),
+      padding: EdgeInsets.fromLTRB(4, topPad + 4, 8, 8),
       child: Row(
         children: [
           IconButton(
             tooltip: 'Close editor',
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Colors.white70, size: 18),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white70,
+              size: 18,
+            ),
             onPressed: () => Navigator.maybePop(context),
           ),
           Expanded(
@@ -62,7 +71,10 @@ class TopBar extends ConsumerWidget {
                 Text(
                   template.name,
                   style: const TextStyle(
-                      color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
@@ -73,94 +85,112 @@ class TopBar extends ConsumerWidget {
               ],
             ),
           ),
-          // Canvas size picker
-          IconButton(
-            tooltip: 'Change canvas size',
-            icon: const Icon(Icons.aspect_ratio_rounded,
-                color: Colors.white70, size: 20),
-            onPressed: () => _showSizePicker(context),
-          ),
-          // Undo / Redo
           IconButton(
             tooltip: 'Undo',
-            icon: Icon(Icons.undo_rounded,
-                color: canUndo ? Colors.white70 : disabledColor, size: 20),
+            icon: Icon(
+              Icons.undo_rounded,
+              color: canUndo ? Colors.white70 : disabledColor,
+              size: 20,
+            ),
             onPressed: canUndo ? onUndo : null,
           ),
           IconButton(
             tooltip: 'Redo',
-            icon: Icon(Icons.redo_rounded,
-                color: canRedo ? Colors.white70 : disabledColor, size: 20),
-            onPressed: canRedo ? onRedo : null,
-          ),
-          // Grid toggle
-          IconButton(
-            tooltip: showGrid ? 'Hide grid' : 'Show grid',
             icon: Icon(
-              Icons.grid_on_rounded,
-              color: showGrid ? kAccent : Colors.white38, size: 20),
-            onPressed: onToggleGrid,
-          ),
-          // Snap toggle
-          IconButton(
-            icon: Icon(
-              Icons.straighten_rounded,
-              color: snapEnabled ? kAccent : Colors.white38, size: 20),
-            onPressed: onToggleSnap,
-            tooltip: 'Snap to guides',
-          ),
-          // Watermark preview toggle
-          IconButton(
-            tooltip: previewEnabled ? 'Hide watermark preview' : 'Show watermark preview',
-            icon: Icon(
-              Icons.water_drop_rounded,
-              color: previewEnabled ? kAccent : Colors.white38,
+              Icons.redo_rounded,
+              color: canRedo ? Colors.white70 : disabledColor,
               size: 20,
             ),
-            onPressed: () {
-              final current = ref.read(watermarkPreviewProvider);
-              ref.read(watermarkPreviewProvider.notifier).state = !current;
+            onPressed: canRedo ? onRedo : null,
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'More canvas tools',
+            icon: const Icon(Icons.more_horiz_rounded, color: Colors.white70),
+            color: kSurface,
+            onSelected: (value) {
+              switch (value) {
+                case 'size':
+                  _showSizePicker(context);
+                case 'grid':
+                  onToggleGrid();
+                case 'snap':
+                  onToggleSnap();
+                case 'watermark':
+                  final current = ref.read(watermarkPreviewProvider);
+                  ref.read(watermarkPreviewProvider.notifier).state = !current;
+                case 'template':
+                  onSaveAs();
+              }
             },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'size',
+                child: _CanvasMenuItem(
+                  icon: Icons.aspect_ratio_rounded,
+                  label: 'Canvas size',
+                ),
+              ),
+              PopupMenuItem(
+                value: 'grid',
+                child: _CanvasMenuItem(
+                  icon: Icons.grid_on_rounded,
+                  label: showGrid ? 'Hide grid' : 'Show grid',
+                  active: showGrid,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'snap',
+                child: _CanvasMenuItem(
+                  icon: Icons.straighten_rounded,
+                  label: 'Snap to guides',
+                  active: snapEnabled,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'watermark',
+                child: _CanvasMenuItem(
+                  icon: Icons.water_drop_rounded,
+                  label: 'Watermark preview',
+                  active: previewEnabled,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'template',
+                child: _CanvasMenuItem(
+                  icon: Icons.bookmark_add_rounded,
+                  label: 'Save as template',
+                ),
+              ),
+            ],
           ),
-          // Save as
-          IconButton(
-            tooltip: 'Save as template',
-            icon: const Icon(Icons.bookmark_add_rounded, color: Colors.white70, size: 20),
-            onPressed: onSaveAs,
-          ),
-          // Share
           if (isBusy)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
               child: SizedBox(
-                width: 18, height: 18,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(kAccent)),
+                  valueColor: AlwaysStoppedAnimation(kAccent),
+                ),
               ),
             )
           else
-            IconButton(
-              tooltip: 'Share',
-              icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 20),
-              onPressed: onShare,
-            ),
-          // Save (green pill)
-          Tooltip(
-            message: 'Save design',
-            child: GestureDetector(
-              onTap: onSave,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  color: kAccent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text('Save',
-                    style: TextStyle(
-                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: kAccent,
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
+              onPressed: onShare,
+              icon: const Icon(Icons.ios_share_rounded, size: 17),
+              label: const Text('Share'),
             ),
+          IconButton(
+            tooltip: 'Save design',
+            onPressed: onSave,
+            icon: const Icon(Icons.check_rounded, color: Colors.white),
           ),
         ],
       ),
@@ -214,21 +244,33 @@ class TopBar extends ConsumerWidget {
                   final isActive = activeSize?.label == size.label;
                   return ListTile(
                     dense: true,
-                    leading: Icon(size.icon,
-                        color: isActive ? kAccent : Colors.white54, size: 22),
+                    leading: Icon(
+                      size.icon,
+                      color: isActive ? kAccent : Colors.white54,
+                      size: 22,
+                    ),
                     title: Text(
                       size.label,
                       style: TextStyle(
                         color: isActive ? kAccent : Colors.white,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                     subtitle: Text(
                       '${size.width.toInt()}×${size.height.toInt()}',
-                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                      ),
                     ),
                     trailing: isActive
-                        ? const Icon(Icons.check_rounded, color: kAccent, size: 20)
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: kAccent,
+                            size: 20,
+                          )
                         : null,
                     onTap: () {
                       Navigator.pop(ctx);
@@ -242,6 +284,33 @@ class TopBar extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CanvasMenuItem extends StatelessWidget {
+  const _CanvasMenuItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: active ? kAccent : Colors.white70, size: 20),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(color: Colors.white)),
+        if (active) ...[
+          const Spacer(),
+          const Icon(Icons.check_rounded, color: kAccent, size: 18),
+        ],
+      ],
     );
   }
 }

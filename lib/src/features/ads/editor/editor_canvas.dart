@@ -15,7 +15,16 @@ import 'editor_state.dart';
 // Editor canvas with element rendering + handles
 // ---------------------------------------------------------------------------
 
-enum ResizeAnchor { topLeft, top, topRight, right, bottomRight, bottom, bottomLeft, left }
+enum ResizeAnchor {
+  topLeft,
+  top,
+  topRight,
+  right,
+  bottomRight,
+  bottom,
+  bottomLeft,
+  left,
+}
 
 class EditorCanvas extends StatefulWidget {
   const EditorCanvas({
@@ -38,7 +47,8 @@ class EditorCanvas extends StatefulWidget {
   final ValueChanged<String> onElementTap;
   final VoidCallback onCanvasTap;
   final void Function(String id, double dx, double dy) onElementMoved;
-  final void Function(String id, double dw, double dh, ResizeAnchor anchor) onElementResized;
+  final void Function(String id, double dw, double dh, ResizeAnchor anchor)
+  onElementResized;
   final void Function(String id, double angle) onElementRotated;
 
   @override
@@ -64,7 +74,8 @@ class _EditorCanvasState extends State<EditorCanvas> {
     return GestureDetector(
       onTap: widget.onCanvasTap,
       child: Container(
-        width: cw, height: ch,
+        width: cw,
+        height: ch,
         clipBehavior: Clip.hardEdge,
         decoration: const BoxDecoration(),
         child: Stack(
@@ -77,13 +88,12 @@ class _EditorCanvasState extends State<EditorCanvas> {
 
             // Grid
             if (state.showGrid)
-              Positioned.fill(
-                child: CustomPaint(painter: _GridPainter(scale)),
-              ),
+              Positioned.fill(child: CustomPaint(painter: _GridPainter(scale))),
 
             // Elements sorted by zIndex
             ...state.sortedElements.where((el) => el.isVisible).map((el) {
-              final isSelected = !widget.isExporting && el.id == state.selectedId;
+              final isSelected =
+                  !widget.isExporting && el.id == state.selectedId;
               return ElementWidget(
                 key: ValueKey(el.id),
                 el: el,
@@ -132,7 +142,11 @@ class _EditorCanvasState extends State<EditorCanvas> {
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: _SnapGuidePainter(
-                      tpl: tpl, selected: state.selected, scale: scale)),
+                      tpl: tpl,
+                      selected: state.selected,
+                      scale: scale,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -200,14 +214,18 @@ class ElementWidget extends StatelessWidget {
         : content;
 
     // Apply opacity
-    Widget opaque = Opacity(opacity: el.opacity.clamp(0.0, 1.0), child: rotated);
+    Widget opaque = Opacity(
+      opacity: el.opacity.clamp(0.0, 1.0),
+      child: rotated,
+    );
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         // Main element
         Positioned(
-          left: x, top: y,
+          left: x,
+          top: y,
           width: w,
           height: h,
           child: GestureDetector(
@@ -221,7 +239,8 @@ class ElementWidget extends StatelessWidget {
         // Selection overlay
         if (isSelected) ...[
           Positioned(
-            left: x - 2, top: y - 2,
+            left: x - 2,
+            top: y - 2,
             width: (w) + 4,
             height: (h ?? 40.0) + 4,
             child: IgnorePointer(
@@ -238,14 +257,21 @@ class ElementWidget extends StatelessWidget {
             left: cx - _kHandleSize / 2,
             top: y - 36,
             child: GestureDetector(
-              onPanStart: (d) => onRotateStart(d.globalPosition, Offset(cx, cy)),
+              onPanStart: (d) =>
+                  onRotateStart(d.globalPosition, Offset(cx, cy)),
               onPanUpdate: (d) => onRotateUpdate(d.globalPosition),
               child: Container(
-                width: _kHandleSize, height: _kHandleSize,
+                width: _kHandleSize,
+                height: _kHandleSize,
                 decoration: const BoxDecoration(
-                  color: kAccent, shape: BoxShape.circle),
-                child: const Icon(Icons.rotate_right_rounded,
-                    color: Colors.white, size: 12),
+                  color: kAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.rotate_right_rounded,
+                  color: Colors.white,
+                  size: 12,
+                ),
               ),
             ),
           ),
@@ -278,13 +304,17 @@ class ElementWidget extends StatelessWidget {
           onPanStart: (d) => onResizeStart(d.globalPosition, anchor),
           onPanUpdate: (d) => onResizeUpdate(d.globalPosition),
           child: Container(
-            width: _kHandleSize, height: _kHandleSize,
+            width: _kHandleSize,
+            height: _kHandleSize,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(color: kAccent, width: 1.5),
               boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 3),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 3,
+                ),
               ],
             ),
           ),
@@ -369,14 +399,16 @@ class ElementWidget extends StatelessWidget {
       decoration: el.textDecoration == 'underline'
           ? TextDecoration.underline
           : el.textDecoration == 'line-through'
-              ? TextDecoration.lineThrough
-              : TextDecoration.none,
+          ? TextDecoration.lineThrough
+          : TextDecoration.none,
     );
 
     if (el.fontFamily != null && studioFonts.containsKey(el.fontFamily)) {
       try {
-        style = GoogleFonts.getFont(studioFonts[el.fontFamily!]!,
-            textStyle: style);
+        style = GoogleFonts.getFont(
+          studioFonts[el.fontFamily!]!,
+          textStyle: style,
+        );
       } catch (_) {}
     }
 
@@ -393,37 +425,42 @@ class ElementWidget extends StatelessWidget {
     );
 
     if (el.hasStroke) {
-      text = Stack(children: [
-        Text(
-          displayText,
-          style: style.copyWith(
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = (el.strokeWidth ?? 1) * s
-              ..color = parseHexColor(el.strokeColor!),
+      text = Stack(
+        children: [
+          Text(
+            displayText,
+            style: style.copyWith(
+              foreground: Paint()
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = (el.strokeWidth ?? 1) * s
+                ..color = parseHexColor(el.strokeColor!),
+            ),
+            textAlign: align,
           ),
-          textAlign: align,
-        ),
-        text,
-      ]);
+          text,
+        ],
+      );
     }
 
-    return SizedBox(
-      width: el.width * s,
-      child: text,
-    );
+    return SizedBox(width: el.width * s, child: text);
   }
 
   String _applyTextTransform(String text, String? transform) {
     switch (transform) {
-      case 'uppercase': return text.toUpperCase();
-      case 'lowercase': return text.toLowerCase();
+      case 'uppercase':
+        return text.toUpperCase();
+      case 'lowercase':
+        return text.toLowerCase();
       case 'capitalize':
-        return text.split(' ').map((w) {
-          if (w.isEmpty) return w;
-          return '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}';
-        }).join(' ');
-      default: return text;
+        return text
+            .split(' ')
+            .map((w) {
+              if (w.isEmpty) return w;
+              return '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}';
+            })
+            .join(' ');
+      default:
+        return text;
     }
   }
 
@@ -433,12 +470,20 @@ class ElementWidget extends StatelessWidget {
 
     Widget img;
     if (src.startsWith('file://')) {
-      img = Image.file(File(src.substring(7)),
-          fit: fit, width: el.width * s, height: el.height * s);
+      img = Image.file(
+        File(src.substring(7)),
+        fit: fit,
+        width: el.width * s,
+        height: el.height * s,
+      );
     } else if (src.startsWith('http')) {
-      img = Image.network(src,
-          fit: fit, width: el.width * s, height: el.height * s,
-          errorBuilder: (_, __, ___) => _placeholder(s));
+      img = Image.network(
+        src,
+        fit: fit,
+        width: el.width * s,
+        height: el.height * s,
+        errorBuilder: (_, __, ___) => _placeholder(s),
+      );
     } else {
       img = _placeholder(s);
     }
@@ -457,11 +502,15 @@ class ElementWidget extends StatelessWidget {
 
   BoxFit _boxFitFor(String? fit) {
     switch (fit) {
-      case 'contain': return BoxFit.contain;
-      case 'fill': return BoxFit.fill;
-      case 'none': return BoxFit.none;
+      case 'contain':
+        return BoxFit.contain;
+      case 'fill':
+        return BoxFit.fill;
+      case 'none':
+        return BoxFit.none;
       case 'cover':
-      default: return BoxFit.cover;
+      default:
+        return BoxFit.cover;
     }
   }
 
@@ -470,20 +519,52 @@ class ElementWidget extends StatelessWidget {
       case 'grayscale':
         return ColorFiltered(
           colorFilter: const ColorFilter.matrix([
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0.2126, 0.7152, 0.0722, 0, 0,
-            0, 0, 0, 1, 0,
+            0.2126,
+            0.7152,
+            0.0722,
+            0,
+            0,
+            0.2126,
+            0.7152,
+            0.0722,
+            0,
+            0,
+            0.2126,
+            0.7152,
+            0.0722,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
           ]),
           child: img,
         );
       case 'sepia':
         return ColorFiltered(
           colorFilter: const ColorFilter.matrix([
-            0.393, 0.769, 0.189, 0, 0,
-            0.349, 0.686, 0.168, 0, 0,
-            0.272, 0.534, 0.131, 0, 0,
-            0, 0, 0, 1, 0,
+            0.393,
+            0.769,
+            0.189,
+            0,
+            0,
+            0.349,
+            0.686,
+            0.168,
+            0,
+            0,
+            0.272,
+            0.534,
+            0.131,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
           ]),
           child: img,
         );
@@ -493,19 +574,21 @@ class ElementWidget extends StatelessWidget {
   }
 
   Widget _placeholder(double s) => Container(
-        width: el.width * s, height: el.height * s,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: el.cornerRadius != null
-              ? BorderRadius.circular(el.cornerRadius! * s)
-              : null,
-        ),
-        child: const Icon(Icons.image_outlined, color: Colors.white24, size: 32),
-      );
+    width: el.width * s,
+    height: el.height * s,
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: el.cornerRadius != null
+          ? BorderRadius.circular(el.cornerRadius! * s)
+          : null,
+    ),
+    child: const Icon(Icons.image_outlined, color: Colors.white24, size: 32),
+  );
 
   Widget _buildFigure(double s) {
     return Container(
-      width: el.width * s, height: el.height * s,
+      width: el.width * s,
+      height: el.height * s,
       decoration: BoxDecoration(
         color: el.fill != null ? parseHexColor(el.fill!) : Colors.white,
         borderRadius: el.cornerRadius != null
@@ -514,7 +597,8 @@ class ElementWidget extends StatelessWidget {
         border: el.hasStroke
             ? Border.all(
                 color: parseHexColor(el.strokeColor!),
-                width: (el.strokeWidth ?? 1) * s)
+                width: (el.strokeWidth ?? 1) * s,
+              )
             : null,
         boxShadow: el.hasShadow
             ? [
@@ -535,7 +619,11 @@ class ElementWidget extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SnapGuidePainter extends CustomPainter {
-  const _SnapGuidePainter({required this.tpl, required this.selected, required this.scale});
+  const _SnapGuidePainter({
+    required this.tpl,
+    required this.selected,
+    required this.scale,
+  });
   final AdTemplate tpl;
   final CanvasElement? selected;
   final double scale;

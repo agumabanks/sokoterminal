@@ -327,7 +327,9 @@ class _ServiceLineTileState extends State<ServiceLineTile> {
                           children: [
                             Text(
                               service.price.toUgx(),
-                              style: DesignTokens.textMono.copyWith(fontSize: 14),
+                              style: DesignTokens.textMono.copyWith(
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(width: DesignTokens.spaceSm),
                             _ServiceStatusPill(
@@ -440,10 +442,7 @@ class _ServiceStatusPill extends StatelessWidget {
 }
 
 class _ServiceLiveToggle extends StatelessWidget {
-  const _ServiceLiveToggle({
-    required this.value,
-    required this.onChanged,
-  });
+  const _ServiceLiveToggle({required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -494,7 +493,9 @@ class _ServiceLiveToggle extends StatelessWidget {
                   Text(
                     'Draft',
                     style: DesignTokens.textSmallBold.copyWith(
-                      color: !value ? DesignTokens.grayDark : Colors.transparent,
+                      color: !value
+                          ? DesignTokens.grayDark
+                          : Colors.transparent,
                       fontSize: 10,
                     ),
                   ),

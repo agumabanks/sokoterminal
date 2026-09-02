@@ -38,6 +38,7 @@ class PosSessionState {
     if (expiresAt == null) return true;
     return expiresAt!.isAfter(DateTime.now());
   }
+
   bool get isManager => (staffRole ?? '').toLowerCase() == 'manager';
 
   PosSessionState copyWith({
@@ -185,10 +186,7 @@ class PosSessionController extends StateNotifier<PosSessionState> {
           expiresAt: expiresAt,
         );
         await _storage.writePosStaffRole(staffId, staffRole);
-        await _upsertLocalStaff(
-          staffId: staffId,
-          staffName: staffName,
-        );
+        await _upsertLocalStaff(staffId: staffId, staffName: staffName);
       }
     } on DioException catch (error) {
       if (error.response?.statusCode == 401) {
@@ -310,10 +308,9 @@ class PosSessionController extends StateNotifier<PosSessionState> {
         if (localStaff != null) {
           final staffId = int.tryParse(localStaff.id);
           final staffName = localStaff.name;
-          final staffRole =
-              staffId != null
-                  ? await _storage.readPosStaffRole(staffId)
-                  : null;
+          final staffRole = staffId != null
+              ? await _storage.readPosStaffRole(staffId)
+              : null;
           final resolvedRole = staffRole ?? 'cashier';
 
           if (requiredRole != null &&
@@ -395,10 +392,7 @@ class PosSessionController extends StateNotifier<PosSessionState> {
       StaffCompanion.insert(
         id: drift.Value(staffId.toString()),
         name: staffName,
-        pin:
-            pin == null
-                ? const drift.Value.absent()
-                : drift.Value(pin),
+        pin: pin == null ? const drift.Value.absent() : drift.Value(pin),
         roleId: const drift.Value.absent(),
         active: const drift.Value(true),
         updatedAt: drift.Value(now),

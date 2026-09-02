@@ -421,7 +421,8 @@ class _PaymentSettingsScreenState extends ConsumerState<PaymentSettingsScreen> {
                       ),
                       const SizedBox(height: DesignTokens.spaceMd),
                       OutlinedButton.icon(
-                        onPressed: () => context.go('/home/more/delivery-settings'),
+                        onPressed: () =>
+                            context.go('/home/more/delivery-settings'),
                         icon: const Icon(Icons.local_shipping_outlined),
                         label: const Text('Open Delivery Options'),
                       ),

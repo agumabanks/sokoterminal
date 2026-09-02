@@ -394,7 +394,7 @@ class ReportsScreen extends ConsumerWidget {
                 1: const pw.FlexColumnWidth(1),
                 2: const pw.FlexColumnWidth(2),
               },
-              headers: ['Product', 'Qty', 'Revenue (UGX)'],
+              headers: ['Product', 'Qty', 'Revenue (/=)'],
               data: topProducts
                   .take(15)
                   .map(
@@ -429,7 +429,7 @@ class ReportsScreen extends ConsumerWidget {
                 1: const pw.FlexColumnWidth(1),
                 2: const pw.FlexColumnWidth(2),
               },
-              headers: ['Service (Variant)', 'Qty', 'Revenue (UGX)'],
+              headers: ['Service (Variant)', 'Qty', 'Revenue (/=)'],
               data: topServices
                   .take(15)
                   .map(
@@ -482,7 +482,7 @@ class ReportsScreen extends ConsumerWidget {
             ),
           ),
           pw.Text(
-            'UGX ${value.toStringAsFixed(0)}',
+            '${value.toStringAsFixed(0)} /=',
             style: pw.TextStyle(
               fontSize: fontSize,
               fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
@@ -629,7 +629,7 @@ class _NetProfitCard extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
-            'UGX ${report.netProfit.toStringAsFixed(0)}',
+            '${report.netProfit.toStringAsFixed(0)} /=',
             style: DesignTokens.textTitleLight.copyWith(fontSize: 28),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
@@ -776,7 +776,7 @@ class _ReportRow extends StatelessWidget {
             style: isBold ? DesignTokens.textBodyBold : DesignTokens.textBody,
           ),
           Text(
-            'UGX ${value.toStringAsFixed(0)}',
+            '${value.toStringAsFixed(0)} /=',
             style: (isBold ? DesignTokens.textBodyBold : DesignTokens.textBody)
                 .copyWith(color: valColor),
           ),

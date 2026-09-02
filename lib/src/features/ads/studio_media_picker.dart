@@ -98,10 +98,9 @@ class _StudioMediaPickerSheetState
       _uploadError = null;
     });
     try {
-      final res = await ref.read(sellerApiProvider).fetchSellerFiles(
-            type: 'image',
-            sort: 'newest',
-          );
+      final res = await ref
+          .read(sellerApiProvider)
+          .fetchSellerFiles(type: 'image', sort: 'newest');
       final body = res.data;
       final rows = <_UploadRow>[];
       if (body is Map && body['data'] is List) {
@@ -109,11 +108,13 @@ class _StudioMediaPickerSheetState
           if (item is! Map) continue;
           final url = item['url']?.toString();
           if (url == null || url.isEmpty) continue;
-          rows.add(_UploadRow(
-            id: (item['id'] as num?)?.toInt() ?? 0,
-            name: item['file_original_name']?.toString() ?? 'Upload',
-            url: url,
-          ));
+          rows.add(
+            _UploadRow(
+              id: (item['id'] as num?)?.toInt() ?? 0,
+              name: item['file_original_name']?.toString() ?? 'Upload',
+              url: url,
+            ),
+          );
         }
       }
       if (mounted) {
@@ -155,12 +156,7 @@ class _StudioMediaPickerSheetState
   }) {
     Navigator.pop(
       context,
-      StudioMediaPick(
-        src: url,
-        label: label,
-        source: kind,
-        uploadId: uploadId,
-      ),
+      StudioMediaPick(src: url, label: label, source: kind, uploadId: uploadId),
     );
   }
 
@@ -204,14 +200,20 @@ class _StudioMediaPickerSheetState
                 if (widget.allowCamera)
                   IconButton(
                     onPressed: () => _pickDevice(ImageSource.camera),
-                    icon: const Icon(Icons.camera_alt_outlined,
-                        color: _accent, size: 22),
+                    icon: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: _accent,
+                      size: 22,
+                    ),
                     tooltip: 'Camera',
                   ),
                 IconButton(
                   onPressed: () => _pickDevice(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined,
-                      color: _accent, size: 22),
+                  icon: const Icon(
+                    Icons.photo_library_outlined,
+                    color: _accent,
+                    size: 22,
+                  ),
                   tooltip: 'Gallery',
                 ),
               ],
@@ -248,24 +250,24 @@ class _StudioMediaPickerSheetState
           Expanded(
             child: switch (_tab) {
               0 => _CatalogGrid(
-                  scrollCtrl: scrollCtrl,
-                  items: items,
-                  services: services,
-                  onPick: _pickUrl,
-                ),
+                scrollCtrl: scrollCtrl,
+                items: items,
+                services: services,
+                onPick: _pickUrl,
+              ),
               1 => _UploadsGrid(
-                  scrollCtrl: scrollCtrl,
-                  loading: _loadingUploads,
-                  error: _uploadError,
-                  uploads: _uploads,
-                  onRetry: _loadUploads,
-                  onPick: _pickUrl,
-                ),
+                scrollCtrl: scrollCtrl,
+                loading: _loadingUploads,
+                error: _uploadError,
+                uploads: _uploads,
+                onRetry: _loadUploads,
+                onPick: _pickUrl,
+              ),
               _ => _BrandPanel(
-                  scrollCtrl: scrollCtrl,
-                  kit: kit,
-                  onPick: _pickUrl,
-                ),
+                scrollCtrl: scrollCtrl,
+                kit: kit,
+                onPick: _pickUrl,
+              ),
             },
           ),
           SizedBox(height: bottom + 8),
@@ -303,9 +305,11 @@ class _TabChip extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon,
-                  size: 14,
-                  color: selected ? Colors.white : Colors.white54),
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? Colors.white : Colors.white54,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -338,14 +342,17 @@ class _CatalogGrid extends StatelessWidget {
     required String url,
     required String label,
     required StudioMediaSourceKind kind,
-  }) onPick;
+  })
+  onPick;
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty && services.isEmpty) {
       return const Center(
-        child: Text('No products or services in catalog',
-            style: TextStyle(color: Colors.white54)),
+        child: Text(
+          'No products or services in catalog',
+          style: TextStyle(color: Colors.white54),
+        ),
       );
     }
 
@@ -363,11 +370,8 @@ class _CatalogGrid extends StatelessWidget {
                 imageUrl: url,
                 onTap: () async {
                   if (url == null || url.isEmpty) return;
-                  final file =
-                      await OfflineMediaCache.instance.resolve(url);
-                  final src = file != null
-                      ? 'file://${file.path}'
-                      : url;
+                  final file = await OfflineMediaCache.instance.resolve(url);
+                  final src = file != null ? 'file://${file.path}' : url;
                   onPick(
                     url: src,
                     label: item.name,
@@ -389,11 +393,8 @@ class _CatalogGrid extends StatelessWidget {
                 onTap: () async {
                   final url = svc.imageUrl;
                   if (url == null || url.isEmpty) return;
-                  final file =
-                      await OfflineMediaCache.instance.resolve(url);
-                  final src = file != null
-                      ? 'file://${file.path}'
-                      : url;
+                  final file = await OfflineMediaCache.instance.resolve(url);
+                  final src = file != null ? 'file://${file.path}' : url;
                   onPick(
                     url: src,
                     label: svc.title,
@@ -430,7 +431,8 @@ class _UploadsGrid extends StatelessWidget {
     required String label,
     required StudioMediaSourceKind kind,
     int? uploadId,
-  }) onPick;
+  })
+  onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -446,8 +448,10 @@ class _UploadsGrid extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Could not load uploads',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+            Text(
+              'Could not load uploads',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            ),
             TextButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
@@ -455,9 +459,11 @@ class _UploadsGrid extends StatelessWidget {
     }
     if (uploads.isEmpty) {
       return const Center(
-        child: Text('No Soko uploads yet — use Gallery or upload from catalog',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54)),
+        child: Text(
+          'No Soko uploads yet — use Gallery or upload from catalog',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white54),
+        ),
       );
     }
 
@@ -499,7 +505,8 @@ class _BrandPanel extends StatelessWidget {
     required String url,
     required String label,
     required StudioMediaSourceKind kind,
-  }) onPick;
+  })
+  onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -621,12 +628,12 @@ class _MediaTile extends StatelessWidget {
                       width: double.infinity,
                     )
                   : localPath?.isNotEmpty == true
-                      ? Image.file(
-                          File(localPath!),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholder(),
-                        )
-                      : _placeholder(),
+                  ? Image.file(
+                      File(localPath!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholder(),
+                    )
+                  : _placeholder(),
             ),
             Padding(
               padding: const EdgeInsets.all(6),
@@ -652,11 +659,7 @@ class _MediaTile extends StatelessWidget {
 }
 
 class _UploadRow {
-  const _UploadRow({
-    required this.id,
-    required this.name,
-    required this.url,
-  });
+  const _UploadRow({required this.id, required this.name, required this.url});
 
   final int id;
   final String name;

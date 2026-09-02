@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../core/theme/design_tokens.dart';
@@ -81,10 +80,7 @@ class BottomSheetModal extends StatelessWidget {
       curve: Curves.easeOutBack,
       tween: Tween<Offset>(begin: const Offset(0, 40), end: Offset.zero),
       builder: (context, offset, child) {
-        return Transform.translate(
-          offset: offset,
-          child: child,
-        );
+        return Transform.translate(offset: offset, child: child);
       },
       child: Container(
         constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
@@ -95,83 +91,83 @@ class BottomSheetModal extends StatelessWidget {
         child: ClipRRect(
           borderRadius: DesignTokens.borderRadiusBottomSheet,
           child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Handle bar
-                if (showHandle) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: DesignTokens.grayLight,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Header with title
-                if (title != null || showCloseButton)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      left: DesignTokens.spaceMd,
-                      right: showCloseButton
-                          ? DesignTokens.spaceXs
-                          : DesignTokens.spaceMd,
-                      top: showHandle ? 0 : DesignTokens.spaceMd,
-                      bottom: DesignTokens.spaceSm,
-                    ),
-                    child: Row(
-                      children: [
-                        if (title != null)
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(title!, style: DesignTokens.textTitle),
-                                if (subtitle != null) ...[
-                                  const SizedBox(height: DesignTokens.spaceXs),
-                                  Text(subtitle!, style: DesignTokens.textSmall),
-                                ],
-                              ],
-                            ),
-                          )
-                        else
-                          const Spacer(),
-                        if (showCloseButton)
-                          IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.close),
-                            color: DesignTokens.grayMedium,
-                            style: IconButton.styleFrom(
-                              backgroundColor: DesignTokens.grayLight.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                // Content
-                Flexible(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      left: padding?.left ?? DesignTokens.spaceMd,
-                      right: padding?.right ?? DesignTokens.spaceMd,
-                      top: padding?.top ?? 0,
-                      bottom:
-                          bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
-                    ),
-                    child: child,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              if (showHandle) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: DesignTokens.grayLight,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
+                const SizedBox(height: 12),
               ],
-            ),
+
+              // Header with title
+              if (title != null || showCloseButton)
+                Padding(
+                  padding: EdgeInsets.only(
+                    left: DesignTokens.spaceMd,
+                    right: showCloseButton
+                        ? DesignTokens.spaceXs
+                        : DesignTokens.spaceMd,
+                    top: showHandle ? 0 : DesignTokens.spaceMd,
+                    bottom: DesignTokens.spaceSm,
+                  ),
+                  child: Row(
+                    children: [
+                      if (title != null)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title!, style: DesignTokens.textTitle),
+                              if (subtitle != null) ...[
+                                const SizedBox(height: DesignTokens.spaceXs),
+                                Text(subtitle!, style: DesignTokens.textSmall),
+                              ],
+                            ],
+                          ),
+                        )
+                      else
+                        const Spacer(),
+                      if (showCloseButton)
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close),
+                          color: DesignTokens.grayMedium,
+                          style: IconButton.styleFrom(
+                            backgroundColor: DesignTokens.grayLight.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              // Content
+              Flexible(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: padding?.left ?? DesignTokens.spaceMd,
+                    right: padding?.right ?? DesignTokens.spaceMd,
+                    top: padding?.top ?? 0,
+                    bottom:
+                        bottomInset + (padding?.bottom ?? DesignTokens.spaceLg),
+                  ),
+                  child: child,
+                ),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 }
 

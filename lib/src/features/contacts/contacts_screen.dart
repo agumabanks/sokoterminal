@@ -155,10 +155,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
         padding: const EdgeInsets.only(left: 16),
         child: Icon(Icons.more_horiz, color: DesignTokens.grayMedium),
       ),
-      title: Text(
-        'Contacts',
-        style: DesignTokens.textTitle,
-      ),
+      title: Text('Contacts', style: DesignTokens.textTitle),
       actions: [
         IconButton(
           icon: Icon(Icons.search, color: DesignTokens.grayDark),
@@ -199,7 +196,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Recent',
-              style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.grayDark),
+              style: DesignTokens.textBodyBold.copyWith(
+                color: DesignTokens.grayDark,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -315,10 +314,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: DesignTokens.surfaceWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Delete Contact',
-          style: DesignTokens.textTitle,
-        ),
+        title: Text('Delete Contact', style: DesignTokens.textTitle),
         content: Text(
           'Remove ${contact.name} from your contacts?',
           style: DesignTokens.textBody,
@@ -355,7 +351,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     _showQuickContactDetails(context, contact);
   }
 
-  Future<_CrmContactDetail> _fetchCrmContactDetail(String remoteCustomerId) async {
+  Future<_CrmContactDetail> _fetchCrmContactDetail(
+    String remoteCustomerId,
+  ) async {
     final response = await ref
         .read(sellerApiProvider)
         .fetchSellerCustomerDetails(remoteCustomerId);
@@ -368,7 +366,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     return _CrmContactDetail.fromJson(data);
   }
 
-  void _showLocalStatsSheet(BuildContext context, ContactItem contact, String localCustomerId) {
+  void _showLocalStatsSheet(
+    BuildContext context,
+    ContactItem contact,
+    String localCustomerId,
+  ) {
     final db = ref.read(appDatabaseProvider);
     showModalBottomSheet(
       context: context,
@@ -390,7 +392,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                   children: [
                     Center(
                       child: Container(
-                        width: 40, height: 4,
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
                           color: DesignTokens.grayLight,
                           borderRadius: BorderRadius.circular(2),
@@ -412,7 +415,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                       Center(
                         child: Text(
                           contact.phone!,
-                          style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                          style: DesignTokens.textBody.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
                         ),
                       ),
                     ],
@@ -420,9 +425,14 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     // Data source label
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: DesignTokens.brandAccent.withValues(alpha: 0.1),
+                          color: DesignTokens.brandAccent.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -436,42 +446,54 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
                     ),
                     const SizedBox(height: 24),
                     if (snapshot.connectionState == ConnectionState.waiting)
-                      const Center(child: CircularProgressIndicator(color: DesignTokens.brandAccent))
+                      const Center(
+                        child: CircularProgressIndicator(
+                          color: DesignTokens.brandAccent,
+                        ),
+                      )
                     else if (snapshot.hasData)
-                      Builder(builder: (ctx) {
-                        final stats = snapshot.data!;
-                        return _CrmSection(
-                          title: 'Client summary · Local POS data',
-                          child: Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
-                              _MetricCard(
-                                label: 'Orders',
-                                value: stats.totalOrders.toString(),
-                              ),
-                              _MetricCard(
-                                label: 'Revenue',
-                                value: 'UGX ${_formatCurrency(stats.totalRevenue)}',
-                              ),
-                              _MetricCard(
-                                label: 'Average',
-                                value: 'UGX ${_formatCurrency(stats.avgOrderValue)}',
-                              ),
-                              if (stats.lastPurchaseAt != null)
+                      Builder(
+                        builder: (ctx) {
+                          final stats = snapshot.data!;
+                          return _CrmSection(
+                            title: 'Client summary · Local POS data',
+                            child: Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
                                 _MetricCard(
-                                  label: 'Last purchase',
-                                  value: _formatDateTime(stats.lastPurchaseAt),
+                                  label: 'Orders',
+                                  value: stats.totalOrders.toString(),
                                 ),
-                            ],
-                          ),
-                        );
-                      })
+                                _MetricCard(
+                                  label: 'Revenue',
+                                  value:
+                                      '${_formatCurrency(stats.totalRevenue)} /=',
+                                ),
+                                _MetricCard(
+                                  label: 'Average',
+                                  value:
+                                      '${_formatCurrency(stats.avgOrderValue)} /=',
+                                ),
+                                if (stats.lastPurchaseAt != null)
+                                  _MetricCard(
+                                    label: 'Last purchase',
+                                    value: _formatDateTime(
+                                      stats.lastPurchaseAt,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      )
                     else ...[
                       Center(
                         child: Text(
                           'No local sales data yet.',
-                          style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                          style: DesignTokens.textBody.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
                         ),
                       ),
                     ],
@@ -544,7 +566,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               // Phone/Email
               Text(
                 contact.phone ?? contact.email ?? 'No contact info',
-                style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                style: DesignTokens.textBody.copyWith(
+                  color: DesignTokens.grayMedium,
+                ),
               ),
 
               // Source badges
@@ -717,7 +741,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
               title: Text(c.name, style: DesignTokens.textBodyBold),
               subtitle: Text(
                 c.phone ?? c.email ?? '',
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.grayMedium,
+                ),
               ),
               onTap: () => Navigator.of(context).pop(c),
             );
@@ -913,17 +939,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
   }
 }
 
-
 // ============================================================================
 // WIDGETS
 // ============================================================================
 
 /// Contextual permission / sync status area with animated transitions
 class _ContactsStatusArea extends StatelessWidget {
-  const _ContactsStatusArea({
-    required this.state,
-    required this.controller,
-  });
+  const _ContactsStatusArea({required this.state, required this.controller});
 
   final ContactsState state;
   final ContactsController controller;
@@ -996,7 +1018,9 @@ class _ContactsStatusArea extends StatelessWidget {
             ? 'You have ${state.deviceContactCount} contacts on this phone. Sync them to Soko and they\'ll appear on all your Soko terminals instantly.'
             : 'Sync your phone contacts so they\'re available on every Soko terminal — even after you switch devices.',
         ctaText: 'Allow Contacts Access',
-        previewCount: state.deviceContactCount > 0 ? state.deviceContactCount : null,
+        previewCount: state.deviceContactCount > 0
+            ? state.deviceContactCount
+            : null,
         onCta: () async => controller.requestContactPermission(),
       ),
     );
@@ -1014,13 +1038,16 @@ class _SyncedPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: DesignTokens.brandAccentLight,
         borderRadius: DesignTokens.borderRadiusFull,
-        border: Border.all(color: DesignTokens.brandAccent.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: DesignTokens.brandAccent.withValues(alpha: 0.2),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6, height: 6,
+            width: 6,
+            height: 6,
             decoration: const BoxDecoration(
               color: DesignTokens.brandAccent,
               shape: BoxShape.circle,
@@ -1139,7 +1166,10 @@ class _ContactPreviewCard extends StatelessWidget {
                     );
                   }),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: DesignTokens.surfaceTint,
                       borderRadius: BorderRadius.circular(20),
@@ -1295,46 +1325,43 @@ class _ContactListTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        contact.name,
+                        style: DesignTokens.textBodyBold.copyWith(
+                          color: DesignTokens.grayDark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      if (contact.phone != null && contact.phone!.isNotEmpty)
                         Text(
-                          contact.name,
-                          style: DesignTokens.textBodyBold.copyWith(
-                            color: DesignTokens.grayDark,
+                          contact.phone!,
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
+                        )
+                      else if (contact.email != null &&
+                          contact.email!.isNotEmpty)
+                        Text(
+                          contact.email!,
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayMedium,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        if (contact.phone != null && contact.phone!.isNotEmpty)
-                          Text(
-                            contact.phone!,
-                            style: DesignTokens.textSmall.copyWith(
-                              color: DesignTokens.grayMedium,
-                            ),
-                          )
-                        else if (contact.email != null &&
-                            contact.email!.isNotEmpty)
-                          Text(
-                            contact.email!,
-                            style: DesignTokens.textSmall.copyWith(
-                              color: DesignTokens.grayMedium,
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: DesignTokens.grayLight,
-                  ),
-                ],
-              ),
+                ),
+                Icon(Icons.chevron_right, color: DesignTokens.grayLight),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -1380,7 +1407,9 @@ class _EmptySearchState extends StatelessWidget {
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
             if (ctaText != null) ...[
               const SizedBox(height: 24),
@@ -1457,15 +1486,9 @@ class _SourceBadges extends StatelessWidget {
       alignment: WrapAlignment.center,
       children: [
         if (contact.isFromDevice)
-          _Badge(
-            label: 'Phone',
-            color: DesignTokens.info,
-          ),
+          _Badge(label: 'Phone', color: DesignTokens.info),
         if (contact.isFromSoko)
-          _Badge(
-            label: 'Soko CRM',
-            color: DesignTokens.brandAccent,
-          ),
+          _Badge(label: 'Soko CRM', color: DesignTokens.brandAccent),
       ],
     );
   }
@@ -1486,10 +1509,7 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: DesignTokens.textSmallBold.copyWith(
-          color: color,
-          fontSize: 11,
-        ),
+        style: DesignTokens.textSmallBold.copyWith(color: color, fontSize: 11),
       ),
     );
   }
@@ -1559,7 +1579,8 @@ class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
         if (detail != null) {
           _cached = detail;
         }
-        if (snapshot.connectionState == ConnectionState.waiting && detail == null) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            detail == null) {
           return const Center(
             child: CircularProgressIndicator(color: DesignTokens.brandAccent),
           );
@@ -1569,7 +1590,11 @@ class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 48, color: DesignTokens.grayMedium),
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: DesignTokens.grayMedium,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'Could not load details',
@@ -1578,7 +1603,9 @@ class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
                 const SizedBox(height: 8),
                 Text(
                   'Please try again later.',
-                  style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+                  style: DesignTokens.textBody.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
                 ),
               ],
             ),
@@ -1676,17 +1703,18 @@ class _CrmContactDetailSheetState extends State<_CrmContactDetailSheet> {
                     ),
                     _MetricCard(
                       label: 'Revenue',
-                      value: 'UGX ${_formatCurrency(detail.summary.totalRevenue)}',
+                      value:
+                          '${_formatCurrency(detail.summary.totalRevenue)} /=',
                     ),
                     _MetricCard(
                       label: 'Average',
                       value:
-                          'UGX ${_formatCurrency(detail.summary.avgOrderValue)}',
+                          '${_formatCurrency(detail.summary.avgOrderValue)} /=',
                     ),
                     _MetricCard(
                       label: 'Outstanding',
                       value:
-                          'UGX ${_formatCurrency(detail.summary.outstandingBalance)}',
+                          '${_formatCurrency(detail.summary.outstandingBalance)} /=',
                     ),
                     _MetricCard(
                       label: 'Segment',
@@ -1935,7 +1963,7 @@ class _OrderCard extends StatelessWidget {
                 ),
               ),
               Text(
-                'UGX ${_formatCurrency(order.grandTotal)}',
+                '${_formatCurrency(order.grandTotal)} /=',
                 style: DesignTokens.textBodyBold.copyWith(
                   color: DesignTokens.grayDark,
                 ),
@@ -1956,7 +1984,10 @@ class _OrderCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               _StatusPill(label: order.paymentStatus, color: DesignTokens.info),
-              _StatusPill(label: order.deliveryStatus, color: DesignTokens.warning),
+              _StatusPill(
+                label: order.deliveryStatus,
+                color: DesignTokens.warning,
+              ),
               _StatusPill(
                 label: '${order.items.length} item(s)',
                 color: DesignTokens.success,
@@ -1969,7 +2000,7 @@ class _OrderCard extends StatelessWidget {
               (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '${item.name} • ${item.quantity} x UGX ${_formatCurrency(item.price)}',
+                  '${item.name} • ${item.quantity} x ${_formatCurrency(item.price)} /=',
                   style: DesignTokens.textSmall.copyWith(
                     color: DesignTokens.grayMedium,
                     fontSize: 13,
@@ -2086,7 +2117,9 @@ class _CrmContactDetail {
     final summaryJson = json['summary'] is Map<String, dynamic>
         ? Map<String, dynamic>.from(json['summary'] as Map<String, dynamic>)
         : const <String, dynamic>{};
-    final ordersJson = json['orders'] is List ? json['orders'] as List : const [];
+    final ordersJson = json['orders'] is List
+        ? json['orders'] as List
+        : const [];
     final timelineJson = json['timeline'] is List
         ? json['timeline'] as List
         : const [];
@@ -2165,7 +2198,9 @@ class _CrmContactSummary {
       segment: json['segment']?.toString() ?? 'New',
       loyaltyLevel: json['loyalty_level']?.toString() ?? 'Standard',
       churnRisk: json['churn_risk']?.toString() ?? 'Low',
-      lastPurchaseAt: DateTime.tryParse(json['last_purchase_at']?.toString() ?? ''),
+      lastPurchaseAt: DateTime.tryParse(
+        json['last_purchase_at']?.toString() ?? '',
+      ),
       purchaseFrequencyDays: json['purchase_frequency_days'] == null
           ? null
           : _asDouble(json['purchase_frequency_days']),
@@ -2237,11 +2272,7 @@ class _CrmOrderItem {
 }
 
 class _CrmTimelineEvent {
-  const _CrmTimelineEvent({
-    required this.title,
-    this.description,
-    this.date,
-  });
+  const _CrmTimelineEvent({required this.title, this.description, this.date});
 
   factory _CrmTimelineEvent.fromJson(Map<String, dynamic> json) {
     return _CrmTimelineEvent(
@@ -2258,7 +2289,10 @@ class _CrmTimelineEvent {
 
 List<String> _stringList(dynamic value) {
   if (value is! List) return const [];
-  return value.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
+  return value
+      .map((e) => e.toString())
+      .where((e) => e.trim().isNotEmpty)
+      .toList();
 }
 
 double _asDouble(dynamic value) {
@@ -2302,7 +2336,9 @@ String _formatDateTime(DateTime? value) {
     'Nov',
     'Dec',
   ][local.month - 1];
-  final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+  final hour = local.hour == 0
+      ? 12
+      : (local.hour > 12 ? local.hour - 12 : local.hour);
   final minute = local.minute.toString().padLeft(2, '0');
   final suffix = local.hour >= 12 ? 'PM' : 'AM';
   return '${local.day} $month ${local.year}, $hour:$minute $suffix';

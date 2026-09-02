@@ -142,9 +142,15 @@ class PosSyncPullResponse {
       isFullSnapshot: _asBool(snapshot['full']),
       snapshotProductIds: _parseStringList(snapshot['product_ids']),
       snapshotServiceIds: _parseStringList(snapshot['service_ids']),
-      snapshotServiceVariantIds: _parseStringList(snapshot['service_variant_ids']),
-      snapshotServicePackageIds: _parseStringList(snapshot['service_package_ids']),
-      snapshotCustomerPackageIds: _parseStringList(snapshot['customer_package_ids']),
+      snapshotServiceVariantIds: _parseStringList(
+        snapshot['service_variant_ids'],
+      ),
+      snapshotServicePackageIds: _parseStringList(
+        snapshot['service_package_ids'],
+      ),
+      snapshotCustomerPackageIds: _parseStringList(
+        snapshot['customer_package_ids'],
+      ),
       snapshotPackageRedemptionIds: _parseStringList(
         snapshot['package_redemption_ids'],
       ),
@@ -1249,8 +1255,7 @@ class PosSyncCustomerPackage {
       id: (json['id'] ?? '').toString(),
       packageId: (json['package_id'] ?? '').toString(),
       customerId: (json['customer_id'] ?? '').toString(),
-      idempotencyKey:
-          (json['idempotency_key'] ?? json['id'] ?? '').toString(),
+      idempotencyKey: (json['idempotency_key'] ?? json['id'] ?? '').toString(),
       remainingSessions: _asInt(json['remaining_sessions']),
       expiresAt: _asDateTime(json['expires_at']),
       updatedAt: _asDateTime(json['updated_at']),
@@ -1279,8 +1284,7 @@ class PosSyncPackageRedemption {
     return PosSyncPackageRedemption(
       id: (json['id'] ?? '').toString(),
       customerPackageId: (json['customer_package_id'] ?? '').toString(),
-      idempotencyKey:
-          (json['idempotency_key'] ?? json['id'] ?? '').toString(),
+      idempotencyKey: (json['idempotency_key'] ?? json['id'] ?? '').toString(),
       sessionsUsed: _asInt(json['sessions_used']),
       note: json['note']?.toString(),
       updatedAt: _asDateTime(json['updated_at']),

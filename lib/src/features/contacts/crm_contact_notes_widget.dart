@@ -34,7 +34,9 @@ class CrmNote {
     type: json['type']?.toString() ?? 'note',
     isPinned: json['is_pinned'] == true,
     createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
-    meta: json['meta'] is Map ? Map<String, dynamic>.from(json['meta'] as Map) : null,
+    meta: json['meta'] is Map
+        ? Map<String, dynamic>.from(json['meta'] as Map)
+        : null,
   );
 
   CrmNote copyWith({bool? isPinned}) => CrmNote(
@@ -50,29 +52,71 @@ class CrmNote {
 // ─── Note type config ─────────────────────────────────────────────────────────
 
 const _noteTypes = [
-  (value: 'note',     label: 'Note',      icon: Icons.notes_outlined,               color: DesignTokens.brandPrimary),
-  (value: 'call',     label: 'Call',      icon: Icons.call_outlined,                color: DesignTokens.brandAccent),
-  (value: 'visit',    label: 'Visit',     icon: Icons.store_outlined,               color: DesignTokens.info),
-  (value: 'sale',     label: 'Sale',      icon: Icons.receipt_long_outlined,        color: DesignTokens.success),
-  (value: 'news',     label: 'News',      icon: Icons.campaign_outlined,            color: DesignTokens.warning),
-  (value: 'reminder', label: 'Reminder',  icon: Icons.alarm_outlined,               color: DesignTokens.error),
-  (value: 'whatsapp', label: 'WhatsApp',  icon: Icons.chat_bubble_outline_rounded,  color: Color(0xFF25D366)),
+  (
+    value: 'note',
+    label: 'Note',
+    icon: Icons.notes_outlined,
+    color: DesignTokens.brandPrimary,
+  ),
+  (
+    value: 'call',
+    label: 'Call',
+    icon: Icons.call_outlined,
+    color: DesignTokens.brandAccent,
+  ),
+  (
+    value: 'visit',
+    label: 'Visit',
+    icon: Icons.store_outlined,
+    color: DesignTokens.info,
+  ),
+  (
+    value: 'sale',
+    label: 'Sale',
+    icon: Icons.receipt_long_outlined,
+    color: DesignTokens.success,
+  ),
+  (
+    value: 'news',
+    label: 'News',
+    icon: Icons.campaign_outlined,
+    color: DesignTokens.warning,
+  ),
+  (
+    value: 'reminder',
+    label: 'Reminder',
+    icon: Icons.alarm_outlined,
+    color: DesignTokens.error,
+  ),
+  (
+    value: 'whatsapp',
+    label: 'WhatsApp',
+    icon: Icons.chat_bubble_outline_rounded,
+    color: Color(0xFF25D366),
+  ),
 ];
 
 ({IconData icon, Color color, String label}) _typeConfig(String type) {
   for (final t in _noteTypes) {
     if (t.value == type) return (icon: t.icon, color: t.color, label: t.label);
   }
-  return (icon: Icons.notes_outlined, color: DesignTokens.inkMuted, label: 'Note');
+  return (
+    icon: Icons.notes_outlined,
+    color: DesignTokens.inkMuted,
+    label: 'Note',
+  );
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 final _crmNotesProvider = StateNotifierProvider.family
-    .autoDispose<_CrmNotesNotifier, AsyncValue<List<CrmNote>>, String>((ref, contactId) {
-  final api = ref.watch(sellerApiProvider);
-  return _CrmNotesNotifier(api, contactId)..load();
-});
+    .autoDispose<_CrmNotesNotifier, AsyncValue<List<CrmNote>>, String>((
+      ref,
+      contactId,
+    ) {
+      final api = ref.watch(sellerApiProvider);
+      return _CrmNotesNotifier(api, contactId)..load();
+    });
 
 class _CrmNotesNotifier extends StateNotifier<AsyncValue<List<CrmNote>>> {
   _CrmNotesNotifier(this._api, this._contactId) : super(const AsyncLoading());
@@ -84,7 +128,9 @@ class _CrmNotesNotifier extends StateNotifier<AsyncValue<List<CrmNote>>> {
     try {
       final res = await _api.fetchContactNotes(_contactId);
       final body = res.data;
-      final rawList = (body is Map && body['data'] is List) ? body['data'] as List : const [];
+      final rawList = (body is Map && body['data'] is List)
+          ? body['data'] as List
+          : const [];
       final notes = rawList
           .whereType<Map>()
           .map((e) => CrmNote.fromJson(Map<String, dynamic>.from(e)))
@@ -140,10 +186,16 @@ class _CrmNotesNotifier extends StateNotifier<AsyncValue<List<CrmNote>>> {
       if (mounted) {
         final current = state.valueOrNull ?? [];
         state = AsyncData(
-          current.map((n) => n.id == noteId ? n.copyWith(isPinned: !n.isPinned) : n).toList()
+          current
+              .map(
+                (n) => n.id == noteId ? n.copyWith(isPinned: !n.isPinned) : n,
+              )
+              .toList()
             ..sort((a, b) {
               if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-              return (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0));
+              return (b.createdAt ?? DateTime(0)).compareTo(
+                a.createdAt ?? DateTime(0),
+              );
             }),
         );
       }
@@ -186,7 +238,10 @@ class CrmContactNotesWidget extends ConsumerWidget {
             GestureDetector(
               onTap: () => _showAddNote(context, ref),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: DesignTokens.brandAccent,
                   borderRadius: DesignTokens.borderRadiusFull,
@@ -194,7 +249,11 @@ class CrmContactNotesWidget extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_rounded, color: Colors.white, size: 16),
+                    const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Add',
@@ -224,11 +283,19 @@ class CrmContactNotesWidget extends ConsumerWidget {
           data: (notes) => notes.isEmpty
               ? _EmptyNotes(onAdd: () => _showAddNote(context, ref))
               : Column(
-                  children: notes.map((note) => _NoteCard(
-                    note: note,
-                    onDelete: () => ref.read(_crmNotesProvider(contactId).notifier).deleteNote(note.id),
-                    onTogglePin: () => ref.read(_crmNotesProvider(contactId).notifier).togglePin(note.id),
-                  )).toList(),
+                  children: notes
+                      .map(
+                        (note) => _NoteCard(
+                          note: note,
+                          onDelete: () => ref
+                              .read(_crmNotesProvider(contactId).notifier)
+                              .deleteNote(note.id),
+                          onTogglePin: () => ref
+                              .read(_crmNotesProvider(contactId).notifier)
+                              .togglePin(note.id),
+                        ),
+                      )
+                      .toList(),
                 ),
         ),
       ],
@@ -272,16 +339,24 @@ class _EmptyNotes extends StatelessWidget {
         ),
         child: Column(
           children: [
-            const Icon(Icons.sticky_note_2_outlined, size: 32, color: DesignTokens.inkMuted),
+            const Icon(
+              Icons.sticky_note_2_outlined,
+              size: 32,
+              color: DesignTokens.inkMuted,
+            ),
             const SizedBox(height: 10),
             Text(
               label ?? 'No notes yet',
-              style: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+              style: DesignTokens.textSmall.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Tap to add a call log, visit note, or news',
-              style: DesignTokens.textCaption.copyWith(color: DesignTokens.inkMuted),
+              style: DesignTokens.textCaption.copyWith(
+                color: DesignTokens.inkMuted,
+              ),
             ),
           ],
         ),
@@ -319,7 +394,11 @@ class _NoteCard extends StatelessWidget {
           color: DesignTokens.error.withValues(alpha: 0.1),
           borderRadius: DesignTokens.borderRadiusMd,
         ),
-        child: const Icon(Icons.delete_outline, color: DesignTokens.error, size: 22),
+        child: const Icon(
+          Icons.delete_outline,
+          color: DesignTokens.error,
+          size: 22,
+        ),
       ),
       onDismissed: (_) => onDelete(),
       child: Container(
@@ -360,14 +439,22 @@ class _NoteCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (note.isPinned)
-                  const Icon(Icons.push_pin_rounded, size: 14, color: DesignTokens.brandAccent),
+                  const Icon(
+                    Icons.push_pin_rounded,
+                    size: 14,
+                    color: DesignTokens.brandAccent,
+                  ),
                 const SizedBox(width: 4),
                 GestureDetector(
                   onTap: onTogglePin,
                   child: Icon(
-                    note.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                    note.isPinned
+                        ? Icons.push_pin_rounded
+                        : Icons.push_pin_outlined,
                     size: 16,
-                    color: note.isPinned ? DesignTokens.brandAccent : DesignTokens.inkMuted,
+                    color: note.isPinned
+                        ? DesignTokens.brandAccent
+                        : DesignTokens.inkMuted,
                   ),
                 ),
               ],
@@ -375,12 +462,17 @@ class _NoteCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               note.body,
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.ink, height: 1.45),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.ink,
+                height: 1.45,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               timeLabel,
-              style: DesignTokens.textCaption.copyWith(color: DesignTokens.inkMuted),
+              style: DesignTokens.textCaption.copyWith(
+                color: DesignTokens.inkMuted,
+              ),
             ),
           ],
         ),
@@ -397,7 +489,20 @@ class _NoteCard extends StatelessWidget {
     if (diff.inHours < 1) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${local.day} ${months[local.month - 1]}';
   }
 }
@@ -438,7 +543,9 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
         borderRadius: DesignTokens.borderRadiusBottomSheet,
       ),
       padding: EdgeInsets.fromLTRB(
-        20, 12, 20,
+        20,
+        12,
+        20,
         MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
@@ -448,7 +555,8 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
           // Handle
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               decoration: BoxDecoration(
                 color: DesignTokens.hairline,
                 borderRadius: DesignTokens.borderRadiusFull,
@@ -467,14 +575,20 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
                     Text('Add Activity', style: DesignTokens.textTitle),
                     Text(
                       widget.contactName,
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.inkMuted,
+                      ),
                     ),
                   ],
                 ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, size: 20, color: DesignTokens.inkMuted),
+                icon: const Icon(
+                  Icons.close,
+                  size: 20,
+                  color: DesignTokens.inkMuted,
+                ),
               ),
             ],
           ),
@@ -491,7 +605,10 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 140),
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
                     decoration: BoxDecoration(
                       color: selected ? t.color : DesignTokens.canvasCloud,
                       borderRadius: DesignTokens.borderRadiusFull,
@@ -503,7 +620,11 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(t.icon, size: 15, color: selected ? Colors.white : t.color),
+                        Icon(
+                          t.icon,
+                          size: 15,
+                          color: selected ? Colors.white : t.color,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           t.label,
@@ -530,7 +651,9 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
             style: DesignTokens.textBody.copyWith(color: DesignTokens.ink),
             decoration: InputDecoration(
               hintText: _placeholder(_selectedType),
-              hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkDisabled),
+              hintStyle: DesignTokens.textBody.copyWith(
+                color: DesignTokens.inkDisabled,
+              ),
               filled: true,
               fillColor: DesignTokens.canvasCloud,
               border: OutlineInputBorder(
@@ -543,7 +666,10 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: DesignTokens.borderRadiusMd,
-                borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
+                borderSide: const BorderSide(
+                  color: DesignTokens.brandAccent,
+                  width: 1.5,
+                ),
               ),
               contentPadding: const EdgeInsets.all(14),
             ),
@@ -559,10 +685,20 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
               shape: const StadiumBorder(),
               minimumSize: const Size(double.infinity, 50),
               elevation: 0,
-              textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
             ),
             child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Text('Save'),
           ),
         ],
@@ -572,13 +708,13 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
 
   String _placeholder(String type) {
     return switch (type) {
-      'call'     => 'Describe the call — what was discussed, next steps…',
-      'visit'    => 'Who visited, what was shared or sold…',
-      'sale'     => 'Items sold, amount, payment method…',
-      'news'     => 'Any news or update about this contact…',
+      'call' => 'Describe the call — what was discussed, next steps…',
+      'visit' => 'Who visited, what was shared or sold…',
+      'sale' => 'Items sold, amount, payment method…',
+      'news' => 'Any news or update about this contact…',
       'reminder' => 'What to follow up on and when…',
       'whatsapp' => 'Summary of the WhatsApp conversation…',
-      _          => 'Write your note here…',
+      _ => 'Write your note here…',
     };
   }
 
@@ -586,17 +722,20 @@ class _AddNoteSheetState extends ConsumerState<_AddNoteSheet> {
     final body = _bodyCtrl.text.trim();
     if (body.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Write something first'), behavior: SnackBarBehavior.floating, shape: StadiumBorder()),
+        const SnackBar(
+          content: Text('Write something first'),
+          behavior: SnackBarBehavior.floating,
+          shape: StadiumBorder(),
+        ),
       );
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final note = await ref.read(_crmNotesProvider(widget.contactId).notifier).addNote(
-        body: body,
-        type: _selectedType,
-      );
+      final note = await ref
+          .read(_crmNotesProvider(widget.contactId).notifier)
+          .addNote(body: body, type: _selectedType);
       if (!mounted) return;
       Navigator.pop(context);
       if (note != null) {

@@ -150,7 +150,10 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
           onTap: (_) => setState(() {}),
           tabs: studioEnabled
               ? const [
-                  Tab(icon: Icon(Icons.auto_awesome, size: 18), text: 'AI Studio'),
+                  Tab(
+                    icon: Icon(Icons.auto_awesome, size: 18),
+                    text: 'AI Studio',
+                  ),
                   Tab(icon: Icon(Icons.brush, size: 18), text: 'Local Builder'),
                 ]
               : const [
@@ -161,173 +164,170 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
       body: TabBarView(
         controller: _tabController,
         children: studioEnabled
-            ? [
-                const AIAdsTab(),
-                _buildLocalBuilder(items, adState),
-              ]
-            : [
-                _buildLocalBuilder(items, adState),
-              ],
+            ? [const AIAdsTab(), _buildLocalBuilder(items, adState)]
+            : [_buildLocalBuilder(items, adState)],
       ),
     );
   }
 
-  Widget _buildLocalBuilder(AsyncValue<List<Item>> items, AdBuilderState adState) {
+  Widget _buildLocalBuilder(
+    AsyncValue<List<Item>> items,
+    AdBuilderState adState,
+  ) {
     return items.when(
-        data: (list) {
-          if (list.isEmpty) {
-            return _EmptyProductsState();
-          }
-          if (_selectedId == null || !list.any((e) => e.id == _selectedId)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              setState(() => _selectedId = list.first.id);
-            });
-          }
-          final selected = list.firstWhere(
-            (e) => e.id == _selectedId,
-            orElse: () => list.first,
-          );
-          final caption = _buildCaption(selected, adState);
+      data: (list) {
+        if (list.isEmpty) {
+          return _EmptyProductsState();
+        }
+        if (_selectedId == null || !list.any((e) => e.id == _selectedId)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() => _selectedId = list.first.id);
+          });
+        }
+        final selected = list.firstWhere(
+          (e) => e.id == _selectedId,
+          orElse: () => list.first,
+        );
+        final caption = _buildCaption(selected, adState);
 
-          return ListView(
-            padding: DesignTokens.paddingScreen,
-            children: [
-              // Product selector
-              _SectionTitle(title: 'Select Product'),
-              const SizedBox(height: DesignTokens.spaceSm),
-              SizedBox(
-                height: 80,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(width: DesignTokens.spaceSm),
-                  itemBuilder: (context, index) {
-                    final item = list[index];
-                    final isSelected = item.id == _selectedId;
-                    return _ProductChip(
-                      item: item,
-                      isSelected: isSelected,
-                      onTap: () => setState(() => _selectedId = item.id),
-                    );
-                  },
+        return ListView(
+          padding: DesignTokens.paddingScreen,
+          children: [
+            // Product selector
+            _SectionTitle(title: 'Select Product'),
+            const SizedBox(height: DesignTokens.spaceSm),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: list.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: DesignTokens.spaceSm),
+                itemBuilder: (context, index) {
+                  final item = list[index];
+                  final isSelected = item.id == _selectedId;
+                  return _ProductChip(
+                    item: item,
+                    isSelected: isSelected,
+                    onTap: () => setState(() => _selectedId = item.id),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: DesignTokens.spaceLg),
+
+            // Template selector
+            _SectionTitle(title: 'Template Style'),
+            const SizedBox(height: DesignTokens.spaceSm),
+            _TemplateSelector(
+              selected: adState.template,
+              onSelect: (t) => ref.read(adBuilderStateProvider.notifier).state =
+                  adState.copyWith(template: t),
+            ),
+
+            const SizedBox(height: DesignTokens.spaceLg),
+
+            // Ad Preview
+            _SectionTitle(title: 'Preview'),
+            const SizedBox(height: DesignTokens.spaceSm),
+            RepaintBoundary(
+              key: _previewKey,
+              child: _AdPreview(
+                item: selected,
+                template: adState.template,
+                showPrice: adState.showPrice,
+                showQr: adState.showQr,
+                showBrand: adState.showBrand,
+                showStock: adState.showStock,
+                discount: adState.discount,
+              ),
+            ),
+
+            const SizedBox(height: DesignTokens.spaceLg),
+
+            // Caption
+            _SectionTitle(title: 'Caption'),
+            const SizedBox(height: DesignTokens.spaceXs),
+            Container(
+              padding: DesignTokens.paddingMd,
+              decoration: BoxDecoration(
+                color: DesignTokens.surfaceWhite,
+                borderRadius: DesignTokens.borderRadiusMd,
+                boxShadow: DesignTokens.shadowSm,
+              ),
+              child: Text(caption, style: DesignTokens.textSmall),
+            ),
+
+            const SizedBox(height: DesignTokens.spaceLg),
+
+            // Share buttons
+            _SectionTitle(title: 'Share'),
+            const SizedBox(height: DesignTokens.spaceSm),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: DesignTokens.spaceSm,
+              crossAxisSpacing: DesignTokens.spaceSm,
+              childAspectRatio: 2.5,
+              children: [
+                _ShareButton(
+                  icon: Icons.share,
+                  label: 'Share',
+                  color: DesignTokens.brandPrimary,
+                  onPressed: _busy
+                      ? null
+                      : () => _shareAd(
+                          context,
+                          selected,
+                          caption,
+                          _AdImageFormat.png,
+                        ),
                 ),
-              ),
-
-              const SizedBox(height: DesignTokens.spaceLg),
-
-              // Template selector
-              _SectionTitle(title: 'Template Style'),
-              const SizedBox(height: DesignTokens.spaceSm),
-              _TemplateSelector(
-                selected: adState.template,
-                onSelect: (t) =>
-                    ref.read(adBuilderStateProvider.notifier).state =
-                        adState.copyWith(template: t),
-              ),
-
-              const SizedBox(height: DesignTokens.spaceLg),
-
-              // Ad Preview
-              _SectionTitle(title: 'Preview'),
-              const SizedBox(height: DesignTokens.spaceSm),
-              RepaintBoundary(
-                key: _previewKey,
-                child: _AdPreview(
-                  item: selected,
-                  template: adState.template,
-                  showPrice: adState.showPrice,
-                  showQr: adState.showQr,
-                  showBrand: adState.showBrand,
-                  showStock: adState.showStock,
-                  discount: adState.discount,
+                _ShareButton(
+                  icon: Icons.chat,
+                  label: 'WhatsApp',
+                  color: const Color(0xFF25D366),
+                  onPressed: _busy
+                      ? null
+                      : () => _shareToWhatsApp(context, selected, caption),
                 ),
-              ),
-
-              const SizedBox(height: DesignTokens.spaceLg),
-
-              // Caption
-              _SectionTitle(title: 'Caption'),
-              const SizedBox(height: DesignTokens.spaceXs),
-              Container(
-                padding: DesignTokens.paddingMd,
-                decoration: BoxDecoration(
-                  color: DesignTokens.surfaceWhite,
-                  borderRadius: DesignTokens.borderRadiusMd,
-                  boxShadow: DesignTokens.shadowSm,
+                _ShareButton(
+                  icon: Icons.image,
+                  label: 'Save PNG',
+                  color: DesignTokens.info,
+                  onPressed: _busy
+                      ? null
+                      : () => _saveToGallery(
+                          context,
+                          selected,
+                          _AdImageFormat.png,
+                        ),
                 ),
-                child: Text(caption, style: DesignTokens.textSmall),
-              ),
+                _ShareButton(
+                  icon: Icons.photo,
+                  label: 'Save JPG',
+                  color: DesignTokens.brandAccent,
+                  onPressed: _busy
+                      ? null
+                      : () => _saveToGallery(
+                          context,
+                          selected,
+                          _AdImageFormat.jpg,
+                        ),
+                ),
+              ],
+            ),
 
-              const SizedBox(height: DesignTokens.spaceLg),
-
-              // Share buttons
-              _SectionTitle(title: 'Share'),
-              const SizedBox(height: DesignTokens.spaceSm),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: DesignTokens.spaceSm,
-                crossAxisSpacing: DesignTokens.spaceSm,
-                childAspectRatio: 2.5,
-                children: [
-                  _ShareButton(
-                    icon: Icons.share,
-                    label: 'Share',
-                    color: DesignTokens.brandPrimary,
-                    onPressed: _busy
-                        ? null
-                        : () => _shareAd(
-                            context,
-                            selected,
-                            caption,
-                            _AdImageFormat.png,
-                          ),
-                  ),
-                  _ShareButton(
-                    icon: Icons.chat,
-                    label: 'WhatsApp',
-                    color: const Color(0xFF25D366),
-                    onPressed: _busy
-                        ? null
-                        : () => _shareToWhatsApp(context, selected, caption),
-                  ),
-                  _ShareButton(
-                    icon: Icons.image,
-                    label: 'Save PNG',
-                    color: DesignTokens.info,
-                    onPressed: _busy
-                        ? null
-                        : () => _saveToGallery(
-                            context,
-                            selected,
-                            _AdImageFormat.png,
-                          ),
-                  ),
-                  _ShareButton(
-                    icon: Icons.photo,
-                    label: 'Save JPG',
-                    color: DesignTokens.brandAccent,
-                    onPressed: _busy
-                        ? null
-                        : () => _saveToGallery(
-                            context,
-                            selected,
-                            _AdImageFormat.jpg,
-                          ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: DesignTokens.spaceLg),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-      );
+            const SizedBox(height: DesignTokens.spaceLg),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
   }
 
   String _buildCaption(Item item, AdBuilderState state) {
@@ -340,12 +340,12 @@ class _AdsScreenState extends ConsumerState<AdsScreen>
 
     if (state.discount > 0) {
       final originalPrice = item.price / (1 - state.discount / 100);
-      buffer.write('\n\n💰 Now: UGX ${item.price.toStringAsFixed(0)}');
+      buffer.write('\n\n💰 Now: ${item.price.toStringAsFixed(0)} /=');
       buffer.write(
-        '\n🏷️ Was: UGX ${originalPrice.toStringAsFixed(0)} (${state.discount.toStringAsFixed(0)}% OFF!)',
+        '\n🏷️ Was: ${originalPrice.toStringAsFixed(0)} /= (${state.discount.toStringAsFixed(0)}% OFF!)',
       );
     } else {
-      buffer.write('\n\n💰 Price: UGX ${item.price.toStringAsFixed(0)}');
+      buffer.write('\n\n💰 Price: ${item.price.toStringAsFixed(0)} /=');
     }
 
     if (state.showStock && item.stockQty > 0) {
@@ -751,14 +751,15 @@ class _AdPreview extends StatelessWidget {
               ? 0.0
               : (shortestSide * (template == LegacyAdStyle.story ? 0.46 : 0.34))
                     .clamp(84.0, 168.0);
-          final titleSize = (shortestSide *
-                  (template == LegacyAdStyle.story ? 0.11 : 0.085))
-              .clamp(18.0, template == LegacyAdStyle.story ? 30.0 : 26.0);
+          final titleSize =
+              (shortestSide * (template == LegacyAdStyle.story ? 0.11 : 0.085))
+                  .clamp(18.0, template == LegacyAdStyle.story ? 30.0 : 26.0);
           final priceSize = (shortestSide * 0.08).clamp(16.0, 22.0);
           final chipFontSize = (shortestSide * 0.042).clamp(11.0, 14.0);
           final qrSize = (shortestSide * 0.24).clamp(42.0, 76.0);
           final bottomLabelSize = (shortestSide * 0.04).clamp(10.0, 13.0);
-          final showQrBlock = showQr && shortestSide >= 180 && longestSide >= 240;
+          final showQrBlock =
+              showQr && shortestSide >= 180 && longestSide >= 240;
 
           return Container(
             clipBehavior: Clip.antiAlias,
@@ -819,18 +820,13 @@ class _AdPreview extends StatelessWidget {
                             const SizedBox.shrink(),
                           if (discount > 0)
                             Container(
-                              margin: EdgeInsets.only(
-                                left: showBrand ? 8 : 0,
-                              ),
+                              margin: EdgeInsets.only(left: showBrand ? 8 : 0),
                               padding: EdgeInsets.symmetric(
                                 horizontal: (edgePadding * 0.55).clamp(
                                   6.0,
                                   12.0,
                                 ),
-                                vertical: (edgePadding * 0.28).clamp(
-                                  4.0,
-                                  8.0,
-                                ),
+                                vertical: (edgePadding * 0.28).clamp(4.0, 8.0),
                               ),
                               decoration: BoxDecoration(
                                 color: DesignTokens.error,
@@ -909,7 +905,7 @@ class _AdPreview extends StatelessWidget {
                                   children: [
                                     if (discount > 0)
                                       Text(
-                                        'UGX ${(item.price / (1 - discount / 100)).toStringAsFixed(0)}',
+                                        '${(item.price / (1 - discount / 100)).toStringAsFixed(0)} /=',
                                         style: DesignTokens.textSmall.copyWith(
                                           fontSize: chipFontSize,
                                           decoration:
@@ -918,7 +914,7 @@ class _AdPreview extends StatelessWidget {
                                         ),
                                       ),
                                     Text(
-                                      'UGX ${item.price.toStringAsFixed(0)}',
+                                      '${item.price.toStringAsFixed(0)} /=',
                                       style: DesignTokens.textBodyBold.copyWith(
                                         color: DesignTokens.brandPrimary,
                                         fontSize: priceSize,
@@ -956,7 +952,8 @@ class _AdPreview extends StatelessWidget {
                                 borderRadius: DesignTokens.borderRadiusSm,
                               ),
                               child: QrImageView(
-                                data: 'https://soko24.co/product/${item.remoteId ?? item.id}',
+                                data:
+                                    'https://soko24.co/product/${item.remoteId ?? item.id}',
                                 version: QrVersions.auto,
                                 size: qrSize,
                               ),

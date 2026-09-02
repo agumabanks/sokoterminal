@@ -2,10 +2,7 @@ import 'dart:convert';
 
 import '../db/app_database.dart';
 
-bool isLedgerEntryQueued(
-  String entryId,
-  Iterable<SyncOp> syncOps,
-) {
+bool isLedgerEntryQueued(String entryId, Iterable<SyncOp> syncOps) {
   for (final op in syncOps) {
     if (op.opType != 'ledger_push') continue;
     try {
@@ -49,7 +46,8 @@ Map<String, dynamic> buildLedgerPushPayload(LedgerEntryBundle bundle) {
           (payment) => {
             'method': payment.method,
             'amount': payment.amount,
-            if (payment.externalRef != null) 'external_ref': payment.externalRef,
+            if (payment.externalRef != null)
+              'external_ref': payment.externalRef,
           },
         )
         .toList(),

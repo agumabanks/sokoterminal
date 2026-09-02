@@ -1,10 +1,6 @@
 /// BNPL seller enrollment status returned by the backend.
 class BnplSellerStatus {
-  const BnplSellerStatus({
-    required this.status,
-    this.message,
-    this.isEligible,
-  });
+  const BnplSellerStatus({required this.status, this.message, this.isEligible});
 
   factory BnplSellerStatus.fromJson(Map<String, dynamic> json) {
     return BnplSellerStatus(
@@ -25,8 +21,8 @@ class BnplSellerStatus {
   bool get isSuspended => status == 'suspended';
 
   Map<String, dynamic> toJson() => {
-        'status': status,
-        if (message != null) 'message': message,
-        if (isEligible != null) 'is_eligible': isEligible,
-      };
+    'status': status,
+    if (message != null) 'message': message,
+    if (isEligible != null) 'is_eligible': isEligible,
+  };
 }

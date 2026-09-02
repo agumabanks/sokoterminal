@@ -4,70 +4,77 @@ import 'ad_templates.dart';
 import '../../core/theme/design_tokens.dart';
 
 /// Extra mesh / pattern backgrounds beyond flat gradients.
-const meshBackgroundPresets = <({
-  String id,
-  String label,
-  List<Color> colors,
-  Alignment begin,
-  Alignment end,
-})>[
-  (
-    id: 'aurora',
-    label: 'Aurora',
-    colors: [Color(0xFF0f0c29), Color(0xFF302b63), Color(0xFF24243e)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  ),
-  (
-    id: 'soko',
-    label: 'Soko Green',
-    colors: [DesignTokens.brandPrimary, DesignTokens.brandAccent, DesignTokens.success],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  ),
-  (
-    id: 'candy',
-    label: 'Candy',
-    colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  ),
-  (
-    id: 'cosmic',
-    label: 'Cosmic',
-    colors: [Color(0xFF141e30), Color(0xFF243b55)],
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-  ),
-  (
-    id: 'lime',
-    label: 'Lime Pop',
-    colors: [Color(0xFF134e5e), Color(0xFF71b280)],
-    begin: Alignment.bottomLeft,
-    end: Alignment.topRight,
-  ),
-  (
-    id: 'velvet',
-    label: 'Velvet',
-    colors: [Color(0xFF200122), Color(0xFF6f0000)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  ),
-  (
-    id: 'sky',
-    label: 'Sky',
-    colors: [Color(0xFF2980b9), Color(0xFF6dd5fa), DesignTokens.canvas],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  ),
-  (
-    id: 'sunrise',
-    label: 'Sunrise',
-    colors: [Color(0xFFff512f), Color(0xFFf09819)],
-    begin: Alignment.bottomLeft,
-    end: Alignment.topRight,
-  ),
-];
+const meshBackgroundPresets =
+    <
+      ({
+        String id,
+        String label,
+        List<Color> colors,
+        Alignment begin,
+        Alignment end,
+      })
+    >[
+      (
+        id: 'aurora',
+        label: 'Aurora',
+        colors: [Color(0xFF0f0c29), Color(0xFF302b63), Color(0xFF24243e)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      (
+        id: 'soko',
+        label: 'Soko Green',
+        colors: [
+          DesignTokens.brandPrimary,
+          DesignTokens.brandAccent,
+          DesignTokens.success,
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ),
+      (
+        id: 'candy',
+        label: 'Candy',
+        colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      (
+        id: 'cosmic',
+        label: 'Cosmic',
+        colors: [Color(0xFF141e30), Color(0xFF243b55)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+      (
+        id: 'lime',
+        label: 'Lime Pop',
+        colors: [Color(0xFF134e5e), Color(0xFF71b280)],
+        begin: Alignment.bottomLeft,
+        end: Alignment.topRight,
+      ),
+      (
+        id: 'velvet',
+        label: 'Velvet',
+        colors: [Color(0xFF200122), Color(0xFF6f0000)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      (
+        id: 'sky',
+        label: 'Sky',
+        colors: [Color(0xFF2980b9), Color(0xFF6dd5fa), DesignTokens.canvas],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ),
+      (
+        id: 'sunrise',
+        label: 'Sunrise',
+        colors: [Color(0xFFff512f), Color(0xFFf09819)],
+        begin: Alignment.bottomLeft,
+        end: Alignment.topRight,
+      ),
+    ];
 
 const patternBackgroundIds = <String>['dots', 'grid', 'diagonal', 'noise'];
 

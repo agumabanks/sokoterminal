@@ -22,9 +22,7 @@ class OrderLine {
         ? (json['total'] as num).toDouble()
         : (unitPrice * qty);
     final name =
-        json['product_name']?.toString() ??
-        json['name']?.toString() ??
-        'Item';
+        json['product_name']?.toString() ?? json['name']?.toString() ?? 'Item';
 
     return OrderLine(
       name: name,
@@ -236,9 +234,7 @@ class MarketplaceOrder {
       customerName ?? shippingAddress?['name']?.toString() ?? 'Customer';
 
   String get displayPhone =>
-      customerPhone ??
-      shippingAddress?['phone']?.toString() ??
-      'Not provided';
+      customerPhone ?? shippingAddress?['phone']?.toString() ?? 'Not provided';
 
   String get normalizedDeliveryStatus =>
       (deliveryStatusRaw ?? deliveryStatus ?? 'pending')
@@ -252,9 +248,8 @@ class MarketplaceOrder {
   String get displayPaymentMethod =>
       (paymentType ?? '').replaceAll('_', ' ').trim();
 
-  String get displaySource => _humanizeStatus(
-    orderFrom ?? source ?? 'marketplace',
-  );
+  String get displaySource =>
+      _humanizeStatus(orderFrom ?? source ?? 'marketplace');
 
   double get displayTotal {
     final rawTotal = grandTotal ?? total;
@@ -280,7 +275,9 @@ class MarketplaceOrder {
   bool get canRequestSokoDelivery {
     if (hasSokoDeliveryRequest) return false;
     final status = normalizedDeliveryStatus;
-    return status != 'delivered' && status != 'cancelled' && status != 'canceled';
+    return status != 'delivered' &&
+        status != 'cancelled' &&
+        status != 'canceled';
   }
 
   OrderActionBucket get actionBucket => orderActionBucketFromStatus(
@@ -296,7 +293,10 @@ class MarketplaceOrder {
   static List<MarketplaceOrder> listFromJson(Iterable<dynamic> raw) {
     return raw
         .whereType<Map>()
-        .map((entry) => MarketplaceOrder.fromJson(Map<String, dynamic>.from(entry)))
+        .map(
+          (entry) =>
+              MarketplaceOrder.fromJson(Map<String, dynamic>.from(entry)),
+        )
         .where((order) => order.id > 0)
         .toList();
   }

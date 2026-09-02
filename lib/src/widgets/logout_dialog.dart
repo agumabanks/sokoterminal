@@ -17,18 +17,14 @@ class LogoutDialog extends ConsumerWidget {
   const LogoutDialog({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showDialog(
-      context: context,
-      builder: (_) => const LogoutDialog(),
-    );
+    return showDialog(context: context, builder: (_) => const LogoutDialog());
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingCount = ref.watch(_pendingSyncCountProvider).maybeWhen(
-      data: (count) => count,
-      orElse: () => 0,
-    );
+    final pendingCount = ref
+        .watch(_pendingSyncCountProvider)
+        .maybeWhen(data: (count) => count, orElse: () => 0);
 
     return AlertDialog(
       title: const Text('Sign Out'),
@@ -49,12 +45,18 @@ class LogoutDialog extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.cloud_upload, color: DesignTokens.warning, size: 20),
+                  const Icon(
+                    Icons.cloud_upload,
+                    color: DesignTokens.warning,
+                    size: 20,
+                  ),
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: Text(
                       '$pendingCount unsynced transaction${pendingCount == 1 ? '' : 's'} will be lost if you sign out completely.',
-                      style: DesignTokens.textSmall.copyWith(color: DesignTokens.warning),
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.warning,
+                      ),
                     ),
                   ),
                 ],
@@ -106,7 +108,11 @@ class LogoutDialog extends ConsumerWidget {
     context.go('/pos-login');
   }
 
-  Future<void> _fullLogout(BuildContext context, WidgetRef ref, int pendingCount) async {
+  Future<void> _fullLogout(
+    BuildContext context,
+    WidgetRef ref,
+    int pendingCount,
+  ) async {
     if (pendingCount > 0) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -176,7 +182,12 @@ class _OptionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: DesignTokens.textBody.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   Text(subtitle, style: DesignTokens.textSmall),
                 ],
               ),

@@ -71,61 +71,60 @@ class BrandKit {
     Object? logoLocalPath = _sentinel,
     Object? logoNetworkUrl = _sentinel,
     bool? seededFromShop,
-  }) =>
-      BrandKit(
-        primaryColor: primaryColor ?? this.primaryColor,
-        secondaryColor: secondaryColor ?? this.secondaryColor,
-        accentColor: accentColor ?? this.accentColor,
-        font: font ?? this.font,
-        headingFont: headingFont ?? this.headingFont,
-        businessName: businessName ?? this.businessName,
-        tagline: tagline ?? this.tagline,
-        website: website ?? this.website,
-        phone: phone ?? this.phone,
-        whatsapp: whatsapp ?? this.whatsapp,
-        location: location ?? this.location,
-        logoLocalPath: logoLocalPath == _sentinel
-            ? this.logoLocalPath
-            : logoLocalPath as String?,
-        logoNetworkUrl: logoNetworkUrl == _sentinel
-            ? this.logoNetworkUrl
-            : logoNetworkUrl as String?,
-        seededFromShop: seededFromShop ?? this.seededFromShop,
-      );
+  }) => BrandKit(
+    primaryColor: primaryColor ?? this.primaryColor,
+    secondaryColor: secondaryColor ?? this.secondaryColor,
+    accentColor: accentColor ?? this.accentColor,
+    font: font ?? this.font,
+    headingFont: headingFont ?? this.headingFont,
+    businessName: businessName ?? this.businessName,
+    tagline: tagline ?? this.tagline,
+    website: website ?? this.website,
+    phone: phone ?? this.phone,
+    whatsapp: whatsapp ?? this.whatsapp,
+    location: location ?? this.location,
+    logoLocalPath: logoLocalPath == _sentinel
+        ? this.logoLocalPath
+        : logoLocalPath as String?,
+    logoNetworkUrl: logoNetworkUrl == _sentinel
+        ? this.logoNetworkUrl
+        : logoNetworkUrl as String?,
+    seededFromShop: seededFromShop ?? this.seededFromShop,
+  );
 
   Map<String, dynamic> toJson() => {
-        'primaryColor': primaryColor,
-        'secondaryColor': secondaryColor,
-        'accentColor': accentColor,
-        'font': font,
-        'headingFont': headingFont,
-        'businessName': businessName,
-        'tagline': tagline,
-        'website': website,
-        'phone': phone,
-        'whatsapp': whatsapp,
-        'location': location,
-        if (logoLocalPath != null) 'logoLocalPath': logoLocalPath,
-        if (logoNetworkUrl != null) 'logoNetworkUrl': logoNetworkUrl,
-        'seededFromShop': seededFromShop,
-      };
+    'primaryColor': primaryColor,
+    'secondaryColor': secondaryColor,
+    'accentColor': accentColor,
+    'font': font,
+    'headingFont': headingFont,
+    'businessName': businessName,
+    'tagline': tagline,
+    'website': website,
+    'phone': phone,
+    'whatsapp': whatsapp,
+    'location': location,
+    if (logoLocalPath != null) 'logoLocalPath': logoLocalPath,
+    if (logoNetworkUrl != null) 'logoNetworkUrl': logoNetworkUrl,
+    'seededFromShop': seededFromShop,
+  };
 
   factory BrandKit.fromJson(Map<String, dynamic> j) => BrandKit(
-        primaryColor: j['primaryColor']?.toString() ?? '#0F1D40',
-        secondaryColor: j['secondaryColor']?.toString() ?? '#0EBE7E',
-        accentColor: j['accentColor']?.toString() ?? '#fbbf24',
-        font: j['font']?.toString() ?? 'Poppins',
-        headingFont: j['headingFont']?.toString() ?? 'Montserrat',
-        businessName: j['businessName']?.toString() ?? '',
-        tagline: j['tagline']?.toString() ?? '',
-        website: j['website']?.toString() ?? '',
-        phone: j['phone']?.toString() ?? '',
-        whatsapp: j['whatsapp']?.toString() ?? '',
-        location: j['location']?.toString() ?? '',
-        logoLocalPath: j['logoLocalPath']?.toString(),
-        logoNetworkUrl: j['logoNetworkUrl']?.toString(),
-        seededFromShop: j['seededFromShop'] as bool? ?? false,
-      );
+    primaryColor: j['primaryColor']?.toString() ?? '#0F1D40',
+    secondaryColor: j['secondaryColor']?.toString() ?? '#0EBE7E',
+    accentColor: j['accentColor']?.toString() ?? '#fbbf24',
+    font: j['font']?.toString() ?? 'Poppins',
+    headingFont: j['headingFont']?.toString() ?? 'Montserrat',
+    businessName: j['businessName']?.toString() ?? '',
+    tagline: j['tagline']?.toString() ?? '',
+    website: j['website']?.toString() ?? '',
+    phone: j['phone']?.toString() ?? '',
+    whatsapp: j['whatsapp']?.toString() ?? '',
+    location: j['location']?.toString() ?? '',
+    logoLocalPath: j['logoLocalPath']?.toString(),
+    logoNetworkUrl: j['logoNetworkUrl']?.toString(),
+    seededFromShop: j['seededFromShop'] as bool? ?? false,
+  );
 
   factory BrandKit.fromShopProfile(BusinessProfile profile) {
     final phone = profile.shopPhone ?? profile.sellerPhone ?? '';
@@ -149,7 +148,7 @@ const _sentinel = Object();
 
 class _BrandKitNotifier extends StateNotifier<BrandKit> {
   _BrandKitNotifier(this._prefs, this._db, this._api)
-      : super(const BrandKit()) {
+    : super(const BrandKit()) {
     _load();
   }
 
@@ -176,10 +175,8 @@ class _BrandKitNotifier extends StateNotifier<BrandKit> {
           businessName: state.businessName.isEmpty
               ? seeded.businessName
               : state.businessName,
-          tagline:
-              state.tagline.isEmpty ? seeded.tagline : state.tagline,
-          logoNetworkUrl:
-              state.logoNetworkUrl ?? seeded.logoNetworkUrl,
+          tagline: state.tagline.isEmpty ? seeded.tagline : state.tagline,
+          logoNetworkUrl: state.logoNetworkUrl ?? seeded.logoNetworkUrl,
           phone: state.phone.isEmpty ? seeded.phone : state.phone,
           location: state.location.isEmpty ? seeded.location : state.location,
           seededFromShop: true,
@@ -199,9 +196,7 @@ class _BrandKitNotifier extends StateNotifier<BrandKit> {
       if (data is Map && data['success'] == true && data['data'] != null) {
         final remote = BrandKit.fromJson(data['data'] as Map<String, dynamic>);
         // Merge: prefer local logo path, remote everything else
-        state = remote.copyWith(
-          logoLocalPath: state.logoLocalPath,
-        );
+        state = remote.copyWith(logoLocalPath: state.logoLocalPath);
         await _persist();
       }
     } catch (_) {
@@ -260,16 +255,14 @@ class _BrandKitNotifier extends StateNotifier<BrandKit> {
   }
 
   Future<void> removeLogo() async {
-    final updated = state.copyWith(
-      logoLocalPath: null,
-      logoNetworkUrl: null,
-    );
+    final updated = state.copyWith(logoLocalPath: null, logoNetworkUrl: null);
     await update(updated);
   }
 }
 
-final brandKitProvider =
-    StateNotifierProvider<_BrandKitNotifier, BrandKit>((ref) {
+final brandKitProvider = StateNotifierProvider<_BrandKitNotifier, BrandKit>((
+  ref,
+) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final db = ref.watch(appDatabaseProvider);
   final api = ref.watch(sellerApiProvider);
@@ -322,8 +315,7 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen>
     super.dispose();
   }
 
-  void _sync(BrandKit kit) =>
-      ref.read(brandKitProvider.notifier).update(kit);
+  void _sync(BrandKit kit) => ref.read(brandKitProvider.notifier).update(kit);
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +351,10 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen>
           unselectedLabelColor: Colors.white38,
           indicatorColor: DesignTokens.brandAccent,
           indicatorWeight: 2,
-          labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          labelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.business_rounded, size: 16), text: 'Identity'),
             Tab(icon: Icon(Icons.palette_rounded, size: 16), text: 'Colors'),
@@ -379,8 +374,10 @@ class _BrandKitScreenState extends ConsumerState<BrandKitScreen>
                 whatsappCtrl: _whatsappCtrl,
                 locationCtrl: _locationCtrl,
                 onUpdate: _sync,
-                onPickLogo: () => ref.read(brandKitProvider.notifier).pickAndSaveLogo(),
-                onRemoveLogo: () => ref.read(brandKitProvider.notifier).removeLogo(),
+                onPickLogo: () =>
+                    ref.read(brandKitProvider.notifier).pickAndSaveLogo(),
+                onRemoveLogo: () =>
+                    ref.read(brandKitProvider.notifier).removeLogo(),
               ),
               _ColorsTab(kit: kit, onUpdate: _sync),
               _FontsTab(kit: kit, onUpdate: _sync),
@@ -431,100 +428,126 @@ class _IdentityTab extends StatelessWidget {
         const SizedBox(height: 20),
 
         // ── Logo upload ────────────────────────────────────────────────────
-        _Section(label: 'Business Logo', children: [
-          Row(
-            children: [
-              // Logo preview
-              GestureDetector(
-                onTap: onPickLogo,
-                child: Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: kit.hasLogo
-                          ? DesignTokens.brandAccent
-                          : Colors.white12,
-                      width: kit.hasLogo ? 2 : 1,
-                    ),
-                  ),
-                  child: _LogoWidget(kit: kit, size: 80),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: onPickLogo,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: DesignTokens.brandAccent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: DesignTokens.brandAccent.withValues(alpha: 0.4)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.upload_rounded,
-                                color: DesignTokens.brandAccent, size: 16),
-                            SizedBox(width: 8),
-                            Text('Upload Logo',
-                                style: TextStyle(
-                                    color: DesignTokens.brandAccent,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
+        _Section(
+          label: 'Business Logo',
+          children: [
+            Row(
+              children: [
+                // Logo preview
+                GestureDetector(
+                  onTap: onPickLogo,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: kit.hasLogo
+                            ? DesignTokens.brandAccent
+                            : Colors.white12,
+                        width: kit.hasLogo ? 2 : 1,
                       ),
                     ),
-                    if (kit.hasLogo) ...[
-                      const SizedBox(height: 8),
+                    child: _LogoWidget(kit: kit, size: 80),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       GestureDetector(
-                        onTap: onRemoveLogo,
-                        child: const Text('Remove logo',
+                        onTap: onPickLogo,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DesignTokens.brandAccent.withValues(
+                              alpha: 0.15,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: DesignTokens.brandAccent.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.upload_rounded,
+                                color: DesignTokens.brandAccent,
+                                size: 16,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Upload Logo',
+                                style: TextStyle(
+                                  color: DesignTokens.brandAccent,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (kit.hasLogo) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: onRemoveLogo,
+                          child: const Text(
+                            'Remove logo',
                             style: TextStyle(
-                                color: Colors.redAccent, fontSize: 11)),
+                              color: Colors.redAccent,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        kit.seededFromShop
+                            ? 'Auto-filled from your shop profile'
+                            : 'PNG or JPG, square preferred',
+                        style: const TextStyle(
+                          color: Colors.white30,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 6),
-                    Text(
-                      kit.seededFromShop
-                          ? 'Auto-filled from your shop profile'
-                          : 'PNG or JPG, square preferred',
-                      style: const TextStyle(
-                          color: Colors.white30, fontSize: 10),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ]),
+              ],
+            ),
+          ],
+        ),
 
         const SizedBox(height: 16),
 
         // ── Business info ─────────────────────────────────────────────────
-        _Section(label: 'Business Name & Tagline', children: [
-          _DarkField(
-            ctrl: nameCtrl,
-            hint: 'e.g. Mama Zawadi Fashion',
-            icon: Icons.store_rounded,
-            onChanged: (v) => onUpdate(kit.copyWith(businessName: v)),
-          ),
-          const SizedBox(height: 10),
-          _DarkField(
-            ctrl: taglineCtrl,
-            hint: 'e.g. Style for every occasion',
-            icon: Icons.format_quote_rounded,
-            onChanged: (v) => onUpdate(kit.copyWith(tagline: v)),
-          ),
-        ]),
+        _Section(
+          label: 'Business Name & Tagline',
+          children: [
+            _DarkField(
+              ctrl: nameCtrl,
+              hint: 'e.g. Mama Zawadi Fashion',
+              icon: Icons.store_rounded,
+              onChanged: (v) => onUpdate(kit.copyWith(businessName: v)),
+            ),
+            const SizedBox(height: 10),
+            _DarkField(
+              ctrl: taglineCtrl,
+              hint: 'e.g. Style for every occasion',
+              icon: Icons.format_quote_rounded,
+              onChanged: (v) => onUpdate(kit.copyWith(tagline: v)),
+            ),
+          ],
+        ),
 
         const SizedBox(height: 16),
 
@@ -559,9 +582,10 @@ class _IdentityTab extends StatelessWidget {
                 'This number appears on every ad CTA button automatically — '
                 'the most important field in your brand kit.',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 10,
-                    height: 1.4),
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 10,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 10),
               _DarkField(
@@ -574,13 +598,18 @@ class _IdentityTab extends StatelessWidget {
                 const SizedBox(height: 6),
                 const Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: DesignTokens.warning, size: 13),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: DesignTokens.warning,
+                      size: 13,
+                    ),
                     SizedBox(width: 5),
                     Text(
                       'Add your WhatsApp to enable CTA on all templates',
                       style: TextStyle(
-                          color: DesignTokens.warning, fontSize: 10),
+                        color: DesignTokens.warning,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -592,28 +621,31 @@ class _IdentityTab extends StatelessWidget {
         const SizedBox(height: 16),
 
         // ── Other contact details ──────────────────────────────────────────
-        _Section(label: 'Additional Contact & Location', children: [
-          _DarkField(
-            ctrl: phoneCtrl,
-            hint: 'Phone number  ·  {{PHONE}}',
-            icon: Icons.phone_rounded,
-            onChanged: (v) => onUpdate(kit.copyWith(phone: v)),
-          ),
-          const SizedBox(height: 10),
-          _DarkField(
-            ctrl: locationCtrl,
-            hint: 'Location  ·  {{LOCATION}}  (e.g. Kampala, Nakasero)',
-            icon: Icons.location_on_rounded,
-            onChanged: (v) => onUpdate(kit.copyWith(location: v)),
-          ),
-          const SizedBox(height: 10),
-          _DarkField(
-            ctrl: websiteCtrl,
-            hint: 'Website  ·  {{CTA_LINK}}  (e.g. soko24.co/your-shop)',
-            icon: Icons.language_rounded,
-            onChanged: (v) => onUpdate(kit.copyWith(website: v)),
-          ),
-        ]),
+        _Section(
+          label: 'Additional Contact & Location',
+          children: [
+            _DarkField(
+              ctrl: phoneCtrl,
+              hint: 'Phone number  ·  {{PHONE}}',
+              icon: Icons.phone_rounded,
+              onChanged: (v) => onUpdate(kit.copyWith(phone: v)),
+            ),
+            const SizedBox(height: 10),
+            _DarkField(
+              ctrl: locationCtrl,
+              hint: 'Location  ·  {{LOCATION}}  (e.g. Kampala, Nakasero)',
+              icon: Icons.location_on_rounded,
+              onChanged: (v) => onUpdate(kit.copyWith(location: v)),
+            ),
+            const SizedBox(height: 10),
+            _DarkField(
+              ctrl: websiteCtrl,
+              hint: 'Website  ·  {{CTA_LINK}}  (e.g. soko24.co/your-shop)',
+              icon: Icons.language_rounded,
+              onChanged: (v) => onUpdate(kit.copyWith(website: v)),
+            ),
+          ],
+        ),
 
         const SizedBox(height: 16),
 
@@ -644,39 +676,49 @@ class _IdentityTab extends StatelessWidget {
                 ('{{CTA_LINK}}', 'Website or shop URL'),
                 ('{{BUSINESS}}', 'Your business name'),
                 ('{{LOCATION}}', 'Your location'),
-              ].map((v) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: DesignTokens.brandAccent
-                                .withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: DesignTokens.brandAccent
-                                  .withValues(alpha: 0.3),
-                            ),
+              ].map(
+                (v) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: DesignTokens.brandAccent.withValues(
+                            alpha: 0.12,
                           ),
-                          child: Text(
-                            v.$1,
-                            style: const TextStyle(
-                              color: DesignTokens.brandAccent,
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.w600,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: DesignTokens.brandAccent.withValues(
+                              alpha: 0.3,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(v.$2,
-                            style: const TextStyle(
-                                color: Colors.white38, fontSize: 11)),
-                      ],
-                    ),
-                  )),
+                        child: Text(
+                          v.$1,
+                          style: const TextStyle(
+                            color: DesignTokens.brandAccent,
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        v.$2,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -690,13 +732,17 @@ class _IdentityTab extends StatelessWidget {
             color: DesignTokens.brandAccent.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: DesignTokens.brandAccent.withValues(alpha: 0.2)),
+              color: DesignTokens.brandAccent.withValues(alpha: 0.2),
+            ),
           ),
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.auto_awesome_rounded,
-                  color: DesignTokens.brandAccent, size: 18),
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: DesignTokens.brandAccent,
+                size: 18,
+              ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -704,7 +750,10 @@ class _IdentityTab extends StatelessWidget {
                   'templates, and the Ad Injector overlays. '
                   'The more complete it is, the better your ads look with zero effort.',
                   style: TextStyle(
-                      color: Colors.white60, fontSize: 11, height: 1.5),
+                    color: Colors.white60,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ],
@@ -729,70 +778,81 @@ class _ColorsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        _Section(label: 'Brand Colors', children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _ColorSlot(
-                label: 'Primary',
-                hex: kit.primaryColor,
-                onSelect: (h) => onUpdate(kit.copyWith(primaryColor: h)),
-              ),
-              _ColorSlot(
-                label: 'Secondary',
-                hex: kit.secondaryColor,
-                onSelect: (h) => onUpdate(kit.copyWith(secondaryColor: h)),
-              ),
-              _ColorSlot(
-                label: 'Accent',
-                hex: kit.accentColor,
-                onSelect: (h) => onUpdate(kit.copyWith(accentColor: h)),
-              ),
-            ],
-          ),
-        ]),
+        _Section(
+          label: 'Brand Colors',
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _ColorSlot(
+                  label: 'Primary',
+                  hex: kit.primaryColor,
+                  onSelect: (h) => onUpdate(kit.copyWith(primaryColor: h)),
+                ),
+                _ColorSlot(
+                  label: 'Secondary',
+                  hex: kit.secondaryColor,
+                  onSelect: (h) => onUpdate(kit.copyWith(secondaryColor: h)),
+                ),
+                _ColorSlot(
+                  label: 'Accent',
+                  hex: kit.accentColor,
+                  onSelect: (h) => onUpdate(kit.copyWith(accentColor: h)),
+                ),
+              ],
+            ),
+          ],
+        ),
         const SizedBox(height: 20),
-        _Section(label: 'Quick Color Presets', children: [
-          ..._brandPresets.map((preset) {
-            return GestureDetector(
-              onTap: () => onUpdate(kit.copyWith(
-                primaryColor: preset.$1,
-                secondaryColor: preset.$2,
-                accentColor: preset.$3,
-              )),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
+        _Section(
+          label: 'Quick Color Presets',
+          children: [
+            ..._brandPresets.map((preset) {
+              return GestureDetector(
+                onTap: () => onUpdate(
+                  kit.copyWith(
+                    primaryColor: preset.$1,
+                    secondaryColor: preset.$2,
+                    accentColor: preset.$3,
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    ...[(preset.$1), (preset.$2), (preset.$3)].map((hex) {
-                      return Container(
-                        width: 28, height: 28,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: parseHexColor(hex),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white12),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      ...[(preset.$1), (preset.$2), (preset.$3)].map((hex) {
+                        return Container(
+                          width: 28,
+                          height: 28,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: parseHexColor(hex),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white12),
+                          ),
+                        );
+                      }),
+                      const SizedBox(width: 8),
+                      Text(
+                        preset.$4,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
                         ),
-                      );
-                    }),
-                    const SizedBox(width: 8),
-                    Text(
-                      preset.$4,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 13),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }),
-        ]),
+              );
+            }),
+          ],
+        ),
       ],
     );
   }
@@ -824,25 +884,31 @@ class _FontsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        _Section(label: 'Body Font', children: [
-          SizedBox(
-            height: 110,
-            child: _FontPicker(
-              selected: kit.font,
-              onSelect: (f) => onUpdate(kit.copyWith(font: f)),
+        _Section(
+          label: 'Body Font',
+          children: [
+            SizedBox(
+              height: 110,
+              child: _FontPicker(
+                selected: kit.font,
+                onSelect: (f) => onUpdate(kit.copyWith(font: f)),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 20),
-        _Section(label: 'Heading Font', children: [
-          SizedBox(
-            height: 110,
-            child: _FontPicker(
-              selected: kit.headingFont,
-              onSelect: (f) => onUpdate(kit.copyWith(headingFont: f)),
+        _Section(
+          label: 'Heading Font',
+          children: [
+            SizedBox(
+              height: 110,
+              child: _FontPicker(
+                selected: kit.headingFont,
+                onSelect: (f) => onUpdate(kit.copyWith(headingFont: f)),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ],
     );
   }
@@ -867,15 +933,18 @@ class _FontPicker extends StatelessWidget {
 
         TextStyle style;
         try {
-          style = GoogleFonts.getFont(pkgName,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: isSel ? DesignTokens.brandAccent : Colors.white);
+          style = GoogleFonts.getFont(
+            pkgName,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: isSel ? DesignTokens.brandAccent : Colors.white,
+          );
         } catch (_) {
           style = TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: isSel ? DesignTokens.brandAccent : Colors.white);
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: isSel ? DesignTokens.brandAccent : Colors.white,
+          );
         }
 
         return GestureDetector(
@@ -900,18 +969,20 @@ class _FontPicker extends StatelessWidget {
                 Text(
                   name,
                   style: TextStyle(
-                      color: isSel ? DesignTokens.brandAccent : Colors.white38,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500),
+                    color: isSel ? DesignTokens.brandAccent : Colors.white38,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w500,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
                 if (desc != null)
-                  Text(desc.vibe,
-                      style: const TextStyle(
-                          color: Colors.white24, fontSize: 7),
-                      textAlign: TextAlign.center),
+                  Text(
+                    desc.vibe,
+                    style: const TextStyle(color: Colors.white24, fontSize: 7),
+                    textAlign: TextAlign.center,
+                  ),
               ],
             ),
           ),
@@ -936,18 +1007,28 @@ class _BrandPreviewCard extends StatelessWidget {
     final accent = parseHexColor(kit.accentColor);
 
     TextStyle nameStyle = const TextStyle(
-        color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800);
+      color: Colors.white,
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+    );
     TextStyle tagStyle = const TextStyle(color: Colors.white70, fontSize: 12);
     if (studioFonts.containsKey(kit.headingFont)) {
       try {
-        nameStyle = GoogleFonts.getFont(studioFonts[kit.headingFont]!,
-            fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white);
+        nameStyle = GoogleFonts.getFont(
+          studioFonts[kit.headingFont]!,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        );
       } catch (_) {}
     }
     if (studioFonts.containsKey(kit.font)) {
       try {
-        tagStyle = GoogleFonts.getFont(studioFonts[kit.font]!,
-            fontSize: 12, color: Colors.white70);
+        tagStyle = GoogleFonts.getFont(
+          studioFonts[kit.font]!,
+          fontSize: 12,
+          color: Colors.white70,
+        );
       } catch (_) {}
     }
 
@@ -966,11 +1047,9 @@ class _BrandPreviewCard extends StatelessWidget {
         children: [
           // Logo
           Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-              color: accent,
-              shape: BoxShape.circle,
-            ),
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
             child: ClipOval(child: _LogoWidget(kit: kit, size: 64)),
           ),
           const SizedBox(width: 14),
@@ -989,26 +1068,29 @@ class _BrandPreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  kit.tagline.isNotEmpty
-                      ? kit.tagline
-                      : 'Your tagline here',
+                  kit.tagline.isNotEmpty ? kit.tagline : 'Your tagline here',
                   style: tagStyle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Row(children: [
-                  _Dot(primary),
-                  const SizedBox(width: 5),
-                  _Dot(secondary),
-                  const SizedBox(width: 5),
-                  _Dot(accent),
-                  const SizedBox(width: 10),
-                  Text(kit.font,
+                Row(
+                  children: [
+                    _Dot(primary),
+                    const SizedBox(width: 5),
+                    _Dot(secondary),
+                    const SizedBox(width: 5),
+                    _Dot(accent),
+                    const SizedBox(width: 10),
+                    Text(
+                      kit.font,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 9)),
-                ]),
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1024,12 +1106,14 @@ class _Dot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 16, height: 16,
-        decoration: BoxDecoration(
-          color: color, shape: BoxShape.circle,
-          border: Border.all(color: Colors.white24),
-        ),
-      );
+    width: 16,
+    height: 16,
+    decoration: BoxDecoration(
+      color: color,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white24),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1046,14 +1130,15 @@ class _LogoWidget extends StatelessWidget {
     if (kit.logoLocalPath != null) {
       final file = File(kit.logoLocalPath!);
       if (file.existsSync()) {
-        return Image.file(file,
-            width: size, height: size, fit: BoxFit.cover);
+        return Image.file(file, width: size, height: size, fit: BoxFit.cover);
       }
     }
     if (kit.logoNetworkUrl?.isNotEmpty == true) {
       return Image.network(
         kit.logoNetworkUrl!,
-        width: size, height: size, fit: BoxFit.cover,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _FallbackLogo(kit: kit, size: size),
       );
     }
@@ -1072,24 +1157,28 @@ class _FallbackLogo extends StatelessWidget {
         ? kit.businessName[0].toUpperCase()
         : 'S';
     return Container(
-      width: size, height: size,
+      width: size,
+      height: size,
       color: Colors.transparent,
       child: Center(
-        child: Icon(
-          kit.businessName.isEmpty ? Icons.add_photo_alternate_rounded : null,
-          color: Colors.white54,
-          size: size * 0.4,
-          // Fallback to letter if business name set
-        ).apply(
-          onNull: Text(
-            letter,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size * 0.4,
-              fontWeight: FontWeight.w900,
+        child:
+            Icon(
+              kit.businessName.isEmpty
+                  ? Icons.add_photo_alternate_rounded
+                  : null,
+              color: Colors.white54,
+              size: size * 0.4,
+              // Fallback to letter if business name set
+            ).apply(
+              onNull: Text(
+                letter,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: size * 0.4,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
-          ),
-        ),
       ),
     );
   }
@@ -1124,29 +1213,39 @@ class _ColorSlot extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 64, height: 64,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               color: parseHexColor(hex),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white12),
               boxShadow: [
                 BoxShadow(
-                    color: parseHexColor(hex).withValues(alpha: 0.4),
-                    blurRadius: 12),
+                  color: parseHexColor(hex).withValues(alpha: 0.4),
+                  blurRadius: 12,
+                ),
               ],
             ),
-            child: const Icon(Icons.colorize_rounded,
-                color: Colors.white54, size: 20),
+            child: const Icon(
+              Icons.colorize_rounded,
+              color: Colors.white54,
+              size: 20,
+            ),
           ),
           const SizedBox(height: 6),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(hex.toUpperCase(),
-              style: const TextStyle(color: Colors.white24, fontSize: 9)),
+          Text(
+            hex.toUpperCase(),
+            style: const TextStyle(color: Colors.white24, fontSize: 9),
+          ),
         ],
       ),
     );
@@ -1157,9 +1256,9 @@ class _ColorSlot extends StatelessWidget {
       context: context,
       backgroundColor: DesignTokens.brandPrimary,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _ColorPickerSheet(
-          label: label, onSelect: onSelect),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ColorPickerSheet(label: label, onSelect: onSelect),
     );
   }
 }
@@ -1176,21 +1275,28 @@ class _ColorPickerSheet extends StatelessWidget {
       children: [
         const SizedBox(height: 8),
         Container(
-            width: 36, height: 4,
-            decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2))),
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
         const SizedBox(height: 16),
-        Text('Pick $label Color',
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600)),
+        Text(
+          'Pick $label Color',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
           child: Wrap(
-            spacing: 10, runSpacing: 10,
+            spacing: 10,
+            runSpacing: 10,
             children: colorPalette.map((c) {
               return GestureDetector(
                 onTap: () {
@@ -1198,7 +1304,8 @@ class _ColorPickerSheet extends StatelessWidget {
                   Navigator.pop(context);
                 },
                 child: Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: c,
                     borderRadius: BorderRadius.circular(10),
@@ -1225,18 +1332,21 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label.toUpperCase(),
-              style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0)),
-          const SizedBox(height: 10),
-          ...children,
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white38,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.0,
+        ),
+      ),
+      const SizedBox(height: 10),
+      ...children,
+    ],
+  );
 }
 
 class _DarkField extends StatelessWidget {
@@ -1254,31 +1364,33 @@ class _DarkField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: ctrl,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white30),
-          prefixIcon: icon != null
-              ? Icon(icon, color: Colors.white24, size: 18)
-              : null,
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.07),
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.white12)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.white12)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: DesignTokens.brandAccent)),
-        ),
-      );
+    controller: ctrl,
+    style: const TextStyle(color: Colors.white, fontSize: 14),
+    onChanged: onChanged,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white30),
+      prefixIcon: icon != null
+          ? Icon(icon, color: Colors.white24, size: 18)
+          : null,
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.07),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: DesignTokens.brandAccent),
+      ),
+    ),
+  );
 }
 
 /// Parse a hex string into a Color.

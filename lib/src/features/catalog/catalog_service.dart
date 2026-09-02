@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -10,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/db/app_database.dart';
 import '../../core/media/offline_media_cache.dart';
 import 'catalog_template.dart';
+import 'shop_share_link.dart';
 
 class CatalogService {
   CatalogService(this.db);
@@ -44,7 +46,7 @@ class CatalogService {
           : pw.ThemeData(),
     );
 
-    final shopLink = shopId != null ? 'https://soko24.co/shop/$shopId' : null;
+    final shopLink = buildShopShareLink(shopId: shopId, shopName: shopName);
 
     final allUrls = <String>{};
     for (final item in items) {
@@ -123,15 +125,8 @@ class CatalogService {
                     campaign: campaign,
                   ),
                 if (page == 0) pw.SizedBox(height: 16),
-                pw.Expanded(
-                  child: pw.GridView(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.72,
-                    children: pageEntries.map((e) => _buildCard(e)).toList(),
-                  ),
-                ),
+                _buildEntryGrid(pageEntries),
+                pw.Spacer(),
                 pw.SizedBox(height: 8),
                 _buildFooter(page + 1, totalPages, shopLink),
               ],
@@ -144,6 +139,41 @@ class CatalogService {
     return doc.save();
   }
 
+  pw.Widget _buildEntryGrid(List<_CatalogEntry> entries) {
+    if (entries.length == 1) {
+      return pw.SizedBox(height: 280, child: _buildCard(entries.first));
+    }
+    final rows = <pw.Widget>[];
+    for (var index = 0; index < entries.length; index += 2) {
+      rows.add(
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.SizedBox(
+                height: 180,
+                child: _buildCard(entries[index]),
+              ),
+            ),
+            pw.SizedBox(width: 12),
+            pw.Expanded(
+              child: index + 1 < entries.length
+                  ? pw.SizedBox(
+                      height: 180,
+                      child: _buildCard(entries[index + 1]),
+                    )
+                  : pw.SizedBox(),
+            ),
+          ],
+        ),
+      );
+      if (index + 2 < entries.length) {
+        rows.add(pw.SizedBox(height: 12));
+      }
+    }
+    return pw.Column(children: rows);
+  }
+
   Future<Map<String, pw.MemoryImage>> _loadPdfImages(
     Iterable<String> sources,
   ) async {
@@ -154,12 +184,33 @@ class CatalogService {
       try {
         final bytes = await OfflineMediaCache.instance.resolveBytes(raw);
         if (bytes != null && bytes.isNotEmpty) {
-          imageCache[raw] = pw.MemoryImage(Uint8List.fromList(bytes));
+          final prepared = _preparePdfImage(bytes);
+          if (prepared != null) {
+            imageCache[raw] = pw.MemoryImage(prepared);
+          }
         }
       } catch (_) {}
     });
     await Future.wait(jobs);
     return imageCache;
+  }
+
+  /// Normalises phone photos, WebP files and oversized marketplace images to
+  /// a compact JPEG that the PDF renderer can embed consistently.
+  Uint8List? _preparePdfImage(Uint8List source) {
+    final decoded = img.decodeImage(source);
+    if (decoded == null) return null;
+    final baked = img.bakeOrientation(decoded);
+    final longestSide = baked.width > baked.height ? baked.width : baked.height;
+    final ready = longestSide > 1400
+        ? img.copyResize(
+            baked,
+            width: baked.width >= baked.height ? 1400 : null,
+            height: baked.height > baked.width ? 1400 : null,
+            interpolation: img.Interpolation.cubic,
+          )
+        : baked;
+    return Uint8List.fromList(img.encodeJpg(ready, quality: 90));
   }
 
   bool _isSupportedMediaSource(String? value) {
@@ -203,7 +254,9 @@ class CatalogService {
                     color: PdfColors.white,
                     borderRadius: pw.BorderRadius.circular(8),
                   ),
-                  child: pw.Center(child: pw.Image(logo, fit: pw.BoxFit.contain)),
+                  child: pw.Center(
+                    child: pw.Image(logo, fit: pw.BoxFit.contain),
+                  ),
                 ),
                 pw.SizedBox(width: 14),
               ],
@@ -278,7 +331,10 @@ class CatalogService {
           if (campaign != null && campaign.promo != CatalogPromo.none) ...[
             pw.SizedBox(height: 12),
             pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
               decoration: pw.BoxDecoration(
                 color: PdfColor.fromInt(campaign.promo.badgeColor.toARGB32()),
                 borderRadius: pw.BorderRadius.circular(4),
@@ -299,7 +355,7 @@ class CatalogService {
   }
 
   pw.Widget _buildCard(_CatalogEntry entry) {
-    final priceStr = 'UGX ${_currencyFormat.format(entry.price.round())}';
+    final priceStr = '${_currencyFormat.format(entry.price.round())} /=';
     return pw.Container(
       padding: const pw.EdgeInsets.all(8),
       decoration: pw.BoxDecoration(
@@ -321,11 +377,7 @@ class CatalogService {
                   ? pw.ClipRRect(
                       horizontalRadius: 4,
                       verticalRadius: 4,
-                      child: pw.Image(
-                        entry.image!,
-                        fit: pw.BoxFit.cover,
-                        width: double.infinity,
-                      ),
+                      child: pw.Image(entry.image!, fit: pw.BoxFit.cover),
                     )
                   : pw.Center(
                       child: pw.Text(
@@ -424,8 +476,13 @@ class CatalogService {
       shopId: shopId,
       campaign: campaign,
     );
-    final suffix = campaign != null ? '-${campaign.layout.displayName.toLowerCase()}' : '';
-    await Printing.sharePdf(bytes: bytes, filename: '$shopName$suffix-catalog.pdf');
+    final suffix = campaign != null
+        ? '-${campaign.layout.displayName.toLowerCase()}'
+        : '';
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: '$shopName$suffix-catalog.pdf',
+    );
   }
 
   Future<void> shareWhatsApp({
@@ -437,7 +494,9 @@ class CatalogService {
     CatalogCampaign? campaign,
   }) async {
     final buffer = StringBuffer();
-    final title = campaign?.title.isNotEmpty == true ? campaign!.title : '$shopName — Catalog';
+    final title = campaign?.title.isNotEmpty == true
+        ? campaign!.title
+        : '$shopName — Catalog';
     buffer.writeln('*${title.replaceAll('*', '')}*');
     if (campaign?.promo != null && campaign!.promo != CatalogPromo.none) {
       buffer.writeln('🏷 *${campaign.promo.bannerText}*');
@@ -447,7 +506,7 @@ class CatalogService {
       buffer.writeln('*Products:*');
       for (final item in items) {
         buffer.writeln(
-          '▸ ${item.name} — UGX ${_currencyFormat.format(item.price.round())}',
+          '▸ ${item.name} — ${_currencyFormat.format(item.price.round())} /=',
         );
       }
     }
@@ -459,13 +518,14 @@ class CatalogService {
             ? ' (${svc.durationMinutes} min)'
             : '';
         buffer.writeln(
-          '▸ ${svc.title} — UGX ${_currencyFormat.format(svc.price.round())}$dur',
+          '▸ ${svc.title} — ${_currencyFormat.format(svc.price.round())} /=$dur',
         );
       }
     }
     buffer.writeln();
-    if (shopId != null) {
-      buffer.writeln('🛒 Shop online: https://soko24.co/shop/$shopId');
+    final shopLink = buildShopShareLink(shopId: shopId, shopName: shopName);
+    if (shopLink != null) {
+      buffer.writeln('🛒 Shop online: $shopLink');
     }
     buffer.writeln('📞 Call or WhatsApp to order');
     buffer.writeln();
@@ -486,8 +546,8 @@ class CatalogService {
     }
   }
 
-  Future<void> openShopLink(String shopId) async {
-    final uri = Uri.parse('https://soko24.co/shop/$shopId');
+  Future<void> openShopLink(String link) async {
+    final uri = Uri.parse(link);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

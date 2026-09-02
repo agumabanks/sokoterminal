@@ -38,7 +38,9 @@ class FloatingToolbar extends StatelessWidget {
       decoration: BoxDecoration(
         color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 8),
+        ],
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: SingleChildScrollView(
@@ -46,9 +48,12 @@ class FloatingToolbar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (onEditText != null) _FTBtn(Icons.edit_rounded, 'Edit', onEditText!),
-            if (onEditFont != null) _FTBtn(Icons.font_download_rounded, 'Font', onEditFont!),
-            if (onEditImage != null) _FTBtn(Icons.image_rounded, 'Image', onEditImage!),
+            if (onEditText != null)
+              _FTBtn(Icons.edit_rounded, 'Edit', onEditText!),
+            if (onEditFont != null)
+              _FTBtn(Icons.font_download_rounded, 'Font', onEditFont!),
+            if (onEditImage != null)
+              _FTBtn(Icons.image_rounded, 'Image', onEditImage!),
             _FTBtn(Icons.content_copy_rounded, 'Copy', onDuplicate),
             _FTBtn(Icons.flip_to_front_rounded, '↑', onBringForward),
             _FTBtn(Icons.flip_to_back_rounded, '↓', onSendBackward),
@@ -58,7 +63,12 @@ class FloatingToolbar extends StatelessWidget {
               onLock,
               color: element.isLocked ? DesignTokens.warning : null,
             ),
-            _FTBtn(Icons.delete_rounded, 'Del', onDelete, color: Colors.redAccent),
+            _FTBtn(
+              Icons.delete_rounded,
+              'Del',
+              onDelete,
+              color: Colors.redAccent,
+            ),
           ],
         ),
       ),
@@ -86,7 +96,14 @@ class _FTBtn extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: c, size: 16),
-              Text(label, style: TextStyle(color: c, fontSize: 7, fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: c,
+                  fontSize: 7,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),

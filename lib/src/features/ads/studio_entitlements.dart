@@ -23,8 +23,9 @@ class StudioEntitlements {
   );
 }
 
-final studioEntitlementsProvider =
-    FutureProvider<StudioEntitlements>((ref) async {
+final studioEntitlementsProvider = FutureProvider<StudioEntitlements>((
+  ref,
+) async {
   try {
     final res = await ref.read(sellerApiProvider).fetchSellerWalletDashboard();
     final data = res.data;
@@ -36,7 +37,9 @@ final studioEntitlementsProvider =
   } catch (e, st) {
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
-      unawaited(telemetry.recordError(e, st, hint: 'studio_entitlements_fetch'));
+      unawaited(
+        telemetry.recordError(e, st, hint: 'studio_entitlements_fetch'),
+      );
     }
     return StudioEntitlements.free;
   }
@@ -47,9 +50,7 @@ StudioEntitlements _parseSubscription(dynamic sub) {
 
   final status = (sub['status'] ?? '').toString().toLowerCase();
   final plan = sub['plan'];
-  final planName = plan is Map
-      ? (plan['name'] ?? 'Plan').toString()
-      : 'Plan';
+  final planName = plan is Map ? (plan['name'] ?? 'Plan').toString() : 'Plan';
   final planSlug = plan is Map
       ? (plan['slug'] ?? '').toString().toLowerCase()
       : '';
@@ -66,7 +67,8 @@ StudioEntitlements _parseSubscription(dynamic sub) {
     );
   }
 
-  final isPremiumPlan = planSlug.contains('growth') ||
+  final isPremiumPlan =
+      planSlug.contains('growth') ||
       planSlug.contains('enterprise') ||
       planSlug.contains('studio-pro') ||
       planSlug.contains('pro') ||

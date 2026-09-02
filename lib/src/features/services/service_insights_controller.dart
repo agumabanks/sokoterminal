@@ -57,13 +57,15 @@ class ServiceInsightsState {
   }
 
   double get completionRate {
-    final total = pendingCount + confirmedCount + completedCount + cancelledCount;
+    final total =
+        pendingCount + confirmedCount + completedCount + cancelledCount;
     if (total == 0) return 0;
     return (completedCount / total) * 100;
   }
 
   double get cancellationRate {
-    final total = pendingCount + confirmedCount + completedCount + cancelledCount;
+    final total =
+        pendingCount + confirmedCount + completedCount + cancelledCount;
     if (total == 0) return 0;
     return (cancelledCount / total) * 100;
   }
@@ -79,12 +81,18 @@ class ServiceInsightsController extends StateNotifier<ServiceInsightsState> {
     try {
       final cached = await db.getCachedServiceBookings();
       final bookings = cached
-          .map((r) => Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map))
+          .map(
+            (r) => Map<String, dynamic>.from(jsonDecode(r.payloadJson) as Map),
+          )
           .toList();
 
       final now = DateTime.now();
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+      final weekStartDate = DateTime(
+        weekStart.year,
+        weekStart.month,
+        weekStart.day,
+      );
       final lastWeekStart = weekStartDate.subtract(const Duration(days: 7));
       final lastWeekEnd = weekStartDate.subtract(const Duration(days: 1));
 
@@ -105,7 +113,9 @@ class ServiceInsightsController extends StateNotifier<ServiceInsightsState> {
         final start = startStr != null ? DateTime.tryParse(startStr) : null;
         final status = b['status']?.toString().toLowerCase() ?? 'pending';
         final price = double.tryParse(b['price']?.toString() ?? '') ?? 0;
-        final offering = b['offering'] is Map ? b['offering'] as Map<String, dynamic> : null;
+        final offering = b['offering'] is Map
+            ? b['offering'] as Map<String, dynamic>
+            : null;
         final serviceTitle = offering?['title']?.toString() ?? 'Unknown';
 
         // Status counts
@@ -139,13 +149,15 @@ class ServiceInsightsController extends StateNotifier<ServiceInsightsState> {
             }
           }
           // Last week
-          else if (!dayStart.isBefore(lastWeekStart) && !dayStart.isAfter(lastWeekEnd)) {
+          else if (!dayStart.isBefore(lastWeekStart) &&
+              !dayStart.isAfter(lastWeekEnd)) {
             lastWeekRevenue += price;
             lastWeekBookings++;
           }
 
           // Upcoming (future confirmed/pending)
-          if (dayStart.isAfter(now) && (status == 'pending' || status == 'confirmed')) {
+          if (dayStart.isAfter(now) &&
+              (status == 'pending' || status == 'confirmed')) {
             upcoming++;
           }
         }
@@ -163,7 +175,9 @@ class ServiceInsightsController extends StateNotifier<ServiceInsightsState> {
       }
 
       final topServices = serviceCounts.values.toList()
-        ..sort((a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double));
+        ..sort(
+          (a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double),
+        );
 
       state = ServiceInsightsState(
         loading: false,

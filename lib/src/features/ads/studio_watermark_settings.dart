@@ -8,22 +8,16 @@ import '../../core/app_providers.dart';
 import 'brand_kit_screen.dart';
 
 /// Where the watermark should be placed on exported artwork.
-enum WatermarkPosition {
-  topLeft,
-  topRight,
-  bottomLeft,
-  bottomRight,
-  center,
-}
+enum WatermarkPosition { topLeft, topRight, bottomLeft, bottomRight, center }
 
 extension WatermarkPositionLabel on WatermarkPosition {
   String get label => switch (this) {
-        WatermarkPosition.topLeft => 'Top-left',
-        WatermarkPosition.topRight => 'Top-right',
-        WatermarkPosition.bottomLeft => 'Bottom-left',
-        WatermarkPosition.bottomRight => 'Bottom-right',
-        WatermarkPosition.center => 'Center',
-      };
+    WatermarkPosition.topLeft => 'Top-left',
+    WatermarkPosition.topRight => 'Top-right',
+    WatermarkPosition.bottomLeft => 'Bottom-left',
+    WatermarkPosition.bottomRight => 'Bottom-right',
+    WatermarkPosition.center => 'Center',
+  };
 }
 
 /// User-configurable watermark behaviour for Studio exports.
@@ -55,26 +49,25 @@ class WatermarkSettings {
     double? scale,
     bool? useBusinessLogo,
     bool? prominentBrandStamp,
-  }) =>
-      WatermarkSettings(
-        enabled: enabled ?? this.enabled,
-        opacity: opacity ?? this.opacity,
-        blendMode: blendMode ?? this.blendMode,
-        position: position ?? this.position,
-        scale: scale ?? this.scale,
-        useBusinessLogo: useBusinessLogo ?? this.useBusinessLogo,
-        prominentBrandStamp: prominentBrandStamp ?? this.prominentBrandStamp,
-      );
+  }) => WatermarkSettings(
+    enabled: enabled ?? this.enabled,
+    opacity: opacity ?? this.opacity,
+    blendMode: blendMode ?? this.blendMode,
+    position: position ?? this.position,
+    scale: scale ?? this.scale,
+    useBusinessLogo: useBusinessLogo ?? this.useBusinessLogo,
+    prominentBrandStamp: prominentBrandStamp ?? this.prominentBrandStamp,
+  );
 
   Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        'opacity': opacity,
-        'blendMode': blendMode,
-        'position': position.name,
-        'scale': scale,
-        'useBusinessLogo': useBusinessLogo,
-        'prominentBrandStamp': prominentBrandStamp,
-      };
+    'enabled': enabled,
+    'opacity': opacity,
+    'blendMode': blendMode,
+    'position': position.name,
+    'scale': scale,
+    'useBusinessLogo': useBusinessLogo,
+    'prominentBrandStamp': prominentBrandStamp,
+  };
 
   factory WatermarkSettings.fromJson(Map<String, dynamic> json) {
     WatermarkPosition parsePosition(String? raw) =>
@@ -112,8 +105,7 @@ class WatermarkSettings {
 // ---------------------------------------------------------------------------
 
 class WatermarkSettingsNotifier extends StateNotifier<WatermarkSettings> {
-  WatermarkSettingsNotifier(this._prefs)
-      : super(_load(_prefs));
+  WatermarkSettingsNotifier(this._prefs) : super(_load(_prefs));
 
   final SharedPreferences _prefs;
   static const _key = 'studio_watermark_settings_v1';
@@ -141,10 +133,9 @@ class WatermarkSettingsNotifier extends StateNotifier<WatermarkSettings> {
   }
 
   Future<void> setProminentBrandStamp(bool value) async {
-    state = WatermarkSettings.fromPreset(prominent: value).copyWith(
-      useBusinessLogo: state.useBusinessLogo,
-      enabled: state.enabled,
-    );
+    state = WatermarkSettings.fromPreset(
+      prominent: value,
+    ).copyWith(useBusinessLogo: state.useBusinessLogo, enabled: state.enabled);
     await _persist();
   }
 
@@ -180,8 +171,8 @@ class WatermarkSettingsNotifier extends StateNotifier<WatermarkSettings> {
 
 final watermarkSettingsProvider =
     StateNotifierProvider<WatermarkSettingsNotifier, WatermarkSettings>((ref) {
-  return WatermarkSettingsNotifier(ref.read(sharedPreferencesProvider));
-});
+      return WatermarkSettingsNotifier(ref.read(sharedPreferencesProvider));
+    });
 
 /// Non-destructive preview toggle for the editor canvas. Does NOT affect exports.
 final watermarkPreviewProvider = StateProvider<bool>((ref) => false);
@@ -199,15 +190,15 @@ const List<(String id, String label)> kWatermarkBlendModes = [
 
 /// Resolve a user-facing blend-mode id to a Flutter [BlendMode].
 BlendMode? watermarkBlendMode(String id) => switch (id) {
-      'normal' => BlendMode.srcOver,
-      'overlay' => BlendMode.overlay,
-      'multiply' => BlendMode.multiply,
-      'screen' => BlendMode.screen,
-      'softLight' => BlendMode.softLight,
-      'colorBurn' => BlendMode.colorBurn,
-      'modulate' => BlendMode.modulate,
-      _ => null,
-    };
+  'normal' => BlendMode.srcOver,
+  'overlay' => BlendMode.overlay,
+  'multiply' => BlendMode.multiply,
+  'screen' => BlendMode.screen,
+  'softLight' => BlendMode.softLight,
+  'colorBurn' => BlendMode.colorBurn,
+  'modulate' => BlendMode.modulate,
+  _ => null,
+};
 
 /// Returns the best available watermark source for the current settings.
 ///

@@ -58,9 +58,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
                 child: ListTile(
                   title: Text(v.name),
-                  subtitle: Text(
-                    '${v.price.toUgx()} / ${v.unit ?? "unit"}',
-                  ),
+                  subtitle: Text('${v.price.toUgx()} / ${v.unit ?? "unit"}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -164,7 +162,7 @@ class ServiceVariantsScreen extends ConsumerWidget {
               const SizedBox(height: DesignTokens.spaceMd),
               AppInput(
                 controller: priceCtrl,
-                label: 'Price (UGX)',
+                label: 'Price (/=)',
                 keyboardType: TextInputType.number,
                 inputFormatters: const [CommaNumberFormatter()],
               ),
@@ -182,7 +180,8 @@ class ServiceVariantsScreen extends ConsumerWidget {
                 label: 'Save Variant',
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
-                  final price = double.tryParse(
+                  final price =
+                      double.tryParse(
                         CommaNumberFormatter.unformat(priceCtrl.text.trim()),
                       ) ??
                       0;

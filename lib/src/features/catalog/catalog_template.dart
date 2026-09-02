@@ -81,11 +81,11 @@ extension CatalogLayoutExt on CatalogLayout {
   int get maxRecommended {
     switch (this) {
       case CatalogLayout.magazine:
-        return 7;
-      case CatalogLayout.grid:
-        return 9;
-      case CatalogLayout.story:
         return 5;
+      case CatalogLayout.grid:
+        return 6;
+      case CatalogLayout.story:
+        return 4;
       case CatalogLayout.minimal:
         return 6;
     }
@@ -124,13 +124,7 @@ extension CatalogLayoutExt on CatalogLayout {
 }
 
 /// Promotional overlay that can be applied to any catalog.
-enum CatalogPromo {
-  none,
-  sale,
-  newArrival,
-  limitedTime,
-  bestSeller,
-}
+enum CatalogPromo { none, sale, newArrival, limitedTime, bestSeller }
 
 extension CatalogPromoExt on CatalogPromo {
   String get displayName {

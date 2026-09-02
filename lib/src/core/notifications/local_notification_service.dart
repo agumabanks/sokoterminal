@@ -41,7 +41,9 @@ class LocalNotificationService {
       final location = tz.getLocation('Africa/Kampala');
       tz.setLocalLocation(location);
     } catch (e) {
-      debugPrint('[LocalNotification] timezone init failed: $e; falling back to UTC');
+      debugPrint(
+        '[LocalNotification] timezone init failed: $e; falling back to UTC',
+      );
       try {
         tz.setLocalLocation(tz.UTC);
       } catch (_) {}
@@ -71,8 +73,10 @@ class LocalNotificationService {
     // The manifest already declares POST_NOTIFICATIONS; this triggers the OS
     // dialog on first app launch so local notifications can be shown.
     if (!kIsWeb) {
-      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.requestNotificationsPermission();
     }
 
@@ -84,7 +88,8 @@ class LocalNotificationService {
     );
     await _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannelGroup(androidChannelGroup);
 
     const channels = <AndroidNotificationChannel>[
@@ -118,8 +123,10 @@ class LocalNotificationService {
       ),
     ];
 
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     for (final channel in channels) {
       await androidPlugin?.createNotificationChannel(channel);
     }

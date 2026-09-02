@@ -30,34 +30,36 @@ class CanvasPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: template.aspectRatio,
-      child: LayoutBuilder(builder: (ctx, constraints) {
-        final scaleX = constraints.maxWidth / template.canvasWidth;
-        final scaleY = constraints.maxHeight / template.canvasHeight;
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final scaleX = constraints.maxWidth / template.canvasWidth;
+          final scaleY = constraints.maxHeight / template.canvasHeight;
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(4 * scaleX),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              buildCanvasBackground(background: template.background),
-              ...template.elements.map((el) {
-                return Positioned(
-                  left: el.x * scaleX,
-                  top: el.y * scaleY,
-                  width: el.width * scaleX,
-                  height: el.type == 'text' || el.type == 'sticker'
-                      ? null
-                      : el.height * scaleY,
-                  child: Opacity(
-                    opacity: el.opacity.clamp(0.0, 1.0),
-                    child: _buildStaticElement(el, scaleX, scaleY),
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      }),
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(4 * scaleX),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                buildCanvasBackground(background: template.background),
+                ...template.elements.map((el) {
+                  return Positioned(
+                    left: el.x * scaleX,
+                    top: el.y * scaleY,
+                    width: el.width * scaleX,
+                    height: el.type == 'text' || el.type == 'sticker'
+                        ? null
+                        : el.height * scaleY,
+                    child: Opacity(
+                      opacity: el.opacity.clamp(0.0, 1.0),
+                      child: _buildStaticElement(el, scaleX, scaleY),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -75,11 +77,7 @@ class CanvasPreview extends StatelessWidget {
       case 'text':
       case 'sticker':
       default:
-        child = _TextWidget(
-          el: el,
-          sx: sx,
-          variableContext: variableContext,
-        );
+        child = _TextWidget(el: el, sx: sx, variableContext: variableContext);
     }
     if (interactive && onElementTap != null) {
       return GestureDetector(onTap: () => onElementTap!(el), child: child);
@@ -136,61 +134,64 @@ class _InteractiveCanvasState extends State<InteractiveCanvas> {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: widget.template.aspectRatio,
-      child: LayoutBuilder(builder: (ctx, constraints) {
-        final sx = constraints.maxWidth / widget.template.canvasWidth;
-        final sy = constraints.maxHeight / widget.template.canvasHeight;
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final sx = constraints.maxWidth / widget.template.canvasWidth;
+          final sy = constraints.maxHeight / widget.template.canvasHeight;
 
-        return Listener(
-          onPointerDown: (event) {
-            final pos = event.localPosition;
-            final id = _hitTest(pos, sx, sy);
-            widget.onElementSelected(id);
-            if (id != null) {
-              _dragStart = pos;
-            }
-          },
-          onPointerMove: (event) {
-            if (_dragStart == null || widget.selectedElementId == null) return;
-            widget.onElementMoved(
-              widget.selectedElementId!,
-              event.delta.dx / sx,
-              event.delta.dy / sy,
-            );
-          },
-          onPointerUp: (_) => _dragStart = null,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4 * sx),
-            child: Stack(
-              fit: StackFit.expand,
-              clipBehavior: Clip.none,
-              children: [
-                buildCanvasBackground(background: widget.template.background),
-                ...widget.template.elements.map((el) {
-                  final left = el.x * sx;
-                  final top = el.y * sy;
-                  final w = el.width * sx;
-                  final isText =
-                      el.type == 'text' || el.type == 'sticker';
-                  final h = isText ? null : el.height * sy;
+          return Listener(
+            onPointerDown: (event) {
+              final pos = event.localPosition;
+              final id = _hitTest(pos, sx, sy);
+              widget.onElementSelected(id);
+              if (id != null) {
+                _dragStart = pos;
+              }
+            },
+            onPointerMove: (event) {
+              if (_dragStart == null || widget.selectedElementId == null) {
+                return;
+              }
+              widget.onElementMoved(
+                widget.selectedElementId!,
+                event.delta.dx / sx,
+                event.delta.dy / sy,
+              );
+            },
+            onPointerUp: (_) => _dragStart = null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4 * sx),
+              child: Stack(
+                fit: StackFit.expand,
+                clipBehavior: Clip.none,
+                children: [
+                  buildCanvasBackground(background: widget.template.background),
+                  ...widget.template.elements.map((el) {
+                    final left = el.x * sx;
+                    final top = el.y * sy;
+                    final w = el.width * sx;
+                    final isText = el.type == 'text' || el.type == 'sticker';
+                    final h = isText ? null : el.height * sy;
 
-                  return Positioned(
-                    left: left,
-                    top: top,
-                    width: w,
-                    height: h,
-                    child: Opacity(
-                      opacity: el.opacity.clamp(0.0, 1.0),
-                      child: _buildElement(el, sx, sy),
-                    ),
-                  );
-                }),
-                if (widget.selectedElementId != null)
-                  ..._buildSelectionOverlay(sx, sy),
-              ],
+                    return Positioned(
+                      left: left,
+                      top: top,
+                      width: w,
+                      height: h,
+                      child: Opacity(
+                        opacity: el.opacity.clamp(0.0, 1.0),
+                        child: _buildElement(el, sx, sy),
+                      ),
+                    );
+                  }),
+                  if (widget.selectedElementId != null)
+                    ..._buildSelectionOverlay(sx, sy),
+                ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        },
+      ),
     );
   }
 
@@ -228,15 +229,55 @@ class _InteractiveCanvasState extends State<InteractiveCanvas> {
 
       // Resize handles (corners only for images/figures)
       if (el.type == 'image' || el.type == 'figure') ...[
-        _buildHandle(left - handleSize / 2, top - handleSize / 2, handleSize, 'tl', el, sx, sy),
-        _buildHandle(left + w - handleSize / 2, top - handleSize / 2, handleSize, 'tr', el, sx, sy),
-        _buildHandle(left - handleSize / 2, top + h - handleSize / 2, handleSize, 'bl', el, sx, sy),
-        _buildHandle(left + w - handleSize / 2, top + h - handleSize / 2, handleSize, 'br', el, sx, sy),
+        _buildHandle(
+          left - handleSize / 2,
+          top - handleSize / 2,
+          handleSize,
+          'tl',
+          el,
+          sx,
+          sy,
+        ),
+        _buildHandle(
+          left + w - handleSize / 2,
+          top - handleSize / 2,
+          handleSize,
+          'tr',
+          el,
+          sx,
+          sy,
+        ),
+        _buildHandle(
+          left - handleSize / 2,
+          top + h - handleSize / 2,
+          handleSize,
+          'bl',
+          el,
+          sx,
+          sy,
+        ),
+        _buildHandle(
+          left + w - handleSize / 2,
+          top + h - handleSize / 2,
+          handleSize,
+          'br',
+          el,
+          sx,
+          sy,
+        ),
       ],
     ];
   }
 
-  Widget _buildHandle(double x, double y, double size, String handle, CanvasElement el, double sx, double sy) {
+  Widget _buildHandle(
+    double x,
+    double y,
+    double size,
+    String handle,
+    CanvasElement el,
+    double sx,
+    double sy,
+  ) {
     return Positioned(
       left: x,
       top: y,
@@ -311,7 +352,11 @@ class _IconWidget extends StatelessWidget {
 }
 
 class _IllustrationWidget extends StatelessWidget {
-  const _IllustrationWidget({required this.el, required this.sx, required this.sy});
+  const _IllustrationWidget({
+    required this.el,
+    required this.sx,
+    required this.sy,
+  });
   final CanvasElement el;
   final double sx, sy;
 
@@ -376,7 +421,13 @@ class _ImageWidget extends StatelessWidget {
         fit: BoxFit.cover,
         errorWidget: Container(
           color: Colors.grey.shade200,
-          child: Center(child: Icon(Icons.broken_image, size: 28 * sx, color: Colors.grey.shade400)),
+          child: Center(
+            child: Icon(
+              Icons.broken_image,
+              size: 28 * sx,
+              color: Colors.grey.shade400,
+            ),
+          ),
         ),
       ),
     );
@@ -384,11 +435,7 @@ class _ImageWidget extends StatelessWidget {
 }
 
 class _TextWidget extends StatelessWidget {
-  const _TextWidget({
-    required this.el,
-    required this.sx,
-    this.variableContext,
-  });
+  const _TextWidget({required this.el, required this.sx, this.variableContext});
   final CanvasElement el;
   final double sx;
   final StudioVariableContext? variableContext;
@@ -396,7 +443,11 @@ class _TextWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fontSize = (el.fontSize ?? 24) * sx;
-    final isBold = el.fontWeight == 'bold' || el.fontWeight == '700' || el.fontWeight == '800' || el.fontWeight == '900';
+    final isBold =
+        el.fontWeight == 'bold' ||
+        el.fontWeight == '700' ||
+        el.fontWeight == '800' ||
+        el.fontWeight == '900';
     final isSemiBold = el.fontWeight == '600' || el.fontWeight == '500';
     TextAlign textAlign;
     switch (el.align) {
@@ -421,7 +472,9 @@ class _TextWidget extends StatelessWidget {
 
     var style = TextStyle(
       fontSize: fontSize.clamp(4.0, 200.0),
-      fontWeight: isBold ? FontWeight.bold : (isSemiBold ? FontWeight.w600 : FontWeight.w400),
+      fontWeight: isBold
+          ? FontWeight.bold
+          : (isSemiBold ? FontWeight.w600 : FontWeight.w400),
       color: el.fill != null ? parseHexColor(el.fill!) : Colors.black,
       decoration: decoration,
       height: el.lineHeight ?? 1.2,

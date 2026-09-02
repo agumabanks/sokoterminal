@@ -150,7 +150,9 @@ class ContactsController extends StateNotifier<ContactsState> {
       int deviceCount = 0;
       if (status.isGranted) {
         try {
-          final allDevice = await FlutterContacts.getContacts(withProperties: true);
+          final allDevice = await FlutterContacts.getContacts(
+            withProperties: true,
+          );
           deviceCount = allDevice.length;
         } catch (_) {}
       }

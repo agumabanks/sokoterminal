@@ -106,7 +106,7 @@ class ServiceBookingsScreen extends ConsumerWidget {
                           _StatusChip(status: status),
                           const SizedBox(height: 6),
                           Text(
-                            'UGX ${price.toStringAsFixed(0)}',
+                            '${price.toStringAsFixed(0)} /=',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ],

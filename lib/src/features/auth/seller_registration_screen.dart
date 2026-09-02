@@ -348,7 +348,9 @@ class _SellerRegistrationScreenState
                   decoration: BoxDecoration(
                     color: DesignTokens.brandPrimary.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.5),
@@ -496,15 +498,17 @@ class _SellerRegistrationScreenState
           _currentStep++;
           if (_currentStep == 2) _mapReady = false;
         });
-          _pageController.animateToPage(
-          _currentStep,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeOutQuint,
-        ).then((_) {
-          if (mounted && _currentStep == 2) {
-            setState(() => _mapReady = true);
-          }
-        });
+        _pageController
+            .animateToPage(
+              _currentStep,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutQuint,
+            )
+            .then((_) {
+              if (mounted && _currentStep == 2) {
+                setState(() => _mapReady = true);
+              }
+            });
         _fadeController.forward();
         if (_currentStep == 2 && !_useGoogleMaps) {
           _maybeResolveAddressOnEntry();
@@ -628,7 +632,9 @@ class _SellerRegistrationScreenState
 
       if (_useGoogleMaps && _mapController != null) {
         try {
-          await _mapController!.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+          await _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(latLng, 16),
+          );
         } catch (e) {
           debugPrint('[Map] animateCamera failed: $e');
         }
@@ -1381,7 +1387,9 @@ class _SellerRegistrationScreenState
           width: isActive ? 24 : 8,
           height: 8,
           decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.2),
+            color: isActive
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(4),
           ),
         );
@@ -1609,10 +1617,10 @@ class _SellerRegistrationScreenState
         Positioned.fill(
           child: _useGoogleMaps
               ? (_mapReady
-                  ? _buildGoogleMap()
-                  : const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    ))
+                    ? _buildGoogleMap()
+                    : const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ))
               : _buildFallbackMap(),
         ),
         Positioned(
@@ -1625,7 +1633,10 @@ class _SellerRegistrationScreenState
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withValues(alpha: 0.85), Colors.transparent],
+                colors: [
+                  Colors.black.withValues(alpha: 0.85),
+                  Colors.transparent,
+                ],
               ),
             ),
           ),
@@ -2227,7 +2238,11 @@ class _SellerRegistrationScreenState
               ),
             ),
           ),
-          Container(width: 1, height: 32, color: Colors.white.withValues(alpha: 0.1)),
+          Container(
+            width: 1,
+            height: 32,
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
           Expanded(
             child: TextField(
               controller: _phoneController,
@@ -2242,7 +2257,9 @@ class _SellerRegistrationScreenState
               cursorColor: DesignTokens.info,
               decoration: InputDecoration(
                 hintText: '700 000 000',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 prefixText: '${_selectedCountry.code} ',
@@ -2586,7 +2603,9 @@ class _PostRegistrationDialogState extends State<_PostRegistrationDialog>
                     colors: [DesignTokens.canvas, Color(0xFFF5F6FA)],
                   ),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: _macBorderColor.withValues(alpha: 0.8)),
+                  border: Border.all(
+                    color: _macBorderColor.withValues(alpha: 0.8),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.12),
@@ -2883,7 +2902,9 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search Categories',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
                 prefixIcon: Icon(
                   Icons.search,
                   color: Colors.white.withValues(alpha: 0.3),
@@ -2901,8 +2922,10 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) =>
-                  Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
+              separatorBuilder: (_, __) => Divider(
+                color: Colors.white.withValues(alpha: 0.05),
+                height: 1,
+              ),
               itemBuilder: (context, index) {
                 final item = filtered[index];
                 final isSelected = widget.selected == item['name'];
@@ -3003,7 +3026,7 @@ class _RegistrationPlan {
     if (priceMonthly <= 0) {
       return 'Free';
     }
-    return 'UGX ${_compactMoney(priceMonthly)}/mo';
+    return '${_compactMoney(priceMonthly)} /=/mo';
   }
 
   String limitLabel(int value) {

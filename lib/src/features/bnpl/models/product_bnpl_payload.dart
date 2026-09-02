@@ -30,9 +30,9 @@ class ProductBnplPayload {
   final int? installmentCount;
 
   Map<String, dynamic> toJson() => {
-        'enabled': enabled ? 1 : 0,
-        if (minOrderAmount != null) 'min_order_amount': minOrderAmount,
-        if (maxOrderAmount != null) 'max_order_amount': maxOrderAmount,
-        if (installmentCount != null) 'installment_count': installmentCount,
-      };
+    'enabled': enabled ? 1 : 0,
+    if (minOrderAmount != null) 'min_order_amount': minOrderAmount,
+    if (maxOrderAmount != null) 'max_order_amount': maxOrderAmount,
+    if (installmentCount != null) 'installment_count': installmentCount,
+  };
 }

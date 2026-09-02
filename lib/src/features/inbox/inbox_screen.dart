@@ -570,9 +570,7 @@ void _showRefundDecision(
 ) {
   BottomSheetModal.show(
     context: context,
-    title: refund.orderCode.isEmpty
-        ? 'Refund #${refund.id}'
-        : refund.orderCode,
+    title: refund.orderCode.isEmpty ? 'Refund #${refund.id}' : refund.orderCode,
     subtitle: refund.dateLabel.isEmpty ? null : refund.dateLabel,
     child: Column(
       mainAxisSize: MainAxisSize.min,

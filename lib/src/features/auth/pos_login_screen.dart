@@ -140,8 +140,8 @@ class _PosLoginScreenState extends ConsumerState<PosLoginScreen> {
                   session.loading
                       ? 'Signing in…'
                       : _cooldownSeconds > 0
-                          ? 'Wait $_cooldownSeconds s'
-                          : 'Sign in',
+                      ? 'Wait $_cooldownSeconds s'
+                      : 'Sign in',
                 ),
               ),
               const SizedBox(height: DesignTokens.spaceSm),

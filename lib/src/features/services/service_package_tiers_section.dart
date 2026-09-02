@@ -20,25 +20,24 @@ class ServicePackageTiersSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Pricing packages',
-          style: DesignTokens.textSmallBold,
-        ),
+        Text('Pricing packages', style: DesignTokens.textSmallBold),
         const SizedBox(height: 4),
         Text(
           'Optional tiers like Upwork — buyers pick Basic, Standard, or Premium on your shop.',
           style: DesignTokens.textSmall,
         ),
         const SizedBox(height: 12),
-        ...tiers.map((tier) => _TierCard(
-              tier: tier,
-              onUpdate: (updated) {
-                final next = List<ServicePricingTier>.from(tiers);
-                final i = next.indexWhere((t) => t.tier == tier.tier);
-                if (i >= 0) next[i] = updated;
-                onChanged(next);
-              },
-            )),
+        ...tiers.map(
+          (tier) => _TierCard(
+            tier: tier,
+            onUpdate: (updated) {
+              final next = List<ServicePricingTier>.from(tiers);
+              final i = next.indexWhere((t) => t.tier == tier.tier);
+              if (i >= 0) next[i] = updated;
+              onChanged(next);
+            },
+          ),
+        ),
       ],
     );
   }
@@ -101,18 +100,18 @@ class _TierCardState extends State<_TierCard> {
   }
 
   String get _label => switch (widget.tier.tier) {
-        'basic' => 'Basic',
-        'standard' => 'Standard',
-        'premium' => 'Premium',
-        _ => widget.tier.tier,
-      };
+    'basic' => 'Basic',
+    'standard' => 'Standard',
+    'premium' => 'Premium',
+    _ => widget.tier.tier,
+  };
 
   Color get _accent => switch (widget.tier.tier) {
-        'basic' => DesignTokens.info,
-        'standard' => DesignTokens.brandAccent,
-        'premium' => DesignTokens.brandPrimary,
-        _ => DesignTokens.inkMuted,
-      };
+    'basic' => DesignTokens.info,
+    'standard' => DesignTokens.brandAccent,
+    'premium' => DesignTokens.brandPrimary,
+    _ => DesignTokens.inkMuted,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +148,7 @@ class _TierCardState extends State<_TierCard> {
                 flex: 2,
                 child: AppInput(
                   controller: _priceCtrl,
-                  label: 'Price (UGX)',
+                  label: 'Price (/=)',
                   hint: 'Optional',
                   keyboardType: TextInputType.number,
                   inputFormatters: const [CommaNumberFormatter()],

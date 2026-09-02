@@ -31,10 +31,7 @@ class _SwipeBackWrapperState extends State<SwipeBackWrapper>
     return Stack(
       children: [
         // Main content
-        Transform.translate(
-          offset: Offset(_dragDelta, 0),
-          child: widget.child,
-        ),
+        Transform.translate(offset: Offset(_dragDelta, 0), child: widget.child),
 
         // Left edge gesture detector
         Positioned(

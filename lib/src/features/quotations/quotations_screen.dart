@@ -267,8 +267,7 @@ class _QuotationCard extends ConsumerWidget {
     final dateFormat = DateFormat('MMM dd, yyyy');
     final createdAt = quotation.date.toLocal();
     final validUntil = quotation.validUntil?.toLocal();
-    final isExpired =
-        validUntil != null && DateTime.now().isAfter(validUntil);
+    final isExpired = validUntil != null && DateTime.now().isAfter(validUntil);
     final brandKit = ref.watch(brandKitProvider);
     final businessName = brandKit.businessName.trim().isNotEmpty
         ? brandKit.businessName.trim()
@@ -364,7 +363,9 @@ class _QuotationCard extends ConsumerWidget {
                   ),
                   _MetaChip(
                     icon: Icons.receipt_long_outlined,
-                    label: customer == null ? 'Walk-in quotation' : 'For ${customer.name}',
+                    label: customer == null
+                        ? 'Walk-in quotation'
+                        : 'For ${customer.name}',
                   ),
                 ],
               ),
@@ -385,7 +386,7 @@ class _QuotationCard extends ConsumerWidget {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: FilledButton.icon(
                       onPressed: () async {
                         try {
                           final kit = ref.read(brandKitProvider);
@@ -402,26 +403,21 @@ class _QuotationCard extends ConsumerWidget {
                         }
                       },
                       icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('Share PDF'),
+                      label: const Text('Share quote'),
                     ),
                   ),
                   const SizedBox(width: DesignTokens.spaceSm),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        await launchFullStudioWebForQuotation(
-                          context,
-                          ref,
-                          quotation,
-                          openPanel: 'business-branding',
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.design_services_rounded,
-                        color: DesignTokens.brandPrimary,
-                      ),
-                      label: const Text('Design in Studio'),
-                    ),
+                  IconButton.outlined(
+                    tooltip: 'Design in Studio',
+                    onPressed: () async {
+                      await launchFullStudioWebForQuotation(
+                        context,
+                        ref,
+                        quotation,
+                        openPanel: 'business-branding',
+                      );
+                    },
+                    icon: const Icon(Icons.design_services_rounded),
                   ),
                 ],
               ),

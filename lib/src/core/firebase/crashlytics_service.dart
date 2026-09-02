@@ -40,12 +40,7 @@ class CrashlyticsService {
     // Pass async errors to Crashlytics + bug logger.
     PlatformDispatcher.instance.onError = (error, stack) {
       crashlytics.recordError(error, stack, fatal: true);
-      unawaited(
-        BugLogger.instance.logCrash(
-          error: error,
-          stackTrace: stack,
-        ),
-      );
+      unawaited(BugLogger.instance.logCrash(error: error, stackTrace: stack));
       return true;
     };
   }

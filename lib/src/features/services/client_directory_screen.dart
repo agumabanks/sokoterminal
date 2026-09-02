@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,7 +7,9 @@ import '../../core/theme/design_tokens.dart';
 /// Client Directory — aggregates local customers + remote service clients.
 ///
 /// Design: search-as-you-type, one-tap call/WhatsApp, tap to see history.
-final _clientsProvider = FutureProvider.autoDispose<List<_ClientView>>((ref) async {
+final _clientsProvider = FutureProvider.autoDispose<List<_ClientView>>((
+  ref,
+) async {
   final db = ref.watch(appDatabaseProvider);
   final api = ref.watch(sellerApiProvider);
 
@@ -88,7 +89,8 @@ class ClientDirectoryScreen extends ConsumerStatefulWidget {
   const ClientDirectoryScreen({super.key});
 
   @override
-  ConsumerState<ClientDirectoryScreen> createState() => _ClientDirectoryScreenState();
+  ConsumerState<ClientDirectoryScreen> createState() =>
+      _ClientDirectoryScreenState();
 }
 
 class _ClientDirectoryScreenState extends ConsumerState<ClientDirectoryScreen> {
@@ -100,9 +102,7 @@ class _ClientDirectoryScreenState extends ConsumerState<ClientDirectoryScreen> {
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
-      appBar: AppBar(
-        title: const Text('Clients'),
-      ),
+      appBar: AppBar(title: const Text('Clients')),
       body: Column(
         children: [
           // Search
@@ -129,9 +129,13 @@ class _ClientDirectoryScreenState extends ConsumerState<ClientDirectoryScreen> {
               data: (all) {
                 final filtered = _search.isEmpty
                     ? all
-                    : all.where((c) =>
-                        c.name.toLowerCase().contains(_search) ||
-                        c.phone.contains(_search)).toList();
+                    : all
+                          .where(
+                            (c) =>
+                                c.name.toLowerCase().contains(_search) ||
+                                c.phone.contains(_search),
+                          )
+                          .toList();
 
                 if (filtered.isEmpty) {
                   return const Center(child: Text('No clients found'));
@@ -172,7 +176,9 @@ class _ClientCard extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.1),
+                backgroundColor: DesignTokens.brandPrimary.withValues(
+                  alpha: 0.1,
+                ),
                 child: Text(
                   client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
                   style: TextStyle(
@@ -199,7 +205,10 @@ class _ClientCard extends StatelessWidget {
               ),
               if (client.totalBookings > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: DesignTokens.brandAccent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -252,9 +261,13 @@ class _ClientCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: DesignTokens.brandPrimary.withValues(alpha: 0.1),
+                    backgroundColor: DesignTokens.brandPrimary.withValues(
+                      alpha: 0.1,
+                    ),
                     child: Text(
-                      client.name.isNotEmpty ? client.name[0].toUpperCase() : '?',
+                      client.name.isNotEmpty
+                          ? client.name[0].toUpperCase()
+                          : '?',
                       style: TextStyle(
                         fontSize: 24,
                         color: DesignTokens.brandPrimary,
@@ -277,10 +290,13 @@ class _ClientCard extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               if (client.totalBookings > 0) ...[
-                _StatRow(label: 'Total Bookings', value: client.totalBookings.toString()),
+                _StatRow(
+                  label: 'Total Bookings',
+                  value: client.totalBookings.toString(),
+                ),
                 _StatRow(
                   label: 'Total Spent',
-                  value: 'UGX ${client.totalSpent.toStringAsFixed(0)}',
+                  value: '${client.totalSpent.toStringAsFixed(0)} /=',
                 ),
                 const SizedBox(height: 16),
               ],
@@ -296,7 +312,9 @@ class _ClientCard extends StatelessWidget {
                   if (client.phone.isNotEmpty)
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {/* launch dialer */},
+                        onPressed: () {
+                          /* launch dialer */
+                        },
                         icon: const Icon(Icons.phone, size: 18),
                         label: const Text('Call'),
                       ),
@@ -323,7 +341,12 @@ class _StatRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: DesignTokens.textBody.copyWith(color: DesignTokens.textSecondary)),
+          Text(
+            label,
+            style: DesignTokens.textBody.copyWith(
+              color: DesignTokens.textSecondary,
+            ),
+          ),
           Text(value, style: DesignTokens.textBodyBold),
         ],
       ),

@@ -25,7 +25,9 @@ Future<Uint8List> applySokoWatermark(
     settings: settings,
     brandKit: brandKit,
   );
-  if (logoBytes.isEmpty) throw StateError('Cannot decode empty watermark bytes');
+  if (logoBytes.isEmpty) {
+    throw StateError('Cannot decode empty watermark bytes');
+  }
 
   final logoCodec = await ui.instantiateImageCodec(logoBytes);
   final logoFrame = await logoCodec.getNextFrame();
@@ -39,25 +41,34 @@ Future<Uint8List> applySokoWatermark(
 
   final dst = switch (settings.position) {
     WatermarkPosition.topLeft => ui.Rect.fromLTWH(margin, margin, logoW, logoH),
-    WatermarkPosition.topRight =>
-      ui.Rect.fromLTWH(canvasW - logoW - margin, margin, logoW, logoH),
-    WatermarkPosition.bottomLeft =>
-      ui.Rect.fromLTWH(margin, canvasH - logoH - margin, logoW, logoH),
+    WatermarkPosition.topRight => ui.Rect.fromLTWH(
+      canvasW - logoW - margin,
+      margin,
+      logoW,
+      logoH,
+    ),
+    WatermarkPosition.bottomLeft => ui.Rect.fromLTWH(
+      margin,
+      canvasH - logoH - margin,
+      logoW,
+      logoH,
+    ),
     WatermarkPosition.bottomRight => ui.Rect.fromLTWH(
-        canvasW - logoW - margin,
-        canvasH - logoH - margin,
-        logoW,
-        logoH,
-      ),
+      canvasW - logoW - margin,
+      canvasH - logoH - margin,
+      logoW,
+      logoH,
+    ),
     WatermarkPosition.center => ui.Rect.fromLTWH(
-        (canvasW - logoW) / 2,
-        (canvasH - logoH) / 2,
-        logoW,
-        logoH,
-      ),
+      (canvasW - logoW) / 2,
+      (canvasH - logoH) / 2,
+      logoW,
+      logoH,
+    ),
   };
 
-  final blendMode = watermarkBlendMode(settings.blendMode) ?? ui.BlendMode.modulate;
+  final blendMode =
+      watermarkBlendMode(settings.blendMode) ?? ui.BlendMode.modulate;
 
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder);
@@ -75,7 +86,12 @@ Future<Uint8List> applySokoWatermark(
 
   canvas.drawImageRect(
     logoImage,
-    ui.Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble()),
+    ui.Rect.fromLTWH(
+      0,
+      0,
+      logoImage.width.toDouble(),
+      logoImage.height.toDouble(),
+    ),
     dst,
     watermarkPaint,
   );
@@ -125,7 +141,9 @@ Future<Uint8List> _loadWatermarkBytes({
     return file.readAsBytes();
   } catch (_) {
     // Always fall back to the bundled Soko logo.
-    return (await rootBundle.load('assets/images/app_logo.png')).buffer.asUint8List();
+    return (await rootBundle.load(
+      'assets/images/app_logo.png',
+    )).buffer.asUint8List();
   }
 }
 

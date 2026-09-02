@@ -177,7 +177,11 @@ class PhotoToolsPanel extends StatelessWidget {
                 padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
                 child: Row(
                   children: [
-                    Icon(Icons.touch_app_rounded, color: Colors.white38, size: 16),
+                    Icon(
+                      Icons.touch_app_rounded,
+                      color: Colors.white38,
+                      size: 16,
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -279,7 +283,9 @@ class _ToolChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: enabled ? color.withValues(alpha: 0.35) : Colors.white12),
+            border: Border.all(
+              color: enabled ? color.withValues(alpha: 0.35) : Colors.white12,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -288,7 +294,10 @@ class _ToolChip extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 label,
-                style: TextStyle(color: enabled ? Colors.white70 : Colors.white38, fontSize: 10),
+                style: TextStyle(
+                  color: enabled ? Colors.white70 : Colors.white38,
+                  fontSize: 10,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

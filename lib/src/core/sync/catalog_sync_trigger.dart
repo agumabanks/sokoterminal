@@ -18,10 +18,7 @@ Future<CatalogSyncOutcome> triggerCatalogSync(
 }
 
 /// Fire-and-forget variant for save handlers.
-void triggerCatalogSyncUnawaited(
-  WidgetRef ref, {
-  bool notify = false,
-}) {
+void triggerCatalogSyncUnawaited(WidgetRef ref, {bool notify = false}) {
   unawaited(triggerCatalogSync(ref, notify: notify));
 }
 

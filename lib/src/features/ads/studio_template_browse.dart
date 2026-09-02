@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/util/haptics.dart';
-import '../checkout/checkout_screen.dart' show itemsStreamProvider, servicesStreamProvider;
+import '../checkout/checkout_screen.dart'
+    show itemsStreamProvider, servicesStreamProvider;
 import 'ad_templates.dart';
 import 'business_hub_templates.dart';
 import 'seasonal_campaign_generator.dart';
@@ -28,7 +29,8 @@ class _TemplateBrowseSheet extends ConsumerStatefulWidget {
   final Future<void> Function(AdTemplate) onPick;
 
   @override
-  ConsumerState<_TemplateBrowseSheet> createState() => _TemplateBrowseSheetState();
+  ConsumerState<_TemplateBrowseSheet> createState() =>
+      _TemplateBrowseSheetState();
 }
 
 class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
@@ -41,7 +43,8 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
       if (t.category == 'blank' || t.category == 'photo') return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
-        final match = t.name.toLowerCase().contains(q) ||
+        final match =
+            t.name.toLowerCase().contains(q) ||
             t.category.toLowerCase().contains(q) ||
             t.tags.any((tag) => tag.toLowerCase().contains(q)) ||
             t.industry.toLowerCase().contains(q);
@@ -71,7 +74,9 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
   List<AdTemplate> _featuredTemplates(WidgetRef ref) {
     final items = ref.watch(itemsStreamProvider).valueOrNull ?? [];
     final services = ref.watch(servicesStreamProvider).valueOrNull ?? [];
-    final season = (currentSeasons().isNotEmpty ? currentSeasons().first.name : '').toLowerCase();
+    final season =
+        (currentSeasons().isNotEmpty ? currentSeasons().first.name : '')
+            .toLowerCase();
     final hasItems = items.isNotEmpty;
     final hasServices = services.isNotEmpty;
 
@@ -83,8 +88,12 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
       if (t.complexity == 'premium') s += 20;
       if (t.complexity == 'pro') s += 10;
       // Prefer relevant categories
-      if (hasItems && (t.category == 'product' || t.category == 'promo')) s += 15;
-      if (hasServices && (t.category == 'service' || t.category == 'booking')) s += 15;
+      if (hasItems && (t.category == 'product' || t.category == 'promo')) {
+        s += 15;
+      }
+      if (hasServices && (t.category == 'service' || t.category == 'booking')) {
+        s += 15;
+      }
       if (t.category == 'social' || t.category == 'announcement') s += 5;
       // Prefer square/story sizes (most common for social)
       if (t.canvasWidth == 1080 && t.canvasHeight == 1080) s += 5;
@@ -101,15 +110,16 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
     return pool.take(12).toList();
   }
 
-  static final _sizeOptions = <({String label, String key, double w, double h})>[
-    (label: 'Square', key: 'sq', w: 1080, h: 1080),
-    (label: 'Story', key: 'story', w: 1080, h: 1920),
-    (label: 'Portrait', key: 'portrait', w: 1080, h: 1350),
-    (label: 'Facebook', key: 'fb', w: 1200, h: 630),
-    (label: 'Banner', key: 'banner', w: 1920, h: 1080),
-    (label: 'A5', key: 'a5', w: 1748, h: 2480),
-    (label: 'A6', key: 'a6', w: 1240, h: 1748),
-  ];
+  static final _sizeOptions =
+      <({String label, String key, double w, double h})>[
+        (label: 'Square', key: 'sq', w: 1080, h: 1080),
+        (label: 'Story', key: 'story', w: 1080, h: 1920),
+        (label: 'Portrait', key: 'portrait', w: 1080, h: 1350),
+        (label: 'Facebook', key: 'fb', w: 1200, h: 630),
+        (label: 'Banner', key: 'banner', w: 1920, h: 1080),
+        (label: 'A5', key: 'a5', w: 1748, h: 2480),
+        (label: 'A6', key: 'a6', w: 1240, h: 1748),
+      ];
 
   String? _sizeNameFor(double w, double h) {
     for (final s in _sizeOptions) {
@@ -143,7 +153,8 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
     final theme = ref.watch(studioThemeProvider);
     final grouped = _grouped;
     final categories = grouped.keys.toList();
-    final active = _category ?? (categories.isNotEmpty ? categories.first : null);
+    final active =
+        _category ?? (categories.isNotEmpty ? categories.first : null);
     final templates = active != null ? grouped[active] ?? [] : <AdTemplate>[];
     final bottom = MediaQuery.of(context).padding.bottom;
 
@@ -211,10 +222,18 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
                   decoration: InputDecoration(
                     hintText: 'Search templates...',
                     hintStyle: TextStyle(color: theme.textMuted),
-                    prefixIcon: Icon(Icons.search_rounded, color: theme.textMuted, size: 20),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: theme.textMuted,
+                      size: 20,
+                    ),
                     suffixIcon: _query.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear_rounded, color: theme.textMuted, size: 18),
+                            icon: Icon(
+                              Icons.clear_rounded,
+                              color: theme.textMuted,
+                              size: 18,
+                            ),
                             onPressed: () => setState(() => _query = ''),
                           )
                         : null,
@@ -249,7 +268,10 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
                     if (i == 0) {
                       final sel = _sizeFilter == null;
                       return ChoiceChip(
-                        label: Text('All Sizes', style: TextStyle(fontSize: 11)),
+                        label: Text(
+                          'All Sizes',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         selected: sel,
                         onSelected: (_) => setState(() => _sizeFilter = null),
                         selectedColor: theme.accent,
@@ -326,11 +348,18 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.search_off_rounded, color: theme.textMuted, size: 40),
+                            Icon(
+                              Icons.search_off_rounded,
+                              color: theme.textMuted,
+                              size: 40,
+                            ),
                             const SizedBox(height: 12),
                             Text(
                               'No templates match your search',
-                              style: TextStyle(color: theme.textSecondary, fontSize: 14),
+                              style: TextStyle(
+                                color: theme.textSecondary,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             if (_query.isNotEmpty || _sizeFilter != null)
@@ -339,10 +368,17 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
                                   _query = '';
                                   _sizeFilter = null;
                                 }),
-                                icon: Icon(Icons.clear_all_rounded, color: theme.accent, size: 16),
+                                icon: Icon(
+                                  Icons.clear_all_rounded,
+                                  color: theme.accent,
+                                  size: 16,
+                                ),
                                 label: Text(
                                   'Clear filters',
-                                  style: TextStyle(color: theme.accent, fontSize: 13),
+                                  style: TextStyle(
+                                    color: theme.accent,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
                           ],
@@ -351,12 +387,13 @@ class _TemplateBrowseSheetState extends ConsumerState<_TemplateBrowseSheet> {
                     : GridView.builder(
                         controller: scrollController,
                         padding: EdgeInsets.fromLTRB(16, 0, 16, bottom + 16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.78,
-                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 0.78,
+                            ),
                         itemCount: templates.length,
                         itemBuilder: (_, i) {
                           final tpl = templates[i];
@@ -411,7 +448,10 @@ class _TemplateCard extends ConsumerWidget {
                   top: 6,
                   left: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.surface.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(4),
@@ -420,13 +460,16 @@ class _TemplateCard extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _TemplateBrowseSheetState._categoryIcon(template.category),
+                          _TemplateBrowseSheetState._categoryIcon(
+                            template.category,
+                          ),
                           color: theme.textSecondary,
                           size: 8,
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          template.category[0].toUpperCase() + template.category.substring(1),
+                          template.category[0].toUpperCase() +
+                              template.category.substring(1),
                           style: TextStyle(
                             fontSize: 7,
                             color: theme.textSecondary,
@@ -443,7 +486,10 @@ class _TemplateCard extends ConsumerWidget {
                     top: 4,
                     right: 4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.surface.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(4),
@@ -464,7 +510,10 @@ class _TemplateCard extends ConsumerWidget {
                   bottom: 4,
                   right: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.surface.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(4),
@@ -497,10 +546,7 @@ class _TemplateCard extends ConsumerWidget {
             '${template.canvasWidth.toInt()} × ${template.canvasHeight.toInt()}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: theme.textMuted,
-              fontSize: 9,
-            ),
+            style: TextStyle(color: theme.textMuted, fontSize: 9),
           ),
         ],
       ),
@@ -576,14 +622,22 @@ class _FeaturedTemplatesRow extends StatelessWidget {
                                 top: 4,
                                 right: 4,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFfbbf24).withValues(alpha: 0.9),
+                                    color: const Color(
+                                      0xFFfbbf24,
+                                    ).withValues(alpha: 0.9),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: const Text(
                                     '★',
-                                    style: TextStyle(fontSize: 8, color: Colors.black),
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               ),

@@ -64,6 +64,7 @@ class AdEditorScreen extends ConsumerStatefulWidget {
   final ValueChanged<AdTemplate> onSave;
   final Item? product;
   final String? productLink;
+
   /// `text` | `image` | `background` | `elements` | `fonts` | `effects` | `layers`
   final String? initialPanel;
 
@@ -109,7 +110,10 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     final matrix = _transformCtrl.value;
     // Canvas logical → display pixel
     final tl = Offset(el.x * _displayScale, el.y * _displayScale);
-    final br = Offset((el.x + el.width) * _displayScale, (el.y + el.height) * _displayScale);
+    final br = Offset(
+      (el.x + el.width) * _displayScale,
+      (el.y + el.height) * _displayScale,
+    );
     // Apply InteractiveViewer transform (pan+zoom)
     final stl = MatrixUtils.transformPoint(matrix, tl + _canvasOrigin);
     final sbr = MatrixUtils.transformPoint(matrix, br + _canvasOrigin);
@@ -129,7 +133,14 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     final sel = state.selected;
     final screenW = MediaQuery.of(context).size.width;
     final screenH = MediaQuery.of(context).size.height;
-    _displayScale = (screenW) / state.template.canvasWidth;
+    final canvasViewportHeight = math.max(
+      240.0,
+      screenH - MediaQuery.paddingOf(context).vertical - 210,
+    );
+    _displayScale = math.min(
+      (screenW - 24) / state.template.canvasWidth,
+      canvasViewportHeight / state.template.canvasHeight,
+    );
     final canvasW = state.template.canvasWidth * _displayScale;
     final canvasH = state.template.canvasHeight * _displayScale;
     final hasSeenEditorHint = ref.watch(hasSeenStudioEditorHintProvider);
@@ -146,221 +157,309 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
               children: [
                 // Top bar
                 TopBar(
-              template: state.template,
-              activeSize: state.activeSize,
-              canUndo: state.undoStack.length > 1,
-              canRedo: state.redoStack.isNotEmpty,
-              showGrid: state.showGrid,
-              snapEnabled: state.snapEnabled,
-              isBusy: _busy,
-              onUndo: notifier.undo,
-              onRedo: notifier.redo,
-              onToggleGrid: notifier.toggleGrid,
-              onToggleSnap: notifier.toggleSnap,
-              onSave: () => _saveAndClose(state),
-              onShare: () => _share(state, kit),
-              onSaveAs: () => _saveAs(state),
-              onResize: notifier.resizeToSize,
-            ),
+                  template: state.template,
+                  activeSize: state.activeSize,
+                  canUndo: state.undoStack.length > 1,
+                  canRedo: state.redoStack.isNotEmpty,
+                  showGrid: state.showGrid,
+                  snapEnabled: state.snapEnabled,
+                  isBusy: _busy,
+                  onUndo: notifier.undo,
+                  onRedo: notifier.redo,
+                  onToggleGrid: notifier.toggleGrid,
+                  onToggleSnap: notifier.toggleSnap,
+                  onSave: () => _saveAndClose(state),
+                  onShare: () => _share(state, kit),
+                  onSaveAs: () => _saveAs(state),
+                  onResize: notifier.resizeToSize,
+                ),
 
-            // Canvas area
-            Expanded(
-              child: Stack(
-                children: [
-                  // Pinch-zoom-pan canvas
-                  LayoutBuilder(builder: (ctx, constraints) {
-                    // Store canvas origin for coordinate transform
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      final rb = ctx.findRenderObject() as RenderBox?;
-                      if (rb != null) {
-                        _canvasOrigin = rb.localToGlobal(Offset.zero);
-                      }
-                    });
+                // Canvas area
+                Expanded(
+                  child: Stack(
+                    children: [
+                      // Pinch-zoom-pan canvas
+                      LayoutBuilder(
+                        builder: (ctx, constraints) {
+                          // Store canvas origin for coordinate transform
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            final rb = ctx.findRenderObject() as RenderBox?;
+                            if (rb != null) {
+                              _canvasOrigin = rb.localToGlobal(Offset.zero);
+                            }
+                          });
 
-                    return InteractiveViewer(
-                      transformationController: _transformCtrl,
-                      minScale: 0.3,
-                      maxScale: 8.0,
-                      constrained: false,
-                      child: Stack(
-                        children: [
-                          RepaintBoundary(
-                            key: _canvasKey,
-                            child: SizedBox(
-                              width: canvasW,
-                              height: canvasH,
-                              child: EditorCanvas(
-                                state: state,
-                                scale: _displayScale,
-                                isExporting: _isExporting,
-                                variableContext: varCtx,
-                                onElementTap: (id) {
-                                  if (state.template.elements
-                                      .firstWhere((e) => e.id == id).isLocked) {
-                                    return;
-                                  }
-                                  notifier.select(id);
-                                  setState(() => _activePanel = null);
-                                },
-                                onCanvasTap: () {
-                                  notifier.select(null);
-                                  setState(() => _activePanel = null);
-                                },
-                                onElementMoved: (id, dx, dy) {
-                                  final el = state.template.elements
-                                      .firstWhere((e) => e.id == id);
-                                  if (el.isLocked) return;
-                                  var nx = el.x + dx / _displayScale;
-                                  var ny = el.y + dy / _displayScale;
-                                  // Snap to canvas edges and center
-                                  if (state.snapEnabled) {
-                                    final cw = state.template.canvasWidth;
-                                    final ch = state.template.canvasHeight;
-                                    const thresh = 12.0;
-                                    if ((nx).abs() < thresh) nx = 0;
-                                    if ((nx + el.width - cw).abs() < thresh) nx = cw - el.width;
-                                    if ((nx + el.width / 2 - cw / 2).abs() < thresh) nx = cw / 2 - el.width / 2;
-                                    if ((ny).abs() < thresh) ny = 0;
-                                    if ((ny + el.height - ch).abs() < thresh) ny = ch - el.height;
-                                    if ((ny + el.height / 2 - ch / 2).abs() < thresh) ny = ch / 2 - el.height / 2;
-                                  }
-                                  notifier.updateElement(el.copyWith(x: nx, y: ny));
-                                },
-                                onElementResized: (id, dw, dh, anchor) {
-                                  final el = state.template.elements
-                                      .firstWhere((e) => e.id == id);
-                                  if (el.isLocked) return;
-                                  _applyResize(notifier, el, dw, dh, anchor);
-                                },
-                                onElementRotated: (id, angle) {
-                                  final el = state.template.elements
-                                      .firstWhere((e) => e.id == id);
-                                  notifier.updateElement(el.copyWith(rotation: angle));
-                                },
-                              ),
-                            ),
-                          ),
-                          if (showWatermarkPreview && watermarkSettings.enabled)
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                child: Padding(
-                                  padding: EdgeInsets.all(canvasW * 0.04),
-                                  child: Align(
-                                    alignment: switch (watermarkSettings.position) {
-                                      WatermarkPosition.topLeft => Alignment.topLeft,
-                                      WatermarkPosition.topRight => Alignment.topRight,
-                                      WatermarkPosition.bottomLeft => Alignment.bottomLeft,
-                                      WatermarkPosition.bottomRight => Alignment.bottomRight,
-                                      WatermarkPosition.center => Alignment.center,
-                                    },
-                                    child: SizedBox(
-                                      width: canvasW * watermarkSettings.scale,
-                                      height: canvasW * watermarkSettings.scale,
-                                      child: Opacity(
-                                        opacity: watermarkSettings.opacity,
-                                        child: _buildWatermarkPreviewImage(
-                                          watermarkAssetPath(
-                                            settings: watermarkSettings,
-                                            brandKit: kit,
+                          return Container(
+                            color: const Color(0xFF15171B),
+                            padding: const EdgeInsets.all(12),
+                            child: InteractiveViewer(
+                              transformationController: _transformCtrl,
+                              minScale: 0.45,
+                              maxScale: 8.0,
+                              boundaryMargin: const EdgeInsets.all(80),
+                              child: Center(
+                                child: SizedBox(
+                                  width: canvasW,
+                                  height: canvasH,
+                                  child: Stack(
+                                    children: [
+                                      RepaintBoundary(
+                                        key: _canvasKey,
+                                        child: SizedBox(
+                                          width: canvasW,
+                                          height: canvasH,
+                                          child: EditorCanvas(
+                                            state: state,
+                                            scale: _displayScale,
+                                            isExporting: _isExporting,
+                                            variableContext: varCtx,
+                                            onElementTap: (id) {
+                                              if (state.template.elements
+                                                  .firstWhere((e) => e.id == id)
+                                                  .isLocked) {
+                                                return;
+                                              }
+                                              notifier.select(id);
+                                              setState(
+                                                () => _activePanel = null,
+                                              );
+                                            },
+                                            onCanvasTap: () {
+                                              notifier.select(null);
+                                              setState(
+                                                () => _activePanel = null,
+                                              );
+                                            },
+                                            onElementMoved: (id, dx, dy) {
+                                              final el = state.template.elements
+                                                  .firstWhere(
+                                                    (e) => e.id == id,
+                                                  );
+                                              if (el.isLocked) return;
+                                              var nx =
+                                                  el.x + dx / _displayScale;
+                                              var ny =
+                                                  el.y + dy / _displayScale;
+                                              // Snap to canvas edges and center
+                                              if (state.snapEnabled) {
+                                                final cw =
+                                                    state.template.canvasWidth;
+                                                final ch =
+                                                    state.template.canvasHeight;
+                                                const thresh = 12.0;
+                                                if ((nx).abs() < thresh) nx = 0;
+                                                if ((nx + el.width - cw).abs() <
+                                                    thresh) {
+                                                  nx = cw - el.width;
+                                                }
+                                                if ((nx + el.width / 2 - cw / 2)
+                                                        .abs() <
+                                                    thresh) {
+                                                  nx = cw / 2 - el.width / 2;
+                                                }
+                                                if ((ny).abs() < thresh) ny = 0;
+                                                if ((ny + el.height - ch)
+                                                        .abs() <
+                                                    thresh) {
+                                                  ny = ch - el.height;
+                                                }
+                                                if ((ny +
+                                                            el.height / 2 -
+                                                            ch / 2)
+                                                        .abs() <
+                                                    thresh) {
+                                                  ny = ch / 2 - el.height / 2;
+                                                }
+                                              }
+                                              notifier.updateElement(
+                                                el.copyWith(x: nx, y: ny),
+                                              );
+                                            },
+                                            onElementResized:
+                                                (id, dw, dh, anchor) {
+                                                  final el = state
+                                                      .template
+                                                      .elements
+                                                      .firstWhere(
+                                                        (e) => e.id == id,
+                                                      );
+                                                  if (el.isLocked) return;
+                                                  _applyResize(
+                                                    notifier,
+                                                    el,
+                                                    dw,
+                                                    dh,
+                                                    anchor,
+                                                  );
+                                                },
+                                            onElementRotated: (id, angle) {
+                                              final el = state.template.elements
+                                                  .firstWhere(
+                                                    (e) => e.id == id,
+                                                  );
+                                              notifier.updateElement(
+                                                el.copyWith(rotation: angle),
+                                              );
+                                            },
                                           ),
-                                          canvasW * watermarkSettings.scale,
                                         ),
                                       ),
-                                    ),
+                                      if (showWatermarkPreview &&
+                                          watermarkSettings.enabled)
+                                        Positioned.fill(
+                                          child: IgnorePointer(
+                                            child: Padding(
+                                              padding: EdgeInsets.all(
+                                                canvasW * 0.04,
+                                              ),
+                                              child: Align(
+                                                alignment:
+                                                    switch (watermarkSettings
+                                                        .position) {
+                                                      WatermarkPosition
+                                                          .topLeft =>
+                                                        Alignment.topLeft,
+                                                      WatermarkPosition
+                                                          .topRight =>
+                                                        Alignment.topRight,
+                                                      WatermarkPosition
+                                                          .bottomLeft =>
+                                                        Alignment.bottomLeft,
+                                                      WatermarkPosition
+                                                          .bottomRight =>
+                                                        Alignment.bottomRight,
+                                                      WatermarkPosition
+                                                          .center =>
+                                                        Alignment.center,
+                                                    },
+                                                child: SizedBox(
+                                                  width:
+                                                      canvasW *
+                                                      watermarkSettings.scale,
+                                                  height:
+                                                      canvasW *
+                                                      watermarkSettings.scale,
+                                                  child: Opacity(
+                                                    opacity: watermarkSettings
+                                                        .opacity,
+                                                    child:
+                                                        _buildWatermarkPreviewImage(
+                                                          watermarkAssetPath(
+                                                            settings:
+                                                                watermarkSettings,
+                                                            brandKit: kit,
+                                                          ),
+                                                          canvasW *
+                                                              watermarkSettings
+                                                                  .scale,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                        ],
+                          );
+                        },
                       ),
+
+                      // Floating element toolbar (above selected element)
+                      if (sel != null && sel.isVisible)
+                        AnimatedBuilder(
+                          animation: _transformCtrl,
+                          builder: (_, __) {
+                            final rect = _elementToScreen(sel);
+                            const tbH = 40.0;
+                            final top = (rect.top - tbH - 6).clamp(
+                              MediaQuery.of(context).padding.top + 44.0,
+                              screenH - tbH,
+                            );
+                            return Positioned(
+                              left: rect.left.clamp(0, screenW - 240),
+                              top: top,
+                              child: FloatingToolbar(
+                                element: sel,
+                                onDelete: notifier.deleteSelected,
+                                onDuplicate: notifier.duplicateSelected,
+                                onBringForward: notifier.bringForward,
+                                onSendBackward: notifier.sendBackward,
+                                onLock: notifier.toggleLock,
+                                onEditText: sel.type == 'text'
+                                    ? () =>
+                                          setState(() => _activePanel = 'text')
+                                    : null,
+                                onEditFont: sel.type == 'text'
+                                    ? () =>
+                                          setState(() => _activePanel = 'fonts')
+                                    : null,
+                                onEditImage: sel.type == 'image'
+                                    ? () =>
+                                          setState(() => _activePanel = 'image')
+                                    : null,
+                              ),
+                            );
+                          },
+                        ),
+
+                      // Alignment toolbar (shows when element selected)
+                      if (sel != null && sel.isVisible)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: AlignmentBar(onAlign: notifier.alignSelected),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Quick bottom tool bar
+                BottomToolbar(
+                  activePanel: _activePanel,
+                  hasSelection: sel != null,
+                  onTool: (panel) {
+                    setState(
+                      () => _activePanel = _activePanel == panel ? null : panel,
                     );
-                  }),
+                    if (panel != 'text' &&
+                        panel != 'fonts' &&
+                        panel != 'image') {
+                      notifier.select(null);
+                    }
+                  },
+                ),
 
-                  // Floating element toolbar (above selected element)
-                  if (sel != null && sel.isVisible)
-                    AnimatedBuilder(
-                      animation: _transformCtrl,
-                      builder: (_, __) {
-                        final rect = _elementToScreen(sel);
-                        const tbH = 40.0;
-                        final top = (rect.top - tbH - 6).clamp(
-                            MediaQuery.of(context).padding.top + 44.0,
-                            screenH - tbH);
-                        return Positioned(
-                          left: rect.left.clamp(0, screenW - 240),
-                          top: top,
-                          child: FloatingToolbar(
-                            element: sel,
-                            onDelete: notifier.deleteSelected,
-                            onDuplicate: notifier.duplicateSelected,
-                            onBringForward: notifier.bringForward,
-                            onSendBackward: notifier.sendBackward,
-                            onLock: notifier.toggleLock,
-                            onEditText: sel.type == 'text'
-                                ? () => setState(() => _activePanel = 'text')
-                                : null,
-                            onEditFont: sel.type == 'text'
-                                ? () => setState(() => _activePanel = 'fonts')
-                                : null,
-                            onEditImage: sel.type == 'image'
-                                ? () => setState(() => _activePanel = 'image')
-                                : null,
-                          ),
-                        );
-                      },
-                    ),
-
-                  // Alignment toolbar (shows when element selected)
-                  if (sel != null && sel.isVisible)
-                    Positioned(
-                      bottom: 0,
-                      left: 0, right: 0,
-                      child: AlignmentBar(
-                        onAlign: notifier.alignSelected,
-                      ),
-                    ),
-                ],
-              ),
+                // Panel slides up from bottom
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  child: _buildPanel(state, notifier, kit, varCtx),
+                ),
+              ],
             ),
-
-            // Quick bottom tool bar
-            BottomToolbar(
-              activePanel: _activePanel,
-              hasSelection: sel != null,
-              onTool: (panel) {
-                setState(() => _activePanel = _activePanel == panel ? null : panel);
-                if (panel != 'text' && panel != 'fonts' && panel != 'image') {
-                  notifier.select(null);
-                }
-              },
-            ),
-
-            // Panel slides up from bottom
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              child: _buildPanel(state, notifier, kit, varCtx),
-            ),
-          ],
-        ),
+          ),
+          AnimatedOpacity(
+            opacity: showHint ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            onEnd: () {
+              if (_hintDismissed) {
+                ref.read(hasSeenStudioEditorHintProvider.notifier).markSeen();
+              }
+            },
+            child: showHint
+                ? _EditorFirstRunHint(
+                    onDismiss: () => setState(() => _hintDismissed = true),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
       ),
-      AnimatedOpacity(
-        opacity: showHint ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 250),
-        onEnd: () {
-          if (_hintDismissed) {
-            ref.read(hasSeenStudioEditorHintProvider.notifier).markSeen();
-          }
-        },
-        child: showHint
-            ? _EditorFirstRunHint(
-                onDismiss: () => setState(() => _hintDismissed = true),
-              )
-            : const SizedBox.shrink(),
-      ),
-    ],
-  ),
-);
+    );
   }
 
   Widget _buildPanel(
@@ -386,18 +485,21 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
           onAddText: () {
             final tpl = state.template;
             final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
-            notifier.addElement(CanvasElement(
-              id: id, type: 'text',
-              text: 'Your Text',
-              x: tpl.canvasWidth * 0.1,
-              y: tpl.canvasHeight * 0.4,
-              width: tpl.canvasWidth * 0.8,
-              fontSize: 52,
-              fontFamily: kit.headingFont,
-              fontWeight: 'bold',
-              fill: '#ffffff',
-              align: 'center',
-            ));
+            notifier.addElement(
+              CanvasElement(
+                id: id,
+                type: 'text',
+                text: 'Your Text',
+                x: tpl.canvasWidth * 0.1,
+                y: tpl.canvasHeight * 0.4,
+                width: tpl.canvasWidth * 0.8,
+                fontSize: 52,
+                fontFamily: kit.headingFont,
+                fontWeight: 'bold',
+                fill: '#ffffff',
+                align: 'center',
+              ),
+            );
           },
         );
       case 'photo':
@@ -412,8 +514,12 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
           onRotateRight: sel?.src?.isNotEmpty == true
               ? () => _rotateSelected(notifier, sel!, counterClockwise: false)
               : null,
-          onFlipH: sel != null ? () => notifier.updateElement(sel.copyWith(flipX: !sel.flipX)) : null,
-          onFlipV: sel != null ? () => notifier.updateElement(sel.copyWith(flipY: !sel.flipY)) : null,
+          onFlipH: sel != null
+              ? () => notifier.updateElement(sel.copyWith(flipX: !sel.flipX))
+              : null,
+          onFlipV: sel != null
+              ? () => notifier.updateElement(sel.copyWith(flipY: !sel.flipY))
+              : null,
           onRemoveBg: sel?.src?.isNotEmpty == true
               ? () => _removeBg(notifier, sel!)
               : null,
@@ -442,7 +548,8 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
             accent: kit.accentColor,
           ),
           onSolid: notifier.setBackground,
-          onGradient: (preset) => notifier.setBackground('gradient:${preset.id}'),
+          onGradient: (preset) =>
+              notifier.setBackground('gradient:${preset.id}'),
         );
       case 'elements':
         return CreativeLibraryPanel(
@@ -452,12 +559,14 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
           product: widget.product,
           onInsert: (el) {
             final id = '${el.id}_${DateTime.now().millisecondsSinceEpoch}';
-            notifier.addElement(stampCanvasElement(
-              el,
-              newId: id,
-              canvasWidth: state.template.canvasWidth,
-              canvasHeight: state.template.canvasHeight,
-            ));
+            notifier.addElement(
+              stampCanvasElement(
+                el,
+                newId: id,
+                canvasWidth: state.template.canvasWidth,
+                canvasHeight: state.template.canvasHeight,
+              ),
+            );
             setState(() => _activePanel = null);
           },
           onInsertGroup: (elements, background) {
@@ -471,7 +580,9 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
           selectedFont: sel?.fontFamily ?? kit.font,
           element: sel,
           onSelect: (font) {
-            if (sel != null) notifier.updateElement(sel.copyWith(fontFamily: font));
+            if (sel != null) {
+              notifier.updateElement(sel.copyWith(fontFamily: font));
+            }
           },
         );
       case 'effects':
@@ -504,30 +615,39 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     }
   }
 
-  void _applyResize(EditorNotifier notifier, CanvasElement el,
-      double dw, double dh, ResizeAnchor anchor) {
+  void _applyResize(
+    EditorNotifier notifier,
+    CanvasElement el,
+    double dw,
+    double dh,
+    ResizeAnchor anchor,
+  ) {
     final ds = _displayScale;
     double x = el.x, y = el.y;
     double w = el.width + dw / ds;
     double h = el.height + dh / ds;
 
     // Adjust position for left/top anchors
-    if (anchor == ResizeAnchor.topLeft || anchor == ResizeAnchor.left ||
+    if (anchor == ResizeAnchor.topLeft ||
+        anchor == ResizeAnchor.left ||
         anchor == ResizeAnchor.bottomLeft) {
       x = el.x - dw / ds;
       w = el.width + dw / ds;
     }
-    if (anchor == ResizeAnchor.topLeft || anchor == ResizeAnchor.top ||
+    if (anchor == ResizeAnchor.topLeft ||
+        anchor == ResizeAnchor.top ||
         anchor == ResizeAnchor.topRight) {
       y = el.y - dh / ds;
       h = el.height + dh / ds;
     }
-    notifier.updateElement(el.copyWith(
-      x: math.max(0, x),
-      y: math.max(0, y),
-      width: math.max(20, w),
-      height: math.max(20, h),
-    ));
+    notifier.updateElement(
+      el.copyWith(
+        x: math.max(0, x),
+        y: math.max(0, y),
+        width: math.max(20, w),
+        height: math.max(20, h),
+      ),
+    );
   }
 
   Future<void> _applyImageSrc(
@@ -541,16 +661,18 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     } else {
       final tpl = state.template;
       final w = tpl.canvasWidth * 0.7;
-      notifier.addElement(CanvasElement(
-        id: 'img_${DateTime.now().millisecondsSinceEpoch}',
-        type: 'image',
-        src: src,
-        x: tpl.canvasWidth * 0.15,
-        y: tpl.canvasHeight * 0.2,
-        width: w,
-        height: w,
-        cornerRadius: 16,
-      ));
+      notifier.addElement(
+        CanvasElement(
+          id: 'img_${DateTime.now().millisecondsSinceEpoch}',
+          type: 'image',
+          src: src,
+          x: tpl.canvasWidth * 0.15,
+          y: tpl.canvasHeight * 0.2,
+          width: w,
+          height: w,
+          cornerRadius: 16,
+        ),
+      );
     }
   }
 
@@ -567,11 +689,15 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     await _applyImageSrc(notifier, state, pick.src);
   }
 
-  Future<void> _pickImage(EditorNotifier notifier, EditorState state,
-      {required bool camera}) async {
+  Future<void> _pickImage(
+    EditorNotifier notifier,
+    EditorState state, {
+    required bool camera,
+  }) async {
     try {
       final xf = await _imagePicker.pickImage(
-        source: camera ? ImageSource.camera : ImageSource.gallery);
+        source: camera ? ImageSource.camera : ImageSource.gallery,
+      );
       if (xf == null || !mounted) return;
 
       final cropped = await ImageCropper().cropImage(
@@ -635,7 +761,10 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Crop failed: $e'), backgroundColor: DesignTokens.error),
+          SnackBar(
+            content: Text('Crop failed: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
         );
       }
     }
@@ -667,9 +796,9 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
       await File(dest).writeAsBytes(img.encodePng(decoded));
       notifier.updateElement(el.copyWith(src: 'file://$dest'));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Rotated 90°')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Rotated 90°')));
       }
     } catch (e, st) {
       final telemetry = Telemetry.instance;
@@ -678,7 +807,10 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rotate failed: $e'), backgroundColor: DesignTokens.error),
+          SnackBar(
+            content: Text('Rotate failed: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
         );
       }
     } finally {
@@ -689,40 +821,46 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
   void _addTextElement(EditorNotifier notifier, EditorState state) {
     final tpl = state.template;
     final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
-    notifier.addElement(CanvasElement(
-      id: id,
-      type: 'text',
-      text: 'Your Text',
-      x: tpl.canvasWidth * 0.1,
-      y: tpl.canvasHeight * 0.4,
-      width: tpl.canvasWidth * 0.8,
-      fontSize: 52,
-      fontWeight: 'bold',
-      fill: '#ffffff',
-      align: 'center',
-    ));
+    notifier.addElement(
+      CanvasElement(
+        id: id,
+        type: 'text',
+        text: 'Your Text',
+        x: tpl.canvasWidth * 0.1,
+        y: tpl.canvasHeight * 0.4,
+        width: tpl.canvasWidth * 0.8,
+        fontSize: 52,
+        fontWeight: 'bold',
+        fill: '#ffffff',
+        align: 'center',
+      ),
+    );
   }
 
   void _addStickerElement(EditorNotifier notifier, EditorState state) {
     final tpl = state.template;
     final id = 'sticker_${DateTime.now().millisecondsSinceEpoch}';
-    notifier.addElement(CanvasElement(
-      id: id,
-      type: 'sticker',
-      text: '★',
-      x: tpl.canvasWidth * 0.4,
-      y: tpl.canvasHeight * 0.4,
-      width: tpl.canvasWidth * 0.2,
-      fontSize: 120,
-      fill: '#facc15',
-      align: 'center',
-    ));
+    notifier.addElement(
+      CanvasElement(
+        id: id,
+        type: 'sticker',
+        text: '★',
+        x: tpl.canvasWidth * 0.4,
+        y: tpl.canvasHeight * 0.4,
+        width: tpl.canvasWidth * 0.2,
+        fontSize: 120,
+        fill: '#facc15',
+        align: 'center',
+      ),
+    );
   }
 
   void _showAdjustNotice() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Adjust tool selected — brightness, contrast & saturation scaffold ready.'),
+        content: Text(
+          'Adjust tool selected — brightness, contrast & saturation scaffold ready.',
+        ),
         duration: Duration(seconds: 2),
       ),
     );
@@ -769,8 +907,9 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
     try {
       setState(() => _isExporting = true);
       await WidgetsBinding.instance.endOfFrame;
-      final boundary = _canvasKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
+      final boundary =
+          _canvasKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) {
         throw StateError('Canvas not ready for export');
       }
@@ -798,27 +937,36 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
       if (mounted) setState(() => _isExporting = false);
       if (!mounted) return;
       await ref.read(recentDesignsProvider.notifier).add(state.template);
-      unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordExport());
+      unawaited(
+        ref.read(studioCampaignAnalyticsProvider.notifier).recordExport(),
+      );
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
-        unawaited(telemetry.event('studio_export', props: {
-          'template_id': state.template.id,
-          'template_name': state.template.name,
-          'has_watermark': entitlements.needsSokoWatermark,
-        }));
+        unawaited(
+          telemetry.event(
+            'studio_export',
+            props: {
+              'template_id': state.template.id,
+              'template_name': state.template.name,
+              'has_watermark': entitlements.needsSokoWatermark,
+            },
+          ),
+        );
       }
       if (!mounted) return;
-      await Navigator.of(context).push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => StudioShareSheet(
-          adFile: file,
-          template: state.template,
-          kit: kit,
-          initialProduct: widget.product,
-          showWatermarkBadge: entitlements.needsSokoWatermark,
-          activeSize: state.activeSize,
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => StudioShareSheet(
+            adFile: file,
+            template: state.template,
+            kit: kit,
+            initialProduct: widget.product,
+            showWatermarkBadge: entitlements.needsSokoWatermark,
+            activeSize: state.activeSize,
+          ),
         ),
-      ));
+      );
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
@@ -861,7 +1009,7 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
             elements: tpl.elements,
             previewColors: tpl.previewColors,
           );
-          Navigator.pop(context);  // close the dialog first
+          Navigator.pop(context); // close the dialog first
           widget.onSave(namedTpl); // then save + close editor
         },
         onShareCommunity: (name) async {
@@ -892,7 +1040,9 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
             communityOk = false;
             final telemetry = Telemetry.instance;
             if (telemetry != null) {
-              unawaited(telemetry.recordError(e, st, hint: 'studio_share_community'));
+              unawaited(
+                telemetry.recordError(e, st, hint: 'studio_share_community'),
+              );
             }
           }
           if (mounted) Navigator.pop(context);
@@ -903,9 +1053,11 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(communityOk
-                    ? 'Template saved & shared to community queue'
-                    : 'Shared locally — community upload failed (offline?)'),
+                content: Text(
+                  communityOk
+                      ? 'Template saved & shared to community queue'
+                      : 'Shared locally — community upload failed (offline?)',
+                ),
               ),
             );
           }
@@ -928,16 +1080,24 @@ class _AdEditorScreenState extends ConsumerState<AdEditorScreen>
             publishOk = false;
             final telemetry = Telemetry.instance;
             if (telemetry != null) {
-              unawaited(telemetry.recordError(e, st, hint: 'studio_publish_marketplace'));
+              unawaited(
+                telemetry.recordError(
+                  e,
+                  st,
+                  hint: 'studio_publish_marketplace',
+                ),
+              );
             }
           }
           if (mounted) Navigator.pop(context);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(publishOk
-                    ? 'Template queued for marketplace (UGX $price)'
-                    : 'Saved locally — marketplace upload failed (offline?)'),
+                content: Text(
+                  publishOk
+                      ? 'Template queued for marketplace (/= $price)'
+                      : 'Saved locally — marketplace upload failed (offline?)',
+                ),
               ),
             );
           }
@@ -1003,10 +1163,22 @@ class _EditorFirstRunHint extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const _HintRow(icon: Icons.touch_app_outlined, text: 'Tap an element to select it.'),
-                const _HintRow(icon: Icons.open_with_rounded, text: 'Drag to move, use handles to resize.'),
-                const _HintRow(icon: Icons.pinch_rounded, text: 'Pinch or spread to zoom the canvas.'),
-                const _HintRow(icon: Icons.dashboard_rounded, text: 'Use the bottom toolbar to add content.'),
+                const _HintRow(
+                  icon: Icons.touch_app_outlined,
+                  text: 'Tap an element to select it.',
+                ),
+                const _HintRow(
+                  icon: Icons.open_with_rounded,
+                  text: 'Drag to move, use handles to resize.',
+                ),
+                const _HintRow(
+                  icon: Icons.pinch_rounded,
+                  text: 'Pinch or spread to zoom the canvas.',
+                ),
+                const _HintRow(
+                  icon: Icons.dashboard_rounded,
+                  text: 'Use the bottom toolbar to add content.',
+                ),
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -1047,7 +1219,11 @@ class _HintRow extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ),
         ],

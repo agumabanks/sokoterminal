@@ -117,7 +117,7 @@ List<CanvasElement> _buildDiagonalLayout({
     CanvasElement(
       id: 'diag_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: textX,
       y: h * 0.50,
       width: w * 0.4,
@@ -261,7 +261,7 @@ List<CanvasElement> _buildMagazineLayout({
     CanvasElement(
       id: 'mag_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.05,
       y: h * 0.855,
       width: w * 0.9,
@@ -383,7 +383,7 @@ List<CanvasElement> _buildPolaroidLayout({
     CanvasElement(
       id: 'pol_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.1,
       y: h * 0.85,
       width: w * 0.8,
@@ -569,7 +569,7 @@ List<CanvasElement> _buildPriceSplashLayout({
     CanvasElement(
       id: 'splash_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.05,
       y: h * 0.38,
       width: w * 0.9,
@@ -944,7 +944,7 @@ List<CanvasElement> _buildQrPromoLayout({
     CanvasElement(
       id: 'qr_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.05,
       y: h * 0.7,
       width: w * 0.9,
@@ -1710,7 +1710,8 @@ List<CanvasElement> _buildReviewStarsLayout({
     CanvasElement(
       id: 'rs_body',
       type: 'text',
-      text: 'Absolutely love this product! Fast delivery and amazing quality. Will definitely order again from {{BUSINESS}}.',
+      text:
+          'Absolutely love this product! Fast delivery and amazing quality. Will definitely order again from {{BUSINESS}}.',
       x: w * 0.1,
       y: h * 0.35,
       width: w * 0.8,
@@ -1982,7 +1983,7 @@ List<CanvasElement> _buildHolidayLayout({
     CanvasElement(
       id: 'hol_price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.05,
       y: h * 0.72,
       width: w * 0.9,
@@ -2032,7 +2033,8 @@ List<CanvasElement> _buildFounderLayout({
     CanvasElement(
       id: 'found_quote',
       type: 'text',
-      text: '“We started {{BUSINESS}} to bring quality and trust to every doorstep in Uganda.”',
+      text:
+          '“We started {{BUSINESS}} to bring quality and trust to every doorstep in Uganda.”',
       x: w * 0.08,
       y: h * 0.12,
       width: w * 0.84,
@@ -2319,7 +2321,8 @@ List<CanvasElement> _buildNotificationLayout({
     CanvasElement(
       id: 'notif_body',
       type: 'text',
-      text: 'New offer: PRODUCT NAME is now available at UGX 99,000. Tap to shop!',
+      text:
+          'New offer: PRODUCT NAME is now available at 99,000 /=. Tap to shop!',
       x: w * 0.12,
       y: h * 0.4,
       width: w * 0.76,

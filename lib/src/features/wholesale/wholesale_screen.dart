@@ -192,7 +192,7 @@ class WholesaleScreen extends ConsumerWidget {
                         icon: Icons.cloud_download_outlined,
                         title: p.name.isEmpty ? 'Digital #${p.id}' : p.name,
                         subtitle:
-                            '${p.category.isEmpty ? 'Digital' : p.category} • UGX ${p.price.toStringAsFixed(0)}',
+                            '${p.category.isEmpty ? 'Digital' : p.category} • ${p.price.toStringAsFixed(0)} /=',
                         badge: p.status ? 'Published' : 'Draft',
                         badgeColor: p.status
                             ? DesignTokens.success

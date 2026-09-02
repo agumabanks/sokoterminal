@@ -51,7 +51,7 @@ String resolveStudioVariables(
         .replaceAll('Product Name', productName);
   }
 
-  // Catch any hardcoded UGX price placeholder only when we have a real price.
+  // Catch any hardcoded /= price placeholder only when we have a real price.
   if (price.isNotEmpty) {
     result = result.replaceAll(RegExp(r'UGX\s[0-9,]+'), price);
   }

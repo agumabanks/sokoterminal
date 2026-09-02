@@ -86,7 +86,10 @@ class _TextPanelState extends State<TextPanel>
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(12),
@@ -104,8 +107,8 @@ class _TextPanelState extends State<TextPanel>
                     textAlign: el.align == 'center'
                         ? TextAlign.center
                         : el.align == 'right'
-                            ? TextAlign.right
-                            : TextAlign.left,
+                        ? TextAlign.right
+                        : TextAlign.left,
                     style: _previewStyle(el),
                   ),
                 ),
@@ -116,7 +119,10 @@ class _TextPanelState extends State<TextPanel>
                   indicatorColor: kAccent,
                   indicatorWeight: 2,
                   labelStyle: const TextStyle(fontSize: 11),
-                  tabs: const [Tab(text: 'Content'), Tab(text: 'Style')],
+                  tabs: const [
+                    Tab(text: 'Content'),
+                    Tab(text: 'Style'),
+                  ],
                 ),
                 Expanded(
                   child: TabBarView(
@@ -130,14 +136,18 @@ class _TextPanelState extends State<TextPanel>
                           children: [
                             const Text(
                               'Tap variables from your shop & product',
-                              style: TextStyle(color: Colors.white38, fontSize: 10),
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 10,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             DarkField(
                               ctrl: _ctrl,
                               hint: 'Type your text…',
                               maxLines: 4,
-                              onChanged: (v) => widget.onUpdate(el.copyWith(text: v)),
+                              onChanged: (v) =>
+                                  widget.onUpdate(el.copyWith(text: v)),
                             ),
                             const SizedBox(height: 8),
                             Wrap(
@@ -153,12 +163,15 @@ class _TextPanelState extends State<TextPanel>
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: kAccent.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                          color: kAccent.withValues(alpha: 0.3)),
+                                        color: kAccent.withValues(alpha: 0.3),
+                                      ),
                                     ),
                                     child: Text(
                                       chip.label,
@@ -182,142 +195,263 @@ class _TextPanelState extends State<TextPanel>
                         child: Column(
                           children: [
                             // Font size
-                            Row(children: [
-                              const Text('Size', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                              Expanded(
-                                child: Slider(
-                                  value: (el.fontSize ?? 24).clamp(8, 200),
-                                  min: 8, max: 200,
-                                  activeColor: kAccent, inactiveColor: Colors.white12,
-                                  onChanged: (v) => widget.onUpdate(el.copyWith(fontSize: v)),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Size',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                              Text('${(el.fontSize ?? 24).toInt()}',
-                                  style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                            ]),
+                                Expanded(
+                                  child: Slider(
+                                    value: (el.fontSize ?? 24).clamp(8, 200),
+                                    min: 8,
+                                    max: 200,
+                                    activeColor: kAccent,
+                                    inactiveColor: Colors.white12,
+                                    onChanged: (v) => widget.onUpdate(
+                                      el.copyWith(fontSize: v),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${(el.fontSize ?? 24).toInt()}',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
 
                             // Letter spacing
-                            Row(children: [
-                              const Text('Spacing', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                              Expanded(
-                                child: Slider(
-                                  value: (el.letterSpacing ?? 0).clamp(-5, 20),
-                                  min: -5, max: 20,
-                                  activeColor: kAccent, inactiveColor: Colors.white12,
-                                  onChanged: (v) => widget.onUpdate(el.copyWith(letterSpacing: v)),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Spacing',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                              Text((el.letterSpacing ?? 0).toStringAsFixed(1),
-                                  style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                            ]),
+                                Expanded(
+                                  child: Slider(
+                                    value: (el.letterSpacing ?? 0).clamp(
+                                      -5,
+                                      20,
+                                    ),
+                                    min: -5,
+                                    max: 20,
+                                    activeColor: kAccent,
+                                    inactiveColor: Colors.white12,
+                                    onChanged: (v) => widget.onUpdate(
+                                      el.copyWith(letterSpacing: v),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  (el.letterSpacing ?? 0).toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
 
                             // Line height
-                            Row(children: [
-                              const Text('Line H.', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                              Expanded(
-                                child: Slider(
-                                  value: (el.lineHeight ?? 1.2).clamp(0.8, 3.0),
-                                  min: 0.8, max: 3.0,
-                                  activeColor: kAccent, inactiveColor: Colors.white12,
-                                  onChanged: (v) => widget.onUpdate(el.copyWith(lineHeight: v)),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Line H.',
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
                                 ),
-                              ),
-                              Text((el.lineHeight ?? 1.2).toStringAsFixed(1),
-                                  style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                            ]),
+                                Expanded(
+                                  child: Slider(
+                                    value: (el.lineHeight ?? 1.2).clamp(
+                                      0.8,
+                                      3.0,
+                                    ),
+                                    min: 0.8,
+                                    max: 3.0,
+                                    activeColor: kAccent,
+                                    inactiveColor: Colors.white12,
+                                    onChanged: (v) => widget.onUpdate(
+                                      el.copyWith(lineHeight: v),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  (el.lineHeight ?? 1.2).toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
 
                             // Alignment + bold + italic + underline row
-                            Row(children: [
-                              for (final a in [
-                                ('left', Icons.format_align_left_rounded),
-                                ('center', Icons.format_align_center_rounded),
-                                ('right', Icons.format_align_right_rounded),
-                              ])
+                            Row(
+                              children: [
+                                for (final a in [
+                                  ('left', Icons.format_align_left_rounded),
+                                  ('center', Icons.format_align_center_rounded),
+                                  ('right', Icons.format_align_right_rounded),
+                                ])
+                                  ToggleBtn(
+                                    icon: a.$2,
+                                    active: el.align == a.$1,
+                                    onTap: () => widget.onUpdate(
+                                      el.copyWith(align: a.$1),
+                                    ),
+                                  ),
+                                const Spacer(),
                                 ToggleBtn(
-                                  icon: a.$2,
-                                  active: el.align == a.$1,
-                                  onTap: () => widget.onUpdate(el.copyWith(align: a.$1)),
+                                  label: 'B',
+                                  bold: true,
+                                  active:
+                                      el.fontWeight == 'bold' ||
+                                      el.fontWeight == '700',
+                                  onTap: () => widget.onUpdate(
+                                    el.copyWith(
+                                      fontWeight: el.fontWeight == 'bold'
+                                          ? '400'
+                                          : 'bold',
+                                    ),
+                                  ),
                                 ),
-                              const Spacer(),
-                              ToggleBtn(
-                                label: 'B',
-                                bold: true,
-                                active: el.fontWeight == 'bold' || el.fontWeight == '700',
-                                onTap: () => widget.onUpdate(el.copyWith(
-                                    fontWeight: el.fontWeight == 'bold' ? '400' : 'bold')),
-                              ),
-                              ToggleBtn(
-                                label: 'I',
-                                bold: true,
-                                active: el.fontStyle == 'italic',
-                                onTap: () => widget.onUpdate(el.copyWith(
-                                    fontStyle: el.fontStyle == 'italic' ? 'normal' : 'italic')),
-                              ),
-                              ToggleBtn(
-                                label: 'U',
-                                underline: true,
-                                active: el.textDecoration == 'underline',
-                                onTap: () => widget.onUpdate(CanvasElement(
-                                  id: el.id, type: el.type, text: el.text,
-                                  x: el.x, y: el.y, width: el.width, height: el.height,
-                                  fontSize: el.fontSize, fontWeight: el.fontWeight,
-                                  fontFamily: el.fontFamily, fill: el.fill, align: el.align,
-                                  opacity: el.opacity, rotation: el.rotation, zIndex: el.zIndex,
-                                  letterSpacing: el.letterSpacing, lineHeight: el.lineHeight,
-                                  shadowColor: el.shadowColor, strokeColor: el.strokeColor,
-                                  strokeWidth: el.strokeWidth,
-                                  fontStyle: el.fontStyle,
-                                  textDecoration: el.textDecoration == 'underline'
-                                      ? null
-                                      : 'underline',
-                                )),
-                              ),
-                            ]),
+                                ToggleBtn(
+                                  label: 'I',
+                                  bold: true,
+                                  active: el.fontStyle == 'italic',
+                                  onTap: () => widget.onUpdate(
+                                    el.copyWith(
+                                      fontStyle: el.fontStyle == 'italic'
+                                          ? 'normal'
+                                          : 'italic',
+                                    ),
+                                  ),
+                                ),
+                                ToggleBtn(
+                                  label: 'U',
+                                  underline: true,
+                                  active: el.textDecoration == 'underline',
+                                  onTap: () => widget.onUpdate(
+                                    CanvasElement(
+                                      id: el.id,
+                                      type: el.type,
+                                      text: el.text,
+                                      x: el.x,
+                                      y: el.y,
+                                      width: el.width,
+                                      height: el.height,
+                                      fontSize: el.fontSize,
+                                      fontWeight: el.fontWeight,
+                                      fontFamily: el.fontFamily,
+                                      fill: el.fill,
+                                      align: el.align,
+                                      opacity: el.opacity,
+                                      rotation: el.rotation,
+                                      zIndex: el.zIndex,
+                                      letterSpacing: el.letterSpacing,
+                                      lineHeight: el.lineHeight,
+                                      shadowColor: el.shadowColor,
+                                      strokeColor: el.strokeColor,
+                                      strokeWidth: el.strokeWidth,
+                                      fontStyle: el.fontStyle,
+                                      textDecoration:
+                                          el.textDecoration == 'underline'
+                                          ? null
+                                          : 'underline',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 10),
                             // Text transform chips
-                            const Text('Case',
-                                style: TextStyle(color: Colors.white38, fontSize: 10)),
+                            const Text(
+                              'Case',
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 10,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Wrap(
                               spacing: 8,
-                              children: [
-                                ('none', 'Aa'),
-                                ('uppercase', 'AA'),
-                                ('lowercase', 'aa'),
-                                ('capitalize', 'Aa Aa'),
-                              ].map((t) {
-                                final active = el.textTransform == t.$1 ||
-                                    (t.$1 == 'none' && el.textTransform == null);
-                                return GestureDetector(
-                                  onTap: () => widget.onUpdate(el.copyWith(
-                                      textTransform: t.$1 == 'none' ? null : t.$1)),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: active ? kAccent.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.06),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: active ? kAccent : Colors.white24,
+                              children:
+                                  [
+                                    ('none', 'Aa'),
+                                    ('uppercase', 'AA'),
+                                    ('lowercase', 'aa'),
+                                    ('capitalize', 'Aa Aa'),
+                                  ].map((t) {
+                                    final active =
+                                        el.textTransform == t.$1 ||
+                                        (t.$1 == 'none' &&
+                                            el.textTransform == null);
+                                    return GestureDetector(
+                                      onTap: () => widget.onUpdate(
+                                        el.copyWith(
+                                          textTransform: t.$1 == 'none'
+                                              ? null
+                                              : t.$1,
+                                        ),
                                       ),
-                                    ),
-                                    child: Text(
-                                      t.$2,
-                                      style: TextStyle(
-                                        color: active ? kAccent : Colors.white54,
-                                        fontSize: 11,
-                                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: active
+                                              ? kAccent.withValues(alpha: 0.15)
+                                              : Colors.white.withValues(
+                                                  alpha: 0.06,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          border: Border.all(
+                                            color: active
+                                                ? kAccent
+                                                : Colors.white24,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          t.$2,
+                                          style: TextStyle(
+                                            color: active
+                                                ? kAccent
+                                                : Colors.white54,
+                                            fontSize: 11,
+                                            fontWeight: active
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                    );
+                                  }).toList(),
                             ),
 
                             // Color row
                             const SizedBox(height: 8),
                             if (widget.brandColors.isNotEmpty) ...[
-                              const Text('Brand colors',
-                                  style: TextStyle(color: Colors.white38, fontSize: 10)),
+                              const Text(
+                                'Brand colors',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 10,
+                                ),
+                              ),
                               const SizedBox(height: 6),
                               SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -326,8 +460,9 @@ class _TextPanelState extends State<TextPanel>
                                     final hex = colorToHex(c);
                                     final isSel = el.fill == hex;
                                     return GestureDetector(
-                                      onTap: () =>
-                                          widget.onUpdate(el.copyWith(fill: hex)),
+                                      onTap: () => widget.onUpdate(
+                                        el.copyWith(fill: hex),
+                                      ),
                                       child: Container(
                                         width: 32,
                                         height: 32,
@@ -336,7 +471,9 @@ class _TextPanelState extends State<TextPanel>
                                           color: c,
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: isSel ? kAccent : Colors.white24,
+                                            color: isSel
+                                                ? kAccent
+                                                : Colors.white24,
                                             width: isSel ? 2.5 : 1,
                                           ),
                                         ),
@@ -354,14 +491,19 @@ class _TextPanelState extends State<TextPanel>
                                   final hex = colorToHex(c);
                                   final isSel = el.fill == hex;
                                   return GestureDetector(
-                                    onTap: () => widget.onUpdate(el.copyWith(fill: hex)),
+                                    onTap: () =>
+                                        widget.onUpdate(el.copyWith(fill: hex)),
                                     child: Container(
-                                      width: 28, height: 28,
+                                      width: 28,
+                                      height: 28,
                                       margin: const EdgeInsets.only(right: 6),
                                       decoration: BoxDecoration(
-                                        color: c, shape: BoxShape.circle,
+                                        color: c,
+                                        shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: isSel ? kAccent : Colors.white12,
+                                          color: isSel
+                                              ? kAccent
+                                              : Colors.white12,
                                           width: isSel ? 2.5 : 1,
                                         ),
                                       ),
@@ -390,7 +532,10 @@ class _TextPanelState extends State<TextPanel>
     );
     if (el.fontFamily != null && studioFonts.containsKey(el.fontFamily)) {
       try {
-        style = GoogleFonts.getFont(studioFonts[el.fontFamily!]!, textStyle: style);
+        style = GoogleFonts.getFont(
+          studioFonts[el.fontFamily!]!,
+          textStyle: style,
+        );
       } catch (_) {}
     }
     return style;

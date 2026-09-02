@@ -51,14 +51,17 @@ class _InjectorState {
 
   final File? mediaFile;
   final bool isVideo;
-  final Uint8List? videoFrame;   // extracted first-frame bytes for video
+  final Uint8List? videoFrame; // extracted first-frame bytes for video
   final List<OverlayLayer> layers;
   final String? selectedId;
   final bool isBusy;
 
-  OverlayLayer? get selected =>
-      selectedId == null ? null : layers.cast<OverlayLayer?>()
-          .firstWhere((l) => l?.id == selectedId, orElse: () => null);
+  OverlayLayer? get selected => selectedId == null
+      ? null
+      : layers.cast<OverlayLayer?>().firstWhere(
+          (l) => l?.id == selectedId,
+          orElse: () => null,
+        );
 
   _InjectorState copyWith({
     File? mediaFile,
@@ -67,17 +70,16 @@ class _InjectorState {
     List<OverlayLayer>? layers,
     Object? selectedId = _sentinel,
     bool? isBusy,
-  }) =>
-      _InjectorState(
-        mediaFile: mediaFile ?? this.mediaFile,
-        isVideo: isVideo ?? this.isVideo,
-        videoFrame: videoFrame ?? this.videoFrame,
-        layers: layers ?? this.layers,
-        selectedId: selectedId == _sentinel
-            ? this.selectedId
-            : selectedId as String?,
-        isBusy: isBusy ?? this.isBusy,
-      );
+  }) => _InjectorState(
+    mediaFile: mediaFile ?? this.mediaFile,
+    isVideo: isVideo ?? this.isVideo,
+    videoFrame: videoFrame ?? this.videoFrame,
+    layers: layers ?? this.layers,
+    selectedId: selectedId == _sentinel
+        ? this.selectedId
+        : selectedId as String?,
+    isBusy: isBusy ?? this.isBusy,
+  );
 }
 
 // ignore: avoid_private_typedef_functions
@@ -135,8 +137,7 @@ class _InjectorNotifier extends StateNotifier<_InjectorState> {
     // Toggle selection indicator on layers
     state = state.copyWith(
       layers: [
-        for (final l in state.layers)
-          l.copyWith(isSelected: l.id == id),
+        for (final l in state.layers) l.copyWith(isSelected: l.id == id),
       ],
       selectedId: id,
     );
@@ -151,8 +152,8 @@ class _InjectorNotifier extends StateNotifier<_InjectorState> {
 
 final _injectorProvider =
     StateNotifierProvider.autoDispose<_InjectorNotifier, _InjectorState>(
-  (_) => _InjectorNotifier(),
-);
+      (_) => _InjectorNotifier(),
+    );
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -181,8 +182,6 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
   }
-
-
 
   @override
   void dispose() {
@@ -242,11 +241,9 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
     );
 
     if (!mounted) return;
-    ref.read(_injectorProvider.notifier).setMedia(
-      file: file,
-      isVideo: true,
-      videoFrame: frame,
-    );
+    ref
+        .read(_injectorProvider.notifier)
+        .setMedia(file: file, isVideo: true, videoFrame: frame);
 
     // Set up VideoPlayerController for playback preview
     _videoCtrl?.dispose();
@@ -266,8 +263,9 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
     notifier.selectLayer(null);
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
-    final boundary = _compositeKey.currentContext?.findRenderObject()
-        as RenderRepaintBoundary?;
+    final boundary =
+        _compositeKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
     if (boundary == null) throw Exception('Compositor not ready');
 
     final image = await boundary.toImage(pixelRatio: 3.0);
@@ -315,9 +313,9 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
       setState(() => _activePanel = 'overlays');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Product photo failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Product photo failed: $e')));
     } finally {
       notifier.setBusy(false);
     }
@@ -333,10 +331,7 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
   }
 
   void _addOverlay(OverlayType type, BrandKit kit, Item? product) {
-    final layer = buildPreset(
-      type: type,
-      ctx: _overlayContext(kit, product),
-    );
+    final layer = buildPreset(type: type, ctx: _overlayContext(kit, product));
     ref.read(_injectorProvider.notifier).addLayer(layer);
     setState(() => _activePanel = 'edit');
   }
@@ -413,9 +408,9 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     } finally {
       notifier.setBusy(false);
     }
@@ -471,7 +466,9 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
                     product: product,
                     kit: kit,
                     onApplyCombo: (id) {
-                      final url = (product?.thumbnailUrl ?? product?.imageUrl ?? '').trim();
+                      final url =
+                          (product?.thumbnailUrl ?? product?.imageUrl ?? '')
+                              .trim();
                       if (product != null && url.isNotEmpty) {
                         _loadProductPhoto(product).then((_) {
                           if (mounted) _applyCombo(id, kit, product);
@@ -479,13 +476,17 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
                       } else if (product != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Pick a photo first — product has no image'),
+                            content: Text(
+                              'Pick a photo first — product has no image',
+                            ),
                           ),
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Select a product for one-tap promo packs'),
+                            content: Text(
+                              'Select a product for one-tap promo packs',
+                            ),
                           ),
                         );
                       }
@@ -524,27 +525,29 @@ class _AdInjectorScreenState extends ConsumerState<AdInjectorScreen>
                       onApplyCombo: (id) => _applyCombo(id, kit, product),
                     )
                   : _activePanel == 'edit' && state.selected != null
-                      ? _LayerEditor(
-                          layer: state.selected!,
-                          onUpdate: (l) =>
-                              ref.read(_injectorProvider.notifier).updateLayer(l),
-                          onDelete: () {
-                            ref
-                                .read(_injectorProvider.notifier)
-                                .removeLayer(state.selected!.id);
-                            setState(() => _activePanel =
-                                state.layers.length > 1 ? 'edit' : 'overlays');
-                          },
-                        )
-                      : const SizedBox.shrink(),
+                  ? _LayerEditor(
+                      layer: state.selected!,
+                      onUpdate: (l) =>
+                          ref.read(_injectorProvider.notifier).updateLayer(l),
+                      onDelete: () {
+                        ref
+                            .read(_injectorProvider.notifier)
+                            .removeLayer(state.selected!.id);
+                        setState(
+                          () => _activePanel = state.layers.length > 1
+                              ? 'edit'
+                              : 'overlays',
+                        );
+                      },
+                    )
+                  : const SizedBox.shrink(),
             ),
 
             _BottomToolbar(
               activePanel: _activePanel,
               hasVideo: state.isVideo,
               videoCtrl: _videoCtrl,
-              onOverlays: () =>
-                  setState(() => _activePanel = 'overlays'),
+              onOverlays: () => setState(() => _activePanel = 'overlays'),
               onEdit: state.selected != null
                   ? () => setState(() => _activePanel = 'edit')
                   : null,
@@ -590,22 +593,27 @@ class _TopBar extends StatelessWidget {
           IconButton(
             icon: Icon(
               hasMedia ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded,
-              color: Colors.white70, size: 20,
+              color: Colors.white70,
+              size: 20,
             ),
             onPressed: onBack,
           ),
           const SizedBox(width: 4),
           // Logo + title
           Container(
-            width: 26, height: 26,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0EBE7E), Color(0xFF059669)],
               ),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: const Icon(Icons.auto_fix_high_rounded,
-                color: Colors.white, size: 14),
+            child: const Icon(
+              Icons.auto_fix_high_rounded,
+              color: Colors.white,
+              size: 14,
+            ),
           ),
           const SizedBox(width: 8),
           Column(
@@ -636,7 +644,8 @@ class _TopBar extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: SizedBox(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation(Color(0xFF0EBE7E)),
@@ -645,8 +654,11 @@ class _TopBar extends StatelessWidget {
               )
             else ...[
               IconButton(
-                icon: const Icon(Icons.ios_share_rounded,
-                    color: Colors.white70, size: 20),
+                icon: const Icon(
+                  Icons.ios_share_rounded,
+                  color: Colors.white70,
+                  size: 20,
+                ),
                 onPressed: onShare,
                 tooltip: 'Share',
               ),
@@ -654,7 +666,9 @@ class _TopBar extends StatelessWidget {
                 onTap: onSave,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 7),
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0EBE7E),
                     borderRadius: BorderRadius.circular(999),
@@ -710,7 +724,8 @@ class _LandingPicker extends StatelessWidget {
         children: [
           // Icon
           Container(
-            width: 96, height: 96,
+            width: 96,
+            height: 96,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
@@ -726,8 +741,11 @@ class _LandingPicker extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.auto_fix_high_rounded,
-                color: Colors.white, size: 48),
+            child: const Icon(
+              Icons.auto_fix_high_rounded,
+              color: Colors.white,
+              size: 48,
+            ),
           ),
           const SizedBox(height: 28),
 
@@ -813,16 +831,23 @@ class _LandingPicker extends StatelessWidget {
                             width: 120,
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0EBE7E).withValues(alpha: 0.12),
+                              color: const Color(
+                                0xFF0EBE7E,
+                              ).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: const Color(0xFF0EBE7E).withValues(alpha: 0.35),
+                                color: const Color(
+                                  0xFF0EBE7E,
+                                ).withValues(alpha: 0.35),
                               ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(combo.emoji, style: const TextStyle(fontSize: 22)),
+                                Text(
+                                  combo.emoji,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
                                 const SizedBox(height: 4),
                                 Text(
                                   combo.label,
@@ -1010,11 +1035,13 @@ class _Compositor extends StatelessWidget {
                     Container(color: Colors.black),
 
                   // ── Overlay layers ─────────────────────────────────────
-                  ...state.layers.map((layer) => OverlayRenderer(
-                    layer: layer,
-                    compositorSize: compositorSize,
-                    onTap: () => onLayerTap(layer.id),
-                  )),
+                  ...state.layers.map(
+                    (layer) => OverlayRenderer(
+                      layer: layer,
+                      compositorSize: compositorSize,
+                      onTap: () => onLayerTap(layer.id),
+                    ),
+                  ),
                 ],
               );
             },
@@ -1071,10 +1098,7 @@ class _ActiveLayerBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    _emoji(l.type),
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                  Text(_emoji(l.type), style: const TextStyle(fontSize: 13)),
                   const SizedBox(width: 6),
                   Text(
                     _label(l.type),
@@ -1090,9 +1114,7 @@ class _ActiveLayerBar extends StatelessWidget {
                     child: Icon(
                       Icons.close_rounded,
                       size: 14,
-                      color: isSel
-                          ? const Color(0xFF0EBE7E)
-                          : Colors.white38,
+                      color: isSel ? const Color(0xFF0EBE7E) : Colors.white38,
                     ),
                   ),
                 ],
@@ -1104,17 +1126,19 @@ class _ActiveLayerBar extends StatelessWidget {
     );
   }
 
-  String _emoji(OverlayType t) =>
-      overlayPresetCatalogue
-          .firstWhere((p) => p.type == t,
-              orElse: () => overlayPresetCatalogue.first)
-          .emoji;
+  String _emoji(OverlayType t) => overlayPresetCatalogue
+      .firstWhere(
+        (p) => p.type == t,
+        orElse: () => overlayPresetCatalogue.first,
+      )
+      .emoji;
 
-  String _label(OverlayType t) =>
-      overlayPresetCatalogue
-          .firstWhere((p) => p.type == t,
-              orElse: () => overlayPresetCatalogue.first)
-          .label;
+  String _label(OverlayType t) => overlayPresetCatalogue
+      .firstWhere(
+        (p) => p.type == t,
+        orElse: () => overlayPresetCatalogue.first,
+      )
+      .label;
 }
 
 // ---------------------------------------------------------------------------
@@ -1122,10 +1146,7 @@ class _ActiveLayerBar extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _OverlayPicker extends StatefulWidget {
-  const _OverlayPicker({
-    required this.onAdd,
-    required this.onApplyCombo,
-  });
+  const _OverlayPicker({required this.onAdd, required this.onApplyCombo});
 
   final ValueChanged<OverlayType> onAdd;
   final ValueChanged<String> onApplyCombo;
@@ -1194,15 +1215,19 @@ class _OverlayPickerState extends State<_OverlayPicker> {
                             ),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFF0EBE7E).withValues(alpha: 0.35),
+                              color: const Color(
+                                0xFF0EBE7E,
+                              ).withValues(alpha: 0.35),
                             ),
                           ),
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(combo.emoji,
-                                  style: const TextStyle(fontSize: 24)),
+                              Text(
+                                combo.emoji,
+                                style: const TextStyle(fontSize: 24),
+                              ),
                               const Spacer(),
                               Text(
                                 combo.label,
@@ -1247,8 +1272,10 @@ class _OverlayPickerState extends State<_OverlayPicker> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(preset.emoji,
-                                  style: const TextStyle(fontSize: 28)),
+                              Text(
+                                preset.emoji,
+                                style: const TextStyle(fontSize: 28),
+                              ),
                               const SizedBox(height: 6),
                               Text(
                                 preset.label,
@@ -1335,7 +1362,10 @@ class _ProductQuickBar extends StatelessWidget {
             child: GestureDetector(
               onTap: onPickProduct,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
@@ -1357,14 +1387,19 @@ class _ProductQuickBar extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: product != null ? Colors.white : Colors.white54,
+                          color: product != null
+                              ? Colors.white
+                              : Colors.white54,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Colors.white38, size: 18),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white38,
+                      size: 18,
+                    ),
                   ],
                 ),
               ),
@@ -1375,7 +1410,10 @@ class _ProductQuickBar extends StatelessWidget {
             GestureDetector(
               onTap: onUseProductPhoto,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0EBE7E),
                   borderRadius: BorderRadius.circular(10),
@@ -1413,9 +1451,7 @@ class _InjectorProductSheetState extends State<_InjectorProductSheet> {
     final q = _q.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.items
-        : widget.items
-            .where((i) => i.name.toLowerCase().contains(q))
-            .toList();
+        : widget.items.where((i) => i.name.toLowerCase().contains(q)).toList();
 
     return SafeArea(
       child: Column(
@@ -1440,7 +1476,10 @@ class _InjectorProductSheetState extends State<_InjectorProductSheet> {
               decoration: InputDecoration(
                 hintText: 'Search catalog…',
                 hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon: const Icon(Icons.search_rounded, color: Colors.white38),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: Colors.white38,
+                ),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.06),
                 border: OutlineInputBorder(
@@ -1458,8 +1497,10 @@ class _InjectorProductSheetState extends State<_InjectorProductSheet> {
               itemBuilder: (_, i) {
                 final item = filtered[i];
                 return ListTile(
-                  title: Text(item.name,
-                      style: const TextStyle(color: Colors.white)),
+                  title: Text(
+                    item.name,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                   subtitle: Text(
                     formatUgPrice(item.price),
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -1587,13 +1628,19 @@ class _LayerEditorState extends State<_LayerEditor>
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          const Text('Opacity',
-                              style: TextStyle(color: Colors.white54, fontSize: 12)),
+                          const Text(
+                            'Opacity',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Slider(
                               value: l.opacity,
-                              min: 0.1, max: 1.0,
+                              min: 0.1,
+                              max: 1.0,
                               activeColor: const Color(0xFF0EBE7E),
                               inactiveColor: Colors.white12,
                               onChanged: (v) => _up(l.copyWith(opacity: v)),
@@ -1602,7 +1649,9 @@ class _LayerEditorState extends State<_LayerEditor>
                           Text(
                             '${(l.opacity * 100).toInt()}%',
                             style: const TextStyle(
-                                color: Colors.white54, fontSize: 11),
+                              color: Colors.white54,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -1611,11 +1660,18 @@ class _LayerEditorState extends State<_LayerEditor>
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
                           onPressed: widget.onDelete,
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              color: Colors.redAccent, size: 16),
-                          label: const Text('Remove overlay',
-                              style: TextStyle(
-                                  color: Colors.redAccent, fontSize: 12)),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Remove overlay',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1628,11 +1684,23 @@ class _LayerEditorState extends State<_LayerEditor>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _colorRow('Background', l.bgColor, (c) => _up(l.copyWith(bgColor: c))),
+                      _colorRow(
+                        'Background',
+                        l.bgColor,
+                        (c) => _up(l.copyWith(bgColor: c)),
+                      ),
                       const SizedBox(height: 8),
-                      _colorRow('Accent', l.accentColor, (c) => _up(l.copyWith(accentColor: c))),
+                      _colorRow(
+                        'Accent',
+                        l.accentColor,
+                        (c) => _up(l.copyWith(accentColor: c)),
+                      ),
                       const SizedBox(height: 8),
-                      _colorRow('Text', l.textColor, (c) => _up(l.copyWith(textColor: c))),
+                      _colorRow(
+                        'Text',
+                        l.textColor,
+                        (c) => _up(l.copyWith(textColor: c)),
+                      ),
                     ],
                   ),
                 ),
@@ -1655,24 +1723,34 @@ class _LayerEditorState extends State<_LayerEditor>
 
   Widget _colorRow(String label, Color current, ValueChanged<Color> onPick) {
     final swatches = <Color>[
-      Colors.white, Colors.black, const Color(0xFF0F1D40),
-      const Color(0xFF0EBE7E), const Color(0xFFdc2626), const Color(0xFFf59e0b),
-      const Color(0xFF6366f1), const Color(0xFFec4899), const Color(0xFF3b82f6),
-      const Color(0xFFd4af37), Colors.transparent,
+      Colors.white,
+      Colors.black,
+      const Color(0xFF0F1D40),
+      const Color(0xFF0EBE7E),
+      const Color(0xFFdc2626),
+      const Color(0xFFf59e0b),
+      const Color(0xFF6366f1),
+      const Color(0xFFec4899),
+      const Color(0xFF3b82f6),
+      const Color(0xFFd4af37),
+      Colors.transparent,
     ];
     return Row(
       children: [
         SizedBox(
           width: 80,
-          child: Text(label,
-              style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
         ),
         ...swatches.map((c) {
           final sel = current == c;
           return GestureDetector(
             onTap: () => onPick(c),
             child: Container(
-              width: 24, height: 24,
+              width: 24,
+              height: 24,
               margin: const EdgeInsets.only(right: 6),
               decoration: BoxDecoration(
                 color: c == Colors.transparent ? null : c,
@@ -1683,12 +1761,18 @@ class _LayerEditorState extends State<_LayerEditor>
                 ),
               ),
               child: c == Colors.transparent
-                  ? const Icon(Icons.format_color_reset_rounded,
-                      color: Colors.white38, size: 12)
+                  ? const Icon(
+                      Icons.format_color_reset_rounded,
+                      color: Colors.white38,
+                      size: 12,
+                    )
                   : sel
-                      ? const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 12)
-                      : null,
+                  ? const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 12,
+                    )
+                  : null,
             ),
           );
         }),
@@ -1705,33 +1789,39 @@ class _PositionGrid extends StatelessWidget {
   final ValueChanged<OverlayAnchor> onSelect;
 
   static const _positions = <OverlayAnchor>[
-    OverlayAnchor.topLeft,    OverlayAnchor.topCenter,    OverlayAnchor.topRight,
-    OverlayAnchor.center,     OverlayAnchor.fullBottom,   OverlayAnchor.bottomLeft,
-    OverlayAnchor.bottomCenter, OverlayAnchor.bottomRight, OverlayAnchor.fullTop,
+    OverlayAnchor.topLeft,
+    OverlayAnchor.topCenter,
+    OverlayAnchor.topRight,
+    OverlayAnchor.center,
+    OverlayAnchor.fullBottom,
+    OverlayAnchor.bottomLeft,
+    OverlayAnchor.bottomCenter,
+    OverlayAnchor.bottomRight,
+    OverlayAnchor.fullTop,
   ];
 
   static const _icons = <OverlayAnchor, IconData>{
-    OverlayAnchor.topLeft:      Icons.north_west_rounded,
-    OverlayAnchor.topCenter:    Icons.north_rounded,
-    OverlayAnchor.topRight:     Icons.north_east_rounded,
-    OverlayAnchor.center:       Icons.center_focus_strong_rounded,
-    OverlayAnchor.fullBottom:   Icons.vertical_align_bottom_rounded,
-    OverlayAnchor.bottomLeft:   Icons.south_west_rounded,
+    OverlayAnchor.topLeft: Icons.north_west_rounded,
+    OverlayAnchor.topCenter: Icons.north_rounded,
+    OverlayAnchor.topRight: Icons.north_east_rounded,
+    OverlayAnchor.center: Icons.center_focus_strong_rounded,
+    OverlayAnchor.fullBottom: Icons.vertical_align_bottom_rounded,
+    OverlayAnchor.bottomLeft: Icons.south_west_rounded,
     OverlayAnchor.bottomCenter: Icons.south_rounded,
-    OverlayAnchor.bottomRight:  Icons.south_east_rounded,
-    OverlayAnchor.fullTop:      Icons.vertical_align_top_rounded,
+    OverlayAnchor.bottomRight: Icons.south_east_rounded,
+    OverlayAnchor.fullTop: Icons.vertical_align_top_rounded,
   };
 
   static const _labels = <OverlayAnchor, String>{
-    OverlayAnchor.topLeft:      'Top Left',
-    OverlayAnchor.topCenter:    'Top',
-    OverlayAnchor.topRight:     'Top Right',
-    OverlayAnchor.center:       'Centre',
-    OverlayAnchor.fullBottom:   'Full Bottom',
-    OverlayAnchor.bottomLeft:   'Bot Left',
+    OverlayAnchor.topLeft: 'Top Left',
+    OverlayAnchor.topCenter: 'Top',
+    OverlayAnchor.topRight: 'Top Right',
+    OverlayAnchor.center: 'Centre',
+    OverlayAnchor.fullBottom: 'Full Bottom',
+    OverlayAnchor.bottomLeft: 'Bot Left',
     OverlayAnchor.bottomCenter: 'Bottom',
-    OverlayAnchor.bottomRight:  'Bot Right',
-    OverlayAnchor.fullTop:      'Full Top',
+    OverlayAnchor.bottomRight: 'Bot Right',
+    OverlayAnchor.fullTop: 'Full Top',
   };
 
   @override
@@ -1760,9 +1850,11 @@ class _PositionGrid extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(_icons[pos]!,
-                    color: sel ? const Color(0xFF0EBE7E) : Colors.white38,
-                    size: 16),
+                Icon(
+                  _icons[pos]!,
+                  color: sel ? const Color(0xFF0EBE7E) : Colors.white38,
+                  size: 16,
+                ),
                 const SizedBox(height: 2),
                 Text(
                   _labels[pos]!,
@@ -1882,9 +1974,11 @@ class _Btn extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 22,
-                color: active ? const Color(0xFF0EBE7E) : Colors.white38),
+            Icon(
+              icon,
+              size: 22,
+              color: active ? const Color(0xFF0EBE7E) : Colors.white38,
+            ),
             const SizedBox(height: 3),
             Text(
               label,
@@ -1928,7 +2022,10 @@ class _Field extends StatelessWidget {
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.06),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Colors.white12),
@@ -1945,5 +2042,3 @@ class _Field extends StatelessWidget {
     );
   }
 }
-
-

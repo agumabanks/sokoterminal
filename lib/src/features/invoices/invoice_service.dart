@@ -108,7 +108,10 @@ class InvoiceService {
               pw.Container(
                 padding: const pw.EdgeInsets.all(10),
                 decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: const PdfColor.fromInt(0xFFD30005), width: 2),
+                  border: pw.Border.all(
+                    color: const PdfColor.fromInt(0xFFD30005),
+                    width: 2,
+                  ),
                   borderRadius: pw.BorderRadius.circular(6),
                 ),
                 child: pw.Column(
@@ -233,7 +236,7 @@ class InvoiceService {
                     _totalRow('Tax', '$sign${_formatMoney(entry.tax)}'),
                   _totalRow(
                     'TOTAL',
-                    'UGX $sign${_formatMoney(entry.total)}',
+                    '$sign${_formatMoney(entry.total)} /=',
                     isStrong: true,
                   ),
                 ],
@@ -261,7 +264,7 @@ class InvoiceService {
                             style: const pw.TextStyle(fontSize: 10),
                           ),
                           pw.Text(
-                            'UGX ${_formatMoney(p.amount)}',
+                            '${_formatMoney(p.amount)} /=',
                             style: const pw.TextStyle(fontSize: 10),
                           ),
                         ],
@@ -462,7 +465,7 @@ class InvoiceService {
                   if (tax != null) _totalRow('Tax', _formatMoney(tax)),
                   _totalRow(
                     'TOTAL',
-                    'UGX ${_formatMoney(grandTotal)}',
+                    '${_formatMoney(grandTotal)} /=',
                     isStrong: true,
                   ),
                 ],
@@ -576,7 +579,10 @@ class InvoiceService {
             // Quotation title bar
             pw.Container(
               width: double.infinity,
-              padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              padding: const pw.EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 16,
+              ),
               decoration: pw.BoxDecoration(
                 color: PdfColors.black,
                 borderRadius: pw.BorderRadius.circular(6),
@@ -653,11 +659,11 @@ class InvoiceService {
                 rows: [
                   _totalRow(
                     'Subtotal',
-                    'UGX ${_formatMoney(quotation.totalAmount)}',
+                    '${_formatMoney(quotation.totalAmount)} /=',
                   ),
                   _totalRow(
                     'TOTAL',
-                    'UGX ${_formatMoney(quotation.totalAmount)}',
+                    '${_formatMoney(quotation.totalAmount)} /=',
                     isStrong: true,
                   ),
                 ],
@@ -733,12 +739,15 @@ class InvoiceService {
         (brandKit?.businessName.trim().isNotEmpty == true
             ? brandKit!.businessName.trim()
             : null) ??
-        (outlet?.name.trim().isNotEmpty == true ? outlet!.name.trim() : 'My Business');
+        (outlet?.name.trim().isNotEmpty == true
+            ? outlet!.name.trim()
+            : 'My Business');
 
     final tagline = brandKit?.tagline.trim().isNotEmpty == true
         ? brandKit!.tagline.trim()
         : null;
-    final phone = (brandKit?.phone.trim().isNotEmpty == true
+    final phone =
+        (brandKit?.phone.trim().isNotEmpty == true
             ? brandKit!.phone.trim()
             : null) ??
         outlet?.phone?.trim();
@@ -748,7 +757,8 @@ class InvoiceService {
     final website = brandKit?.website.trim().isNotEmpty == true
         ? brandKit!.website.trim()
         : null;
-    final location = (brandKit?.location.trim().isNotEmpty == true
+    final location =
+        (brandKit?.location.trim().isNotEmpty == true
             ? brandKit!.location.trim()
             : null) ??
         outlet?.address?.trim();
@@ -850,8 +860,14 @@ class InvoiceService {
           children: [
             _qCell(l.title),
             _qCell('${l.quantity}', align: pw.TextAlign.center),
-            _qCell('UGX ${_formatMoney(l.unitPrice)}', align: pw.TextAlign.right),
-            _qCell('UGX ${_formatMoney(l.lineTotal)}', align: pw.TextAlign.right),
+            _qCell(
+              '${_formatMoney(l.unitPrice)} /=',
+              align: pw.TextAlign.right,
+            ),
+            _qCell(
+              '${_formatMoney(l.lineTotal)} /=',
+              align: pw.TextAlign.right,
+            ),
           ],
         ),
       );

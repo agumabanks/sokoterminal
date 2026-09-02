@@ -69,12 +69,14 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
 
-    _bgOpacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _bgCtrl, curve: Curves.easeIn),
-    );
-    _logoScale = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutBack),
-    );
+    _bgOpacity = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _bgCtrl, curve: Curves.easeIn));
+    _logoScale = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _logoCtrl, curve: Curves.easeOutBack));
     _logoOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _logoCtrl,
@@ -87,9 +89,10 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
         curve: const Interval(0.45, 1, curve: Curves.easeIn),
       ),
     );
-    _exitOpacity = Tween<double>(begin: 1, end: 0).animate(
-      CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut),
-    );
+    _exitOpacity = Tween<double>(
+      begin: 1,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut));
 
     _runSequence();
   }
@@ -149,10 +152,8 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
 
     return AnimatedBuilder(
       animation: _exitOpacity,
-      builder: (context, child) => Opacity(
-        opacity: _exitOpacity.value,
-        child: child,
-      ),
+      builder: (context, child) =>
+          Opacity(opacity: _exitOpacity.value, child: child),
       child: AnimatedBuilder(
         animation: _bgOpacity,
         builder: (context, child) =>
@@ -278,11 +279,12 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
                           runSpacing: 10,
                           children: List.generate(_modules.length, (i) {
                             final delay = i / (_modules.length + 1);
-                            final progress = (((_modulesCtrl.value - delay) /
-                                    (1 - delay))
-                                .clamp(0.0, 1.0));
-                            final eased =
-                                Curves.easeOutCubic.transform(progress);
+                            final progress =
+                                (((_modulesCtrl.value - delay) / (1 - delay))
+                                    .clamp(0.0, 1.0));
+                            final eased = Curves.easeOutCubic.transform(
+                              progress,
+                            );
                             return Transform.scale(
                               scale: 0.85 + eased * 0.15,
                               child: Opacity(
@@ -294,8 +296,9 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
                                   ),
                                   decoration: BoxDecoration(
                                     border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.12),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
                                     ),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
@@ -351,8 +354,9 @@ class _StudioSplashScreenState extends State<StudioSplashScreen>
                           borderRadius: BorderRadius.circular(1),
                           child: LinearProgressIndicator(
                             value: _modulesCtrl.value,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.08),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.08,
+                            ),
                             valueColor: const AlwaysStoppedAnimation(
                               Colors.white,
                             ),
@@ -391,7 +395,10 @@ class _GlowOrb extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [color.withValues(alpha: opacity), Colors.transparent],
+          colors: [
+            color.withValues(alpha: opacity),
+            Colors.transparent,
+          ],
         ),
       ),
     );

@@ -19,12 +19,7 @@ import 'canvas_renderer.dart';
 final _fmt = NumberFormat('#,###');
 
 // Available font families
-const _availableFonts = <String>[
-  'Default',
-  'Serif',
-  'Monospace',
-  'Cursive',
-];
+const _availableFonts = <String>['Default', 'Serif', 'Monospace', 'Cursive'];
 
 // Map display name to Flutter fontFamily
 String? _fontFamilyForName(String name) {
@@ -96,7 +91,7 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
   AdTemplate _applyProduct(AdTemplate tpl) {
     return tpl.applyProduct(
       productName: widget.item.name,
-      priceFormatted: 'UGX ${_fmt.format(widget.item.price.round())}',
+      priceFormatted: '${_fmt.format(widget.item.price.round())} /=',
       imageUrl: widget.item.imageUrl ?? widget.item.thumbnailUrl,
     );
   }
@@ -118,7 +113,10 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
 
   // ── Element mutations ────────────────────────────────────
 
-  void _updateElement(String id, CanvasElement Function(CanvasElement) transform) {
+  void _updateElement(
+    String id,
+    CanvasElement Function(CanvasElement) transform,
+  ) {
     setState(() {
       _current = AdTemplate(
         id: _current.id,
@@ -127,7 +125,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
         canvasWidth: _current.canvasWidth,
         canvasHeight: _current.canvasHeight,
         background: _current.background,
-        elements: _current.elements.map((e) => e.id == id ? transform(e) : e).toList(),
+        elements: _current.elements
+            .map((e) => e.id == id ? transform(e) : e)
+            .toList(),
       );
     });
   }
@@ -139,7 +139,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
   void _resizeElement(String id, double dw, double dh) {
     _updateElement(id, (e) {
       final newW = (e.width + dw).clamp(40.0, _current.canvasWidth).toDouble();
-      final newH = (e.height + dh).clamp(40.0, _current.canvasHeight).toDouble();
+      final newH = (e.height + dh)
+          .clamp(40.0, _current.canvasHeight)
+          .toDouble();
       return e.copyWith(width: newW, height: newH);
     });
   }
@@ -157,7 +159,12 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +176,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
               maxLines: 4,
               autofocus: true,
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 hintText: 'Enter text...',
               ),
             ),
@@ -178,13 +187,18 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  _updateElement(el.id, (e) => e.copyWith(text: controller.text));
+                  _updateElement(
+                    el.id,
+                    (e) => e.copyWith(text: controller.text),
+                  );
                   Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: DesignTokens.brandAccent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text('Apply'),
@@ -207,15 +221,28 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
   void _applyFont(String fontName) {
     final el = _selectedElement;
     if (el == null) return;
-    _updateElement(el.id, (e) => CanvasElement(
-      id: e.id, type: e.type, text: e.text, src: e.src,
-      x: e.x, y: e.y, width: e.width, height: e.height,
-      fontSize: e.fontSize, fontWeight: e.fontWeight,
-      fontFamily: _fontFamilyForName(fontName),
-      fill: e.fill, align: e.align, cornerRadius: e.cornerRadius,
-      opacity: e.opacity, textDecoration: e.textDecoration,
-      placeholder: e.placeholder,
-    ));
+    _updateElement(
+      el.id,
+      (e) => CanvasElement(
+        id: e.id,
+        type: e.type,
+        text: e.text,
+        src: e.src,
+        x: e.x,
+        y: e.y,
+        width: e.width,
+        height: e.height,
+        fontSize: e.fontSize,
+        fontWeight: e.fontWeight,
+        fontFamily: _fontFamilyForName(fontName),
+        fill: e.fill,
+        align: e.align,
+        cornerRadius: e.cornerRadius,
+        opacity: e.opacity,
+        textDecoration: e.textDecoration,
+        placeholder: e.placeholder,
+      ),
+    );
   }
 
   // ── Font size ─────────────────────────────────────────────
@@ -246,14 +273,17 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     if (el == null || el.type != 'image') return;
     try {
       final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1920);
+      final file = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+      );
       if (file == null) return;
       _updateElement(el.id, (e) => e.copyWith(src: file.path));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to pick image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
     }
   }
 
@@ -265,13 +295,20 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     final dw = el.width * (factor - 1);
     final dh = el.height * (factor - 1);
     final newW = (el.width + dw).clamp(100.0, _current.canvasWidth).toDouble();
-    final newH = (el.height + dh).clamp(100.0, _current.canvasHeight).toDouble();
+    final newH = (el.height + dh)
+        .clamp(100.0, _current.canvasHeight)
+        .toDouble();
     final cx = el.x + el.width / 2;
     final cy = el.y + el.height / 2;
-    _updateElement(el.id, (e) => e.copyWith(
-      width: newW, height: newH,
-      x: cx - newW / 2, y: cy - newH / 2,
-    ));
+    _updateElement(
+      el.id,
+      (e) => e.copyWith(
+        width: newW,
+        height: newH,
+        x: cx - newW / 2,
+        y: cy - newH / 2,
+      ),
+    );
   }
 
   // ── Export ────────────────────────────────────────────────
@@ -284,11 +321,14 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     });
     await Future.delayed(const Duration(milliseconds: 100));
 
-    final boundary = _renderKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    final boundary =
+        _renderKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) throw StateError('Render not ready');
 
     final pixelRatio = _current.canvasWidth / boundary.size.width;
-    final image = await boundary.toImage(pixelRatio: pixelRatio.clamp(1.0, 4.0));
+    final image = await boundary.toImage(
+      pixelRatio: pixelRatio.clamp(1.0, 4.0),
+    );
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) throw StateError('Export failed');
 
@@ -307,7 +347,8 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     final outDir = Directory(p.join(dir.path, 'generated_ads'));
     if (!outDir.existsSync()) await outDir.create(recursive: true);
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    final size = '${_current.canvasWidth.round()}x${_current.canvasHeight.round()}';
+    final size =
+        '${_current.canvasWidth.round()}x${_current.canvasHeight.round()}';
     final file = File(p.join(outDir.path, 'soko-ad-$size-$stamp.$ext'));
     await file.writeAsBytes(bytes, flush: true);
     return file;
@@ -319,15 +360,18 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
       final file = await _export();
       final adCopy = widget.adCopy;
       final text = adCopy != null
-          ? [adCopy['headline'], adCopy['body'], adCopy['cta']]
-              .whereType<String>()
-              .where((s) => s.isNotEmpty)
-              .join('\n\n')
-          : '${widget.item.name}\nUGX ${_fmt.format(widget.item.price.round())}\n\nsoko24.co';
+          ? [
+              adCopy['headline'],
+              adCopy['body'],
+              adCopy['cta'],
+            ].whereType<String>().where((s) => s.isNotEmpty).join('\n\n')
+          : '${widget.item.name}\n${_fmt.format(widget.item.price.round())} /=\n\nsoko24.co';
       await Share.shareXFiles([XFile(file.path)], text: text);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -338,13 +382,20 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     try {
       final file = await _export(jpg: jpg);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Saved: ${p.basename(file.path)}'),
-        action: SnackBarAction(label: 'Share', onPressed: () => Share.shareXFiles([XFile(file.path)])),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Saved: ${p.basename(file.path)}'),
+          action: SnackBarAction(
+            label: 'Share',
+            onPressed: () => Share.shareXFiles([XFile(file.path)]),
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Save failed: $e')));
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -361,12 +412,19 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text(_current.name, style: DesignTokens.textTitle.copyWith(fontSize: 17)),
+        title: Text(
+          _current.name,
+          style: DesignTokens.textTitle.copyWith(fontSize: 17),
+        ),
         actions: [
           if (_exporting)
             const Padding(
               padding: EdgeInsets.all(12),
-              child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             )
           else ...[
             IconButton(
@@ -406,10 +464,18 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                 final s = adSizes[i];
                 final active = i == _sizeIndex;
                 return ChoiceChip(
-                  label: Text(s.label, style: TextStyle(fontSize: 11,
-                      color: active ? Colors.white : DesignTokens.grayDark)),
-                  avatar: Icon(s.icon, size: 14,
-                      color: active ? Colors.white : DesignTokens.grayMedium),
+                  label: Text(
+                    s.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: active ? Colors.white : DesignTokens.grayDark,
+                    ),
+                  ),
+                  avatar: Icon(
+                    s.icon,
+                    size: 14,
+                    color: active ? Colors.white : DesignTokens.grayMedium,
+                  ),
                   selected: active,
                   selectedColor: DesignTokens.brandPrimary,
                   onSelected: (_) => _switchSize(i),
@@ -431,21 +497,21 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                   child: RepaintBoundary(
                     key: _renderKey,
                     child: InteractiveCanvas(
-                    template: _current,
-                    selectedElementId: _selectedElementId,
-                    onElementSelected: (id) {
-                      setState(() {
-                        _selectedElementId = id;
-                        _activeTool = _EditorTool.none;
-                      });
-                    },
-                    onElementMoved: _moveElement,
-                    onElementResized: _resizeElement,
+                      template: _current,
+                      selectedElementId: _selectedElementId,
+                      onElementSelected: (id) {
+                        setState(() {
+                          _selectedElementId = id;
+                          _activeTool = _EditorTool.none;
+                        });
+                      },
+                      onElementMoved: _moveElement,
+                      onElementResized: _resizeElement,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           ),
 
           const SizedBox(height: 4),
@@ -476,7 +542,8 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                 itemBuilder: (_, i) {
                   final tpl = builtInTemplates[i];
                   final active = tpl.id == _current.id;
-                  final colors = tpl.previewColors ?? [Colors.grey, Colors.white];
+                  final colors =
+                      tpl.previewColors ?? [Colors.grey, Colors.white];
                   return GestureDetector(
                     onTap: () => _switchTemplate(tpl),
                     child: AnimatedContainer(
@@ -490,7 +557,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                         ),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: active ? DesignTokens.brandAccent : Colors.transparent,
+                          color: active
+                              ? DesignTokens.brandAccent
+                              : Colors.transparent,
                           width: 2.5,
                         ),
                       ),
@@ -501,7 +570,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: _isLight(colors.first) ? DesignTokens.grayDark : Colors.white,
+                            color: _isLight(colors.first)
+                                ? DesignTokens.grayDark
+                                : Colors.white,
                           ),
                         ),
                       ),
@@ -527,7 +598,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                       backgroundColor: DesignTokens.brandPrimary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -541,7 +614,9 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                       backgroundColor: const Color(0xFF25D366),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -583,7 +658,11 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
               icon: Icons.format_size,
               label: 'Size',
               active: _activeTool == _EditorTool.fontSize,
-              onTap: () => setState(() => _activeTool = _activeTool == _EditorTool.fontSize ? _EditorTool.none : _EditorTool.fontSize),
+              onTap: () => setState(
+                () => _activeTool = _activeTool == _EditorTool.fontSize
+                    ? _EditorTool.none
+                    : _EditorTool.fontSize,
+              ),
             ),
             _ToolbarButton(
               icon: Icons.palette_outlined,
@@ -594,15 +673,27 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
             _ToolbarButton(
               icon: Icons.format_bold,
               label: el.fontWeight == 'bold' ? 'Unbold' : 'Bold',
-              onTap: () => _updateElement(el.id, (e) => CanvasElement(
-                id: e.id, type: e.type, text: e.text, src: e.src,
-                x: e.x, y: e.y, width: e.width, height: e.height,
-                fontSize: e.fontSize,
-                fontWeight: e.fontWeight == 'bold' ? null : 'bold',
-                fontFamily: e.fontFamily,
-                fill: e.fill, align: e.align, cornerRadius: e.cornerRadius,
-                opacity: e.opacity, textDecoration: e.textDecoration,
-              )),
+              onTap: () => _updateElement(
+                el.id,
+                (e) => CanvasElement(
+                  id: e.id,
+                  type: e.type,
+                  text: e.text,
+                  src: e.src,
+                  x: e.x,
+                  y: e.y,
+                  width: e.width,
+                  height: e.height,
+                  fontSize: e.fontSize,
+                  fontWeight: e.fontWeight == 'bold' ? null : 'bold',
+                  fontFamily: e.fontFamily,
+                  fill: e.fill,
+                  align: e.align,
+                  cornerRadius: e.cornerRadius,
+                  opacity: e.opacity,
+                  textDecoration: e.textDecoration,
+                ),
+              ),
             ),
           ],
           if (isImage) ...[
@@ -644,12 +735,15 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
             onTap: () {
               setState(() {
                 _current = AdTemplate(
-                  id: _current.id, name: _current.name,
+                  id: _current.id,
+                  name: _current.name,
                   category: _current.category,
                   canvasWidth: _current.canvasWidth,
                   canvasHeight: _current.canvasHeight,
                   background: _current.background,
-                  elements: _current.elements.where((e) => e.id != el.id).toList(),
+                  elements: _current.elements
+                      .where((e) => e.id != el.id)
+                      .toList(),
                 );
                 _selectedElementId = null;
                 _activeTool = _EditorTool.none;
@@ -694,17 +788,26 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: active ? DesignTokens.brandPrimary : DesignTokens.surfaceWhite,
+                color: active
+                    ? DesignTokens.brandPrimary
+                    : DesignTokens.surfaceWhite,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: active ? DesignTokens.brandPrimary : DesignTokens.grayLight),
+                border: Border.all(
+                  color: active
+                      ? DesignTokens.brandPrimary
+                      : DesignTokens.grayLight,
+                ),
               ),
               child: Center(
-                child: Text(font, style: TextStyle(
-                  fontSize: 14,
-                  fontFamily: _fontFamilyForName(font),
-                  fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : DesignTokens.grayDark,
-                )),
+                child: Text(
+                  font,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontFamily: _fontFamilyForName(font),
+                    fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : DesignTokens.grayDark,
+                  ),
+                ),
               ),
             ),
           );
@@ -755,11 +858,36 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
   }
 
   static const _colorPalette = [
-    '#ffffff', '#000000', '#f44336', '#e91e63', '#9c27b0', '#673ab7',
-    '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
-    '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722',
-    '#795548', '#607d8b', '#c9a96e', '#dc2626', '#f97316', '#1e293b',
-    '#7c3aed', '#e11d48', '#075e54', '#25d366', '#1e40af', '#6366f1',
+    '#ffffff',
+    '#000000',
+    '#f44336',
+    '#e91e63',
+    '#9c27b0',
+    '#673ab7',
+    '#3f51b5',
+    '#2196f3',
+    '#03a9f4',
+    '#00bcd4',
+    '#009688',
+    '#4caf50',
+    '#8bc34a',
+    '#cddc39',
+    '#ffeb3b',
+    '#ffc107',
+    '#ff9800',
+    '#ff5722',
+    '#795548',
+    '#607d8b',
+    '#c9a96e',
+    '#dc2626',
+    '#f97316',
+    '#1e293b',
+    '#7c3aed',
+    '#e11d48',
+    '#075e54',
+    '#25d366',
+    '#1e40af',
+    '#6366f1',
   ];
 
   Widget _buildColorPanel() {
@@ -784,14 +912,28 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
                 color: color,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: active ? DesignTokens.brandAccent : Colors.grey.shade300,
+                  color: active
+                      ? DesignTokens.brandAccent
+                      : Colors.grey.shade300,
                   width: active ? 3 : 1,
                 ),
-                boxShadow: active ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 6)] : null,
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                        ),
+                      ]
+                    : null,
               ),
               child: active
-                  ? Icon(Icons.check, size: 16,
-                      color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white)
+                  ? Icon(
+                      Icons.check,
+                      size: 16,
+                      color: color.computeLuminance() > 0.5
+                          ? Colors.black
+                          : Colors.white,
+                    )
                   : null,
             ),
           );
@@ -808,7 +950,8 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     });
     final targetSize = adSizes[i];
     final match = builtInTemplates.where(
-      (t) => t.category == _current.category &&
+      (t) =>
+          t.category == _current.category &&
           t.canvasWidth == targetSize.width &&
           t.canvasHeight == targetSize.height,
     );
@@ -817,19 +960,32 @@ class _AdDetailScreenState extends State<AdDetailScreen> {
     } else {
       final scaleX = targetSize.width / _current.canvasWidth;
       final scaleY = targetSize.height / _current.canvasHeight;
-      final scaled = _current.elements.map((e) => CanvasElement(
-        id: e.id, type: e.type, text: e.text, src: e.src,
-        x: e.x * scaleX, y: e.y * scaleY,
-        width: e.width * scaleX,
-        height: e.height * scaleY,
-        fontSize: e.fontSize != null ? e.fontSize! * scaleX : null,
-        fontWeight: e.fontWeight, fontFamily: e.fontFamily,
-        fill: e.fill, align: e.align, cornerRadius: e.cornerRadius,
-        opacity: e.opacity, textDecoration: e.textDecoration,
-      )).toList();
+      final scaled = _current.elements
+          .map(
+            (e) => CanvasElement(
+              id: e.id,
+              type: e.type,
+              text: e.text,
+              src: e.src,
+              x: e.x * scaleX,
+              y: e.y * scaleY,
+              width: e.width * scaleX,
+              height: e.height * scaleY,
+              fontSize: e.fontSize != null ? e.fontSize! * scaleX : null,
+              fontWeight: e.fontWeight,
+              fontFamily: e.fontFamily,
+              fill: e.fill,
+              align: e.align,
+              cornerRadius: e.cornerRadius,
+              opacity: e.opacity,
+              textDecoration: e.textDecoration,
+            ),
+          )
+          .toList();
       setState(() {
         _current = AdTemplate(
-          id: _current.id, name: _current.name,
+          id: _current.id,
+          name: _current.name,
           category: _current.category,
           canvasWidth: targetSize.width,
           canvasHeight: targetSize.height,
@@ -859,7 +1015,8 @@ class _ToolbarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? (active ? DesignTokens.brandPrimary : DesignTokens.grayDark);
+    final c =
+        color ?? (active ? DesignTokens.brandPrimary : DesignTokens.grayDark);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -870,7 +1027,14 @@ class _ToolbarButton extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: c),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: c)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: c,
+              ),
+            ),
           ],
         ),
       ),

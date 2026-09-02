@@ -42,12 +42,18 @@ class FontPanel extends StatelessWidget {
 
                 TextStyle style;
                 try {
-                  style = GoogleFonts.getFont(pkgName,
-                      fontSize: 20, fontWeight: FontWeight.w700,
-                      color: isSel ? kAccent : Colors.white);
+                  style = GoogleFonts.getFont(
+                    pkgName,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: isSel ? kAccent : Colors.white,
+                  );
                 } catch (_) {
-                  style = TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
-                      color: isSel ? kAccent : Colors.white);
+                  style = TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: isSel ? kAccent : Colors.white,
+                  );
                 }
 
                 return GestureDetector(
@@ -55,9 +61,13 @@ class FontPanel extends StatelessWidget {
                   child: Container(
                     width: 88,
                     decoration: BoxDecoration(
-                      color: isSel ? kAccent.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
+                      color: isSel
+                          ? kAccent.withValues(alpha: 0.12)
+                          : Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isSel ? kAccent : Colors.white10),
+                      border: Border.all(
+                        color: isSel ? kAccent : Colors.white10,
+                      ),
                     ),
                     padding: const EdgeInsets.all(8),
                     child: Column(
@@ -65,14 +75,26 @@ class FontPanel extends StatelessWidget {
                       children: [
                         Text(desc?.sample ?? 'Aa', style: style),
                         const SizedBox(height: 3),
-                        Text(name,
-                            style: TextStyle(color: isSel ? kAccent : Colors.white38,
-                                fontSize: 8, fontWeight: FontWeight.w500),
-                            maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: isSel ? kAccent : Colors.white38,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
                         if (desc != null)
-                          Text(desc.vibe,
-                              style: const TextStyle(color: Colors.white24, fontSize: 7),
-                              textAlign: TextAlign.center),
+                          Text(
+                            desc.vibe,
+                            style: const TextStyle(
+                              color: Colors.white24,
+                              fontSize: 7,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                       ],
                     ),
                   ),

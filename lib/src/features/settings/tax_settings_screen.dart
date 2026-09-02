@@ -55,11 +55,12 @@ class _TaxSettingsScreenState extends ConsumerState<TaxSettingsScreen> {
 
   Future<void> _save() async {
     final db = ref.read(appDatabaseProvider);
-    final rate = double.tryParse(
-          CommaNumberFormatter.unformat(_rateCtrl.text.trim()),
-        ) ??
+    final rate =
+        double.tryParse(CommaNumberFormatter.unformat(_rateCtrl.text.trim())) ??
         0;
-    final label = _labelCtrl.text.trim().isEmpty ? 'VAT' : _labelCtrl.text.trim();
+    final label = _labelCtrl.text.trim().isEmpty
+        ? 'VAT'
+        : _labelCtrl.text.trim();
 
     await db.upsertBusinessProfile(
       BusinessProfilesCompanion(
@@ -73,9 +74,9 @@ class _TaxSettingsScreenState extends ConsumerState<TaxSettingsScreen> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tax settings saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Tax settings saved')));
     }
   }
 
@@ -167,7 +168,8 @@ class _TaxSettingsScreenState extends ConsumerState<TaxSettingsScreen> {
                           subtitle: const Text(
                             'Prices do NOT include tax. Tax is added on top at checkout.',
                           ),
-                          onTap: () => setState(() => _inclusionMode = 'exclusive'),
+                          onTap: () =>
+                              setState(() => _inclusionMode = 'exclusive'),
                         ),
                         ListTile(
                           leading: Icon(
@@ -182,7 +184,8 @@ class _TaxSettingsScreenState extends ConsumerState<TaxSettingsScreen> {
                           subtitle: const Text(
                             'Prices already include tax. Receipt shows tax breakdown.',
                           ),
-                          onTap: () => setState(() => _inclusionMode = 'inclusive'),
+                          onTap: () =>
+                              setState(() => _inclusionMode = 'inclusive'),
                         ),
                       ],
                     ),

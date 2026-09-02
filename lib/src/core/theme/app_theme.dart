@@ -45,16 +45,16 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        backgroundColor: DesignTokens.brandPrimary,
-        foregroundColor: DesignTokens.canvas,
+        backgroundColor: DesignTokens.canvas,
+        foregroundColor: DesignTokens.ink,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: DesignTokens.textTitleLight,
-        iconTheme: const IconThemeData(color: DesignTokens.canvas, size: 22),
+        titleTextStyle: DesignTokens.textTitle,
+        iconTheme: const IconThemeData(color: DesignTokens.ink, size: 22),
         systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
+          statusBarColor: DesignTokens.canvas,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
         ),
       ),
 
@@ -87,7 +87,9 @@ class AppTheme {
         backgroundColor: DesignTokens.canvas,
         selectedItemColor: DesignTokens.brandAccent,
         unselectedItemColor: DesignTokens.inkMuted,
-        selectedLabelStyle: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600),
+        selectedLabelStyle: DesignTokens.textCaption.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelStyle: DesignTokens.textCaption,
         showUnselectedLabels: true,
         elevation: 0,
@@ -135,7 +137,9 @@ class AppTheme {
           side: const BorderSide(color: DesignTokens.hairline, width: 1),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: const StadiumBorder(),
-          textStyle: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w500),
+          textStyle: DesignTokens.textBody.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
           minimumSize: const Size(0, 44),
         ),
       ),
@@ -145,7 +149,9 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: DesignTokens.brandAccent,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          textStyle: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+          textStyle: DesignTokens.textBody.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           shape: const StadiumBorder(),
         ),
       ),
@@ -167,7 +173,9 @@ class AppTheme {
         backgroundColor: DesignTokens.canvasCloud,
         selectedColor: DesignTokens.brandAccentDim,
         disabledColor: DesignTokens.hairline,
-        labelStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+        labelStyle: DesignTokens.textSmall.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
         secondaryLabelStyle: DesignTokens.textSmall.copyWith(
           fontWeight: FontWeight.w600,
           color: DesignTokens.brandAccent,
@@ -184,7 +192,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: DesignTokens.canvasCloud,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
           borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
@@ -195,7 +206,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
+          borderSide: const BorderSide(
+            color: DesignTokens.brandAccent,
+            width: 1.5,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
@@ -205,25 +219,37 @@ class AppTheme {
           borderRadius: DesignTokens.borderRadiusMd,
           borderSide: const BorderSide(color: DesignTokens.error, width: 1.5),
         ),
-        labelStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkMuted),
-        hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkDisabled),
+        labelStyle: DesignTokens.textBody.copyWith(
+          color: DesignTokens.inkMuted,
+        ),
+        hintStyle: DesignTokens.textBody.copyWith(
+          color: DesignTokens.inkDisabled,
+        ),
         prefixIconColor: DesignTokens.inkMuted,
         suffixIconColor: DesignTokens.inkMuted,
-        errorStyle: DesignTokens.textCaption.copyWith(color: DesignTokens.error),
+        errorStyle: DesignTokens.textCaption.copyWith(
+          color: DesignTokens.error,
+        ),
       ),
 
       // ─── Switch ──────────────────────────────────────────────────────────
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.all(Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? DesignTokens.brandAccent : DesignTokens.hairline),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? DesignTokens.brandAccent
+              : DesignTokens.hairline,
+        ),
         trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
       ),
 
       // ─── Checkbox ────────────────────────────────────────────────────────
       checkboxTheme: CheckboxThemeData(
-        fillColor: WidgetStateProperty.resolveWith((s) =>
-            s.contains(WidgetState.selected) ? DesignTokens.brandAccent : Colors.transparent),
+        fillColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? DesignTokens.brandAccent
+              : Colors.transparent,
+        ),
         checkColor: WidgetStateProperty.all(Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         side: const BorderSide(color: DesignTokens.hairline, width: 1.5),
@@ -236,7 +262,9 @@ class AppTheme {
         indicatorColor: DesignTokens.brandAccent,
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: DesignTokens.hairline,
-        labelStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w600),
+        labelStyle: DesignTokens.textSmall.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelStyle: DesignTokens.textSmall,
       ),
 
@@ -318,27 +346,46 @@ class AppTheme {
           selectedForegroundColor: Colors.white,
           side: const BorderSide(color: DesignTokens.hairline, width: 0.5),
           shape: const StadiumBorder(),
-          textStyle: DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
+          textStyle: DesignTokens.textSmall.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
 
       // ─── Text Theme ──────────────────────────────────────────────────────
       textTheme: TextTheme(
-        displayLarge:  baseTextTheme.displayLarge?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -1),
-        displayMedium: baseTextTheme.displayMedium?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -0.8),
-        displaySmall:  baseTextTheme.displaySmall?.copyWith(color: DesignTokens.ink, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-        headlineLarge:  DesignTokens.textHeadline.copyWith(fontSize: 24),
+        displayLarge: baseTextTheme.displayLarge?.copyWith(
+          color: DesignTokens.ink,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1,
+        ),
+        displayMedium: baseTextTheme.displayMedium?.copyWith(
+          color: DesignTokens.ink,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.8,
+        ),
+        displaySmall: baseTextTheme.displaySmall?.copyWith(
+          color: DesignTokens.ink,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+        ),
+        headlineLarge: DesignTokens.textHeadline.copyWith(fontSize: 24),
         headlineMedium: DesignTokens.textHeadline,
-        headlineSmall:  DesignTokens.textTitle.copyWith(fontSize: 19),
-        titleLarge:   DesignTokens.textTitle,
-        titleMedium:  DesignTokens.textBodyBold,
-        titleSmall:   DesignTokens.textSmallBold,
-        bodyLarge:    DesignTokens.textBody.copyWith(fontSize: 17, color: DesignTokens.ink),
-        bodyMedium:   DesignTokens.textBody,
-        bodySmall:    DesignTokens.textSmall,
-        labelLarge:   DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
-        labelMedium:  DesignTokens.textSmall.copyWith(fontWeight: FontWeight.w500),
-        labelSmall:   DesignTokens.textCaption,
+        headlineSmall: DesignTokens.textTitle.copyWith(fontSize: 19),
+        titleLarge: DesignTokens.textTitle,
+        titleMedium: DesignTokens.textBodyBold,
+        titleSmall: DesignTokens.textSmallBold,
+        bodyLarge: DesignTokens.textBody.copyWith(
+          fontSize: 17,
+          color: DesignTokens.ink,
+        ),
+        bodyMedium: DesignTokens.textBody,
+        bodySmall: DesignTokens.textSmall,
+        labelLarge: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+        labelMedium: DesignTokens.textSmall.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+        labelSmall: DesignTokens.textCaption,
       ),
     );
   }

@@ -28,6 +28,7 @@ import 'features/items/items_screen.dart';
 import 'features/services/services_screen.dart';
 import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
+import 'features/ads/video_ad_screen.dart';
 import 'features/ads/item_deep_link_screen.dart';
 import 'features/ads/studio_deep_link_launcher.dart';
 import 'features/ads/studio_notification_scheduler.dart';
@@ -42,10 +43,13 @@ import 'features/settings/export_screen.dart';
 import 'features/settings/print_queue_screen.dart';
 import 'features/settings/print_diagnostics_screen.dart';
 import 'features/profile/profile_screen.dart';
+import 'features/profile/brand_media_screen.dart';
 import 'features/profile/seller_profile_edit_screen.dart';
 import 'features/profile/shop_info_screen.dart';
 import 'features/profile/shop_seo_screen.dart';
 import 'features/payments/payment_settings_screen.dart';
+import 'features/payment_links/payment_links_screen.dart';
+import 'features/marketing/marketing_generator_screen.dart';
 import 'features/wallet/seller_wallet_screen.dart';
 import 'features/bnpl/bnpl_settings_screen.dart';
 // import 'features/auctions/auctions_screen.dart';
@@ -98,18 +102,18 @@ Page<dynamic> _buildPage({required Widget child, GoRouterState? state}) {
       final slideIn = Tween<Offset>(
         begin: const Offset(1.0, 0.0),
         end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      ));
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
 
-      final slideOut = Tween<Offset>(
-        begin: Offset.zero,
-        end: const Offset(-0.3, 0.0),
-      ).animate(CurvedAnimation(
-        parent: secondaryAnimation,
-        curve: Curves.easeOutCubic,
-      ));
+      final slideOut =
+          Tween<Offset>(
+            begin: Offset.zero,
+            end: const Offset(-0.3, 0.0),
+          ).animate(
+            CurvedAnimation(
+              parent: secondaryAnimation,
+              curve: Curves.easeOutCubic,
+            ),
+          );
 
       return SlideTransition(
         position: slideOut,
@@ -175,12 +179,9 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
       if (initial != null && mounted) _handleDeepLink(initial);
     } catch (_) {}
 
-    appLinks.uriLinkStream.listen(
-      (uri) {
-        if (mounted) _handleDeepLink(uri);
-      },
-      onError: (_) {},
-    );
+    appLinks.uriLinkStream.listen((uri) {
+      if (mounted) _handleDeepLink(uri);
+    }, onError: (_) {});
   }
 
   void _handleDeepLink(Uri uri) {
@@ -212,8 +213,8 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
     }
 
     // If the app was launched from a local notification tap, route there.
-    final launchPayload =
-        await LocalNotificationService.instance.getLaunchPayload();
+    final launchPayload = await LocalNotificationService.instance
+        .getLaunchPayload();
     if (launchPayload != null && mounted) {
       widget.router.go(launchPayload);
     }
@@ -225,12 +226,7 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
         if (!mounted) return;
         widget.router.go(route);
       },
-      onForegroundBanner: ({
-        required title,
-        body,
-        actionLabel,
-        onAction,
-      }) {
+      onForegroundBanner: ({required title, body, actionLabel, onAction}) {
         final messenger = rootScaffoldMessengerKey.currentState;
         if (messenger == null) return;
         messenger.hideCurrentSnackBar();
@@ -270,8 +266,8 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
         final status = await Permission.contacts.status;
         if (status.isGranted) {
           await sync.setDeviceContactsOptIn(true);
-          unawaited(sync.syncDeviceContacts(force: false));
-          unawaited(sync.pullCrmContacts());
+          unawaited(sync.syncDeviceContacts(force: false).catchError((_) {}));
+          unawaited(sync.pullCrmContacts().catchError((_) {}));
         }
         return;
       }
@@ -280,8 +276,8 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
       if (!status.isGranted) return;
 
       // Let the sync service's throttle logic decide if a sync is due.
-      unawaited(sync.syncDeviceContacts(force: false));
-      unawaited(sync.pullCrmContacts());
+      unawaited(sync.syncDeviceContacts(force: false).catchError((_) {}));
+      unawaited(sync.pullCrmContacts().catchError((_) {}));
     } catch (_) {
       // Background sync must never crash the app.
     }
@@ -377,7 +373,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/splash',
         name: 'splash',
-        pageBuilder: (context, state) => _buildPage(state: state, child: const SplashScreen()),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const SplashScreen()),
       ),
       GoRoute(
         path: '/studio',
@@ -430,25 +427,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        pageBuilder: (context, state) => _buildPage(state: state, child: const LoginScreen()),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const LoginScreen()),
       ),
       GoRoute(
         path: '/staff-login',
         name: 'staff-login',
-        pageBuilder: (context, state) => _buildPage(state: state, child: const StaffLoginScreen()),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const StaffLoginScreen()),
       ),
       GoRoute(
         path: '/register',
         name: 'register',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return _buildPage(child: SellerRegistrationScreen(initialPhone: extra?['phone']));
+          return _buildPage(
+            child: SellerRegistrationScreen(initialPhone: extra?['phone']),
+          );
         },
       ),
       GoRoute(
         path: '/forgot-password',
         name: 'forgot-password',
-        pageBuilder: (context, state) => _buildPage(state: state, child: const ForgotPasswordScreen()),
+        pageBuilder: (context, state) =>
+            _buildPage(state: state, child: const ForgotPasswordScreen()),
       ),
       GoRoute(
         path: '/onboarding',
@@ -484,7 +486,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/checkout',
                 name: 'checkout',
-                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.checkoutTab()),
+                pageBuilder: (context, state) =>
+                    _buildPage(state: state, child: HomeShell.checkoutTab()),
               ),
             ],
           ),
@@ -493,7 +496,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/transactions',
                 name: 'transactions',
-                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.transactionsTab()),
+                pageBuilder: (context, state) => _buildPage(
+                  state: state,
+                  child: HomeShell.transactionsTab(),
+                ),
               ),
             ],
           ),
@@ -502,7 +508,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/notifications',
                 name: 'notifications',
-                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.notificationsTab()),
+                pageBuilder: (context, state) => _buildPage(
+                  state: state,
+                  child: HomeShell.notificationsTab(),
+                ),
               ),
             ],
           ),
@@ -511,47 +520,66 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home/more',
                 name: 'more',
-                pageBuilder: (context, state) => _buildPage(state: state, child: HomeShell.moreTab()),
+                pageBuilder: (context, state) =>
+                    _buildPage(state: state, child: HomeShell.moreTab()),
                 routes: [
                   GoRoute(
                     path: 'dashboard',
                     name: 'dashboard',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const DashboardScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const DashboardScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'items',
                     name: 'items',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ItemsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ItemsScreen()),
                   ),
                   GoRoute(
                     path: 'suppliers',
                     name: 'suppliers',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const SuppliersScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const SuppliersScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'purchase-orders',
                     name: 'purchase-orders',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const PurchaseOrdersScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const PurchaseOrdersScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'receive-stock',
                     name: 'receive-stock',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReceiveStockScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const ReceiveStockScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'stocktake',
                     name: 'stocktake',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const StocktakeScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const StocktakeScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'low-stock',
                     name: 'low-stock',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const LowStockScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const LowStockScreen()),
                   ),
                   GoRoute(
                     path: 'services',
                     name: 'services',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ServicesScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ServicesScreen()),
                   ),
                   // Hidden: dead features (not MVP-ready)
                   // GoRoute(
@@ -567,7 +595,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'analytics',
                     name: 'analytics',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const AnalyticsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const AnalyticsScreen(),
+                    ),
                   ),
                   // GoRoute(
                   //   path: 'chat/:conversationId',
@@ -582,17 +613,20 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'coupons',
                     name: 'coupons',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const CouponsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const CouponsScreen()),
                   ),
                   GoRoute(
                     path: 'orders',
                     name: 'orders',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const OrdersScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const OrdersScreen()),
                   ),
                   GoRoute(
                     path: 'catalog',
                     name: 'catalog',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const CatalogScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const CatalogScreen()),
                   ),
                   // GoRoute(
                   //   path: 'wholesale',
@@ -602,159 +636,271 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'ads',
                     name: 'ads',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const AdsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const AdsScreen()),
                   ),
                   GoRoute(
                     path: 'bulk-sms',
                     name: 'bulk-sms',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const BulkSmsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const BulkSmsScreen()),
                   ),
                   GoRoute(
                     path: 'reports',
                     name: 'reports',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReportsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ReportsScreen()),
                   ),
                   GoRoute(
                     path: 'expenses',
                     name: 'expenses',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ExpensesScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ExpensesScreen()),
                   ),
                   GoRoute(
                     path: 'refunds',
                     name: 'refunds',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const RefundsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const RefundsScreen()),
                   ),
                   GoRoute(
                     path: 'settings',
                     name: 'settings',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const SettingsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const SettingsScreen()),
                   ),
                   GoRoute(
                     path: 'backup',
                     name: 'backup',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const BackupScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const BackupScreen()),
                   ),
                   GoRoute(
                     path: 'delivery-settings',
                     name: 'delivery-settings',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const DeliverySettingsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const DeliverySettingsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'tax-settings',
                     name: 'tax-settings',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const TaxSettingsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const TaxSettingsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'accounting',
                     name: 'accounting',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const AccountingScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const AccountingScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'payment-links',
+                    name: 'payment-links',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const PaymentLinksScreen(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: ':id',
+                        name: 'payment-link-details',
+                        pageBuilder: (context, state) {
+                          final id = int.tryParse(
+                            state.pathParameters['id'] ?? '',
+                          );
+                          if (id == null) {
+                            return _buildPage(
+                              child: const PaymentLinksScreen(),
+                            );
+                          }
+                          return _buildPage(
+                            child: PaymentLinkDetailsScreen(linkId: id),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'marketing',
+                    name: 'marketing',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const MarketingGeneratorScreen(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'video-ad',
+                    name: 'video-ad',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const VideoAdScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'print-queue',
                     name: 'print-queue',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const PrintQueueScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const PrintQueueScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'print-diagnostics',
                     name: 'print-diagnostics',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const PrintDiagnosticsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const PrintDiagnosticsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'sync-health',
                     name: 'sync-health',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const SyncHealthScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const SyncHealthScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'device-health',
                     name: 'device-health',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const DeviceHealthScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const DeviceHealthScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'export',
                     name: 'export',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ExportScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ExportScreen()),
                   ),
                   GoRoute(
                     path: 'profile',
                     name: 'profile',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ProfileScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ProfileScreen()),
+                  ),
+                  GoRoute(
+                    path: 'brand-media',
+                    name: 'brand-media',
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const BrandMediaScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'seller-profile',
                     name: 'seller-profile',
-                    pageBuilder: (context, state) => _buildPage(
-                        child: const SellerProfileEditScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(child: const SellerProfileEditScreen()),
                   ),
                   GoRoute(
                     path: 'shop-info',
                     name: 'shop-info',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShopInfoScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ShopInfoScreen()),
                   ),
                   GoRoute(
                     path: 'shop-seo',
                     name: 'shop-seo',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShopSeoScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ShopSeoScreen()),
                   ),
                   GoRoute(
                     path: 'payment-settings',
                     name: 'payment-settings',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const PaymentSettingsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const PaymentSettingsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'wallet',
                     name: 'wallet',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const SellerWalletScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const SellerWalletScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'bnpl-settings',
                     name: 'bnpl-settings',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const BnplSettingsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const BnplSettingsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'verification',
                     name: 'verification',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const VerificationScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const VerificationScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'staff',
                     name: 'staff',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const StaffManagementScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const StaffManagementScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'staff-menu-access',
                     name: 'staff-menu-access',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const StaffMenuAccessScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const StaffMenuAccessScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'shifts',
                     name: 'shifts',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ShiftsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ShiftsScreen()),
                   ),
                   GoRoute(
                     path: 'contacts',
                     name: 'contacts',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ContactsScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const ContactsScreen()),
                   ),
                   GoRoute(
                     path: 'quotations',
                     name: 'quotations',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const QuotationsScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const QuotationsScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'receipt-templates',
                     name: 'receipt-templates',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const ReceiptTemplatesScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const ReceiptTemplatesScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'void-reason-codes',
                     name: 'void-reason-codes',
-                    pageBuilder: (context, state) => _buildPage(state: state, child: const VoidReasonCodesScreen()),
+                    pageBuilder: (context, state) => _buildPage(
+                      state: state,
+                      child: const VoidReasonCodesScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'business-setup',
                     name: 'business-setup',
-                    pageBuilder: (context, state) => _buildPage(
-                        child: const BusinessSetupWizardScreen()),
+                    pageBuilder: (context, state) =>
+                        _buildPage(child: const BusinessSetupWizardScreen()),
                   ),
                 ],
               ),

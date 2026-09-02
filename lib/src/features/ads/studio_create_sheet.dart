@@ -75,10 +75,8 @@ class _StudioCreateSheet extends StatelessWidget {
                   subtitle: 'Start from scratch',
                   icon: Icons.add_rounded,
                   accent: DesignTokens.brandAccent,
-                  onTap: () => Navigator.pop(
-                    context,
-                    blankCanvas(adSizes.first),
-                  ),
+                  onTap: () =>
+                      Navigator.pop(context, blankCanvas(adSizes.first)),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -190,8 +188,10 @@ class _SizeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.white.withValues(alpha: 0.35)),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withValues(alpha: 0.35),
+              ),
             ],
           ),
         ),

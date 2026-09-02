@@ -109,5 +109,6 @@ class _OfflineCachedImageState extends State<OfflineCachedImage> {
         );
   }
 
-  Widget _fallback() => widget.errorWidget ?? widget.placeholder ?? const SizedBox();
+  Widget _fallback() =>
+      widget.errorWidget ?? widget.placeholder ?? const SizedBox();
 }

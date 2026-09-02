@@ -363,12 +363,12 @@ class _BusinessSetupWizardScreenState
               : drift.Value(existingProfile!.deliveryRadiusKm),
           deliveryPickupLatitude:
               existingProfile?.deliveryPickupLatitude == null
-                  ? const drift.Value.absent()
-                  : drift.Value(existingProfile!.deliveryPickupLatitude),
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryPickupLatitude),
           deliveryPickupLongitude:
               existingProfile?.deliveryPickupLongitude == null
-                  ? const drift.Value.absent()
-                  : drift.Value(existingProfile!.deliveryPickupLongitude),
+              ? const drift.Value.absent()
+              : drift.Value(existingProfile!.deliveryPickupLongitude),
           cashOnDeliveryEnabled: drift.Value(settings.cashEnabled),
           bankPaymentEnabled: drift.Value(settings.bankEnabled),
           mobileMoneyEnabled: drift.Value(settings.mobileMoneyEnabled),
@@ -468,7 +468,9 @@ class _BusinessSetupWizardScreenState
     final devices = await BlueThermalPrinter.instance.getBondedDevices();
     if (!mounted) return;
     if (devices.isEmpty) {
-      _showError('No paired printers found. Pair one in Bluetooth settings first.');
+      _showError(
+        'No paired printers found. Pair one in Bluetooth settings first.',
+      );
       return;
     }
 
@@ -506,11 +508,20 @@ class _BusinessSetupWizardScreenState
                         itemBuilder: (context, index) {
                           final d = devices[index];
                           return ListTile(
-                            leading: const Icon(Icons.print_outlined, color: Colors.white70),
-                            title: Text(d.name ?? 'Printer', style: const TextStyle(color: Colors.white)),
+                            leading: const Icon(
+                              Icons.print_outlined,
+                              color: Colors.white70,
+                            ),
+                            title: Text(
+                              d.name ?? 'Printer',
+                              style: const TextStyle(color: Colors.white),
+                            ),
                             subtitle: Text(
                               d.address ?? '',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 13,
+                              ),
                             ),
                             onTap: () async {
                               try {
@@ -518,7 +529,9 @@ class _BusinessSetupWizardScreenState
                                     .read(printQueueServiceProvider)
                                     .setPreferredPrinter(d);
                                 await BlueThermalPrinter.instance.connect(d);
-                                unawaited(ref.read(printQueueServiceProvider).pump());
+                                unawaited(
+                                  ref.read(printQueueServiceProvider).pump(),
+                                );
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 if (!mounted) return;
                                 setState(() {});
@@ -558,7 +571,9 @@ class _BusinessSetupWizardScreenState
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                 child: Container(
@@ -585,12 +600,25 @@ class _BusinessSetupWizardScreenState
                       const SizedBox(height: 8),
                       Text(
                         '4–8 digits to lock this device.',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 20),
-                      _DarkInput(controller: pinCtrl, label: 'PIN', obscure: true, digitsOnly: true),
+                      _DarkInput(
+                        controller: pinCtrl,
+                        label: 'PIN',
+                        obscure: true,
+                        digitsOnly: true,
+                      ),
                       const SizedBox(height: 12),
-                      _DarkInput(controller: confirmCtrl, label: 'Confirm PIN', obscure: true, digitsOnly: true),
+                      _DarkInput(
+                        controller: confirmCtrl,
+                        label: 'Confirm PIN',
+                        obscure: true,
+                        digitsOnly: true,
+                      ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -598,7 +626,13 @@ class _BusinessSetupWizardScreenState
                             child: _GlassButton(
                               onTap: () => Navigator.pop(ctx),
                               child: const Center(
-                                child: Text('Cancel', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                                child: Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -623,7 +657,9 @@ class _BusinessSetupWizardScreenState
                                 await ctrl.unlock(pin);
                                 final telemetry = Telemetry.instance;
                                 if (telemetry != null) {
-                                  unawaited(telemetry.event('setup_terminal_pin_set'));
+                                  unawaited(
+                                    telemetry.event('setup_terminal_pin_set'),
+                                  );
                                 }
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 if (!mounted) return;
@@ -632,7 +668,13 @@ class _BusinessSetupWizardScreenState
                                 });
                               },
                               child: const Center(
-                                child: Text('Save PIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+                                child: Text(
+                                  'Save PIN',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -711,7 +753,8 @@ class _BusinessSetupWizardScreenState
 
   int _suggestedStepIndex(ReceiptTemplate? activeTemplate) {
     final resolvedTemplate =
-        activeTemplate ?? ref.read(_activeReceiptTemplateProvider).asData?.value;
+        activeTemplate ??
+        ref.read(_activeReceiptTemplateProvider).asData?.value;
     final staffPin = ref.read(staffPinProvider);
     final steps = [
       _businessComplete,
@@ -809,7 +852,10 @@ class _BusinessSetupWizardScreenState
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withValues(alpha: 0.14), size: 380),
+              child: _GlowBlob(
+                color: _accent.withValues(alpha: 0.14),
+                size: 380,
+              ),
             ),
             Positioned(
               bottom: -160,
@@ -827,13 +873,17 @@ class _BusinessSetupWizardScreenState
                         duration: const Duration(milliseconds: 320),
                         switchInCurve: Curves.easeOutQuart,
                         switchOutCurve: Curves.easeInQuart,
-                        transitionBuilder: (child, animation) => SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.06, 0),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: FadeTransition(opacity: animation, child: child),
-                        ),
+                        transitionBuilder: (child, animation) =>
+                            SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.06, 0),
+                                end: Offset.zero,
+                              ).animate(animation),
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            ),
                         child: KeyedSubtree(
                           key: ValueKey(currentStep),
                           child: Padding(
@@ -849,7 +899,12 @@ class _BusinessSetupWizardScreenState
                         ),
                       ),
                     ),
-                    _buildBottomBar(currentMeta, currentStep, totalSteps, activeTemplate),
+                    _buildBottomBar(
+                      currentMeta,
+                      currentStep,
+                      totalSteps,
+                      activeTemplate,
+                    ),
                   ],
                 ),
               ),
@@ -860,7 +915,11 @@ class _BusinessSetupWizardScreenState
     );
   }
 
-  Widget _buildHeader(int currentStep, int totalSteps, List<_WizardStepMeta> steps) {
+  Widget _buildHeader(
+    int currentStep,
+    int totalSteps,
+    List<_WizardStepMeta> steps,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       child: Column(
@@ -868,7 +927,9 @@ class _BusinessSetupWizardScreenState
           Row(
             children: [
               GestureDetector(
-                onTap: currentStep > 0 ? _prevStep : () => context.go('/home/checkout'),
+                onTap: currentStep > 0
+                    ? _prevStep
+                    : () => context.go('/home/checkout'),
                 child: Container(
                   width: 40,
                   height: 40,
@@ -914,9 +975,13 @@ class _BusinessSetupWizardScreenState
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   height: 4,
-                  margin: EdgeInsets.only(right: index < totalSteps - 1 ? 6 : 0),
+                  margin: EdgeInsets.only(
+                    right: index < totalSteps - 1 ? 6 : 0,
+                  ),
                   decoration: BoxDecoration(
-                    color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.12),
+                    color: isActive
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1027,7 +1092,11 @@ class _BusinessSetupWizardScreenState
         ),
         if (_bankEnabled) ...[
           const SizedBox(height: 12),
-          _DarkInput(controller: _bankNameCtrl, label: 'Bank name', hint: 'e.g. Stanbic'),
+          _DarkInput(
+            controller: _bankNameCtrl,
+            label: 'Bank name',
+            hint: 'e.g. Stanbic',
+          ),
           const SizedBox(height: 12),
           _DarkInput(controller: _bankAccNameCtrl, label: 'Account name'),
           const SizedBox(height: 12),
@@ -1042,11 +1111,23 @@ class _BusinessSetupWizardScreenState
         ),
         if (_mobileMoneyEnabled) ...[
           const SizedBox(height: 12),
-          _DarkInput(controller: _mtnMerchantCtrl, label: 'MTN merchant code', hint: 'e.g. 123456'),
+          _DarkInput(
+            controller: _mtnMerchantCtrl,
+            label: 'MTN merchant code',
+            hint: 'e.g. 123456',
+          ),
           const SizedBox(height: 12),
-          _DarkInput(controller: _airtelMerchantCtrl, label: 'Airtel merchant code', hint: 'e.g. 654321'),
+          _DarkInput(
+            controller: _airtelMerchantCtrl,
+            label: 'Airtel merchant code',
+            hint: 'e.g. 654321',
+          ),
           const SizedBox(height: 12),
-          _DarkInput(controller: _paybillCtrl, label: 'Paybill number', hint: 'e.g. 200200'),
+          _DarkInput(
+            controller: _paybillCtrl,
+            label: 'Paybill number',
+            hint: 'e.g. 200200',
+          ),
         ],
       ],
     );
@@ -1088,7 +1169,14 @@ class _BusinessSetupWizardScreenState
               children: [
                 Icon(Icons.add, color: Colors.black, size: 20),
                 SizedBox(width: 8),
-                Text('Create default template', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 15)),
+                Text(
+                  'Create default template',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
           )
@@ -1107,7 +1195,10 @@ class _BusinessSetupWizardScreenState
                 Expanded(
                   child: Text(
                     'Template active: ${activeTemplate.name}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -1117,7 +1208,13 @@ class _BusinessSetupWizardScreenState
         _GlassButton(
           onTap: () => context.go('/home/more/receipt-templates'),
           child: const Center(
-            child: Text('Edit templates', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Edit templates',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ],
@@ -1171,8 +1268,13 @@ class _BusinessSetupWizardScreenState
                 const Icon(Icons.print_outlined, color: Colors.white, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  printer.hasPreferredPrinter ? printer.preferredPrinterLabel() : 'Choose printer',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  printer.hasPreferredPrinter
+                      ? printer.preferredPrinterLabel()
+                      : 'Choose printer',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -1229,7 +1331,14 @@ class _BusinessSetupWizardScreenState
               children: [
                 Icon(Icons.add, color: Colors.black, size: 20),
                 SizedBox(width: 8),
-                Text('Set PIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 15)),
+                Text(
+                  'Set PIN',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ],
             ),
           )
@@ -1248,14 +1357,24 @@ class _BusinessSetupWizardScreenState
                 const Expanded(
                   child: Text(
                     'Device lock is active',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 _GlassButton(
                   onTap: _setTerminalPin,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Text('Change', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                    child: Text(
+                      'Change',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1281,11 +1400,7 @@ class _BusinessSetupWizardScreenState
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            _bg.withValues(alpha: 0),
-            _bg.withValues(alpha: 0.9),
-            _bg,
-          ],
+          colors: [_bg.withValues(alpha: 0), _bg.withValues(alpha: 0.9), _bg],
         ),
       ),
       child: SafeArea(
@@ -1297,22 +1412,28 @@ class _BusinessSetupWizardScreenState
             _SolidButton(
               onTap: isLast
                   ? (canFinish ? _finishSetup : null)
-                  : (canContinue ? () {
-                      if (currentStep == 0) {
-                        _saveBusinessInfo();
-                      } else if (currentStep == 1) {
-                        _savePaymentSettings();
-                      } else {
-                        _nextStep();
-                      }
-                    } : null),
+                  : (canContinue
+                        ? () {
+                            if (currentStep == 0) {
+                              _saveBusinessInfo();
+                            } else if (currentStep == 1) {
+                              _savePaymentSettings();
+                            } else {
+                              _nextStep();
+                            }
+                          }
+                        : null),
               child: Center(
                 child: Text(
                   isLast
-                      ? (canFinish ? 'Start selling' : 'Complete required steps')
+                      ? (canFinish
+                            ? 'Start selling'
+                            : 'Complete required steps')
                       : 'Continue',
                   style: TextStyle(
-                    color: isLast && !canFinish ? Colors.white.withValues(alpha: 0.4) : Colors.black,
+                    color: isLast && !canFinish
+                        ? Colors.white.withValues(alpha: 0.4)
+                        : Colors.black,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
@@ -1325,7 +1446,10 @@ class _BusinessSetupWizardScreenState
                 onPressed: _nextStep,
                 child: Text(
                   'Skip for now',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -1443,12 +1567,22 @@ class _DarkInputState extends State<_DarkInput> {
             inputFormatters: widget.digitsOnly
                 ? [FilteringTextInputFormatter.digitsOnly]
                 : null,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
             decoration: InputDecoration(
               hintText: widget.hint,
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 16),
+              hintStyle: TextStyle(
+                color: Colors.white.withValues(alpha: 0.25),
+                fontSize: 16,
+              ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 16,
+              ),
             ),
           ),
         ),
@@ -1481,10 +1615,14 @@ class _PaymentToggle extends StatelessWidget {
         curve: Curves.easeOutQuart,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: value ? DesignTokens.brandAccent.withValues(alpha: 0.12) : DesignTokens.brandPrimary,
+          color: value
+              ? DesignTokens.brandAccent.withValues(alpha: 0.12)
+              : DesignTokens.brandPrimary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: value ? DesignTokens.brandAccent.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.1),
+            color: value
+                ? DesignTokens.brandAccent.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.1),
             width: value ? 1.5 : 1,
           ),
         ),
@@ -1494,10 +1632,16 @@ class _PaymentToggle extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: value ? DesignTokens.brandAccent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.06),
+                color: value
+                    ? DesignTokens.brandAccent.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: value ? DesignTokens.brandAccent : Colors.white70, size: 20),
+              child: Icon(
+                icon,
+                color: value ? DesignTokens.brandAccent : Colors.white70,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1515,7 +1659,10 @@ class _PaymentToggle extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 13,
+                      ),
                     ),
                 ],
               ),
@@ -1523,8 +1670,16 @@ class _PaymentToggle extends StatelessWidget {
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: value
-                  ? Icon(Icons.check_circle, color: DesignTokens.brandAccent, key: const ValueKey('on'))
-                  : Icon(Icons.circle_outlined, color: Colors.white.withValues(alpha: 0.2), key: const ValueKey('off')),
+                  ? Icon(
+                      Icons.check_circle,
+                      color: DesignTokens.brandAccent,
+                      key: const ValueKey('on'),
+                    )
+                  : Icon(
+                      Icons.circle_outlined,
+                      color: Colors.white.withValues(alpha: 0.2),
+                      key: const ValueKey('off'),
+                    ),
             ),
           ],
         ),
@@ -1551,14 +1706,22 @@ class _SolidButtonState extends State<_SolidButton> {
       scale: _pressed ? 0.98 : 1.0,
       duration: const Duration(milliseconds: 120),
       child: GestureDetector(
-        onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
-        onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
-        onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+        onTapDown: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = true),
+        onTapUp: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = false),
+        onTapCancel: widget.onTap == null
+            ? null
+            : () => setState(() => _pressed = false),
         onTap: widget.onTap,
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: widget.onTap == null ? Colors.white.withValues(alpha: 0.15) : Colors.white,
+            color: widget.onTap == null
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.white,
             borderRadius: BorderRadius.circular(18),
             boxShadow: widget.onTap == null
                 ? null
@@ -1596,9 +1759,15 @@ class _GlassButtonState extends State<_GlassButton> {
       scale: _pressed ? 0.98 : 1.0,
       duration: const Duration(milliseconds: 120),
       child: GestureDetector(
-        onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
-        onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
-        onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+        onTapDown: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = true),
+        onTapUp: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = false),
+        onTapCancel: widget.onTap == null
+            ? null
+            : () => setState(() => _pressed = false),
         onTap: widget.onTap,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
@@ -1634,7 +1803,11 @@ class _GlowBlob extends StatelessWidget {
         shape: BoxShape.circle,
         color: color,
         boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 80, spreadRadius: 30),
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 80,
+            spreadRadius: 30,
+          ),
         ],
       ),
     );

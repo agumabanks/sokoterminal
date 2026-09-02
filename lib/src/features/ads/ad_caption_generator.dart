@@ -2,12 +2,7 @@
 // Platform-optimized caption generator for Soko Studio ads
 // ---------------------------------------------------------------------------
 
-enum CaptionPlatform {
-  whatsapp,
-  instagram,
-  facebook,
-  x,
-}
+enum CaptionPlatform { whatsapp, instagram, facebook, x }
 
 extension CaptionPlatformX on CaptionPlatform {
   String get label => switch (this) {
@@ -66,8 +61,8 @@ GeneratedCaption generateCaption({
   final contact = whatsapp?.isNotEmpty == true
       ? 'WhatsApp: $whatsapp'
       : phone?.isNotEmpty == true
-          ? 'Call: $phone'
-          : '';
+      ? 'Call: $phone'
+      : '';
   final loc = location?.isNotEmpty == true ? '📍 $location' : '';
 
   final hash = seed + platform.name.hashCode + productName.hashCode;
@@ -123,11 +118,7 @@ GeneratedCaption generateCaption({
         tagline: tagline,
         hash: hash,
       );
-      hashtags = [
-        '#ShopLocal',
-        '#UgandaBusiness',
-        ...extraHashtags,
-      ];
+      hashtags = ['#ShopLocal', '#UgandaBusiness', ...extraHashtags];
 
     case CaptionPlatform.x:
       text = _xCaption(
@@ -149,11 +140,7 @@ GeneratedCaption generateCaption({
     text = '${text.substring(0, platform.maxLength - 53)}...';
   }
 
-  return GeneratedCaption(
-    platform: platform,
-    text: text,
-    hashtags: hashtags,
-  );
+  return GeneratedCaption(platform: platform, text: text, hashtags: hashtags);
 }
 
 String _whatsappCaption({

@@ -33,10 +33,7 @@ class ServiceDescriptionArticle extends StatelessWidget {
           Text(title!, style: DesignTokens.textBodyBold),
           const SizedBox(height: 10),
         ],
-        Html(
-          data: normalized,
-          style: _articleStyles(baseSize),
-        ),
+        Html(data: normalized, style: _articleStyles(baseSize)),
       ],
     );
   }
@@ -101,7 +98,9 @@ class ServiceDescriptionArticle extends StatelessWidget {
         margin: Margins.symmetric(vertical: 12),
         padding: HtmlPaddings.only(left: 14, top: 10, bottom: 10, right: 10),
         backgroundColor: DesignTokens.canvasCloud,
-        border: const Border(left: BorderSide(color: DesignTokens.brandAccent, width: 3)),
+        border: const Border(
+          left: BorderSide(color: DesignTokens.brandAccent, width: 3),
+        ),
         color: DesignTokens.inkSubtle,
       ),
       'hr': Style(

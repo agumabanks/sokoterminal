@@ -21,20 +21,19 @@ class StudioVariableContext {
   );
 
   String resolve(String? raw) => resolveStudioVariables(
-        raw,
-        kit: kit,
-        product: product,
-        productLink: productLink,
-      );
+    raw,
+    kit: kit,
+    product: product,
+    productLink: productLink,
+  );
 
   StudioVariableContext copyWith({
     BrandKit? kit,
     Item? product,
     String? productLink,
-  }) =>
-      StudioVariableContext(
-        kit: kit ?? this.kit,
-        product: product ?? this.product,
-        productLink: productLink ?? this.productLink,
-      );
+  }) => StudioVariableContext(
+    kit: kit ?? this.kit,
+    product: product ?? this.product,
+    productLink: productLink ?? this.productLink,
+  );
 }

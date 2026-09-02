@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -202,21 +201,30 @@ class ProductFormState {
     );
   }
 
-  double? get priceValue => double.tryParse(CommaNumberFormatter.unformat(price.trim()));
-  double? get costValue => cost.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(cost.trim()));
-  int? get stockValue => int.tryParse(CommaNumberFormatter.unformat(stock.trim()));
-  double? get discountValue =>
-      discount.trim().isEmpty ? 0 : double.tryParse(CommaNumberFormatter.unformat(discount.trim()));
-  int? get minQtyValue => int.tryParse(CommaNumberFormatter.unformat(minQty.trim()));
+  double? get priceValue =>
+      double.tryParse(CommaNumberFormatter.unformat(price.trim()));
+  double? get costValue => cost.trim().isEmpty
+      ? null
+      : double.tryParse(CommaNumberFormatter.unformat(cost.trim()));
+  int? get stockValue =>
+      int.tryParse(CommaNumberFormatter.unformat(stock.trim()));
+  double? get discountValue => discount.trim().isEmpty
+      ? 0
+      : double.tryParse(CommaNumberFormatter.unformat(discount.trim()));
+  int? get minQtyValue =>
+      int.tryParse(CommaNumberFormatter.unformat(minQty.trim()));
   int? get lowStockWarningValue => lowStockWarning.trim().isEmpty
       ? null
       : int.tryParse(CommaNumberFormatter.unformat(lowStockWarning.trim()));
-  double? get weightValue =>
-      weight.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(weight.trim()));
-  int? get shippingDaysValue =>
-      shippingDays.trim().isEmpty ? null : int.tryParse(CommaNumberFormatter.unformat(shippingDays.trim()));
-  double? get shippingFeeValue =>
-      shippingFee.trim().isEmpty ? null : double.tryParse(CommaNumberFormatter.unformat(shippingFee.trim()));
+  double? get weightValue => weight.trim().isEmpty
+      ? null
+      : double.tryParse(CommaNumberFormatter.unformat(weight.trim()));
+  int? get shippingDaysValue => shippingDays.trim().isEmpty
+      ? null
+      : int.tryParse(CommaNumberFormatter.unformat(shippingDays.trim()));
+  double? get shippingFeeValue => shippingFee.trim().isEmpty
+      ? null
+      : double.tryParse(CommaNumberFormatter.unformat(shippingFee.trim()));
 
   /// Check if basic info is valid
   bool get isBasicInfoValid => name.trim().isNotEmpty && unit.isNotEmpty;
@@ -392,7 +400,10 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       } else if (data is List) {
         categories = List<Map<String, dynamic>>.from(data);
       }
-      await prefs.setString('product_categories_cache_v1', jsonEncode(categories));
+      await prefs.setString(
+        'product_categories_cache_v1',
+        jsonEncode(categories),
+      );
       state = state.copyWith(
         categories: categories,
         isLoadingCategories: false,
@@ -452,70 +463,21 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     }
   }
 
-  /// Requests the appropriate media/camera permission for the current platform
-  /// and Android API level. Returns true if the caller may proceed.
+  /// Requests camera access when capturing a new photo. Gallery selection uses
+  /// the platform photo picker and deliberately requires no broad media access.
   Future<bool> _requestMediaPermission({required bool camera}) async {
     if (!Platform.isAndroid && !Platform.isIOS) return true;
+    if (!camera) return true;
 
-    Permission permission;
-    if (camera) {
-      permission = Permission.camera;
-    } else if (Platform.isAndroid) {
-      // READ_MEDIA_IMAGES is the correct permission on Android 13+ (API 33+);
-      // on older versions image_picker handles READ_EXTERNAL_STORAGE itself.
-      final sdkInt = await _androidSdkInt();
-      permission = sdkInt >= 33 ? Permission.photos : Permission.storage;
-    } else {
-      permission = Permission.photos;
-    }
-
-    final status = await permission.request();
+    final status = await Permission.camera.request();
     if (status.isGranted || status.isLimited) return true;
     if (status.isPermanentlyDenied) {
       // User must go to settings; surface this via error state.
       state = state.copyWith(
-        error: camera
-            ? 'Camera access denied. Enable it in Settings → App → Permissions.'
-            : 'Photo library access denied. Enable it in Settings → App → Permissions.',
+        error: 'Camera access denied. Enable it in Settings → App → Permissions.',
       );
     }
     return false;
-  }
-
-  /// Returns the Android SDK integer or 0 on non-Android.
-  Future<int> _androidSdkInt() async {
-    if (!Platform.isAndroid) return 0;
-    try {
-      // permission_handler exposes this via a native channel indirectly.
-      // We read it from the build info available via dart:io on Android.
-      final result = Platform.operatingSystemVersion; // e.g. "4.14.117... (Android 13)"
-      final match = RegExp(r'Android (\d+)').firstMatch(result);
-      if (match != null) {
-        final version = int.tryParse(match.group(1) ?? '') ?? 0;
-        return _androidMarketingVersionToApiLevel(version);
-      }
-    } catch (e) {
-      debugPrint('[ProductForm] Could not determine Android SDK: $e');
-    }
-    return 0;
-  }
-
-  /// Maps Android marketing versions (e.g. 13, 14) to API levels for permissions.
-  int _androidMarketingVersionToApiLevel(int version) {
-    const map = <int, int>{
-      15: 35,
-      14: 34,
-      13: 33,
-      12: 31,
-      11: 30,
-      10: 29,
-      9: 28,
-      8: 26,
-      7: 24,
-      6: 23,
-      5: 21,
-    };
-    return map[version] ?? (version >= 13 ? 33 + (version - 13) : version);
   }
 
   /// Pick thumbnail image

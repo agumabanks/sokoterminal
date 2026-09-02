@@ -51,7 +51,10 @@ class BottomToolbar extends StatelessWidget {
                   onTap: () => onTool(t.$1),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: active
                           ? kAccent.withValues(alpha: 0.15)
@@ -64,16 +67,22 @@ class BottomToolbar extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(t.$2,
-                            size: 20,
-                            color: active ? kAccent : Colors.white38),
+                        Icon(
+                          t.$2,
+                          size: 20,
+                          color: active ? kAccent : Colors.white38,
+                        ),
                         const SizedBox(height: 2),
-                        Text(t.$3,
-                            style: TextStyle(
-                              color: active ? kAccent : Colors.white38,
-                              fontSize: 9,
-                              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                            )),
+                        Text(
+                          t.$3,
+                          style: TextStyle(
+                            color: active ? kAccent : Colors.white38,
+                            fontSize: 9,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                        ),
                       ],
                     ),
                   ),

@@ -319,33 +319,43 @@ class _DeliverySettingsScreenState
   }
 
   void _applyCachedBusinessProfile(BusinessProfile profile) {
-    final deliveryProfile = decodeJsonObject(profile.deliveryProfileJson) ?? const {};
+    final deliveryProfile =
+        decodeJsonObject(profile.deliveryProfileJson) ?? const {};
     final originLat =
-        _toDouble(deliveryProfile['origin_lat']) ?? profile.deliveryPickupLatitude;
+        _toDouble(deliveryProfile['origin_lat']) ??
+        profile.deliveryPickupLatitude;
     final originLng =
-        _toDouble(deliveryProfile['origin_lng']) ?? profile.deliveryPickupLongitude;
+        _toDouble(deliveryProfile['origin_lng']) ??
+        profile.deliveryPickupLongitude;
 
-    _enabled = _resolveBool(deliveryProfile['enabled']) ?? profile.selfDeliveryActive;
+    _enabled =
+        _resolveBool(deliveryProfile['enabled']) ?? profile.selfDeliveryActive;
     _radiusKm =
-        (_toDouble(deliveryProfile['radius_km']) ?? profile.deliveryRadiusKm ?? _maxRadiusKm)
+        (_toDouble(deliveryProfile['radius_km']) ??
+                profile.deliveryRadiusKm ??
+                _maxRadiusKm)
             .clamp(_minRadiusKm, _maxRadiusKm)
             .toDouble();
     _pricingMode =
-        (deliveryProfile['pricing_mode']?.toString() ?? 'base_per_km').trim().isEmpty
+        (deliveryProfile['pricing_mode']?.toString() ?? 'base_per_km')
+            .trim()
+            .isEmpty
         ? 'base_per_km'
         : deliveryProfile['pricing_mode'].toString();
     _originLabelCtrl.text =
-        (deliveryProfile['origin_label'] ?? profile.shopAddress ?? '').toString();
+        (deliveryProfile['origin_label'] ?? profile.shopAddress ?? '')
+            .toString();
     _originLatCtrl.text = originLat != null ? originLat.toStringAsFixed(7) : '';
     _originLngCtrl.text = originLng != null ? originLng.toStringAsFixed(7) : '';
     _baseFeeCtrl.text =
         (_toDouble(deliveryProfile['base_fee']) ?? profile.shippingCost ?? 0)
             .toStringAsFixed(0);
-    _perKmFeeCtrl.text =
-        (_toDouble(deliveryProfile['per_km_fee']) ?? 0).toStringAsFixed(0);
-    _minFeeCtrl.text =
-        (_toDouble(deliveryProfile['min_fee']) ?? 0).toStringAsFixed(0);
-    _maxFeeCtrl.text = _toDouble(deliveryProfile['max_fee'])?.toStringAsFixed(0) ?? '';
+    _perKmFeeCtrl.text = (_toDouble(deliveryProfile['per_km_fee']) ?? 0)
+        .toStringAsFixed(0);
+    _minFeeCtrl.text = (_toDouble(deliveryProfile['min_fee']) ?? 0)
+        .toStringAsFixed(0);
+    _maxFeeCtrl.text =
+        _toDouble(deliveryProfile['max_fee'])?.toStringAsFixed(0) ?? '';
     _etaMinCtrl.text = (deliveryProfile['eta_min_minutes'] ?? '').toString();
     _etaMaxCtrl.text = (deliveryProfile['eta_max_minutes'] ?? '').toString();
   }
@@ -568,321 +578,329 @@ class _DeliverySettingsScreenState
                           ],
                         ),
                       ),
-                _SectionCard(
-                  title: 'Seller delivery',
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Enable seller delivery'),
-                        subtitle: Text(
-                          !_platformEnabled
-                              ? 'Seller delivery is temporarily disabled by Soko24'
-                              : (_sellerVerified
-                                    ? 'Deliver locally to nearby buyers'
-                                    : 'Verify your shop to enable seller delivery'),
-                          style: DesignTokens.textSmall,
-                        ),
-                        value: _enabled,
-                        onChanged: (!_sellerVerified || !_platformEnabled)
-                            ? null
-                            : (v) => setState(() => _enabled = v),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Seller delivery is limited to ${_fmtKm(_maxRadiusKm)} km. Outside this radius, buyers will use Soko24 delivery.',
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.grayDark,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      Row(
+                    _SectionCard(
+                      title: 'Seller delivery',
+                      child: Column(
                         children: [
-                          const Icon(
-                            Icons.radio_button_checked,
-                            size: 18,
-                            color: DesignTokens.grayDark,
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Enable seller delivery'),
+                            subtitle: Text(
+                              !_platformEnabled
+                                  ? 'Seller delivery is temporarily disabled by Soko24'
+                                  : (_sellerVerified
+                                        ? 'Deliver locally to nearby buyers'
+                                        : 'Verify your shop to enable seller delivery'),
+                              style: DesignTokens.textSmall,
+                            ),
+                            value: _enabled,
+                            onChanged: (!_sellerVerified || !_platformEnabled)
+                                ? null
+                                : (v) => setState(() => _enabled = v),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          Align(
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              'Radius: ${_fmtKm(_radiusKm)} km',
-                              style: DesignTokens.textBody,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Slider(
-                        value: _radiusKm
-                            .clamp(_minRadiusKm, _maxRadiusKm)
-                            .toDouble(),
-                        min: _minRadiusKm,
-                        max: _maxRadiusKm,
-                        divisions: radiusDivisions,
-                        label: '${_fmtKm(_radiusKm)} km',
-                        onChanged: (v) =>
-                            setState(() => _radiusKm = _snapKm(v)),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      DropdownButtonFormField<String>(
-                        initialValue: _pricingMode,
-                        decoration: const InputDecoration(
-                          labelText: 'Pricing model',
-                          prefixIcon: Icon(Icons.price_change_outlined),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'base_per_km',
-                            child: Text('Base fee + per km (recommended)'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'flat',
-                            child: Text('Flat fee (within radius)'),
-                          ),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => _pricingMode = v ?? 'base_per_km'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
-                _SectionCard(
-                  title: 'Origin (where you start)',
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _originLabelCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Location label',
-                          hintText: 'e.g. Kisaasi, Kampala',
-                          prefixIcon: Icon(Icons.place_outlined),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceMd),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _originLatCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                    signed: true,
-                                  ),
-                              decoration: const InputDecoration(
-                                labelText: 'Latitude',
-                                prefixIcon: Icon(Icons.my_location_outlined),
+                              'Seller delivery is limited to ${_fmtKm(_maxRadiusKm)} km. Outside this radius, buyers will use Soko24 delivery.',
+                              style: DesignTokens.textSmall.copyWith(
+                                color: DesignTokens.grayDark,
                               ),
-                              onChanged: (_) => setState(() {}),
                             ),
                           ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: TextField(
-                              controller: _originLngCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                    signed: true,
-                                  ),
-                              decoration: const InputDecoration(
-                                labelText: 'Longitude',
-                                prefixIcon: Icon(Icons.my_location_outlined),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.radio_button_checked,
+                                size: 18,
+                                color: DesignTokens.grayDark,
                               ),
-                              onChanged: (_) => setState(() {}),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Radius: ${_fmtKm(_radiusKm)} km',
+                                  style: DesignTokens.textBody,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Slider(
+                            value: _radiusKm
+                                .clamp(_minRadiusKm, _maxRadiusKm)
+                                .toDouble(),
+                            min: _minRadiusKm,
+                            max: _maxRadiusKm,
+                            divisions: radiusDivisions,
+                            label: '${_fmtKm(_radiusKm)} km',
+                            onChanged: (v) =>
+                                setState(() => _radiusKm = _snapKm(v)),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          DropdownButtonFormField<String>(
+                            initialValue: _pricingMode,
+                            decoration: const InputDecoration(
+                              labelText: 'Pricing model',
+                              prefixIcon: Icon(Icons.price_change_outlined),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'base_per_km',
+                                child: Text('Base fee + per km (recommended)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'flat',
+                                child: Text('Flat fee (within radius)'),
+                              ),
+                            ],
+                            onChanged: (v) => setState(
+                              () => _pricingMode = v ?? 'base_per_km',
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      Row(
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    _SectionCard(
+                      title: 'Origin (where you start)',
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _pasteLocationFromClipboard,
-                              icon: const Icon(Icons.content_paste_outlined),
-                              label: const Text('Paste'),
+                          TextField(
+                            controller: _originLabelCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Location label',
+                              hintText: 'e.g. Kisaasi, Kampala',
+                              prefixIcon: Icon(Icons.place_outlined),
                             ),
+                            onChanged: (_) => setState(() {}),
                           ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _openInMaps,
-                              icon: const Icon(Icons.map_outlined),
-                              label: const Text('Open in Maps'),
-                            ),
+                          const SizedBox(height: DesignTokens.spaceMd),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _originLatCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                        signed: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Latitude',
+                                    prefixIcon: Icon(
+                                      Icons.my_location_outlined,
+                                    ),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: DesignTokens.spaceSm),
+                              Expanded(
+                                child: TextField(
+                                  controller: _originLngCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                        signed: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Longitude',
+                                    prefixIcon: Icon(
+                                      Icons.my_location_outlined,
+                                    ),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _pasteLocationFromClipboard,
+                                  icon: const Icon(
+                                    Icons.content_paste_outlined,
+                                  ),
+                                  label: const Text('Paste'),
+                                ),
+                              ),
+                              const SizedBox(width: DesignTokens.spaceSm),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _openInMaps,
+                                  icon: const Icon(Icons.map_outlined),
+                                  label: const Text('Open in Maps'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
-                _SectionCard(
-                  title: 'Fees (UGX)',
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _baseFeeCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: _pricingMode == 'flat'
-                              ? 'Flat fee'
-                              : 'Base fee',
-                          prefixIcon: const Icon(Icons.payments_outlined),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceMd),
-                      if (_pricingMode != 'flat')
-                        TextField(
-                          controller: _perKmFeeCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Per km fee',
-                            prefixIcon: Icon(Icons.linear_scale_outlined),
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      if (_pricingMode != 'flat')
-                        const SizedBox(height: DesignTokens.spaceMd),
-                      Row(
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    _SectionCard(
+                      title: 'Fees (/=)',
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _minFeeCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              decoration: const InputDecoration(
-                                labelText: 'Minimum fee',
-                                prefixIcon: Icon(Icons.arrow_upward),
-                              ),
-                              onChanged: (_) => setState(() {}),
+                          TextField(
+                            controller: _baseFeeCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            decoration: InputDecoration(
+                              labelText: _pricingMode == 'flat'
+                                  ? 'Flat fee'
+                                  : 'Base fee',
+                              prefixIcon: const Icon(Icons.payments_outlined),
+                            ),
+                            onChanged: (_) => setState(() {}),
                           ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: TextField(
-                              controller: _maxFeeCtrl,
+                          const SizedBox(height: DesignTokens.spaceMd),
+                          if (_pricingMode != 'flat')
+                            TextField(
+                              controller: _perKmFeeCtrl,
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
                               decoration: const InputDecoration(
-                                labelText: 'Maximum fee (optional)',
-                                prefixIcon: Icon(Icons.arrow_downward),
+                                labelText: 'Per km fee',
+                                prefixIcon: Icon(Icons.linear_scale_outlined),
                               ),
                               onChanged: (_) => setState(() {}),
                             ),
+                          if (_pricingMode != 'flat')
+                            const SizedBox(height: DesignTokens.spaceMd),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _minFeeCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Minimum fee',
+                                    prefixIcon: Icon(Icons.arrow_upward),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: DesignTokens.spaceSm),
+                              Expanded(
+                                child: TextField(
+                                  controller: _maxFeeCtrl,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Maximum fee (optional)',
+                                    prefixIcon: Icon(Icons.arrow_downward),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: DesignTokens.spaceMd),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Platform system charge: ${_platformFeePercent.toStringAsFixed(0)}% (min ${_ugx(_minPlatformFee)}${_maxPlatformFee != null ? ', max ${_ugx(_maxPlatformFee!)}' : ''}).',
+                              style: DesignTokens.textSmall.copyWith(
+                                color: DesignTokens.grayDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(
+                            label: '1 km (customer pays)',
+                            value: _ugx(preview1),
+                          ),
+                          _PreviewRow(
+                            label: '1 km (you receive)',
+                            value: _ugx(
+                              math.max(0, preview1 - preview1PlatformFee),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(
+                            label: '3 km (customer pays)',
+                            value: _ugx(preview3),
+                          ),
+                          _PreviewRow(
+                            label: '3 km (you receive)',
+                            value: _ugx(
+                              math.max(0, preview3 - preview3PlatformFee),
+                            ),
+                          ),
+                          const SizedBox(height: DesignTokens.spaceSm),
+                          _PreviewRow(
+                            label: '5 km (customer pays)',
+                            value: _ugx(preview5),
+                          ),
+                          _PreviewRow(
+                            label: '5 km (you receive)',
+                            value: _ugx(
+                              math.max(0, preview5 - preview5PlatformFee),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: DesignTokens.spaceMd),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Platform system charge: ${_platformFeePercent.toStringAsFixed(0)}% (min ${_ugx(_minPlatformFee)}${_maxPlatformFee != null ? ', max ${_ugx(_maxPlatformFee!)}' : ''}).',
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.grayDark,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      _PreviewRow(
-                        label: '1 km (customer pays)',
-                        value: _ugx(preview1),
-                      ),
-                      _PreviewRow(
-                        label: '1 km (you receive)',
-                        value: _ugx(
-                          math.max(0, preview1 - preview1PlatformFee),
-                        ),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      _PreviewRow(
-                        label: '3 km (customer pays)',
-                        value: _ugx(preview3),
-                      ),
-                      _PreviewRow(
-                        label: '3 km (you receive)',
-                        value: _ugx(
-                          math.max(0, preview3 - preview3PlatformFee),
-                        ),
-                      ),
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      _PreviewRow(
-                        label: '5 km (customer pays)',
-                        value: _ugx(preview5),
-                      ),
-                      _PreviewRow(
-                        label: '5 km (you receive)',
-                        value: _ugx(
-                          math.max(0, preview5 - preview5PlatformFee),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
-                _SectionCard(
-                  title: 'ETA (optional)',
-                  child: Column(
-                    children: [
-                      Row(
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    _SectionCard(
+                      title: 'ETA (optional)',
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _etaMinCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Min minutes',
-                                prefixIcon: Icon(Icons.timer_outlined),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _etaMinCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Min minutes',
+                                    prefixIcon: Icon(Icons.timer_outlined),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: TextField(
-                              controller: _etaMaxCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Max minutes',
-                                prefixIcon: Icon(Icons.timer_outlined),
+                              const SizedBox(width: DesignTokens.spaceSm),
+                              Expanded(
+                                child: TextField(
+                                  controller: _etaMaxCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Max minutes',
+                                    prefixIcon: Icon(Icons.timer_outlined),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
-                ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(_saving ? 'Saving…' : 'Save'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: DesignTokens.brandAccent,
-                  ),
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    ElevatedButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(_saving ? 'Saving…' : 'Save'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: DesignTokens.brandAccent,
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
                   ],
                 ),
                 if (_refreshing)
@@ -919,9 +937,9 @@ class _DeliverySettingsScreenState
     } catch (e) {
       debugPrint('pasteLocationFromClipboard failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to read clipboard: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to read clipboard: $e')));
     }
   }
 
@@ -980,7 +998,7 @@ class _DeliverySettingsScreenState
     return platformFee;
   }
 
-  String _ugx(double value) => 'UGX ${value.toStringAsFixed(0)}';
+  String _ugx(double value) => '${value.toStringAsFixed(0)} /=';
 
   double _snapKm(double value) {
     final snapped = (value / 0.5).round() * 0.5;

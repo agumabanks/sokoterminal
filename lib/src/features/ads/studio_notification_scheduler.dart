@@ -43,17 +43,18 @@ class StudioNotificationPrefs {
   }
 
   Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        'reminderTimes': reminderTimes
-            .map((t) => {'hour': t.hour, 'minute': t.minute})
-            .toList(),
-        'suggestFromInventory': suggestFromInventory,
-        'suggestWeeklyPromo': suggestWeeklyPromo,
-      };
+    'enabled': enabled,
+    'reminderTimes': reminderTimes
+        .map((t) => {'hour': t.hour, 'minute': t.minute})
+        .toList(),
+    'suggestFromInventory': suggestFromInventory,
+    'suggestWeeklyPromo': suggestWeeklyPromo,
+  };
 
   factory StudioNotificationPrefs.fromJson(Map<String, dynamic> json) {
     final rawTimes = json['reminderTimes'] as List<dynamic>?;
-    final times = rawTimes
+    final times =
+        rawTimes
             ?.map(
               (e) => TimeOfDay(
                 hour: (e['hour'] as num?)?.toInt() ?? 0,
@@ -80,13 +81,13 @@ class StudioNotificationPrefs {
 /// corresponding local notifications.
 class StudioNotificationPrefsNotifier
     extends StateNotifier<StudioNotificationPrefs> {
-  StudioNotificationPrefsNotifier(this._prefs)
-      : super(_load(_prefs));
+  StudioNotificationPrefsNotifier(this._prefs) : super(_load(_prefs));
 
   final SharedPreferences _prefs;
   static const _key = 'studio_notification_prefs_v1';
   static const _scheduledIdsKey = 'studio_notification_scheduled_ids_v1';
-  static const _payload = '{"type":"studio","open_panel":"smart_ad","source":"notification"}';
+  static const _payload =
+      '{"type":"studio","open_panel":"smart_ad","source":"notification"}';
   static const _idBase = 900000;
 
   static StudioNotificationPrefs _load(SharedPreferences prefs) {
@@ -136,12 +137,12 @@ class StudioNotificationPrefsNotifier
   /// Call after [LocalNotificationService.instance.init()] has completed.
   Future<void> refreshReminders() async {
     // Cancel only the IDs we previously scheduled.
-    final previousIds = _prefs
-            .getStringList(_scheduledIdsKey)
-            ?.map(int.parse)
-            .toList() ??
+    final previousIds =
+        _prefs.getStringList(_scheduledIdsKey)?.map(int.parse).toList() ??
         <int>[];
-    await LocalNotificationService.instance.cancelStudioReminders(ids: previousIds);
+    await LocalNotificationService.instance.cancelStudioReminders(
+      ids: previousIds,
+    );
 
     if (!state.enabled) return;
 
@@ -203,15 +204,27 @@ class StudioNotificationPrefsNotifier
 
     if (hour < 12) {
       return _pickOne([
-        ('Post your morning deal 🌅', 'Your customers are online — share a new ad'),
+        (
+          'Post your morning deal 🌅',
+          'Your customers are online — share a new ad',
+        ),
         if (state.suggestFromInventory)
-          ('New inventory? Promote it now', 'You added items recently — turn them into ads'),
+          (
+            'New inventory? Promote it now',
+            'You added items recently — turn them into ads',
+          ),
       ]);
     } else if (hour < 17) {
       return _pickOne([
-        ('Your customers are online — share a new ad', 'Midday is a great time to post'),
+        (
+          'Your customers are online — share a new ad',
+          'Midday is a great time to post',
+        ),
         if (state.suggestFromInventory)
-          ('Boost your newest items', 'Promote what you added today in one tap'),
+          (
+            'Boost your newest items',
+            'Promote what you added today in one tap',
+          ),
       ]);
     } else {
       final nowWeekday = tz.TZDateTime.now(tz.local).weekday;
@@ -233,6 +246,10 @@ class StudioNotificationPrefsNotifier
 }
 
 final studioNotificationPrefsProvider =
-    StateNotifierProvider<StudioNotificationPrefsNotifier, StudioNotificationPrefs>(
-  (ref) => StudioNotificationPrefsNotifier(ref.read(sharedPreferencesProvider)),
-);
+    StateNotifierProvider<
+      StudioNotificationPrefsNotifier,
+      StudioNotificationPrefs
+    >(
+      (ref) =>
+          StudioNotificationPrefsNotifier(ref.read(sharedPreferencesProvider)),
+    );

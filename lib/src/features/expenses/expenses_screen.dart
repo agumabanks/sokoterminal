@@ -76,7 +76,9 @@ class ExpensesScreen extends ConsumerWidget {
         shape: const StadiumBorder(),
       ),
       body: expenses.when(
-        data: (rows) => rows.isEmpty ? _EmptyState(onAdd: () => _showAddExpense(context, ref)) : _ExpenseList(rows: rows),
+        data: (rows) => rows.isEmpty
+            ? _EmptyState(onAdd: () => _showAddExpense(context, ref))
+            : _ExpenseList(rows: rows),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorPage(
           title: 'Failed to load expenses',
@@ -92,7 +94,11 @@ class ExpensesScreen extends ConsumerWidget {
       final telemetry = Telemetry.instance;
       unawaited(telemetry?.event('expense_create_open'));
 
-      final approved = await requireManagerPin(context, ref, reason: 'record an expense');
+      final approved = await requireManagerPin(
+        context,
+        ref,
+        reason: 'record an expense',
+      );
       if (!approved) return;
       if (!context.mounted) return;
 
@@ -109,10 +115,12 @@ class ExpensesScreen extends ConsumerWidget {
       final occurredAt = DateTime.now().toUtc();
 
       try {
-        unawaited(telemetry?.event(
-          'expense_create_submit',
-          props: {'method': form.method, 'category': form.category},
-        ));
+        unawaited(
+          telemetry?.event(
+            'expense_create_submit',
+            props: {'method': form.method, 'category': form.category},
+          ),
+        );
 
         String? expenseId;
         await db.transaction(() async {
@@ -128,7 +136,9 @@ class ExpensesScreen extends ConsumerWidget {
           );
 
           if (form.method == 'cash') {
-            final tag = (form.category == 'supplier' || form.supplierId != null) ? 'supplier' : 'expense';
+            final tag = (form.category == 'supplier' || form.supplierId != null)
+                ? 'supplier'
+                : 'expense';
             final label = form.category.trim();
             final storedNote = (form.note ?? '').trim().isEmpty
                 ? '[$tag] $label'
@@ -167,10 +177,12 @@ class ExpensesScreen extends ConsumerWidget {
             shape: const StadiumBorder(),
           ),
         );
-        unawaited(telemetry?.event(
-          'expense_create_success',
-          props: {'method': form.method, 'category': form.category},
-        ));
+        unawaited(
+          telemetry?.event(
+            'expense_create_success',
+            props: {'method': form.method, 'category': form.category},
+          ),
+        );
       } catch (e, st) {
         unawaited(telemetry?.recordError(e, st, hint: 'expense_create'));
         if (!context.mounted) return;
@@ -182,7 +194,12 @@ class ExpensesScreen extends ConsumerWidget {
             shape: const StadiumBorder(),
           ),
         );
-        unawaited(telemetry?.event('expense_create_failed', props: {'error': e.toString()}));
+        unawaited(
+          telemetry?.event(
+            'expense_create_failed',
+            props: {'error': e.toString()},
+          ),
+        );
       }
     }());
   }
@@ -232,8 +249,14 @@ class _EmptyState extends StatelessWidget {
                 backgroundColor: DesignTokens.brandAccent,
                 foregroundColor: Colors.white,
                 shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
               ),
             ),
           ],
@@ -255,7 +278,8 @@ class _ExpenseList extends StatelessWidget {
     final groups = <String, List<Expense>>{};
     for (final e in rows) {
       final d = e.occurredAt.toLocal();
-      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       groups.putIfAbsent(key, () => []).add(e);
     }
     final keys = groups.keys.toList();
@@ -271,12 +295,10 @@ class _ExpenseList extends StatelessWidget {
             SliverToBoxAdapter(child: _DateHeader(dateKey: key)),
             SliverList.separated(
               itemCount: groups[key]!.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 72,
-                endIndent: 16,
-              ),
-              itemBuilder: (context, i) => _ExpenseRow(expense: groups[key]![i]),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, indent: 72, endIndent: 16),
+              itemBuilder: (context, i) =>
+                  _ExpenseRow(expense: groups[key]![i]),
             ),
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -293,11 +315,13 @@ class _SummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = rows.fold<double>(0, (s, e) => s + e.amount);
-    final today = rows.where((e) {
-      final d = e.occurredAt.toLocal();
-      final now = DateTime.now();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
-    }).fold<double>(0, (s, e) => s + e.amount);
+    final today = rows
+        .where((e) {
+          final d = e.occurredAt.toLocal();
+          final now = DateTime.now();
+          return d.year == now.year && d.month == now.month && d.day == now.day;
+        })
+        .fold<double>(0, (s, e) => s + e.amount);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -310,7 +334,12 @@ class _SummaryBar extends StatelessWidget {
       child: Row(
         children: [
           _SumCell(label: 'Total', amount: total),
-          Container(width: 0.5, height: 40, color: DesignTokens.hairline, margin: const EdgeInsets.symmetric(horizontal: 20)),
+          Container(
+            width: 0.5,
+            height: 40,
+            color: DesignTokens.hairline,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+          ),
           _SumCell(label: 'Today', amount: today),
           const Spacer(),
           Container(
@@ -321,7 +350,9 @@ class _SummaryBar extends StatelessWidget {
             ),
             child: Text(
               '${rows.length} entries',
-              style: DesignTokens.textCaption.copyWith(color: DesignTokens.inkMuted),
+              style: DesignTokens.textCaption.copyWith(
+                color: DesignTokens.inkMuted,
+              ),
             ),
           ),
         ],
@@ -343,8 +374,11 @@ class _SumCell extends StatelessWidget {
         Text(label, style: DesignTokens.textCaption),
         const SizedBox(height: 2),
         Text(
-          'UGX ${_fmt(amount)}',
-          style: DesignTokens.textMono.copyWith(fontSize: 17, letterSpacing: -0.3),
+          '${_fmt(amount)} /=',
+          style: DesignTokens.textMono.copyWith(
+            fontSize: 17,
+            letterSpacing: -0.3,
+          ),
         ),
       ],
     );
@@ -364,16 +398,35 @@ class _DateHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parts = dateKey.split('-');
-    final d = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    final d = DateTime(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
     final now = DateTime.now();
-    final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
-    final isYesterday = d.year == now.year && d.month == now.month && d.day == now.day - 1;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final isToday =
+        d.year == now.year && d.month == now.month && d.day == now.day;
+    final isYesterday =
+        d.year == now.year && d.month == now.month && d.day == now.day - 1;
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final label = isToday
         ? 'Today'
         : isYesterday
-            ? 'Yesterday'
-            : '${d.day} ${months[d.month - 1]} ${d.year}';
+        ? 'Yesterday'
+        : '${d.day} ${months[d.month - 1]} ${d.year}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
@@ -435,7 +488,9 @@ class _ExpenseRow extends StatelessWidget {
                 ),
                 child: Text(
                   'Syncing',
-                  style: DesignTokens.textCaption.copyWith(color: DesignTokens.inkMuted),
+                  style: DesignTokens.textCaption.copyWith(
+                    color: DesignTokens.inkMuted,
+                  ),
                 ),
               ),
           ],
@@ -448,13 +503,15 @@ class _ExpenseRow extends StatelessWidget {
               if ((expense.note ?? '').trim().isNotEmpty) expense.note!.trim(),
               _timeLabel(expense.occurredAt),
             ].join(' · '),
-            style: DesignTokens.textSmall.copyWith(color: DesignTokens.inkMuted),
+            style: DesignTokens.textSmall.copyWith(
+              color: DesignTokens.inkMuted,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
         trailing: Text(
-          'UGX ${_fmtAmount(expense.amount)}',
+          '${_fmtAmount(expense.amount)} /=',
           style: DesignTokens.textMono.copyWith(
             fontSize: 15,
             color: DesignTokens.ink,
@@ -564,9 +621,12 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
         const SizedBox(height: 8),
         categoriesAsync.when(
           data: (cats) => _buildCategoryChips(cats),
-          loading: () => const LinearProgressIndicator(color: DesignTokens.brandAccent),
-          error: (e, _) => Text('Error loading categories: $e',
-              style: DesignTokens.textSmall.copyWith(color: DesignTokens.error)),
+          loading: () =>
+              const LinearProgressIndicator(color: DesignTokens.brandAccent),
+          error: (e, _) => Text(
+            'Error loading categories: $e',
+            style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+          ),
         ),
         const SizedBox(height: 20),
 
@@ -574,7 +634,8 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
         if (_category.toLowerCase() == 'supplier') ...[
           suppliers.when(
             data: (rows) => _buildSupplierDropdown(rows),
-            loading: () => const LinearProgressIndicator(color: DesignTokens.brandAccent),
+            loading: () =>
+                const LinearProgressIndicator(color: DesignTokens.brandAccent),
             error: (_, __) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 20),
@@ -590,15 +651,24 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
             fillColor: DesignTokens.canvasCloud,
             border: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
+              borderSide: const BorderSide(
+                color: DesignTokens.hairline,
+                width: 1,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
+              borderSide: const BorderSide(
+                color: DesignTokens.hairline,
+                width: 1,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
+              borderSide: const BorderSide(
+                color: DesignTokens.brandAccent,
+                width: 1.5,
+              ),
             ),
           ),
           style: DesignTokens.textBody.copyWith(color: DesignTokens.ink),
@@ -630,7 +700,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel('Amount (UGX)'),
+        _buildLabel('Amount (/=)'),
         const SizedBox(height: 8),
         TextField(
           controller: _amountCtrl,
@@ -640,27 +710,52 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
             FilteringTextInputFormatter.digitsOnly,
             const CommaNumberFormatter(),
           ],
-          style: _interDisplayStyle(fontSize: 26, fontWeight: FontWeight.w700, color: DesignTokens.ink, letterSpacing: -0.5),
+          style: _interDisplayStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: DesignTokens.ink,
+            letterSpacing: -0.5,
+          ),
           decoration: InputDecoration(
             hintText: '0',
-            hintStyle: _interDisplayStyle(fontSize: 26, fontWeight: FontWeight.w700, color: DesignTokens.inkDisabled, letterSpacing: -0.5),
-            prefixText: 'UGX  ',
-            prefixStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkMuted, fontWeight: FontWeight.w500),
+            hintStyle: _interDisplayStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: DesignTokens.inkDisabled,
+              letterSpacing: -0.5,
+            ),
+            suffixText: '  /=',
+            prefixStyle: DesignTokens.textBody.copyWith(
+              color: DesignTokens.inkMuted,
+              fontWeight: FontWeight.w500,
+            ),
             filled: true,
             fillColor: DesignTokens.canvasCloud,
             border: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
+              borderSide: const BorderSide(
+                color: DesignTokens.hairline,
+                width: 1,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.hairline, width: 1),
+              borderSide: const BorderSide(
+                color: DesignTokens.hairline,
+                width: 1,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 2),
+              borderSide: const BorderSide(
+                color: DesignTokens.brandAccent,
+                width: 2,
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 18,
+            ),
           ),
         ),
       ],
@@ -719,7 +814,11 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
           onTap: () => _showAddCategoryDialog(context),
           child: Row(
             children: [
-              Icon(Icons.add_rounded, size: 16, color: DesignTokens.brandAccent),
+              Icon(
+                Icons.add_rounded,
+                size: 16,
+                color: DesignTokens.brandAccent,
+              ),
               const SizedBox(width: 4),
               Text(
                 'New',
@@ -745,7 +844,9 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
 
     if (_category.isEmpty && cats.isNotEmpty) {
       Future.microtask(() {
-        if (mounted && _category.isEmpty) setState(() => _category = cats.first.name);
+        if (mounted && _category.isEmpty) {
+          setState(() => _category = cats.first.name);
+        }
       });
     }
 
@@ -760,10 +861,14 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: selected ? DesignTokens.brandAccentDim : DesignTokens.canvasCloud,
+              color: selected
+                  ? DesignTokens.brandAccentDim
+                  : DesignTokens.canvasCloud,
               borderRadius: DesignTokens.borderRadiusFull,
               border: Border.all(
-                color: selected ? DesignTokens.brandAccent : DesignTokens.hairline,
+                color: selected
+                    ? DesignTokens.brandAccent
+                    : DesignTokens.hairline,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -798,12 +903,20 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: DesignTokens.borderRadiusMd,
-          borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
+          borderSide: const BorderSide(
+            color: DesignTokens.brandAccent,
+            width: 1.5,
+          ),
         ),
       ),
       items: [
-        const DropdownMenuItem<int?>(value: null, child: Text('Select supplier')),
-        ...rows.map((s) => DropdownMenuItem<int?>(value: s.id, child: Text(s.name))),
+        const DropdownMenuItem<int?>(
+          value: null,
+          child: Text('Select supplier'),
+        ),
+        ...rows.map(
+          (s) => DropdownMenuItem<int?>(value: s.id, child: Text(s.name)),
+        ),
       ],
       onChanged: (v) => setState(() => _supplierId = v),
     );
@@ -861,7 +974,9 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: DesignTokens.canvas,
-        shape: const RoundedRectangleBorder(borderRadius: DesignTokens.borderRadiusLg),
+        shape: const RoundedRectangleBorder(
+          borderRadius: DesignTokens.borderRadiusLg,
+        ),
         title: Text('New Category', style: DesignTokens.textTitle),
         content: TextField(
           controller: ctrl,
@@ -869,7 +984,9 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
           textCapitalization: TextCapitalization.sentences,
           decoration: InputDecoration(
             hintText: 'e.g. Repairs, Internet, Transport',
-            hintStyle: DesignTokens.textBody.copyWith(color: DesignTokens.inkDisabled),
+            hintStyle: DesignTokens.textBody.copyWith(
+              color: DesignTokens.inkDisabled,
+            ),
             filled: true,
             fillColor: DesignTokens.canvasCloud,
             border: OutlineInputBorder(
@@ -882,19 +999,27 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: DesignTokens.borderRadiusMd,
-              borderSide: const BorderSide(color: DesignTokens.brandAccent, width: 1.5),
+              borderSide: const BorderSide(
+                color: DesignTokens.brandAccent,
+                width: 1.5,
+              ),
             ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(foregroundColor: DesignTokens.inkMuted, shape: const StadiumBorder()),
+            style: TextButton.styleFrom(
+              foregroundColor: DesignTokens.inkMuted,
+              shape: const StadiumBorder(),
+            ),
             child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) Navigator.pop(ctx, ctrl.text.trim());
+              if (ctrl.text.trim().isNotEmpty) {
+                Navigator.pop(ctx, ctrl.text.trim());
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: DesignTokens.brandAccent,

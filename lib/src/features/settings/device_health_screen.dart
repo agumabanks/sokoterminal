@@ -64,7 +64,9 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
     // DB size proxy
     int dbSizeBytes = 0;
     try {
-      final dbFile = File('${(await getApplicationDocumentsDirectory()).path}/app_database.sqlite');
+      final dbFile = File(
+        '${(await getApplicationDocumentsDirectory()).path}/app_database.sqlite',
+      );
       if (await dbFile.exists()) {
         dbSizeBytes = await dbFile.length();
       }
@@ -89,14 +91,20 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
     final pendingCount = pendingOps.length;
     final blockedCount = blockedOps.length;
 
-    final recentFailures = [...blockedOps, ...pendingOps]
-        .where((op) => (op.lastError ?? '').trim().isNotEmpty)
-        .toList()
-      ..sort((a, b) {
-        final at = a.lastTriedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-        final bt = b.lastTriedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-        return bt.compareTo(at);
-      });
+    final recentFailures =
+        [
+            ...blockedOps,
+            ...pendingOps,
+          ].where((op) => (op.lastError ?? '').trim().isNotEmpty).toList()
+          ..sort((a, b) {
+            final at =
+                a.lastTriedAt ??
+                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+            final bt =
+                b.lastTriedAt ??
+                DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+            return bt.compareTo(at);
+          });
 
     final unresolvedBugs = await BugLogger.instance.getUnresolvedBugs();
     final pendingUploads = await BugLogger.instance.getPendingUploads();
@@ -160,7 +168,6 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
       Permission.locationWhenInUse,
       Permission.contacts,
       Permission.notification,
-      Permission.photos,
     ];
     final statuses = <Permission, PermissionStatus>{};
     for (final p in permissions) {
@@ -207,7 +214,9 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
         results.tokenValid = false;
         results.tokenError = 'No access token found';
       } else {
-        final response = await apiClient.get<Map<String, dynamic>>('/v2/auth/user');
+        final response = await apiClient.get<Map<String, dynamic>>(
+          '/v2/auth/user',
+        );
         results.tokenValid = response.statusCode == 200;
         if (results.tokenValid != true) {
           results.tokenError = 'HTTP ${response.statusCode}';
@@ -258,22 +267,26 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
     secureStorage.clearFailureCounters();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Secure storage counters cleared. Restart app if issues persist.')),
+      const SnackBar(
+        content: Text(
+          'Secure storage counters cleared. Restart app if issues persist.',
+        ),
+      ),
     );
     _refresh();
   }
 
   Future<void> _repairSync(BuildContext context) async {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Running sync repair…')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Running sync repair…')));
     final syncService = ref.read(syncServiceProvider);
     await syncService.syncNow();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sync repair finished')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Sync repair finished')));
     _refresh();
   }
 
@@ -414,12 +427,18 @@ class _OverallStatusCard extends StatelessWidget {
     if (!data.accessTokenPresent) issues.add('No access token');
     if (!data.storageHealth.isHealthy) issues.add('Secure storage errors');
     if (!data.online) issues.add('Offline');
-    if (data.blockedSyncOps > 0) issues.add('${data.blockedSyncOps} blocked syncs');
-    if (data.pendingSyncOps > 20) issues.add('${data.pendingSyncOps} pending syncs');
+    if (data.blockedSyncOps > 0) {
+      issues.add('${data.blockedSyncOps} blocked syncs');
+    }
+    if (data.pendingSyncOps > 20) {
+      issues.add('${data.pendingSyncOps} pending syncs');
+    }
 
     final hasIssues = issues.isNotEmpty;
     final color = hasIssues ? DesignTokens.warning : DesignTokens.success;
-    final label = hasIssues ? '${issues.length} issue${issues.length > 1 ? 's' : ''}' : 'All clear';
+    final label = hasIssues
+        ? '${issues.length} issue${issues.length > 1 ? 's' : ''}'
+        : 'All clear';
 
     return Container(
       padding: DesignTokens.paddingLg,
@@ -427,7 +446,9 @@ class _OverallStatusCard extends StatelessWidget {
         color: hasIssues ? const Color(0xFFFFF8E1) : const Color(0xFFE8F5E9),
         borderRadius: DesignTokens.borderRadiusMd,
         border: Border.all(
-          color: hasIssues ? DesignTokens.warning.withValues(alpha: 0.4) : DesignTokens.success.withValues(alpha: 0.4),
+          color: hasIssues
+              ? DesignTokens.warning.withValues(alpha: 0.4)
+              : DesignTokens.success.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -456,9 +477,7 @@ class _OverallStatusCard extends StatelessWidget {
                   children: [
                     Icon(Icons.circle, size: 6, color: DesignTokens.warning),
                     const SizedBox(width: DesignTokens.spaceSm),
-                    Expanded(
-                      child: Text(issue, style: DesignTokens.textSmall),
-                    ),
+                    Expanded(child: Text(issue, style: DesignTokens.textSmall)),
                   ],
                 ),
               ),
@@ -487,22 +506,38 @@ class _AuthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokenOk = data.accessTokenPresent;
     final storageOk = data.storageHealth.isHealthy;
-    final memoryFallback = data.storageHealth.keys.any((k) => k.key == 'access_token' && !k.isHealthy) ||
-        data.storageHealth.keys.any((k) => k.readFailures > 0 || k.writeFailures > 0);
+    final memoryFallback =
+        data.storageHealth.keys.any(
+          (k) => k.key == 'access_token' && !k.isHealthy,
+        ) ||
+        data.storageHealth.keys.any(
+          (k) => k.readFailures > 0 || k.writeFailures > 0,
+        );
 
     return _Section(
       title: 'Auth & Session',
       icon: Icons.shield_outlined,
       children: [
-        _kv('Access token', tokenOk ? 'Present (${data.accessTokenLength} chars)' : 'Missing',
-            valueColor: tokenOk ? DesignTokens.success : DesignTokens.error),
+        _kv(
+          'Access token',
+          tokenOk ? 'Present (${data.accessTokenLength} chars)' : 'Missing',
+          valueColor: tokenOk ? DesignTokens.success : DesignTokens.error,
+        ),
         _kv('POS session', data.posTokenPresent ? 'Active' : 'None'),
         _kv('Seller UUID', data.sellerUUID ?? '—'),
-        _kv('Secure storage', storageOk ? 'Healthy' : 'Errors detected',
-            valueColor: storageOk ? DesignTokens.success : DesignTokens.error),
+        _kv(
+          'Secure storage',
+          storageOk ? 'Healthy' : 'Errors detected',
+          valueColor: storageOk ? DesignTokens.success : DesignTokens.error,
+        ),
         if (diagnostics?.tokenValid != null)
-          _kv('Token API check', diagnostics!.tokenValid! ? 'Valid' : 'Failed',
-              valueColor: diagnostics!.tokenValid! ? DesignTokens.success : DesignTokens.error),
+          _kv(
+            'Token API check',
+            diagnostics!.tokenValid! ? 'Valid' : 'Failed',
+            valueColor: diagnostics!.tokenValid!
+                ? DesignTokens.success
+                : DesignTokens.error,
+          ),
         if (diagnostics?.tokenError != null)
           Padding(
             padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
@@ -561,7 +596,9 @@ class _DeviceCard extends StatelessWidget {
     if (data.deviceOS == 'android') {
       // Very rough heuristic based on OS version string
       final versionString = data.deviceVersion.toLowerCase();
-      if (versionString.contains('api level 2') || versionString.contains('5.') || versionString.contains('6.')) {
+      if (versionString.contains('api level 2') ||
+          versionString.contains('5.') ||
+          versionString.contains('6.')) {
         return 'Legacy — some features may be limited';
       }
     }
@@ -583,12 +620,20 @@ class _NetworkCard extends StatelessWidget {
       title: 'Network',
       icon: Icons.wifi_outlined,
       children: [
-        _kv('Status', data.online ? 'Online' : 'Offline',
-            valueColor: data.online ? DesignTokens.success : DesignTokens.error),
+        _kv(
+          'Status',
+          data.online ? 'Online' : 'Offline',
+          valueColor: data.online ? DesignTokens.success : DesignTokens.error,
+        ),
         _kv('Connection types', data.connectivityTypes.join(', ')),
         if (diagnostics?.apiReachable != null)
-          _kv('API reachable', diagnostics!.apiReachable! ? 'Yes' : 'No',
-              valueColor: diagnostics!.apiReachable! ? DesignTokens.success : DesignTokens.error),
+          _kv(
+            'API reachable',
+            diagnostics!.apiReachable! ? 'Yes' : 'No',
+            valueColor: diagnostics!.apiReachable!
+                ? DesignTokens.success
+                : DesignTokens.error,
+          ),
         _kv('API latency', latencyText),
         if (diagnostics?.apiError != null)
           Padding(
@@ -623,8 +668,8 @@ class _PermissionsCard extends StatelessWidget {
             valueColor: entry.value.isGranted
                 ? DesignTokens.success
                 : entry.value.isPermanentlyDenied
-                    ? DesignTokens.error
-                    : DesignTokens.warning,
+                ? DesignTokens.error
+                : DesignTokens.warning,
           ),
       ],
     );
@@ -645,10 +690,7 @@ class _PermissionsCard extends StatelessWidget {
 }
 
 class _FeedbackCard extends StatelessWidget {
-  const _FeedbackCard({
-    required this.data,
-    required this.onUpload,
-  });
+  const _FeedbackCard({required this.data, required this.onUpload});
 
   final _DeviceHealthSnapshot data;
   final VoidCallback onUpload;
@@ -670,7 +712,9 @@ class _FeedbackCard extends StatelessWidget {
         const SizedBox(height: DesignTokens.spaceSm),
         Text(
           'Sync errors and crashes are saved locally and sent to Soko24 support when you are online.',
-          style: DesignTokens.textSmall.copyWith(color: DesignTokens.textSecondary),
+          style: DesignTokens.textSmall.copyWith(
+            color: DesignTokens.textSecondary,
+          ),
         ),
         const SizedBox(height: DesignTokens.spaceMd),
         OutlinedButton.icon(
@@ -701,11 +745,21 @@ class _SyncCard extends StatelessWidget {
       icon: Icons.sync_outlined,
       children: [
         _kv('Pending operations', '${data.pendingSyncOps}'),
-        _kv('Blocked operations', '${data.blockedSyncOps}',
-            valueColor: data.blockedSyncOps > 0 ? DesignTokens.error : DesignTokens.success),
+        _kv(
+          'Blocked operations',
+          '${data.blockedSyncOps}',
+          valueColor: data.blockedSyncOps > 0
+              ? DesignTokens.error
+              : DesignTokens.success,
+        ),
         if (diagnostics?.syncPumpOk != null)
-          _kv('Sync pump test', diagnostics!.syncPumpOk! ? 'Passed' : 'Failed',
-              valueColor: diagnostics!.syncPumpOk! ? DesignTokens.success : DesignTokens.error),
+          _kv(
+            'Sync pump test',
+            diagnostics!.syncPumpOk! ? 'Passed' : 'Failed',
+            valueColor: diagnostics!.syncPumpOk!
+                ? DesignTokens.success
+                : DesignTokens.error,
+          ),
         if (diagnostics?.syncError != null)
           Padding(
             padding: const EdgeInsets.only(top: DesignTokens.spaceXs),
@@ -755,7 +809,9 @@ class _FailuresCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        op.status == 'blocked' ? Icons.lock_outline : Icons.error_outline,
+                        op.status == 'blocked'
+                            ? Icons.lock_outline
+                            : Icons.error_outline,
                         color: DesignTokens.error,
                         size: 18,
                       ),
@@ -804,7 +860,8 @@ class _DiagnosticsActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allPassed = results != null &&
+    final allPassed =
+        results != null &&
         results!.storageReadWrite == true &&
         results!.tokenValid == true &&
         results!.apiReachable == true &&
@@ -828,10 +885,26 @@ class _DiagnosticsActionCard extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceMd),
           if (results != null) ...[
-            _diagRow('Storage read/write', results!.storageReadWrite, error: results!.storageError),
-            _diagRow('Token valid', results!.tokenValid, error: results!.tokenError),
-            _diagRow('API reachable', results!.apiReachable, error: results!.apiError),
-            _diagRow('Sync pump', results!.syncPumpOk, error: results!.syncError),
+            _diagRow(
+              'Storage read/write',
+              results!.storageReadWrite,
+              error: results!.storageError,
+            ),
+            _diagRow(
+              'Token valid',
+              results!.tokenValid,
+              error: results!.tokenError,
+            ),
+            _diagRow(
+              'API reachable',
+              results!.apiReachable,
+              error: results!.apiError,
+            ),
+            _diagRow(
+              'Sync pump',
+              results!.syncPumpOk,
+              error: results!.syncError,
+            ),
             const SizedBox(height: DesignTokens.spaceMd),
             if (allPassed)
               Container(
@@ -844,7 +917,12 @@ class _DiagnosticsActionCard extends StatelessWidget {
                   children: [
                     Icon(Icons.check_circle, color: DesignTokens.success),
                     const SizedBox(width: DesignTokens.spaceSm),
-                    Text('All tests passed', style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.success)),
+                    Text(
+                      'All tests passed',
+                      style: DesignTokens.textBodyBold.copyWith(
+                        color: DesignTokens.success,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -858,7 +936,10 @@ class _DiagnosticsActionCard extends StatelessWidget {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.play_arrow),
               label: Text(running ? 'Running…' : 'Run Diagnostics'),
@@ -873,8 +954,8 @@ class _DiagnosticsActionCard extends StatelessWidget {
     final icon = passed == true
         ? Icon(Icons.check_circle, color: DesignTokens.success, size: 18)
         : passed == false
-            ? Icon(Icons.cancel, color: DesignTokens.error, size: 18)
-            : Icon(Icons.help_outline, color: DesignTokens.grayMedium, size: 18);
+        ? Icon(Icons.cancel, color: DesignTokens.error, size: 18)
+        : Icon(Icons.help_outline, color: DesignTokens.grayMedium, size: 18);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceXs),
       child: Row(
@@ -887,7 +968,9 @@ class _DiagnosticsActionCard extends StatelessWidget {
               flex: 2,
               child: Text(
                 error,
-                style: DesignTokens.textSmall.copyWith(color: DesignTokens.error),
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.error,
+                ),
                 textAlign: TextAlign.right,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -900,7 +983,11 @@ class _DiagnosticsActionCard extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.icon, required this.children});
+  const _Section({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
   final String title;
   final IconData icon;
   final List<Widget> children;
@@ -937,17 +1024,12 @@ Widget _kv(String key, String value, {Color? valueColor}) {
     padding: const EdgeInsets.symmetric(vertical: DesignTokens.spaceXs),
     child: Row(
       children: [
-        Expanded(
-          flex: 2,
-          child: Text(key, style: DesignTokens.textSmall),
-        ),
+        Expanded(flex: 2, child: Text(key, style: DesignTokens.textSmall)),
         Expanded(
           flex: 3,
           child: Text(
             value,
-            style: DesignTokens.textSmallBold.copyWith(
-              color: valueColor,
-            ),
+            style: DesignTokens.textSmallBold.copyWith(color: valueColor),
             textAlign: TextAlign.right,
           ),
         ),

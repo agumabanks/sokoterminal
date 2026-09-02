@@ -40,55 +40,55 @@ class _KeypadScreenState extends ConsumerState<KeypadScreen> {
       color: DesignTokens.surface,
       child: Column(
         children: [
-        const SizedBox(height: 40),
-        SizedBox(
-          height: 80,
-          child: Center(
-            child: Text(
-              _digits,
-              style: DesignTokens.textTitle.copyWith(fontSize: 40),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 40),
+          SizedBox(
+            height: 80,
+            child: Center(
+              child: Text(
+                _digits,
+                style: DesignTokens.textTitle.copyWith(fontSize: 40),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
-        ),
-        if (_digits.isNotEmpty)
-          TextButton.icon(
-            onPressed: () {
-              // Open a simple save-contact bottom sheet
-              showModalBottomSheet(
-                context: context,
-                builder: (context) => Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('Save \$_digits', style: DesignTokens.textTitle),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Use your device contacts app to save this number.',
-                        style: DesignTokens.textBody,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Got it'),
-                      ),
-                    ],
+          if (_digits.isNotEmpty)
+            TextButton.icon(
+              onPressed: () {
+                // Open a simple save-contact bottom sheet
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) => Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('Save \$_digits', style: DesignTokens.textTitle),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Use your device contacts app to save this number.',
+                          style: DesignTokens.textBody,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Got it'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.person_add_outlined),
-            label: const Text('Add to Contacts'),
-          ),
-        const Spacer(),
-        _buildKeypad(),
-        const SizedBox(height: 40),
-        _buildActions(),
-        const SizedBox(height: 40),
-      ],
+                );
+              },
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Add to Contacts'),
+            ),
+          const Spacer(),
+          _buildKeypad(),
+          const SizedBox(height: 40),
+          _buildActions(),
+          const SizedBox(height: 40),
+        ],
       ),
     );
   }

@@ -103,14 +103,18 @@ class StatCard extends StatelessWidget {
                       child: child,
                     ),
                   ),
-                  child: valueWidget ?? Text(
-                    value,
-                    key: ValueKey<String>(value),
-                    style: DesignTokens.textTitle.copyWith(
-                      color: variant.valueColor,
-                      fontSize: variant == StatCardVariant.compact ? 18 : 22,
-                    ),
-                  ),
+                  child:
+                      valueWidget ??
+                      Text(
+                        value,
+                        key: ValueKey<String>(value),
+                        style: DesignTokens.textTitle.copyWith(
+                          color: variant.valueColor,
+                          fontSize: variant == StatCardVariant.compact
+                              ? 18
+                              : 22,
+                        ),
+                      ),
                 ),
               ],
             ),

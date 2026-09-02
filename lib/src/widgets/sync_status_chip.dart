@@ -33,7 +33,9 @@ class SyncStatusChip extends ConsumerWidget {
         // No sync op at all → show based on item.synced flag
         if (op == null) {
           return _buildChip(
-            icon: isSynced ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+            icon: isSynced
+                ? Icons.cloud_done_outlined
+                : Icons.cloud_off_outlined,
             color: isSynced ? DesignTokens.success : Colors.grey,
             tooltip: isSynced ? 'Online' : 'Local only',
             showPulse: false,

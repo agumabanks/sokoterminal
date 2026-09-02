@@ -15,15 +15,17 @@ final campaignManagerProvider = Provider<CampaignManager>((ref) {
   return CampaignManager(prefs);
 });
 
-final campaignsProvider = StateNotifierProvider<CampaignsNotifier, List<Campaign>>((ref) {
-  final manager = ref.watch(campaignManagerProvider);
-  return CampaignsNotifier(manager);
-});
+final campaignsProvider =
+    StateNotifierProvider<CampaignsNotifier, List<Campaign>>((ref) {
+      final manager = ref.watch(campaignManagerProvider);
+      return CampaignsNotifier(manager);
+    });
 
-final scheduledPostsProvider = StateNotifierProvider<ScheduledPostsNotifier, List<ScheduledPost>>((ref) {
-  final manager = ref.watch(campaignManagerProvider);
-  return ScheduledPostsNotifier(manager);
-});
+final scheduledPostsProvider =
+    StateNotifierProvider<ScheduledPostsNotifier, List<ScheduledPost>>((ref) {
+      final manager = ref.watch(campaignManagerProvider);
+      return ScheduledPostsNotifier(manager);
+    });
 
 final marketingAnalyticsProvider = Provider<MarketingAnalytics>((ref) {
   final campaigns = ref.watch(campaignsProvider);
@@ -54,7 +56,10 @@ class CampaignsNotifier extends StateNotifier<List<Campaign>> {
 
   Future<void> update(Campaign campaign) async {
     await _manager.saveCampaign(campaign);
-    state = [for (final c in state) if (c.id == campaign.id) campaign else c];
+    state = [
+      for (final c in state)
+        if (c.id == campaign.id) campaign else c,
+    ];
   }
 
   Future<void> delete(String id) async {
@@ -119,14 +124,17 @@ class CampaignManager {
 
   List<Campaign> loadCampaigns() {
     final raw = _prefs.getStringList(_campaignsKey) ?? [];
-    return raw.map((s) {
-      try {
-        final m = jsonDecode(s) as Map<String, dynamic>;
-        return Campaign.fromJson(m);
-      } catch (_) {
-        return null;
-      }
-    }).whereType<Campaign>().toList();
+    return raw
+        .map((s) {
+          try {
+            final m = jsonDecode(s) as Map<String, dynamic>;
+            return Campaign.fromJson(m);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<Campaign>()
+        .toList();
   }
 
   Future<void> saveCampaign(Campaign campaign) async {
@@ -151,14 +159,17 @@ class CampaignManager {
 
   List<ScheduledPost> loadScheduledPosts() {
     final raw = _prefs.getStringList(_postsKey) ?? [];
-    return raw.map((s) {
-      try {
-        final m = jsonDecode(s) as Map<String, dynamic>;
-        return ScheduledPost.fromJson(m);
-      } catch (_) {
-        return null;
-      }
-    }).whereType<ScheduledPost>().toList();
+    return raw
+        .map((s) {
+          try {
+            final m = jsonDecode(s) as Map<String, dynamic>;
+            return ScheduledPost.fromJson(m);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<ScheduledPost>()
+        .toList();
   }
 
   Future<void> saveScheduledPost(ScheduledPost post) async {
@@ -182,7 +193,9 @@ class CampaignManager {
   }
 
   List<ScheduledPost> postsForCampaign(String campaignId) {
-    return loadScheduledPosts().where((p) => p.campaignId == campaignId).toList();
+    return loadScheduledPosts()
+        .where((p) => p.campaignId == campaignId)
+        .toList();
   }
 
   List<ScheduledPost> postsForDate(DateTime date) {

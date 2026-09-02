@@ -55,7 +55,11 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
     try {
       final schedules = await db.getAllAvailabilitySchedules();
       final exceptions = await db.getAllAvailabilityExceptions();
-      state = state.copyWith(loading: false, schedules: schedules, exceptions: exceptions);
+      state = state.copyWith(
+        loading: false,
+        schedules: schedules,
+        exceptions: exceptions,
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
@@ -80,10 +84,7 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
       }
 
       // Queue sync
-      await sync.enqueue(
-        'availability_update',
-        {'schedules': schedules},
-      );
+      await sync.enqueue('availability_update', {'schedules': schedules});
 
       final updated = await db.getAllAvailabilitySchedules();
       state = state.copyWith(loading: false, schedules: updated);
@@ -105,22 +106,21 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
         AvailabilityExceptionsCompanion.insert(
           date: date,
           isAvailable: Value(isAvailable),
-          startTime: startTime != null ? Value(startTime) : const Value.absent(),
+          startTime: startTime != null
+              ? Value(startTime)
+              : const Value.absent(),
           endTime: endTime != null ? Value(endTime) : const Value.absent(),
           reason: reason != null ? Value(reason) : const Value.absent(),
         ),
       );
 
-      await sync.enqueue(
-        'availability_exception_create',
-        {
-          'date': date,
-          'is_available': isAvailable,
-          if (startTime != null) 'start_time': startTime,
-          if (endTime != null) 'end_time': endTime,
-          if (reason != null) 'reason': reason,
-        },
-      );
+      await sync.enqueue('availability_exception_create', {
+        'date': date,
+        'is_available': isAvailable,
+        if (startTime != null) 'start_time': startTime,
+        if (endTime != null) 'end_time': endTime,
+        if (reason != null) 'reason': reason,
+      });
 
       final updated = await db.getAllAvailabilityExceptions();
       state = state.copyWith(loading: false, exceptions: updated);
@@ -132,17 +132,16 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
   Future<void> removeException(int id) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final row = await (db.select(db.availabilityExceptions)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      final row = await (db.select(
+        db.availabilityExceptions,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
       await db.deleteAvailabilityException(id);
 
       if (row?.remoteId != null) {
-        await sync.enqueue(
-          'availability_exception_delete',
-          {'remote_id': row!.remoteId},
-        );
+        await sync.enqueue('availability_exception_delete', {
+          'remote_id': row!.remoteId,
+        });
       }
 
       final updated = await db.getAllAvailabilityExceptions();
@@ -177,7 +176,8 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
     List<Map<String, dynamic>> existingBookings = const [],
   }) {
     final date = DateTime.parse(dateStr);
-    final dayOfWeek = date.weekday % 7; // Dart: 1=Mon … 7=Sun, convert to 0=Sun … 6=Sat
+    final dayOfWeek =
+        date.weekday % 7; // Dart: 1=Mon … 7=Sun, convert to 0=Sun … 6=Sat
 
     final exception = getExceptionForDate(dateStr);
     DateTime? windowStart;
@@ -202,8 +202,12 @@ class AvailabilityController extends StateNotifier<AvailabilityState> {
     final slots = <String>[];
     var current = windowStart;
 
-    while (current.add(Duration(minutes: durationMinutes)).isBefore(windowEnd) ||
-        current.add(Duration(minutes: durationMinutes)).isAtSameMomentAs(windowEnd)) {
+    while (current
+            .add(Duration(minutes: durationMinutes))
+            .isBefore(windowEnd) ||
+        current
+            .add(Duration(minutes: durationMinutes))
+            .isAtSameMomentAs(windowEnd)) {
       final slotStart = current;
       final slotEnd = current.add(Duration(minutes: durationMinutes));
 

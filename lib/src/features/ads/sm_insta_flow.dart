@@ -80,10 +80,7 @@ Future<void> runSmInstaFlow(BuildContext context, WidgetRef ref) async {
 
   File? flippedFile;
   try {
-    flippedFile = await prepareSmInstaPhoto(
-      xf.path,
-      flip: options.flip,
-    );
+    flippedFile = await prepareSmInstaPhoto(xf.path, flip: options.flip);
   } catch (e, st) {
     telemetry?.recordError(e, st, hint: 'sm_insta_prepare_photo');
     if (context.mounted) {
@@ -126,14 +123,17 @@ Future<void> runSmInstaFlow(BuildContext context, WidgetRef ref) async {
     );
 
     if (adFile != null) {
-      unawaited(ref.read(studioCampaignAnalyticsProvider.notifier).recordExport());
+      unawaited(
+        ref.read(studioCampaignAnalyticsProvider.notifier).recordExport(),
+      );
       ref.read(recentDesignsProvider.notifier).add(template);
       await ref.read(yourDesignsProvider.notifier).saveDesign(template);
     }
   } catch (e, st) {
     telemetry?.recordError(e, st, hint: 'sm_insta_export');
   } finally {
-    if (context.mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+    if (context.mounted &&
+        Navigator.of(context, rootNavigator: true).canPop()) {
       Navigator.of(context, rootNavigator: true).pop();
     }
   }
@@ -150,11 +150,14 @@ Future<void> runSmInstaFlow(BuildContext context, WidgetRef ref) async {
   final shareFile = adFile;
 
   Haptics.success();
-  telemetry?.event('sm_insta_export', props: {
-    'style': options.style.name,
-    'flip': options.flip,
-    'has_product': product != null,
-  });
+  telemetry?.event(
+    'sm_insta_export',
+    props: {
+      'style': options.style.name,
+      'flip': options.flip,
+      'has_product': product != null,
+    },
+  );
 
   final productName = product?.name ?? kit.businessName;
   final price = product != null ? formatUgPrice(product.price) : '';
@@ -243,12 +246,17 @@ Future<File> prepareSmInstaPhoto(
   final decoded = img.decodeImage(bytes);
   if (decoded == null) throw Exception('Could not decode camera image');
 
-  final mirrored = img.copyFlip(decoded, direction: img.FlipDirection.horizontal);
+  final mirrored = img.copyFlip(
+    decoded,
+    direction: img.FlipDirection.horizontal,
+  );
   final dir = outputDir ?? await getTemporaryDirectory();
-  final out = File(p.join(
-    dir.path,
-    'sminsta_flipped_${DateTime.now().millisecondsSinceEpoch}.png',
-  ));
+  final out = File(
+    p.join(
+      dir.path,
+      'sminsta_flipped_${DateTime.now().millisecondsSinceEpoch}.png',
+    ),
+  );
   await out.writeAsBytes(img.encodePng(mirrored));
   return out;
 }
@@ -257,30 +265,24 @@ Future<File> prepareSmInstaPhoto(
 // Template builder
 // ---------------------------------------------------------------------------
 
-enum SmInstaStyle {
-  smart,
-  sale,
-  newArrival,
-  minimal,
-  whatsApp,
-}
+enum SmInstaStyle { smart, sale, newArrival, minimal, whatsApp }
 
 extension SmInstaStyleX on SmInstaStyle {
   String get label => switch (this) {
-        SmInstaStyle.smart => 'Smart',
-        SmInstaStyle.sale => 'Sale',
-        SmInstaStyle.newArrival => 'New',
-        SmInstaStyle.minimal => 'Minimal',
-        SmInstaStyle.whatsApp => 'WhatsApp',
-      };
+    SmInstaStyle.smart => 'Smart',
+    SmInstaStyle.sale => 'Sale',
+    SmInstaStyle.newArrival => 'New',
+    SmInstaStyle.minimal => 'Minimal',
+    SmInstaStyle.whatsApp => 'WhatsApp',
+  };
 
   IconData get icon => switch (this) {
-        SmInstaStyle.smart => Icons.auto_awesome_rounded,
-        SmInstaStyle.sale => Icons.local_offer_rounded,
-        SmInstaStyle.newArrival => Icons.star_rounded,
-        SmInstaStyle.minimal => Icons.crop_rounded,
-        SmInstaStyle.whatsApp => Icons.chat_rounded,
-      };
+    SmInstaStyle.smart => Icons.auto_awesome_rounded,
+    SmInstaStyle.sale => Icons.local_offer_rounded,
+    SmInstaStyle.newArrival => Icons.star_rounded,
+    SmInstaStyle.minimal => Icons.crop_rounded,
+    SmInstaStyle.whatsApp => Icons.chat_rounded,
+  };
 }
 
 AdTemplate buildSmInstaTemplate({
@@ -425,7 +427,10 @@ class _SmInstaOptionsSheetState extends State<_SmInstaOptionsSheet> {
           const SizedBox(height: 4),
           Text(
             'Pick a style, then share in seconds.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 13,
+            ),
           ),
           const SizedBox(height: 18),
           SizedBox(
@@ -458,19 +463,22 @@ class _SmInstaOptionsSheetState extends State<_SmInstaOptionsSheet> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(style.icon,
-                            color: selected
-                                ? DesignTokens.brandAccent
-                                : Colors.white54,
-                            size: 24),
+                        Icon(
+                          style.icon,
+                          color: selected
+                              ? DesignTokens.brandAccent
+                              : Colors.white54,
+                          size: 24,
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           style.label,
                           style: TextStyle(
                             color: selected ? Colors.white : Colors.white54,
                             fontSize: 11,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                           ),
                         ),
                       ],
@@ -490,11 +498,17 @@ class _SmInstaOptionsSheetState extends State<_SmInstaOptionsSheet> {
             activeThumbColor: DesignTokens.brandAccent,
             title: const Text(
               'Mirror flip',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             subtitle: Text(
               'Flip the photo horizontally',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
             ),
           ),
           const SizedBox(height: 12),

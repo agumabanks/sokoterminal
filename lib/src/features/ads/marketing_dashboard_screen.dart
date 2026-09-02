@@ -61,16 +61,24 @@ class MarketingDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // ── Active Campaigns ──────────────────────────────────────
-                _SectionHeader(title: 'Campaigns', count: campaigns.length, theme: theme),
+                _SectionHeader(
+                  title: 'Campaigns',
+                  count: campaigns.length,
+                  theme: theme,
+                ),
                 const SizedBox(height: 10),
                 if (campaigns.isEmpty)
                   _EmptyCampaigns(theme: theme)
                 else
-                  ...campaigns.take(5).map((c) => _CampaignCard(
-                    campaign: c,
-                    theme: theme,
-                    onTap: () => _showCampaignDetail(context, ref, c),
-                  )),
+                  ...campaigns
+                      .take(5)
+                      .map(
+                        (c) => _CampaignCard(
+                          campaign: c,
+                          theme: theme,
+                          onTap: () => _showCampaignDetail(context, ref, c),
+                        ),
+                      ),
                 const SizedBox(height: 24),
 
                 // ── Upcoming Posts ────────────────────────────────────────
@@ -96,7 +104,11 @@ class MarketingDashboardScreen extends ConsumerWidget {
     );
   }
 
-  void _showCampaignDetail(BuildContext context, WidgetRef ref, Campaign campaign) {
+  void _showCampaignDetail(
+    BuildContext context,
+    WidgetRef ref,
+    Campaign campaign,
+  ) {
     Haptics.selection();
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -122,8 +134,8 @@ class _HealthScoreCard extends StatelessWidget {
     final color = score >= 75
         ? const Color(0xFF22c55e)
         : score >= 50
-            ? const Color(0xFFf59e0b)
-            : const Color(0xFFef4444);
+        ? const Color(0xFFf59e0b)
+        : const Color(0xFFef4444);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -175,12 +187,9 @@ class _HealthScoreCard extends StatelessWidget {
                   score >= 75
                       ? 'Your marketing is performing great!'
                       : score >= 50
-                          ? 'Good progress. A few tweaks needed.'
-                          : 'Let\'s get your marketing started.',
-                  style: TextStyle(
-                    color: theme.textMuted,
-                    fontSize: 13,
-                  ),
+                      ? 'Good progress. A few tweaks needed.'
+                      : 'Let\'s get your marketing started.',
+                  style: TextStyle(color: theme.textMuted, fontSize: 13),
                 ),
               ],
             ),
@@ -204,9 +213,17 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = [
-      ('Ads', analytics.designsCreatedThisMonth.toString(), Icons.auto_awesome_rounded),
+      (
+        'Ads',
+        analytics.designsCreatedThisMonth.toString(),
+        Icons.auto_awesome_rounded,
+      ),
       ('Active', analytics.activeCampaigns.toString(), Icons.campaign_rounded),
-      ('Done', analytics.completedCampaigns.toString(), Icons.check_circle_rounded),
+      (
+        'Done',
+        analytics.completedCampaigns.toString(),
+        Icons.check_circle_rounded,
+      ),
       ('Shares', analytics.totalShares.toString(), Icons.share_rounded),
     ];
 
@@ -394,10 +411,7 @@ class _EmptyCampaigns extends StatelessWidget {
           Text(
             'Create your first marketing campaign to track progress.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: theme.textMuted,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: theme.textMuted, fontSize: 12),
           ),
         ],
       ),
@@ -466,10 +480,7 @@ class _CampaignCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${campaign.goal.label} · ${campaign.status.label}',
-                    style: TextStyle(
-                      color: theme.textMuted,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: theme.textMuted, fontSize: 11),
                   ),
                 ],
               ),
@@ -522,11 +533,11 @@ class _WeeklyCalendar extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 3),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isToday ? theme.accent.withValues(alpha: 0.15) : theme.surface,
+              color: isToday
+                  ? theme.accent.withValues(alpha: 0.15)
+                  : theme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isToday ? theme.accent : theme.border,
-              ),
+              border: Border.all(color: isToday ? theme.accent : theme.border),
             ),
             child: Column(
               children: [
@@ -562,7 +573,8 @@ class _WeeklyCalendar extends StatelessWidget {
 
 class _CreateCampaignSheet extends ConsumerStatefulWidget {
   @override
-  ConsumerState<_CreateCampaignSheet> createState() => _CreateCampaignSheetState();
+  ConsumerState<_CreateCampaignSheet> createState() =>
+      _CreateCampaignSheetState();
 }
 
 class _CreateCampaignSheetState extends ConsumerState<_CreateCampaignSheet> {
@@ -615,10 +627,7 @@ class _CreateCampaignSheetState extends ConsumerState<_CreateCampaignSheet> {
               const SizedBox(height: 4),
               Text(
                 'Plan and track your marketing efforts.',
-                style: TextStyle(
-                  color: theme.textMuted,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: theme.textMuted, fontSize: 13),
               ),
               const SizedBox(height: 24),
               Text(
@@ -779,7 +788,10 @@ class _CampaignDetailScreen extends ConsumerWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -795,7 +807,10 @@ class _CampaignDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -842,19 +857,21 @@ class _CampaignDetailScreen extends ConsumerWidget {
                 style: TextStyle(color: theme.textMuted, fontSize: 12),
               )
             else
-              ...campaign.templateIds.map((id) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.border),
+              ...campaign.templateIds.map(
+                (id) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.border),
+                  ),
+                  child: Text(
+                    'Ad: $id',
+                    style: TextStyle(color: theme.textSecondary, fontSize: 12),
+                  ),
                 ),
-                child: Text(
-                  'Ad: $id',
-                  style: TextStyle(color: theme.textSecondary, fontSize: 12),
-                ),
-              )),
+              ),
           ],
         ),
       ),

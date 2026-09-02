@@ -57,7 +57,14 @@ class PanelAction extends StatelessWidget {
           children: [
             Icon(icon, color: c, size: 16),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: c, fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                color: c,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -87,10 +94,13 @@ class ToggleBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36, height: 36,
+        width: 36,
+        height: 36,
         margin: const EdgeInsets.only(right: 6),
         decoration: BoxDecoration(
-          color: active ? kAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06),
+          color: active
+              ? kAccent.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: active ? kAccent : Colors.transparent),
         ),
@@ -103,7 +113,9 @@ class ToggleBtn extends StatelessWidget {
                     color: active ? kAccent : Colors.white38,
                     fontSize: 14,
                     fontWeight: bold ? FontWeight.w900 : FontWeight.w400,
-                    decoration: underline ? TextDecoration.underline : TextDecoration.none,
+                    decoration: underline
+                        ? TextDecoration.underline
+                        : TextDecoration.none,
                     decorationColor: active ? kAccent : Colors.white38,
                   ),
                 ),
@@ -128,26 +140,29 @@ class DarkField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: ctrl,
-        maxLines: maxLines,
-        style: const TextStyle(color: Colors.white, fontSize: 13),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.07),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.white12)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.white12)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: kAccent)),
-        ),
-      );
+    controller: ctrl,
+    maxLines: maxLines,
+    style: const TextStyle(color: Colors.white, fontSize: 13),
+    onChanged: onChanged,
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.07),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.white12),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: kAccent),
+      ),
+    ),
+  );
 }

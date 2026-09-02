@@ -230,7 +230,10 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
+              child: _GlowBlob(
+                color: _accent.withValues(alpha: 0.16),
+                size: 420,
+              ),
             ),
             Positioned(
               bottom: -160,
@@ -262,7 +265,9 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                                   Text(
                                     'Staff Sign In',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white.withValues(alpha: 0.95),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.95,
+                                      ),
                                       fontSize: 42,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: -1.2,
@@ -273,7 +278,9 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                                   Text(
                                     'Enter your phone and 6-digit PIN',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white.withValues(alpha: 0.62),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.62,
+                                      ),
                                       fontSize: 16,
                                       height: 1.35,
                                     ),
@@ -421,11 +428,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
             color: Colors.white.withValues(alpha: 0.28),
             fontWeight: FontWeight.w500,
           ),
-          prefixIcon: const Icon(
-            Icons.phone,
-            color: Colors.white70,
-            size: 20,
-          ),
+          prefixIcon: const Icon(Icons.phone, color: Colors.white70, size: 20),
         ),
         validator: (value) {
           if (value == null || value.trim().isEmpty) {

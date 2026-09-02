@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/security/manager_approval.dart';
@@ -26,6 +27,7 @@ import 'cart_controller.dart';
 import 'parked_sales_controller.dart';
 import '../receipts/receipt_details_sheet.dart';
 import '../receipts/receipt_providers.dart';
+import '../shop_scanner/shop_qr_scanner_screen.dart';
 
 /// All locally-synced items are eligible for POS checkout.
 /// The backend [PosSyncController] already filters out digital/auction/wholesale
@@ -35,7 +37,9 @@ final itemsStreamProvider = StreamProvider<List<Item>>((ref) {
   return ref
       .watch(appDatabaseProvider)
       .watchItems()
-      .map((items) => items.where((i) => i.publishedOnline || i.synced).toList());
+      .map(
+        (items) => items.where((i) => i.publishedOnline || i.synced).toList(),
+      );
 });
 
 /// Services eligible for POS checkout: either published (Live) or synced from backend.
@@ -108,8 +112,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<bool> _isOwnerSoloSeller() async {
     final sellerId = await ref.read(secureStorageProvider).readSellerId();
     if (sellerId == null || sellerId.isEmpty) return false;
-    final profile =
-        await ref.read(appDatabaseProvider).getBusinessProfile();
+    final profile = await ref.read(appDatabaseProvider).getBusinessProfile();
     return profile?.sellerId == sellerId;
   }
 
@@ -120,8 +123,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final existingToken = await storage.readPosSessionToken();
     if (existingToken != null && existingToken.trim().isNotEmpty) return;
 
-    final ownerToken =
-        'OFFLINE_owner_${DateTime.now().millisecondsSinceEpoch}';
+    final ownerToken = 'OFFLINE_owner_${DateTime.now().millisecondsSinceEpoch}';
     await storage.writePosSessionToken(ownerToken);
     await storage.writePosSessionMeta(
       staffId: 0,
@@ -359,17 +361,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ),
 
               // Products section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DesignTokens.spaceMd,
-                    DesignTokens.spaceSm,
-                    DesignTokens.spaceMd,
-                    DesignTokens.spaceSm,
-                  ),
-                  child: Text('Products', style: DesignTokens.textBodyBold),
-                ),
-              ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: DesignTokens.spaceMd,
@@ -393,10 +384,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     return SliverGrid(
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 200,
+                            maxCrossAxisExtent: 180,
                             mainAxisSpacing: DesignTokens.spaceSm,
                             crossAxisSpacing: DesignTokens.spaceSm,
-                            childAspectRatio: 0.8,
+                            childAspectRatio: 0.75,
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = filtered[index];
@@ -448,20 +439,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             .toList();
                   return SliverMainAxisGroup(
                     slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            DesignTokens.spaceMd,
-                            DesignTokens.spaceLg,
-                            DesignTokens.spaceMd,
-                            DesignTokens.spaceSm,
-                          ),
-                          child: Text(
-                            'Services',
-                            style: DesignTokens.textBodyBold,
-                          ),
-                        ),
-                      ),
                       if (filtered.isEmpty)
                         SliverToBoxAdapter(
                           child: _EmptySearchState(
@@ -476,10 +453,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           sliver: SliverGrid(
                             gridDelegate:
                                 const SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: 200,
+                                  maxCrossAxisExtent: 180,
                                   mainAxisSpacing: DesignTokens.spaceSm,
                                   crossAxisSpacing: DesignTokens.spaceSm,
-                                  childAspectRatio: 0.85,
+                                  childAspectRatio: 0.75,
                                 ),
                             delegate: SliverChildBuilderDelegate((
                               context,
@@ -657,7 +634,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'UGX ${v.price.toStringAsFixed(0)}',
+                  '${v.price.toStringAsFixed(0)} /=',
                   style: DesignTokens.textBodyBold,
                 ),
                 if (v.isDefault) ...[
@@ -705,6 +682,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _handleScannedCode(String code) async {
+    final shopTarget = parseSokoShopQr(code);
+    if (shopTarget != null) {
+      Haptics.success();
+      final opened = await launchUrl(
+        shopTarget.url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this Soko shop')),
+        );
+      }
+      return;
+    }
+
     _searchDebounce?.cancel();
     _searchCtrl.text = code;
     if (mounted) setState(() => _query = code.toLowerCase());
@@ -1156,7 +1148,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               'shared_with_business': true,
                             });
                           } catch (e) {
-                            debugPrint('[Checkout] Customer push enqueue failed: $e');
+                            debugPrint(
+                              '[Checkout] Customer push enqueue failed: $e',
+                            );
                           }
                         }
 
@@ -1210,7 +1204,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
-              labelText: 'New price (UGX)',
+              labelText: 'New price (/=)',
               prefixIcon: Icon(Icons.edit_outlined),
             ),
           ),
@@ -1433,6 +1427,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               subtitle: 'Record as credit sale (customer required)',
               onTap: () => Navigator.of(sheetContext).pop('credit'),
             ),
+            const SizedBox(height: DesignTokens.spaceSm),
+            _PaymentMethodTile(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'BNPL (Pay in installments)',
+              subtitle: 'Sanaa Finance BNPL',
+              onTap: () => Navigator.of(sheetContext).pop('bnpl'),
+            ),
           ],
         ),
       ),
@@ -1534,6 +1535,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         payments = [CheckoutPayment(method: 'credit', amount: total)];
         note = creditNote.trim().isEmpty ? null : creditNote.trim();
         break;
+      case 'bnpl':
+        if (cart.customer == null) {
+          await _selectCustomer(context);
+          if (!context.mounted) return;
+        }
+        final bnplCart = ref.read(cartControllerProvider);
+        if (bnplCart.customer == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Select a customer for BNPL sale'),
+            ),
+          );
+          return;
+        }
+        final bnplNote = await _bnplFlow(
+          context,
+          customerName: bnplCart.customer!.name,
+          total: total,
+        );
+        if (!context.mounted) return;
+        if (bnplNote == null) return;
+        payments = [CheckoutPayment(method: 'bnpl', amount: total)];
+        note = bnplNote.trim().isEmpty ? null : bnplNote.trim();
+        break;
       default:
         return;
     }
@@ -1622,9 +1647,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 await printer.enqueueReceipt(entryId);
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Print failed: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Print failed: $e')));
                 }
                 return;
               }
@@ -1669,9 +1694,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 await ref.read(receiptServiceProvider).shareWhatsapp(entryId);
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Share failed: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
                 }
               }
               if (context.mounted) Navigator.of(context).pop();
@@ -1686,9 +1711,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 await ref.read(receiptServiceProvider).sharePdf(entryId);
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Share failed: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
                 }
               }
               if (context.mounted) Navigator.of(context).pop();
@@ -1976,6 +2001,83 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 ),
                 icon: const Icon(Icons.check_circle_outline),
                 label: const Text('Confirm credit sale'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      noteCtrl.dispose();
+    }
+  }
+
+  Future<String?> _bnplFlow(
+    BuildContext context, {
+    required String customerName,
+    required double total,
+  }) async {
+    final noteCtrl = TextEditingController();
+    try {
+      return await BottomSheetModal.show<String>(
+        context: context,
+        title: 'BNPL (Pay in installments)',
+        subtitle: customerName,
+        child: Builder(
+          builder: (sheetContext) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: DesignTokens.paddingMd,
+                decoration: BoxDecoration(
+                  color: DesignTokens.brandAccentLight,
+                  borderRadius: DesignTokens.borderRadiusMd,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: DesignTokens.brandPrimary,
+                        ),
+                        const SizedBox(width: DesignTokens.spaceSm),
+                        Expanded(
+                          child: Text(
+                            'Record ${total.toUgx()} as BNPL for this customer.',
+                            style: DesignTokens.textSmall.copyWith(
+                              color: DesignTokens.brandPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DesignTokens.spaceSm),
+                    Text(
+                      'Customer pays in installments via Sanaa Finance BNPL.',
+                      style: DesignTokens.textCaption,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: DesignTokens.spaceSm),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Note (optional)',
+                  prefixIcon: Icon(Icons.note_outlined),
+                ),
+                minLines: 1,
+                maxLines: 3,
+              ),
+              const SizedBox(height: DesignTokens.spaceLg),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(sheetContext).pop(noteCtrl.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: DesignTokens.brandPrimary,
+                ),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Confirm BNPL sale'),
               ),
             ],
           ),
@@ -2368,11 +2470,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       title: 'Options',
       actions: [
         ActionSheetItem(
-          label: 'Seed demo items',
-          icon: Icons.add_box_outlined,
-          onTap: () => _seedDemoDataIfEmpty(ref),
-        ),
-        ActionSheetItem(
           label: 'View transactions',
           icon: Icons.receipt_long_outlined,
           onTap: () => context.go('/home/transactions'),
@@ -2382,49 +2479,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           icon: Icons.lock_clock,
           onTap: () => context.go('/home/more/shifts'),
         ),
+        ActionSheetItem(
+          label: 'Payment links',
+          icon: Icons.link,
+          onTap: () => context.go('/home/more/payment-links'),
+        ),
       ],
     );
   }
 
-  Future<void> _seedDemoDataIfEmpty(WidgetRef ref) async {
-    final db = ref.read(appDatabaseProvider);
-    final items = await db.getAllItems();
-    if (items.isNotEmpty) return;
-    await db.upsertItem(
-      ItemsCompanion.insert(
-        name: 'Coffee',
-        price: 6000,
-        stockQty: const Value(20),
-      ),
-    );
-    await db.upsertItem(
-      ItemsCompanion.insert(
-        name: 'Snack Box',
-        price: 14000,
-        stockQty: const Value(15),
-      ),
-    );
-    await db.upsertItem(
-      ItemsCompanion.insert(
-        name: 'Water Bottle',
-        price: 2000,
-        stockQty: const Value(50),
-      ),
-    );
-    await db.upsertItem(
-      ItemsCompanion.insert(
-        name: 'Sandwich',
-        price: 8500,
-        stockQty: const Value(10),
-      ),
-    );
-    await db.upsertService(
-      ServicesCompanion.insert(title: 'Consultation', price: 30000),
-    );
-    await db.upsertService(
-      ServicesCompanion.insert(title: 'Express Delivery', price: 15000),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2469,7 +2532,11 @@ class _SearchBarState extends State<_SearchBar> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, size: 20, color: DesignTokens.textTertiary),
+            const Icon(
+              Icons.search,
+              size: 20,
+              color: DesignTokens.textTertiary,
+            ),
             const SizedBox(width: DesignTokens.spaceSm),
             Expanded(
               child: TextField(
@@ -2509,7 +2576,11 @@ class _SearchBarState extends State<_SearchBar> {
             ),
             if (!_focused)
               IconButton(
-                icon: const Icon(Icons.qr_code_scanner, size: 20, color: DesignTokens.textTertiary),
+                icon: const Icon(
+                  Icons.qr_code_scanner,
+                  size: 20,
+                  color: DesignTokens.textTertiary,
+                ),
                 tooltip: 'Scan',
                 onPressed: widget.onScan,
                 padding: EdgeInsets.zero,
@@ -2645,7 +2716,8 @@ class _ProductTile extends StatelessWidget {
                         if (effectiveStock != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: DesignTokens.spaceXs + DesignTokens.spaceXxs,
+                              horizontal:
+                                  DesignTokens.spaceXs + DesignTokens.spaceXxs,
                               vertical: DesignTokens.spaceXxs,
                             ),
                             decoration: BoxDecoration(
@@ -2653,11 +2725,17 @@ class _ProductTile extends StatelessWidget {
                                   ? DesignTokens.error.withValues(alpha: 0.12)
                                   : lowStock
                                   ? DesignTokens.warning.withValues(alpha: 0.12)
-                                  : DesignTokens.success.withValues(alpha: 0.12),
+                                  : DesignTokens.success.withValues(
+                                      alpha: 0.12,
+                                    ),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              outOfStock ? 'Out' : lowStock ? 'Low' : 'In stock',
+                              outOfStock
+                                  ? 'Out'
+                                  : lowStock
+                                  ? 'Low'
+                                  : 'In stock',
                               style: DesignTokens.textCaption.copyWith(
                                 color: outOfStock
                                     ? DesignTokens.error
@@ -2814,9 +2892,15 @@ class _ScaleButtonState extends State<_ScaleButton> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
-      onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
-      onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+      onTapDown: widget.onTap == null
+          ? null
+          : (_) => setState(() => _pressed = true),
+      onTapUp: widget.onTap == null
+          ? null
+          : (_) => setState(() => _pressed = false),
+      onTapCancel: widget.onTap == null
+          ? null
+          : () => setState(() => _pressed = false),
       onTap: widget.onTap,
       child: AnimatedScale(
         duration: const Duration(milliseconds: 120),
@@ -3017,10 +3101,7 @@ class _CartPane extends StatelessWidget {
                         '$taxLabel (${taxRate.toStringAsFixed(0)}%)',
                         style: DesignTokens.textBody,
                       ),
-                      Text(
-                        taxAmount.toUgx(),
-                        style: DesignTokens.textBodyBold,
-                      ),
+                      Text(taxAmount.toUgx(), style: DesignTokens.textBodyBold),
                     ],
                   ),
                 ],
@@ -3095,7 +3176,8 @@ class _CartItem extends StatelessWidget {
         .take(2)
         .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
         .join();
-    final thumbColor = Colors.primaries[title.hashCode % Colors.primaries.length];
+    final thumbColor =
+        Colors.primaries[title.hashCode % Colors.primaries.length];
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -3142,10 +3224,7 @@ class _CartItem extends StatelessWidget {
                       color: DesignTokens.grayLight.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
-                      variant!,
-                      style: DesignTokens.textCaption,
-                    ),
+                    child: Text(variant!, style: DesignTokens.textCaption),
                   ),
                 ],
                 const SizedBox(height: 2),
@@ -3194,10 +3273,7 @@ class _CartItem extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                subtotal.toUgx(),
-                style: DesignTokens.textBodyBold,
-              ),
+              Text(subtotal.toUgx(), style: DesignTokens.textBodyBold),
               const SizedBox(height: 2),
               GestureDetector(
                 onTap: onRemove,
@@ -3326,9 +3402,7 @@ class _FloatingCartSummary extends StatelessWidget {
                 const Spacer(),
                 Text(
                   displayTotal.toUgx(),
-                  style: DesignTokens.textTitle.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: DesignTokens.textTitle.copyWith(color: Colors.white),
                 ),
                 const SizedBox(width: 4),
                 const Icon(Icons.chevron_right, color: Colors.white, size: 18),
@@ -3437,9 +3511,7 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _EmptySearchState extends StatelessWidget {
-  const _EmptySearchState({
-    required this.message,
-  });
+  const _EmptySearchState({required this.message});
   final String message;
 
   @override
@@ -3559,7 +3631,7 @@ class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet> {
         ),
         const SizedBox(height: DesignTokens.spaceSm),
         Text(
-          'Scan a product barcode or receipt QR',
+          'Scan a product, receipt, or Soko shop QR',
           style: DesignTokens.textSmall,
           textAlign: TextAlign.center,
         ),

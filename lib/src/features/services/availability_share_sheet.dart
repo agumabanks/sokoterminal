@@ -78,7 +78,9 @@ class AvailabilityShareSheet extends ConsumerWidget {
               backgroundColor: DesignTokens.brandAccent,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -87,7 +89,15 @@ class AvailabilityShareSheet extends ConsumerWidget {
   }
 
   String _buildMessage(List<AvailabilitySchedule> schedules) {
-    final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    final days = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
     final buffer = StringBuffer();
     buffer.writeln('Hello! 👋');
     buffer.writeln('');

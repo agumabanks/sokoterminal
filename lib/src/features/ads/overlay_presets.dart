@@ -8,31 +8,35 @@ import '../../core/theme/design_tokens.dart';
 // ---------------------------------------------------------------------------
 
 enum OverlayType {
-  logoBadge,         // Corner brand badge — business name + tagline
-  newsTicker,        // Full-width bottom scroll bar (TV-style)
-  saleRibbon,        // Diagonal corner ribbon (SALE / HOT / NEW)
-  priceTag,          // Speech-bubble price indicator
-  promoBar,          // Full-width bottom CTA gradient bar
-  breakingNews,      // TV lower-third with logo box + headline + subline
-  watermark,         // Centre semi-transparent brand watermark
-  storyFrame,        // Header + footer brand strips (Reels/Stories style)
-  contactStrip,      // Slim bar: phone · WhatsApp · location
-  productSpotlight,  // Product name + price inline badge
-  flashSale,         // Bold centred flash-sale banner
-  countdown,         // Urgency strip — ends soon / limited time
-  trustBadge,        // Verified / quality trust pill
-  deliveryBadge,     // Free delivery / fast shipping callout
-  limitedStock,      // Scarcity — only X left
-  newArrival,        // NEW / JUST IN corner ribbon
+  logoBadge, // Corner brand badge — business name + tagline
+  newsTicker, // Full-width bottom scroll bar (TV-style)
+  saleRibbon, // Diagonal corner ribbon (SALE / HOT / NEW)
+  priceTag, // Speech-bubble price indicator
+  promoBar, // Full-width bottom CTA gradient bar
+  breakingNews, // TV lower-third with logo box + headline + subline
+  watermark, // Centre semi-transparent brand watermark
+  storyFrame, // Header + footer brand strips (Reels/Stories style)
+  contactStrip, // Slim bar: phone · WhatsApp · location
+  productSpotlight, // Product name + price inline badge
+  flashSale, // Bold centred flash-sale banner
+  countdown, // Urgency strip — ends soon / limited time
+  trustBadge, // Verified / quality trust pill
+  deliveryBadge, // Free delivery / fast shipping callout
+  limitedStock, // Scarcity — only X left
+  newArrival, // NEW / JUST IN corner ribbon
 }
 
 enum OverlayAnchor {
-  topLeft, topRight, topCenter,
-  bottomLeft, bottomRight, bottomCenter,
+  topLeft,
+  topRight,
+  topCenter,
+  bottomLeft,
+  bottomRight,
+  bottomCenter,
   center,
   fullBottom, // spans full width, sticks to bottom
-  fullTop,    // spans full width, sticks to top
-  fullFrame,  // top + bottom strips (storyFrame only)
+  fullTop, // spans full width, sticks to top
+  fullFrame, // top + bottom strips (storyFrame only)
 }
 
 class OverlayLayer {
@@ -75,21 +79,20 @@ class OverlayLayer {
     double? opacity,
     String? fontFamily,
     bool? isSelected,
-  }) =>
-      OverlayLayer(
-        id: id,
-        type: type,
-        anchor: anchor ?? this.anchor,
-        primaryText: primaryText ?? this.primaryText,
-        secondaryText: secondaryText ?? this.secondaryText,
-        tertiaryText: tertiaryText ?? this.tertiaryText,
-        bgColor: bgColor ?? this.bgColor,
-        accentColor: accentColor ?? this.accentColor,
-        textColor: textColor ?? this.textColor,
-        opacity: opacity ?? this.opacity,
-        fontFamily: fontFamily ?? this.fontFamily,
-        isSelected: isSelected ?? this.isSelected,
-      );
+  }) => OverlayLayer(
+    id: id,
+    type: type,
+    anchor: anchor ?? this.anchor,
+    primaryText: primaryText ?? this.primaryText,
+    secondaryText: secondaryText ?? this.secondaryText,
+    tertiaryText: tertiaryText ?? this.tertiaryText,
+    bgColor: bgColor ?? this.bgColor,
+    accentColor: accentColor ?? this.accentColor,
+    textColor: textColor ?? this.textColor,
+    opacity: opacity ?? this.opacity,
+    fontFamily: fontFamily ?? this.fontFamily,
+    isSelected: isSelected ?? this.isSelected,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -126,9 +129,8 @@ class OverlayBrandContext {
   String get contactPhone =>
       phone.isNotEmpty ? '📞 $phone' : '📞 Call us today';
 
-  String get contactWhatsapp => whatsapp.isNotEmpty
-      ? '💬 $whatsapp'
-      : '💬 WhatsApp Us';
+  String get contactWhatsapp =>
+      whatsapp.isNotEmpty ? '💬 $whatsapp' : '💬 WhatsApp Us';
 
   String get contactLocation =>
       location.isNotEmpty ? '📍 $location' : '📍 Kampala, Uganda';
@@ -136,11 +138,11 @@ class OverlayBrandContext {
   String get displayProduct =>
       productName.isNotEmpty ? productName : 'Your Product';
 
-  String get displayPrice =>
-      productPrice.isNotEmpty ? productPrice : 'UGX —';
+  String get displayPrice => productPrice.isNotEmpty ? productPrice : '— /=';
 
-  String get displayWebsite =>
-      website.isNotEmpty ? website.replaceFirst(RegExp(r'^https?://'), '') : 'soko24.co';
+  String get displayWebsite => website.isNotEmpty
+      ? website.replaceFirst(RegExp(r'^https?://'), '')
+      : 'soko24.co';
 }
 
 // ---------------------------------------------------------------------------
@@ -161,140 +163,200 @@ OverlayLayer buildPreset({
   switch (type) {
     case OverlayType.logoBadge:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.bottomLeft,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.bottomLeft,
         primaryText: businessName.isNotEmpty ? businessName : 'Your Brand',
         secondaryText: tagline.isNotEmpty ? tagline : 'soko24.co',
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.newsTicker:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullBottom,
-        primaryText: '${businessName.isNotEmpty ? businessName.toUpperCase() : 'YOUR BRAND'}  •  ',
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullBottom,
+        primaryText:
+            '${businessName.isNotEmpty ? businessName.toUpperCase() : 'YOUR BRAND'}  •  ',
         secondaryText: 'SALE NOW ON  |  UP TO 50% OFF  |  CALL US TODAY  |',
         tertiaryText: 'LIMITED STOCK AVAILABLE  |  FREE DELIVERY KAMPALA',
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.saleRibbon:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.topRight,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.topRight,
         primaryText: 'SALE',
-        bgColor: const Color(0xFFdc2626), accentColor: brandAccent,
+        bgColor: const Color(0xFFdc2626),
+        accentColor: brandAccent,
       );
 
     case OverlayType.priceTag:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.bottomRight,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.bottomRight,
         primaryText: ctx.displayPrice,
         secondaryText: ctx.productWasPrice,
-        bgColor: brandAccent, accentColor: brandPrimary, textColor: Colors.white,
+        bgColor: brandAccent,
+        accentColor: brandPrimary,
+        textColor: Colors.white,
       );
 
     case OverlayType.promoBar:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullBottom,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullBottom,
         primaryText: businessName.isNotEmpty ? businessName : 'Your Brand',
         secondaryText: 'SHOP NOW  →',
         tertiaryText: ctx.displayWebsite,
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.breakingNews:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullBottom,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullBottom,
         primaryText: 'BREAKING',
         secondaryText: businessName.isNotEmpty
             ? '${businessName.toUpperCase()} — BIG SALE NOW ON'
             : 'BIG SALE — LIMITED OFFER ENDS TONIGHT',
-        tertiaryText: tagline.isNotEmpty ? tagline : 'Soko 24 • Uganda\'s #1 Marketplace',
-        bgColor: brandPrimary, accentColor: const Color(0xFFdc2626),
+        tertiaryText: tagline.isNotEmpty
+            ? tagline
+            : 'Soko 24 • Uganda\'s #1 Marketplace',
+        bgColor: brandPrimary,
+        accentColor: const Color(0xFFdc2626),
       );
 
     case OverlayType.watermark:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.center,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.center,
         primaryText: businessName.isNotEmpty ? businessName : 'YOUR BRAND',
         secondaryText: 'soko24.co',
-        bgColor: Colors.transparent, accentColor: brandAccent,
-        textColor: Colors.white, opacity: 0.35,
+        bgColor: Colors.transparent,
+        accentColor: brandAccent,
+        textColor: Colors.white,
+        opacity: 0.35,
       );
 
     case OverlayType.storyFrame:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullFrame,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullFrame,
         primaryText: businessName.isNotEmpty ? businessName : 'Your Brand',
         secondaryText: tagline.isNotEmpty ? tagline : 'Quality • Style • Value',
         tertiaryText: 'soko24.co',
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.contactStrip:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullBottom,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullBottom,
         primaryText: ctx.contactPhone,
         secondaryText: ctx.contactWhatsapp,
         tertiaryText: ctx.contactLocation,
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.productSpotlight:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.bottomLeft,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.bottomLeft,
         primaryText: ctx.displayProduct,
         secondaryText: ctx.displayPrice,
-        bgColor: brandPrimary, accentColor: brandAccent,
+        bgColor: brandPrimary,
+        accentColor: brandAccent,
       );
 
     case OverlayType.flashSale:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.center,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.center,
         primaryText: 'FLASH SALE',
         secondaryText: ctx.displayPrice,
         tertiaryText: 'TODAY ONLY',
-        bgColor: const Color(0xFFdc2626), accentColor: brandAccent,
-        textColor: Colors.white, opacity: 0.92,
+        bgColor: const Color(0xFFdc2626),
+        accentColor: brandAccent,
+        textColor: Colors.white,
+        opacity: 0.92,
       );
 
     case OverlayType.countdown:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.fullTop,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.fullTop,
         primaryText: 'ENDS SOON',
         secondaryText: 'ORDER NOW BEFORE IT\'S GONE',
         tertiaryText: ctx.displayWebsite,
-        bgColor: brandPrimary, accentColor: const Color(0xFFdc2626),
+        bgColor: brandPrimary,
+        accentColor: const Color(0xFFdc2626),
       );
 
     case OverlayType.trustBadge:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.topLeft,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.topLeft,
         primaryText: '✓ Trusted Seller',
-        secondaryText: businessName.isNotEmpty ? businessName : 'Verified on Soko24',
-        bgColor: brandPrimary.withValues(alpha: 0.88), accentColor: brandAccent,
+        secondaryText: businessName.isNotEmpty
+            ? businessName
+            : 'Verified on Soko24',
+        bgColor: brandPrimary.withValues(alpha: 0.88),
+        accentColor: brandAccent,
       );
 
     case OverlayType.deliveryBadge:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.topCenter,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.topCenter,
         primaryText: '🚚 FREE DELIVERY',
-        secondaryText: ctx.location.isNotEmpty ? ctx.location : 'Kampala & nearby',
-        bgColor: brandAccent, accentColor: brandPrimary, textColor: Colors.white,
+        secondaryText: ctx.location.isNotEmpty
+            ? ctx.location
+            : 'Kampala & nearby',
+        bgColor: brandAccent,
+        accentColor: brandPrimary,
+        textColor: Colors.white,
       );
 
     case OverlayType.limitedStock:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.topRight,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.topRight,
         primaryText: '⚡ LIMITED STOCK',
         secondaryText: 'Order while available',
-        bgColor: const Color(0xFFf59e0b), accentColor: brandPrimary,
+        bgColor: const Color(0xFFf59e0b),
+        accentColor: brandPrimary,
         textColor: Colors.black,
       );
 
     case OverlayType.newArrival:
       return OverlayLayer(
-        id: id, type: type, anchor: OverlayAnchor.topRight,
+        id: id,
+        type: type,
+        anchor: OverlayAnchor.topRight,
         primaryText: 'NEW',
-        bgColor: brandAccent, accentColor: brandPrimary, textColor: Colors.white,
+        bgColor: brandAccent,
+        accentColor: brandPrimary,
+        textColor: Colors.white,
       );
   }
 }
@@ -308,89 +370,186 @@ List<OverlayLayer> buildComboLayers({
     (c) => c.id == comboId,
     orElse: () => overlayComboCatalogue.first,
   );
-  return [
-    for (final type in combo.types) buildPreset(type: type, ctx: ctx),
-  ];
+  return [for (final type in combo.types) buildPreset(type: type, ctx: ctx)];
 }
 
 // ---------------------------------------------------------------------------
 // Preset catalogue (shown in the picker strip)
 // ---------------------------------------------------------------------------
 
-const overlayPresetCatalogue = <({
-  OverlayType type,
-  String label,
-  String emoji,
-  String description,
-})>[
-  (type: OverlayType.newsTicker,      label: 'News Ticker',      emoji: '📺', description: 'TV-style scrolling text bar'),
-  (type: OverlayType.breakingNews,    label: 'Breaking News',    emoji: '🔴', description: 'CNN/BBC lower-third layout'),
-  (type: OverlayType.storyFrame,      label: 'Story Frame',      emoji: '🎬', description: 'Header + footer brand strips'),
-  (type: OverlayType.promoBar,        label: 'Promo Bar',        emoji: '🏷️', description: 'Full-width CTA gradient bar'),
-  (type: OverlayType.logoBadge,       label: 'Logo Badge',       emoji: '🏷️', description: 'Brand name corner badge'),
-  (type: OverlayType.saleRibbon,      label: 'Sale Ribbon',      emoji: '🎀', description: 'Diagonal corner ribbon'),
-  (type: OverlayType.priceTag,        label: 'Price Tag',        emoji: '💰', description: 'Price bubble indicator'),
-  (type: OverlayType.productSpotlight,label: 'Product Tag',      emoji: '✨', description: 'Name + price inline tag'),
-  (type: OverlayType.contactStrip,    label: 'Contact Strip',    emoji: '📞', description: 'Phone · WhatsApp · location'),
-  (type: OverlayType.watermark,       label: 'Watermark',        emoji: '💧', description: 'Semi-transparent brand stamp'),
-  (type: OverlayType.flashSale,       label: 'Flash Sale',       emoji: '🔥', description: 'Bold centre sale banner'),
-  (type: OverlayType.countdown,       label: 'Ends Soon',        emoji: '⏰', description: 'Urgency top strip'),
-  (type: OverlayType.trustBadge,      label: 'Trust Badge',      emoji: '✓', description: 'Verified seller pill'),
-  (type: OverlayType.deliveryBadge,   label: 'Free Delivery',    emoji: '🚚', description: 'Shipping callout'),
-  (type: OverlayType.limitedStock,    label: 'Limited Stock',    emoji: '⚡', description: 'Scarcity alert'),
-  (type: OverlayType.newArrival,      label: 'New Arrival',      emoji: '✨', description: 'Just-in corner ribbon'),
-];
+const overlayPresetCatalogue =
+    <({OverlayType type, String label, String emoji, String description})>[
+      (
+        type: OverlayType.newsTicker,
+        label: 'News Ticker',
+        emoji: '📺',
+        description: 'TV-style scrolling text bar',
+      ),
+      (
+        type: OverlayType.breakingNews,
+        label: 'Breaking News',
+        emoji: '🔴',
+        description: 'CNN/BBC lower-third layout',
+      ),
+      (
+        type: OverlayType.storyFrame,
+        label: 'Story Frame',
+        emoji: '🎬',
+        description: 'Header + footer brand strips',
+      ),
+      (
+        type: OverlayType.promoBar,
+        label: 'Promo Bar',
+        emoji: '🏷️',
+        description: 'Full-width CTA gradient bar',
+      ),
+      (
+        type: OverlayType.logoBadge,
+        label: 'Logo Badge',
+        emoji: '🏷️',
+        description: 'Brand name corner badge',
+      ),
+      (
+        type: OverlayType.saleRibbon,
+        label: 'Sale Ribbon',
+        emoji: '🎀',
+        description: 'Diagonal corner ribbon',
+      ),
+      (
+        type: OverlayType.priceTag,
+        label: 'Price Tag',
+        emoji: '💰',
+        description: 'Price bubble indicator',
+      ),
+      (
+        type: OverlayType.productSpotlight,
+        label: 'Product Tag',
+        emoji: '✨',
+        description: 'Name + price inline tag',
+      ),
+      (
+        type: OverlayType.contactStrip,
+        label: 'Contact Strip',
+        emoji: '📞',
+        description: 'Phone · WhatsApp · location',
+      ),
+      (
+        type: OverlayType.watermark,
+        label: 'Watermark',
+        emoji: '💧',
+        description: 'Semi-transparent brand stamp',
+      ),
+      (
+        type: OverlayType.flashSale,
+        label: 'Flash Sale',
+        emoji: '🔥',
+        description: 'Bold centre sale banner',
+      ),
+      (
+        type: OverlayType.countdown,
+        label: 'Ends Soon',
+        emoji: '⏰',
+        description: 'Urgency top strip',
+      ),
+      (
+        type: OverlayType.trustBadge,
+        label: 'Trust Badge',
+        emoji: '✓',
+        description: 'Verified seller pill',
+      ),
+      (
+        type: OverlayType.deliveryBadge,
+        label: 'Free Delivery',
+        emoji: '🚚',
+        description: 'Shipping callout',
+      ),
+      (
+        type: OverlayType.limitedStock,
+        label: 'Limited Stock',
+        emoji: '⚡',
+        description: 'Scarcity alert',
+      ),
+      (
+        type: OverlayType.newArrival,
+        label: 'New Arrival',
+        emoji: '✨',
+        description: 'Just-in corner ribbon',
+      ),
+    ];
 
-const overlayComboCatalogue = <({
-  String id,
-  String label,
-  String emoji,
-  String description,
-  List<OverlayType> types,
-})>[
-  (
-    id: 'product_sale',
-    label: 'Product Sale',
-    emoji: '🛍️',
-    description: 'Ribbon + product tag + price',
-    types: [OverlayType.saleRibbon, OverlayType.productSpotlight, OverlayType.priceTag],
-  ),
-  (
-    id: 'story_promo',
-    label: 'Story Promo',
-    emoji: '📱',
-    description: 'Reels frame + sale ribbon',
-    types: [OverlayType.storyFrame, OverlayType.saleRibbon, OverlayType.logoBadge],
-  ),
-  (
-    id: 'tv_broadcast',
-    label: 'TV Broadcast',
-    emoji: '📺',
-    description: 'Breaking news + ticker',
-    types: [OverlayType.breakingNews, OverlayType.newsTicker],
-  ),
-  (
-    id: 'full_promo',
-    label: 'Full Promo',
-    emoji: '🔥',
-    description: 'Flash sale + contact + delivery',
-    types: [OverlayType.flashSale, OverlayType.deliveryBadge, OverlayType.contactStrip],
-  ),
-  (
-    id: 'trust_shop',
-    label: 'Trust & Shop',
-    emoji: '✓',
-    description: 'Trust badge + promo CTA',
-    types: [OverlayType.trustBadge, OverlayType.promoBar, OverlayType.watermark],
-  ),
-  (
-    id: 'urgency_pack',
-    label: 'Urgency Pack',
-    emoji: '⚡',
-    description: 'Countdown + limited + price',
-    types: [OverlayType.countdown, OverlayType.limitedStock, OverlayType.priceTag],
-  ),
-];
+const overlayComboCatalogue =
+    <
+      ({
+        String id,
+        String label,
+        String emoji,
+        String description,
+        List<OverlayType> types,
+      })
+    >[
+      (
+        id: 'product_sale',
+        label: 'Product Sale',
+        emoji: '🛍️',
+        description: 'Ribbon + product tag + price',
+        types: [
+          OverlayType.saleRibbon,
+          OverlayType.productSpotlight,
+          OverlayType.priceTag,
+        ],
+      ),
+      (
+        id: 'story_promo',
+        label: 'Story Promo',
+        emoji: '📱',
+        description: 'Reels frame + sale ribbon',
+        types: [
+          OverlayType.storyFrame,
+          OverlayType.saleRibbon,
+          OverlayType.logoBadge,
+        ],
+      ),
+      (
+        id: 'tv_broadcast',
+        label: 'TV Broadcast',
+        emoji: '📺',
+        description: 'Breaking news + ticker',
+        types: [OverlayType.breakingNews, OverlayType.newsTicker],
+      ),
+      (
+        id: 'full_promo',
+        label: 'Full Promo',
+        emoji: '🔥',
+        description: 'Flash sale + contact + delivery',
+        types: [
+          OverlayType.flashSale,
+          OverlayType.deliveryBadge,
+          OverlayType.contactStrip,
+        ],
+      ),
+      (
+        id: 'trust_shop',
+        label: 'Trust & Shop',
+        emoji: '✓',
+        description: 'Trust badge + promo CTA',
+        types: [
+          OverlayType.trustBadge,
+          OverlayType.promoBar,
+          OverlayType.watermark,
+        ],
+      ),
+      (
+        id: 'urgency_pack',
+        label: 'Urgency Pack',
+        emoji: '⚡',
+        description: 'Countdown + limited + price',
+        types: [
+          OverlayType.countdown,
+          OverlayType.limitedStock,
+          OverlayType.priceTag,
+        ],
+      ),
+    ];
 
 // ---------------------------------------------------------------------------
 // Overlay renderer widgets
@@ -428,10 +587,7 @@ class OverlayRenderer extends StatelessWidget {
             child: IgnorePointer(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: DesignTokens.brandAccent,
-                    width: 2,
-                  ),
+                  border: Border.all(color: DesignTokens.brandAccent, width: 2),
                 ),
               ),
             ),
@@ -444,22 +600,38 @@ class OverlayRenderer extends StatelessWidget {
 
   Widget _buildOverlay(BuildContext context) {
     switch (layer.type) {
-      case OverlayType.logoBadge:      return _LogoBadge(layer: layer, size: compositorSize);
-      case OverlayType.newsTicker:     return _NewsTicker(layer: layer, size: compositorSize);
-      case OverlayType.saleRibbon:     return _SaleRibbon(layer: layer, size: compositorSize);
-      case OverlayType.priceTag:       return _PriceTag(layer: layer, size: compositorSize);
-      case OverlayType.promoBar:       return _PromoBar(layer: layer, size: compositorSize);
-      case OverlayType.breakingNews:   return _BreakingNews(layer: layer, size: compositorSize);
-      case OverlayType.watermark:      return _Watermark(layer: layer, size: compositorSize);
-      case OverlayType.storyFrame:     return _StoryFrame(layer: layer, size: compositorSize);
-      case OverlayType.contactStrip:   return _ContactStrip(layer: layer, size: compositorSize);
-      case OverlayType.productSpotlight: return _ProductSpotlight(layer: layer, size: compositorSize);
-      case OverlayType.flashSale:      return _FlashSale(layer: layer, size: compositorSize);
-      case OverlayType.countdown:      return _CountdownStrip(layer: layer, size: compositorSize);
-      case OverlayType.trustBadge:     return _TrustBadge(layer: layer, size: compositorSize);
-      case OverlayType.deliveryBadge:  return _DeliveryBadge(layer: layer, size: compositorSize);
-      case OverlayType.limitedStock:   return _LimitedStock(layer: layer, size: compositorSize);
-      case OverlayType.newArrival:     return _SaleRibbon(layer: layer, size: compositorSize);
+      case OverlayType.logoBadge:
+        return _LogoBadge(layer: layer, size: compositorSize);
+      case OverlayType.newsTicker:
+        return _NewsTicker(layer: layer, size: compositorSize);
+      case OverlayType.saleRibbon:
+        return _SaleRibbon(layer: layer, size: compositorSize);
+      case OverlayType.priceTag:
+        return _PriceTag(layer: layer, size: compositorSize);
+      case OverlayType.promoBar:
+        return _PromoBar(layer: layer, size: compositorSize);
+      case OverlayType.breakingNews:
+        return _BreakingNews(layer: layer, size: compositorSize);
+      case OverlayType.watermark:
+        return _Watermark(layer: layer, size: compositorSize);
+      case OverlayType.storyFrame:
+        return _StoryFrame(layer: layer, size: compositorSize);
+      case OverlayType.contactStrip:
+        return _ContactStrip(layer: layer, size: compositorSize);
+      case OverlayType.productSpotlight:
+        return _ProductSpotlight(layer: layer, size: compositorSize);
+      case OverlayType.flashSale:
+        return _FlashSale(layer: layer, size: compositorSize);
+      case OverlayType.countdown:
+        return _CountdownStrip(layer: layer, size: compositorSize);
+      case OverlayType.trustBadge:
+        return _TrustBadge(layer: layer, size: compositorSize);
+      case OverlayType.deliveryBadge:
+        return _DeliveryBadge(layer: layer, size: compositorSize);
+      case OverlayType.limitedStock:
+        return _LimitedStock(layer: layer, size: compositorSize);
+      case OverlayType.newArrival:
+        return _SaleRibbon(layer: layer, size: compositorSize);
     }
   }
 }
@@ -509,7 +681,11 @@ class _LogoBadge extends StatelessWidget {
               SizedBox(width: size.width * 0.015),
               Text(
                 layer.primaryText,
-                style: _ts(size.width * 0.042, FontWeight.w800, layer.textColor),
+                style: _ts(
+                  size.width * 0.042,
+                  FontWeight.w800,
+                  layer.textColor,
+                ),
               ),
             ],
           ),
@@ -517,8 +693,11 @@ class _LogoBadge extends StatelessWidget {
             SizedBox(height: size.height * 0.003),
             Text(
               layer.secondaryText,
-              style: _ts(size.width * 0.026, FontWeight.w400,
-                  layer.textColor.withValues(alpha: 0.7)),
+              style: _ts(
+                size.width * 0.026,
+                FontWeight.w400,
+                layer.textColor.withValues(alpha: 0.7),
+              ),
             ),
           ],
         ],
@@ -527,10 +706,7 @@ class _LogoBadge extends StatelessWidget {
 
     return Align(
       alignment: _toAlignment(layer.anchor),
-      child: Padding(
-        padding: EdgeInsets.all(pad),
-        child: badge,
-      ),
+      child: Padding(padding: EdgeInsets.all(pad), child: badge),
     );
   }
 }
@@ -579,7 +755,9 @@ class _NewsTickerState extends State<_NewsTicker>
         '${layer.primaryText}  ${layer.secondaryText}  ';
 
     return Positioned(
-      left: 0, right: 0, bottom: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       child: SizedBox(
         height: barH,
         child: Stack(
@@ -590,21 +768,30 @@ class _NewsTickerState extends State<_NewsTicker>
             ),
             // Label box
             Positioned(
-              left: 0, top: 0, bottom: 0,
+              left: 0,
+              top: 0,
+              bottom: 0,
               width: labelW,
               child: Container(
                 color: layer.accentColor,
                 child: Center(
                   child: Text(
                     'LIVE',
-                    style: _ts(size.width * 0.038, FontWeight.w900, Colors.white),
+                    style: _ts(
+                      size.width * 0.038,
+                      FontWeight.w900,
+                      Colors.white,
+                    ),
                   ),
                 ),
               ),
             ),
             // Scrolling text
             Positioned(
-              left: labelW, right: 0, top: 0, bottom: 0,
+              left: labelW,
+              right: 0,
+              top: 0,
+              bottom: 0,
               child: ClipRect(
                 child: AnimatedBuilder(
                   animation: _offset,
@@ -614,8 +801,11 @@ class _NewsTickerState extends State<_NewsTicker>
                       alignment: Alignment.centerLeft,
                       child: Text(
                         tickerText,
-                        style: _ts(size.width * 0.036, FontWeight.w600,
-                            layer.textColor),
+                        style: _ts(
+                          size.width * 0.036,
+                          FontWeight.w600,
+                          layer.textColor,
+                        ),
                         maxLines: 1,
                         softWrap: false,
                       ),
@@ -641,7 +831,8 @@ class _SaleRibbon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ribbonW = size.width * 0.38;
-    final isRight = layer.anchor == OverlayAnchor.topRight ||
+    final isRight =
+        layer.anchor == OverlayAnchor.topRight ||
         layer.anchor == OverlayAnchor.bottomRight;
 
     return Positioned(
@@ -712,10 +903,8 @@ class _RibbonPainter extends CustomPainter {
         letterSpacing: 1.5,
       ),
     );
-    final tp = TextPainter(
-      text: span,
-      textDirection: ui.TextDirection.ltr,
-    )..layout();
+    final tp = TextPainter(text: span, textDirection: ui.TextDirection.ltr)
+      ..layout();
     tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
     canvas.restore();
 
@@ -792,7 +981,9 @@ class _PromoBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 0, right: 0, bottom: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: size.width * 0.05,
@@ -814,13 +1005,20 @@ class _PromoBar extends StatelessWidget {
                 children: [
                   Text(
                     layer.primaryText,
-                    style: _ts(size.width * 0.05, FontWeight.w800, layer.textColor),
+                    style: _ts(
+                      size.width * 0.05,
+                      FontWeight.w800,
+                      layer.textColor,
+                    ),
                   ),
                   if (layer.tertiaryText.isNotEmpty)
                     Text(
                       layer.tertiaryText,
-                      style: _ts(size.width * 0.025, FontWeight.w400,
-                          layer.textColor.withValues(alpha: 0.75)),
+                      style: _ts(
+                        size.width * 0.025,
+                        FontWeight.w400,
+                        layer.textColor.withValues(alpha: 0.75),
+                      ),
                     ),
                 ],
               ),
@@ -860,21 +1058,23 @@ class _BreakingNews extends StatelessWidget {
     final accentH = size.height * 0.06;
 
     return Positioned(
-      left: 0, right: 0, bottom: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       child: SizedBox(
         height: totalH,
         child: Stack(
           children: [
             // Dark translucent base
             Positioned.fill(
-              child: Container(
-                color: layer.bgColor.withValues(alpha: 0.92),
-              ),
+              child: Container(color: layer.bgColor.withValues(alpha: 0.92)),
             ),
 
             // Accent label bar (left column — "BREAKING" badge)
             Positioned(
-              left: 0, top: 0, bottom: 0,
+              left: 0,
+              top: 0,
+              bottom: 0,
               width: labelW,
               child: Container(
                 color: layer.accentColor,
@@ -883,8 +1083,11 @@ class _BreakingNews extends StatelessWidget {
                   children: [
                     Text(
                       layer.primaryText,
-                      style: _ts(size.width * 0.042, FontWeight.w900,
-                          Colors.white),
+                      style: _ts(
+                        size.width * 0.042,
+                        FontWeight.w900,
+                        Colors.white,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: size.height * 0.006),
@@ -896,8 +1099,11 @@ class _BreakingNews extends StatelessWidget {
                     SizedBox(height: size.height * 0.006),
                     Text(
                       'NEWS',
-                      style: _ts(size.width * 0.028, FontWeight.w500,
-                          Colors.white.withValues(alpha: 0.85)),
+                      style: _ts(
+                        size.width * 0.028,
+                        FontWeight.w500,
+                        Colors.white.withValues(alpha: 0.85),
+                      ),
                     ),
                   ],
                 ),
@@ -916,8 +1122,11 @@ class _BreakingNews extends StatelessWidget {
                 children: [
                   Text(
                     layer.secondaryText,
-                    style: _ts(size.width * 0.044, FontWeight.w700,
-                        layer.textColor),
+                    style: _ts(
+                      size.width * 0.044,
+                      FontWeight.w700,
+                      layer.textColor,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -927,7 +1136,9 @@ class _BreakingNews extends StatelessWidget {
 
             // Bottom thin accent strip with tertiary text
             Positioned(
-              left: 0, right: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               height: accentH,
               child: Container(
                 color: layer.bgColor,
@@ -936,8 +1147,11 @@ class _BreakingNews extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     layer.tertiaryText,
-                    style: _ts(size.width * 0.026, FontWeight.w400,
-                        layer.textColor.withValues(alpha: 0.7)),
+                    style: _ts(
+                      size.width * 0.026,
+                      FontWeight.w400,
+                      layer.textColor.withValues(alpha: 0.7),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -968,14 +1182,20 @@ class _Watermark extends StatelessWidget {
           children: [
             Text(
               layer.primaryText.toUpperCase(),
-              style: _ts(size.width * 0.1, FontWeight.w900,
-                  layer.textColor.withValues(alpha: layer.opacity)),
+              style: _ts(
+                size.width * 0.1,
+                FontWeight.w900,
+                layer.textColor.withValues(alpha: layer.opacity),
+              ),
               textAlign: TextAlign.center,
             ),
             Text(
               layer.secondaryText,
-              style: _ts(size.width * 0.04, FontWeight.w400,
-                  layer.textColor.withValues(alpha: layer.opacity * 0.7)),
+              style: _ts(
+                size.width * 0.04,
+                FontWeight.w400,
+                layer.textColor.withValues(alpha: layer.opacity * 0.7),
+              ),
             ),
           ],
         ),
@@ -1000,7 +1220,9 @@ class _StoryFrame extends StatelessWidget {
       children: [
         // Header strip
         Positioned(
-          left: 0, right: 0, top: 0,
+          left: 0,
+          right: 0,
+          top: 0,
           height: headerH,
           child: Container(
             decoration: BoxDecoration(
@@ -1031,8 +1253,11 @@ class _StoryFrame extends StatelessWidget {
                       layer.primaryText.isNotEmpty
                           ? layer.primaryText[0].toUpperCase()
                           : 'S',
-                      style: _ts(size.width * 0.04, FontWeight.w900,
-                          layer.bgColor),
+                      style: _ts(
+                        size.width * 0.04,
+                        FontWeight.w900,
+                        layer.bgColor,
+                      ),
                     ),
                   ),
                 ),
@@ -1043,13 +1268,19 @@ class _StoryFrame extends StatelessWidget {
                   children: [
                     Text(
                       layer.primaryText,
-                      style: _ts(size.width * 0.042, FontWeight.w700,
-                          Colors.white),
+                      style: _ts(
+                        size.width * 0.042,
+                        FontWeight.w700,
+                        Colors.white,
+                      ),
                     ),
                     Text(
                       layer.secondaryText,
-                      style: _ts(size.width * 0.025, FontWeight.w400,
-                          Colors.white.withValues(alpha: 0.75)),
+                      style: _ts(
+                        size.width * 0.025,
+                        FontWeight.w400,
+                        Colors.white.withValues(alpha: 0.75),
+                      ),
                     ),
                   ],
                 ),
@@ -1060,7 +1291,9 @@ class _StoryFrame extends StatelessWidget {
 
         // Footer strip
         Positioned(
-          left: 0, right: 0, bottom: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           height: footerH,
           child: Container(
             decoration: BoxDecoration(
@@ -1081,8 +1314,11 @@ class _StoryFrame extends StatelessWidget {
               alignment: Alignment.bottomCenter,
               child: Text(
                 layer.tertiaryText,
-                style: _ts(size.width * 0.028, FontWeight.w500,
-                    Colors.white.withValues(alpha: 0.8)),
+                style: _ts(
+                  size.width * 0.028,
+                  FontWeight.w500,
+                  Colors.white.withValues(alpha: 0.8),
+                ),
               ),
             ),
           ),
@@ -1102,7 +1338,9 @@ class _ContactStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 0, right: 0, bottom: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       child: Container(
         color: layer.bgColor.withValues(alpha: 0.94),
         padding: EdgeInsets.symmetric(
@@ -1124,15 +1362,15 @@ class _ContactStrip extends StatelessWidget {
   }
 
   Widget _contactItem(String text, Size size) => Text(
-        text,
-        style: _ts(size.width * 0.028, FontWeight.w600, layer.textColor),
-      );
+    text,
+    style: _ts(size.width * 0.028, FontWeight.w600, layer.textColor),
+  );
 
   Widget _divider(Size size) => Container(
-        width: 1,
-        height: size.height * 0.04,
-        color: layer.accentColor.withValues(alpha: 0.5),
-      );
+    width: 1,
+    height: size.height * 0.04,
+    color: layer.accentColor.withValues(alpha: 0.5),
+  );
 }
 
 // ── Product Spotlight ─────────────────────────────────────────────────────────
@@ -1168,8 +1406,11 @@ class _ProductSpotlight extends StatelessWidget {
                 ),
                 child: Text(
                   layer.primaryText,
-                  style: _ts(size.width * 0.036, FontWeight.w600,
-                      layer.textColor),
+                  style: _ts(
+                    size.width * 0.036,
+                    FontWeight.w600,
+                    layer.textColor,
+                  ),
                 ),
               ),
               Container(
@@ -1213,9 +1454,7 @@ class _FlashSale extends StatelessWidget {
           vertical: size.height * 0.035,
         ),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [layer.bgColor, layer.accentColor],
-          ),
+          gradient: LinearGradient(colors: [layer.bgColor, layer.accentColor]),
           borderRadius: BorderRadius.circular(size.width * 0.03),
           boxShadow: [
             BoxShadow(
@@ -1242,8 +1481,11 @@ class _FlashSale extends StatelessWidget {
             if (layer.tertiaryText.isNotEmpty)
               Text(
                 layer.tertiaryText,
-                style: _ts(size.width * 0.028, FontWeight.w600,
-                    Colors.white.withValues(alpha: 0.85)),
+                style: _ts(
+                  size.width * 0.028,
+                  FontWeight.w600,
+                  Colors.white.withValues(alpha: 0.85),
+                ),
               ),
           ],
         ),
@@ -1262,7 +1504,9 @@ class _CountdownStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 0, right: 0, top: 0,
+      left: 0,
+      right: 0,
+      top: 0,
       child: Container(
         color: layer.bgColor.withValues(alpha: 0.94),
         padding: EdgeInsets.symmetric(
@@ -1331,13 +1575,20 @@ class _TrustBadge extends StatelessWidget {
             children: [
               Text(
                 layer.primaryText,
-                style: _ts(size.width * 0.032, FontWeight.w800, layer.textColor),
+                style: _ts(
+                  size.width * 0.032,
+                  FontWeight.w800,
+                  layer.textColor,
+                ),
               ),
               if (layer.secondaryText.isNotEmpty)
                 Text(
                   layer.secondaryText,
-                  style: _ts(size.width * 0.022, FontWeight.w500,
-                      layer.textColor.withValues(alpha: 0.75)),
+                  style: _ts(
+                    size.width * 0.022,
+                    FontWeight.w500,
+                    layer.textColor.withValues(alpha: 0.75),
+                  ),
                 ),
             ],
           ),
@@ -1381,14 +1632,21 @@ class _DeliveryBadge extends StatelessWidget {
             children: [
               Text(
                 layer.primaryText,
-                style: _ts(size.width * 0.034, FontWeight.w800, layer.textColor),
+                style: _ts(
+                  size.width * 0.034,
+                  FontWeight.w800,
+                  layer.textColor,
+                ),
               ),
               if (layer.secondaryText.isNotEmpty) ...[
                 SizedBox(width: size.width * 0.02),
                 Text(
                   '· ${layer.secondaryText}',
-                  style: _ts(size.width * 0.024, FontWeight.w500,
-                      layer.textColor.withValues(alpha: 0.85)),
+                  style: _ts(
+                    size.width * 0.024,
+                    FontWeight.w500,
+                    layer.textColor.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ],
@@ -1428,13 +1686,20 @@ class _LimitedStock extends StatelessWidget {
             children: [
               Text(
                 layer.primaryText,
-                style: _ts(size.width * 0.034, FontWeight.w900, layer.textColor),
+                style: _ts(
+                  size.width * 0.034,
+                  FontWeight.w900,
+                  layer.textColor,
+                ),
               ),
               if (layer.secondaryText.isNotEmpty)
                 Text(
                   layer.secondaryText,
-                  style: _ts(size.width * 0.022, FontWeight.w600,
-                      layer.textColor.withValues(alpha: 0.8)),
+                  style: _ts(
+                    size.width * 0.022,
+                    FontWeight.w600,
+                    layer.textColor.withValues(alpha: 0.8),
+                  ),
                 ),
             ],
           ),
@@ -1457,20 +1722,34 @@ TextStyle _ts(double size, FontWeight weight, Color color) {
       height: 1.2,
     );
   } catch (_) {
-    return TextStyle(fontSize: size, fontWeight: weight, color: color, height: 1.2);
+    return TextStyle(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.2,
+    );
   }
 }
 
 Alignment _toAlignment(OverlayAnchor anchor) {
   switch (anchor) {
-    case OverlayAnchor.topLeft:      return Alignment.topLeft;
-    case OverlayAnchor.topRight:     return Alignment.topRight;
-    case OverlayAnchor.topCenter:    return Alignment.topCenter;
-    case OverlayAnchor.bottomLeft:   return Alignment.bottomLeft;
-    case OverlayAnchor.bottomRight:  return Alignment.bottomRight;
-    case OverlayAnchor.bottomCenter: return Alignment.bottomCenter;
-    case OverlayAnchor.center:       return Alignment.center;
-    case OverlayAnchor.fullTop:      return Alignment.topCenter;
-    default:                         return Alignment.bottomLeft;
+    case OverlayAnchor.topLeft:
+      return Alignment.topLeft;
+    case OverlayAnchor.topRight:
+      return Alignment.topRight;
+    case OverlayAnchor.topCenter:
+      return Alignment.topCenter;
+    case OverlayAnchor.bottomLeft:
+      return Alignment.bottomLeft;
+    case OverlayAnchor.bottomRight:
+      return Alignment.bottomRight;
+    case OverlayAnchor.bottomCenter:
+      return Alignment.bottomCenter;
+    case OverlayAnchor.center:
+      return Alignment.center;
+    case OverlayAnchor.fullTop:
+      return Alignment.topCenter;
+    default:
+      return Alignment.bottomLeft;
   }
 }

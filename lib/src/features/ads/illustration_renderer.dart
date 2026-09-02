@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-
 /// Renders vector-style illustration elements by [assetId].
 class IllustrationRenderer extends StatelessWidget {
   const IllustrationRenderer({
@@ -63,7 +62,12 @@ class _IllustrationPainter extends CustomPainter {
     }
   }
 
-  void _burst(Canvas canvas, Size size, {required int rays, double inner = 0.2}) {
+  void _burst(
+    Canvas canvas,
+    Size size, {
+    required int rays,
+    double inner = 0.2,
+  }) {
     final c = Offset(size.width / 2, size.height / 2);
     final outer = size.shortestSide * 0.48;
     final paint = Paint()..color = color.withValues(alpha: 0.92);
@@ -117,7 +121,12 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawPath(tail, Paint()..color = color.withValues(alpha: 0.95));
   }
 
-  void _ring(Canvas canvas, Size size, {required String label, bool rotate = false}) {
+  void _ring(
+    Canvas canvas,
+    Size size, {
+    required String label,
+    bool rotate = false,
+  }) {
     final c = Offset(size.width / 2, size.height / 2);
     final r = size.shortestSide * 0.42;
     canvas.drawCircle(
@@ -201,13 +210,12 @@ class _IllustrationPainter extends CustomPainter {
   void _orb(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
     final r = size.shortestSide * 0.4;
-    final grad = RadialGradient(
-      colors: [color, color.withValues(alpha: 0.1)],
-    );
+    final grad = RadialGradient(colors: [color, color.withValues(alpha: 0.1)]);
     canvas.drawCircle(
       c,
       r,
-      Paint()..shader = grad.createShader(Rect.fromCircle(center: c, radius: r)),
+      Paint()
+        ..shader = grad.createShader(Rect.fromCircle(center: c, radius: r)),
     );
   }
 

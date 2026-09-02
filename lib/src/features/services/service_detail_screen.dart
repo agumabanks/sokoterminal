@@ -66,10 +66,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
         SnackBar(
           content: Text(blockReason),
           backgroundColor: DesignTokens.warning,
-          action: SnackBarAction(
-            label: 'Edit',
-            onPressed: _showEditService,
-          ),
+          action: SnackBarAction(label: 'Edit', onPressed: _showEditService),
         ),
       );
       return;
@@ -80,22 +77,24 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     final payload = buildServiceSyncPayload(
       service.copyWith(
         publishedOnline: value,
-        moderationStatus: value
-            ? const Value.absent()
-            : const Value(null),
+        moderationStatus: value ? const Value.absent() : const Value(null),
       ),
     );
-    final opType = service.remoteId == null ? 'service_create' : 'service_update';
+    final opType = service.remoteId == null
+        ? 'service_create'
+        : 'service_update';
     try {
       await db.saveServiceAndEnqueueSync(
-        service: service.toCompanion(true).copyWith(
-          publishedOnline: Value(value),
-          moderationStatus: value
-              ? const Value.absent()
-              : const Value(null),
-          synced: const Value(false),
-          updatedAt: Value(DateTime.now().toUtc()),
-        ),
+        service: service
+            .toCompanion(true)
+            .copyWith(
+              publishedOnline: Value(value),
+              moderationStatus: value
+                  ? const Value.absent()
+                  : const Value(null),
+              synced: const Value(false),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
         opType: opType,
         syncPayload: payload,
       );
@@ -128,9 +127,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     await ref.read(syncServiceProvider).syncCatalogImmediately();
     await _load();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sync requested')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Sync requested')));
   }
 
   Future<void> _showEditService() async {
@@ -188,7 +187,10 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
       debugPrint('[ServiceDetail] Delete failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e'), backgroundColor: DesignTokens.error),
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: DesignTokens.error,
+          ),
         );
       }
       return;
@@ -238,9 +240,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
 
     final gallery = _galleryImages(service);
     final hasDescription = (service.description?.trim().isNotEmpty ?? false);
-    final pricingTiers = decodePricingPackages(service.pricingPackages)
-        .where((t) => t.hasPrice)
-        .toList();
+    final pricingTiers = decodePricingPackages(
+      service.pricingPackages,
+    ).where((t) => t.hasPrice).toList();
 
     return Scaffold(
       backgroundColor: DesignTokens.surfaceGrouped,
@@ -295,7 +297,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           const SizedBox(height: DesignTokens.spaceLg),
           Text(
             'Actions',
-            style: DesignTokens.textBodyBold.copyWith(color: DesignTokens.grayMedium),
+            style: DesignTokens.textBodyBold.copyWith(
+              color: DesignTokens.grayMedium,
+            ),
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           GridView.count(
@@ -325,7 +329,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                   if (!context.mounted) return;
                   if (file != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Service promo image saved to Studio')),
+                      const SnackBar(
+                        content: Text('Service promo image saved to Studio'),
+                      ),
                     );
                   }
                 },
@@ -337,7 +343,8 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ServiceVariantsScreen(serviceId: service.id),
+                    builder: (_) =>
+                        ServiceVariantsScreen(serviceId: service.id),
                   ),
                 ),
               ),
@@ -348,7 +355,8 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ServiceBookingsScreen(serviceId: service.id),
+                    builder: (_) =>
+                        ServiceBookingsScreen(serviceId: service.id),
                   ),
                 ),
               ),
@@ -358,7 +366,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 color: DesignTokens.brandPrimary,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ServiceCalendarScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const ServiceCalendarScreen(),
+                  ),
                 ),
               ),
               _ActionTile(
@@ -367,7 +377,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 color: DesignTokens.warning,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const AvailabilityScheduleScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const AvailabilityScheduleScreen(),
+                  ),
                 ),
               ),
               _ActionTile(
@@ -375,7 +387,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                     ? Icons.unpublished_outlined
                     : Icons.publish_outlined,
                 label: service.publishedOnline ? 'Unpublish' : 'Publish',
-                color: service.publishedOnline ? DesignTokens.warning : DesignTokens.success,
+                color: service.publishedOnline
+                    ? DesignTokens.warning
+                    : DesignTokens.success,
                 onTap: () => _togglePublish(!service.publishedOnline),
               ),
               _ActionTile(
@@ -466,7 +480,12 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     }
     final file = File(url);
     if (file.existsSync()) {
-      return Image.file(file, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
     }
     return ServiceArtwork(
       title: title,
@@ -489,13 +508,20 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.hourglass_top_outlined, color: DesignTokens.warning, size: 20),
+          const Icon(
+            Icons.hourglass_top_outlined,
+            color: DesignTokens.warning,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Awaiting shop approval', style: DesignTokens.textBodyBold),
+                Text(
+                  'Awaiting shop approval',
+                  style: DesignTokens.textBodyBold,
+                ),
                 const SizedBox(height: 2),
                 Text(
                   'This service is in the moderation queue. Buyers will see it once approved.',
@@ -535,16 +561,23 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
             const SizedBox(height: 8),
             Text(
               service.summary!.trim(),
-              style: DesignTokens.textBody.copyWith(color: DesignTokens.grayMedium),
+              style: DesignTokens.textBody.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
           ],
           const SizedBox(height: 10),
-          Text(service.price.toUgx(), style: DesignTokens.textMono.copyWith(fontSize: 20)),
+          Text(
+            service.price.toUgx(),
+            style: DesignTokens.textMono.copyWith(fontSize: 20),
+          ),
           if (service.cost != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Cost: UGX ${service.cost!.toStringAsFixed(0)}',
-              style: DesignTokens.textSmall.copyWith(color: DesignTokens.grayMedium),
+              'Cost: ${service.cost!.toStringAsFixed(0)} /=',
+              style: DesignTokens.textSmall.copyWith(
+                color: DesignTokens.grayMedium,
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -558,7 +591,10 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                   label: '${service.durationMinutes} min',
                 ),
               if (service.category?.trim().isNotEmpty == true)
-                _MetaChip(icon: Icons.category_outlined, label: service.category!.trim()),
+                _MetaChip(
+                  icon: Icons.category_outlined,
+                  label: service.category!.trim(),
+                ),
               if ((service.serviceType ?? '').trim().isNotEmpty)
                 _MetaChip(
                   icon: Icons.place_outlined,
@@ -574,7 +610,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                   label: service.deliveryTimeframe!.trim(),
                 ),
               _MetaChip(
-                icon: service.publishedOnline ? Icons.public : Icons.store_outlined,
+                icon: service.publishedOnline
+                    ? Icons.public
+                    : Icons.store_outlined,
                 label: service.publishedOnline ? 'Online shop' : 'POS only',
               ),
             ],
@@ -616,12 +654,17 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                       children: [
                         Text(label, style: DesignTokens.textBodyBold),
                         if ((tier.description ?? '').trim().isNotEmpty)
-                          Text(tier.description!.trim(), style: DesignTokens.textSmall),
+                          Text(
+                            tier.description!.trim(),
+                            style: DesignTokens.textSmall,
+                          ),
                         if (tier.deliveryDays != null || tier.revisions != null)
                           Text(
                             [
-                              if (tier.deliveryDays != null) '${tier.deliveryDays} days',
-                              if (tier.revisions != null) '${tier.revisions} revisions',
+                              if (tier.deliveryDays != null)
+                                '${tier.deliveryDays} days',
+                              if (tier.revisions != null)
+                                '${tier.revisions} revisions',
                             ].join(' · '),
                             style: DesignTokens.textCaption,
                           ),
@@ -655,7 +698,11 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.article_outlined, size: 18, color: DesignTokens.brandPrimary),
+              const Icon(
+                Icons.article_outlined,
+                size: 18,
+                color: DesignTokens.brandPrimary,
+              ),
               const SizedBox(width: 8),
               Text('About this service', style: DesignTokens.textBodyBold),
             ],

@@ -129,7 +129,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (!mounted) return;
       Haptics.impact();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset successful. Please log in.')),
+        const SnackBar(
+          content: Text('Password reset successful. Please log in.'),
+        ),
       );
       context.go('/login');
     } on DioException catch (e) {
@@ -218,7 +220,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(
-                    onPressed: _resendCooldown > 0 || _isLoading ? null : _resendCode,
+                    onPressed: _resendCooldown > 0 || _isLoading
+                        ? null
+                        : _resendCode,
                     child: Text(
                       _resendCooldown > 0
                           ? 'Resend code in \$_resendCooldown s'

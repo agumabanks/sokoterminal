@@ -38,21 +38,23 @@ class ServicePricingTier {
   }
 
   Map<String, dynamic> toJson() => {
-        'tier': tier,
-        if (remoteId != null) 'remote_id': remoteId,
-        if (price != null) 'price': price,
-        if (deliveryDays != null) 'delivery_days': deliveryDays,
-        if (revisions != null) 'revisions': revisions,
-        if (description != null && description!.trim().isNotEmpty)
-          'description': description,
-      };
+    'tier': tier,
+    if (remoteId != null) 'remote_id': remoteId,
+    if (price != null) 'price': price,
+    if (deliveryDays != null) 'delivery_days': deliveryDays,
+    if (revisions != null) 'revisions': revisions,
+    if (description != null && description!.trim().isNotEmpty)
+      'description': description,
+  };
 
   factory ServicePricingTier.fromJson(Map<String, dynamic> json) {
     return ServicePricingTier(
       tier: (json['tier'] ?? '').toString(),
       remoteId: json['remote_id'] is int
           ? json['remote_id'] as int
-          : int.tryParse(json['id']?.toString() ?? json['remote_id']?.toString() ?? ''),
+          : int.tryParse(
+              json['id']?.toString() ?? json['remote_id']?.toString() ?? '',
+            ),
       price: _asDouble(json['price']),
       deliveryDays: _asInt(json['delivery_days']),
       revisions: _asInt(json['revisions']),
@@ -61,12 +63,14 @@ class ServicePricingTier {
   }
 
   static List<ServicePricingTier> emptyTiers() => const [
-        ServicePricingTier(tier: 'basic'),
-        ServicePricingTier(tier: 'standard'),
-        ServicePricingTier(tier: 'premium'),
-      ];
+    ServicePricingTier(tier: 'basic'),
+    ServicePricingTier(tier: 'standard'),
+    ServicePricingTier(tier: 'premium'),
+  ];
 
-  static List<ServicePricingTier> mergeWithDefaults(List<ServicePricingTier> existing) {
+  static List<ServicePricingTier> mergeWithDefaults(
+    List<ServicePricingTier> existing,
+  ) {
     final map = {for (final t in existing) t.tier: t};
     return [
       map['basic'] ?? const ServicePricingTier(tier: 'basic'),

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/media/offline_media_cache.dart';
 import 'ad_templates.dart';
 import 'brand_kit_screen.dart';
 import 'canvas_renderer.dart';
@@ -68,8 +69,16 @@ Future<File?> _renderTemplateToPng(
   bool applyWatermark = false,
   double pixelRatio = 1.5,
 }) async {
-  final key = GlobalKey();
   final overlay = Overlay.of(context);
+  final container = ProviderScope.containerOf(context);
+  final mediaSources = template.elements
+      .where((element) => element.type == 'image')
+      .map((element) => element.src?.trim())
+      .whereType<String>()
+      .where((source) => source.isNotEmpty);
+  await OfflineMediaCache.instance.prefetchAll(mediaSources);
+
+  final key = GlobalKey();
   late OverlayEntry entry;
   entry = OverlayEntry(
     builder: (_) => Positioned(
@@ -89,15 +98,18 @@ Future<File?> _renderTemplateToPng(
     ),
   );
   overlay.insert(entry);
-  final container = ProviderScope.containerOf(context);
   try {
     await Future<void>.delayed(Duration.zero);
     await WidgetsBinding.instance.endOfFrame;
-    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await Future<void>.delayed(const Duration(milliseconds: 180));
     final boundary =
         key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final longestSide = template.canvasWidth > template.canvasHeight
+        ? template.canvasWidth
+        : template.canvasHeight;
+    final safeRatio = pixelRatio.clamp(0.5, 2400 / longestSide).toDouble();
+    final image = await boundary.toImage(pixelRatio: safeRatio);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) return null;
     Uint8List bytes = data.buffer.asUint8List();

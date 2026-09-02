@@ -27,13 +27,15 @@ class _AvailabilityExceptionsScreenState
     );
     if (result == null) return;
 
-    await ref.read(availabilityControllerProvider.notifier).addException(
-      date: result.date,
-      isAvailable: result.isAvailable,
-      startTime: result.startTime,
-      endTime: result.endTime,
-      reason: result.reason,
-    );
+    await ref
+        .read(availabilityControllerProvider.notifier)
+        .addException(
+          date: result.date,
+          isAvailable: result.isAvailable,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          reason: result.reason,
+        );
   }
 
   Future<void> _deleteException(int id) async {
@@ -43,13 +45,21 @@ class _AvailabilityExceptionsScreenState
         title: const Text('Delete Exception'),
         content: const Text('Remove this date exception?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
     if (confirmed == true) {
-      await ref.read(availabilityControllerProvider.notifier).removeException(id);
+      await ref
+          .read(availabilityControllerProvider.notifier)
+          .removeException(id);
     }
   }
 
@@ -68,59 +78,76 @@ class _AvailabilityExceptionsScreenState
       body: state.loading && state.exceptions.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : state.exceptions.isEmpty
-              ? _EmptyState(onTap: _addException)
-              : ListView.builder(
-                  padding: DesignTokens.paddingScreen,
-                  itemCount: state.exceptions.length,
-                  itemBuilder: (context, index) {
-                    final e = state.exceptions[index];
-                    final date = DateTime.tryParse(e.date);
-                    return Dismissible(
-                      key: ValueKey('exc_${e.id}'),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        color: DesignTokens.error,
-                        child: const Icon(Icons.delete, color: Colors.white),
+          ? _EmptyState(onTap: _addException)
+          : ListView.builder(
+              padding: DesignTokens.paddingScreen,
+              itemCount: state.exceptions.length,
+              itemBuilder: (context, index) {
+                final e = state.exceptions[index];
+                final date = DateTime.tryParse(e.date);
+                return Dismissible(
+                  key: ValueKey('exc_${e.id}'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    color: DesignTokens.error,
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (_) => _deleteException(e.id),
+                  child: Card(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
                       ),
-                      onDismissed: (_) => _deleteException(e.id),
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          leading: CircleAvatar(
-                            backgroundColor: e.isAvailable
-                                ? DesignTokens.brandAccent.withValues(alpha: 0.15)
-                                : DesignTokens.error.withValues(alpha: 0.15),
-                            child: Icon(
-                              e.isAvailable ? Icons.event_available : Icons.event_busy,
-                              color: e.isAvailable ? DesignTokens.brandAccent : DesignTokens.error,
-                            ),
-                          ),
-                          title: Text(
-                            date != null ? _dateFormat.format(date) : e.date,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (e.startTime != null && e.endTime != null)
-                                Text('${e.startTime} — ${e.endTime}'),
-                              if (e.reason != null && e.reason!.isNotEmpty)
-                                Text(e.reason!, style: const TextStyle(color: DesignTokens.grayMedium)),
-                            ],
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: DesignTokens.grayMedium),
-                            onPressed: () => _deleteException(e.id),
-                          ),
+                      leading: CircleAvatar(
+                        backgroundColor: e.isAvailable
+                            ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                            : DesignTokens.error.withValues(alpha: 0.15),
+                        child: Icon(
+                          e.isAvailable
+                              ? Icons.event_available
+                              : Icons.event_busy,
+                          color: e.isAvailable
+                              ? DesignTokens.brandAccent
+                              : DesignTokens.error,
                         ),
                       ),
-                    );
-                  },
-                ),
+                      title: Text(
+                        date != null ? _dateFormat.format(date) : e.date,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (e.startTime != null && e.endTime != null)
+                            Text('${e.startTime} — ${e.endTime}'),
+                          if (e.reason != null && e.reason!.isNotEmpty)
+                            Text(
+                              e.reason!,
+                              style: const TextStyle(
+                                color: DesignTokens.grayMedium,
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: DesignTokens.grayMedium,
+                        ),
+                        onPressed: () => _deleteException(e.id),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -135,11 +162,19 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.calendar_today_outlined, size: 64, color: DesignTokens.grayLight),
+          const Icon(
+            Icons.calendar_today_outlined,
+            size: 64,
+            color: DesignTokens.grayLight,
+          ),
           const SizedBox(height: 16),
           const Text(
             'No blocked dates',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: DesignTokens.grayMedium),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: DesignTokens.grayMedium,
+            ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -235,9 +270,13 @@ class _AddExceptionSheetState extends State<_AddExceptionSheet> {
       _ExceptionData(
         date: dateStr,
         isAvailable: _isAvailable,
-        startTime: _hasCustomHours && _startTime != null ? _fmt(_startTime!) : null,
+        startTime: _hasCustomHours && _startTime != null
+            ? _fmt(_startTime!)
+            : null,
         endTime: _hasCustomHours && _endTime != null ? _fmt(_endTime!) : null,
-        reason: _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+        reason: _reasonCtrl.text.trim().isEmpty
+            ? null
+            : _reasonCtrl.text.trim(),
       ),
     );
   }
@@ -288,7 +327,9 @@ class _AddExceptionSheetState extends State<_AddExceptionSheet> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Available'),
-            subtitle: Text(_isAvailable ? 'Open for bookings' : 'Blocked / Day off'),
+            subtitle: Text(
+              _isAvailable ? 'Open for bookings' : 'Blocked / Day off',
+            ),
             value: _isAvailable,
             onChanged: (v) => setState(() => _isAvailable = v),
             activeThumbColor: DesignTokens.brandAccent,
@@ -308,7 +349,9 @@ class _AddExceptionSheetState extends State<_AddExceptionSheet> {
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Start'),
-                    subtitle: Text(_startTime != null ? _fmt(_startTime!) : '—'),
+                    subtitle: Text(
+                      _startTime != null ? _fmt(_startTime!) : '—',
+                    ),
                     onTap: () => _pickTime(true),
                   ),
                 ),
@@ -336,9 +379,14 @@ class _AddExceptionSheetState extends State<_AddExceptionSheet> {
               backgroundColor: DesignTokens.brandPrimary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Save Exception', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Save Exception',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

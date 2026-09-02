@@ -90,14 +90,12 @@ Future<RemoveBackgroundResult> removeImageBackground({
         message: 'No result image returned.',
       );
     }
-    return RemoveBackgroundResult(
-      success: true,
-      resultUrl: resultUrl,
-    );
+    return RemoveBackgroundResult(success: true, resultUrl: resultUrl);
   } on SocketException catch (_) {
     return const RemoveBackgroundResult(
       success: false,
-      message: 'No internet connection. Background removal requires an online server.',
+      message:
+          'No internet connection. Background removal requires an online server.',
     );
   } on TimeoutException catch (_) {
     return const RemoveBackgroundResult(

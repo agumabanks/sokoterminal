@@ -22,15 +22,25 @@ class BookingDetailSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final id = int.tryParse(booking['id']?.toString() ?? '') ?? 0;
     final status = booking['status']?.toString() ?? 'pending';
-    final offering = booking['offering'] is Map ? booking['offering'] as Map<String, dynamic> : null;
-    final user = booking['user'] is Map ? booking['user'] as Map<String, dynamic> : null;
-    final metadata = booking['metadata'] is Map ? booking['metadata'] as Map<String, dynamic> : null;
+    final offering = booking['offering'] is Map
+        ? booking['offering'] as Map<String, dynamic>
+        : null;
+    final user = booking['user'] is Map
+        ? booking['user'] as Map<String, dynamic>
+        : null;
+    final metadata = booking['metadata'] is Map
+        ? booking['metadata'] as Map<String, dynamic>
+        : null;
 
     final offeringTitle = offering?['title']?.toString() ?? 'Service';
     final customerName = user?['name']?.toString() ?? 'Customer';
     final customerPhone = user?['phone']?.toString() ?? '';
-    final scheduledStart = DateTime.tryParse(booking['scheduled_start']?.toString() ?? '');
-    final scheduledEnd = DateTime.tryParse(booking['scheduled_end']?.toString() ?? '');
+    final scheduledStart = DateTime.tryParse(
+      booking['scheduled_start']?.toString() ?? '',
+    );
+    final scheduledEnd = DateTime.tryParse(
+      booking['scheduled_end']?.toString() ?? '',
+    );
     final price = double.tryParse(booking['price']?.toString() ?? '') ?? 0;
     final notes = booking['notes']?.toString() ?? '';
     final meetingType = booking['meeting_type']?.toString() ?? 'in_person';
@@ -72,7 +82,10 @@ class BookingDetailSheet extends ConsumerWidget {
               Expanded(
                 child: Text(
                   offeringTitle,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               _StatusChip(status: status),
@@ -81,13 +94,21 @@ class BookingDetailSheet extends ConsumerWidget {
           const SizedBox(height: 4),
           if (scheduledStart != null)
             Text(
-              DateFormat('EEEE, dd MMM yyyy • HH:mm').format(scheduledStart.toLocal()),
-              style: const TextStyle(color: DesignTokens.grayMedium, fontSize: 14),
+              DateFormat(
+                'EEEE, dd MMM yyyy • HH:mm',
+              ).format(scheduledStart.toLocal()),
+              style: const TextStyle(
+                color: DesignTokens.grayMedium,
+                fontSize: 14,
+              ),
             ),
           if (scheduledEnd != null && scheduledStart != null)
             Text(
               'Duration: ${_fmtDuration(scheduledEnd.difference(scheduledStart))}',
-              style: const TextStyle(color: DesignTokens.grayMedium, fontSize: 13),
+              style: const TextStyle(
+                color: DesignTokens.grayMedium,
+                fontSize: 13,
+              ),
             ),
           const SizedBox(height: 16),
           _InfoRow(icon: Icons.person_outline, label: displayName),
@@ -107,7 +128,7 @@ class BookingDetailSheet extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'UGX ${price.toStringAsFixed(0)}',
+                '${price.toStringAsFixed(0)} /=',
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -148,7 +169,13 @@ class BookingDetailSheet extends ConsumerWidget {
                   color: DesignTokens.info,
                   onTap: () async {
                     Navigator.pop(context);
-                    await _showRescheduleDialog(context, ref, id, scheduledStart, scheduledEnd);
+                    await _showRescheduleDialog(
+                      context,
+                      ref,
+                      id,
+                      scheduledStart,
+                      scheduledEnd,
+                    );
                   },
                 ),
               _ActionChip(
@@ -234,33 +261,48 @@ class BookingDetailSheet extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text('New Time', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text(
+                  'New Time',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: [
-                    '09:00', '10:00', '11:00', '12:00',
-                    '13:00', '14:00', '15:00', '16:00',
-                  ].map((slot) {
-                    final selected = newSlot == slot;
-                    return ChoiceChip(
-                      label: Text(slot),
-                      selected: selected,
-                      onSelected: (_) => setState(() => newSlot = slot),
-                      selectedColor: DesignTokens.brandAccent,
-                      labelStyle: TextStyle(
-                        color: selected ? Colors.white : DesignTokens.textPrimary,
-                      ),
-                    );
-                  }).toList(),
+                  children:
+                      [
+                        '09:00',
+                        '10:00',
+                        '11:00',
+                        '12:00',
+                        '13:00',
+                        '14:00',
+                        '15:00',
+                        '16:00',
+                      ].map((slot) {
+                        final selected = newSlot == slot;
+                        return ChoiceChip(
+                          label: Text(slot),
+                          selected: selected,
+                          onSelected: (_) => setState(() => newSlot = slot),
+                          selectedColor: DesignTokens.brandAccent,
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : DesignTokens.textPrimary,
+                          ),
+                        );
+                      }).toList(),
                 ),
               ],
             );
           },
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () {
               if (newDate == null || newSlot == null) return;
@@ -272,7 +314,10 @@ class BookingDetailSheet extends ConsumerWidget {
       ),
     );
 
-    if (result == true && newDate != null && newSlot != null && context.mounted) {
+    if (result == true &&
+        newDate != null &&
+        newSlot != null &&
+        context.mounted) {
       final parts = newSlot!.split(':');
       final start = DateTime(
         newDate!.year,
@@ -295,15 +340,16 @@ class BookingDetailSheet extends ConsumerWidget {
       unawaited(sync.syncNow());
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reschedule queued')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Reschedule queued')));
       }
     }
   }
 
   Future<void> _createSale(BuildContext context, WidgetRef ref) async {
-    final offeringId = booking['offering_id']?.toString() ??
+    final offeringId =
+        booking['offering_id']?.toString() ??
         booking['offering']?['id']?.toString();
     if (offeringId == null || offeringId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -319,16 +365,17 @@ class BookingDetailSheet extends ConsumerWidget {
     if (service == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Service not found locally. Sync first.')),
+          const SnackBar(
+            content: Text('Service not found locally. Sync first.'),
+          ),
         );
       }
       return;
     }
     final price = double.tryParse(booking['price']?.toString() ?? '') ?? 0;
-    ref.read(cartControllerProvider.notifier).addService(
-      service: service,
-      variantPrice: price > 0 ? price : null,
-    );
+    ref
+        .read(cartControllerProvider.notifier)
+        .addService(service: service, variantPrice: price > 0 ? price : null);
     if (context.mounted) {
       context.go('/checkout');
     }
@@ -378,9 +425,15 @@ class BookingDetailSheet extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(
+              ctx,
+              ctrl.text.trim().isEmpty ? null : ctrl.text.trim(),
+            ),
             child: const Text('Cancel booking'),
           ),
         ],
@@ -407,7 +460,10 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 14, color: DesignTokens.textSecondary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: DesignTokens.textSecondary,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -446,7 +502,10 @@ class _StatusChip extends StatelessWidget {
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Text(
         normalized.toUpperCase(),
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
@@ -484,7 +543,14 @@ class _ActionChip extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ),

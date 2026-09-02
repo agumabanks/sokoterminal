@@ -247,7 +247,7 @@ class BugLogger {
       severity: BugSeverity.critical,
       category: BugCategory.payment,
       title: 'Payment failed: $method',
-      description: 'Payment of ${amount.toStringAsFixed(0)} UGX failed',
+      description: 'Payment of ${amount.toStringAsFixed(0)} /= failed',
       error: error,
       stackTrace: stackTrace,
       context: {

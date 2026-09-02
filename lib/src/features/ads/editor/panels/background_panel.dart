@@ -20,7 +20,8 @@ class BackgroundPanel extends StatefulWidget {
   final String current;
   final List<Color> brandColors;
   final ValueChanged<String> onSolid;
-  final void Function(({String id, String label, List<Color> colors})) onGradient;
+  final void Function(({String id, String label, List<Color> colors}))
+  onGradient;
 
   @override
   State<BackgroundPanel> createState() => _BackgroundPanelState();
@@ -67,7 +68,10 @@ class _BackgroundPanelState extends State<BackgroundPanel>
               children: [
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       ...widget.brandColors.map((c) {
@@ -89,8 +93,11 @@ class _BackgroundPanelState extends State<BackgroundPanel>
                               ),
                             ),
                             child: widget.current == hex
-                                ? const Icon(Icons.check_rounded,
-                                    color: Colors.white, size: 16)
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  )
                                 : null,
                           ),
                         );
@@ -114,8 +121,11 @@ class _BackgroundPanelState extends State<BackgroundPanel>
                               ),
                             ),
                             child: widget.current == hex
-                                ? const Icon(Icons.check_rounded,
-                                    color: Colors.white, size: 16)
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  )
                                 : null,
                           ),
                         );
@@ -125,33 +135,49 @@ class _BackgroundPanelState extends State<BackgroundPanel>
                 ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: gradientPresets.map((g) {
                       final isSel = widget.current == 'gradient:${g.id}';
                       return GestureDetector(
                         onTap: () => widget.onGradient(g),
                         child: Container(
-                          width: 64, height: 64,
+                          width: 64,
+                          height: 64,
                           margin: const EdgeInsets.only(right: 10),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              begin: Alignment.topLeft, end: Alignment.bottomRight,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                               colors: g.colors,
                             ),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isSel ? kAccent : Colors.transparent, width: 2),
+                              color: isSel ? kAccent : Colors.transparent,
+                              width: 2,
+                            ),
                           ),
                           child: Align(
                             alignment: Alignment.bottomCenter,
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(g.label,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 8,
-                                      fontWeight: FontWeight.w600,
-                                      shadows: [Shadow(blurRadius: 4, color: Colors.black54)])),
+                              child: Text(
+                                g.label,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w600,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 4,
+                                      color: Colors.black54,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -161,7 +187,10 @@ class _BackgroundPanelState extends State<BackgroundPanel>
                 ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       ...patternBackgroundIds.map((id) {
@@ -224,7 +253,10 @@ class _BackgroundPanelState extends State<BackgroundPanel>
                                     fontSize: 8,
                                     fontWeight: FontWeight.w600,
                                     shadows: [
-                                      Shadow(blurRadius: 4, color: Colors.black54),
+                                      Shadow(
+                                        blurRadius: 4,
+                                        color: Colors.black54,
+                                      ),
                                     ],
                                   ),
                                 ),

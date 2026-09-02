@@ -32,7 +32,11 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final api = ref.watch(sellerApiProvider);
   final secureStorage = ref.watch(secureStorageProvider);
-  final service = SyncService(db: db, sellerApi: api, secureStorage: secureStorage);
+  final service = SyncService(
+    db: db,
+    sellerApi: api,
+    secureStorage: secureStorage,
+  );
   ref.onDispose(() => unawaited(service.dispose()));
   return service;
 });
@@ -71,6 +75,7 @@ class SyncService {
       _syncStatusController.add(status);
     }
   }
+
   static const _contactsSyncKey = 'device_contacts_synced_at';
   static const _contactsOptInKey = 'device_contacts_opt_in';
   static const _contactsSyncInterval = Duration(hours: 4); // reduced from 12h
@@ -112,28 +117,29 @@ class SyncService {
   };
 
   void start() {
-    _connectivitySub ??= Connectivity().onConnectivityChanged.listen(
-      (results) async {
-        final online = results.any((r) => r != ConnectivityResult.none);
-        if (online) {
-          if (_wasOffline) {
-            if (kDebugMode) {
-              debugPrint(
-                '[SyncService] Back online — prioritizing catalog sync',
-              );
-            }
-            unawaited(syncCatalogImmediately(notify: true));
-          } else {
-            _pump();
+    _connectivitySub ??= Connectivity().onConnectivityChanged.listen((
+      results,
+    ) async {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (online) {
+        if (_wasOffline) {
+          if (kDebugMode) {
+            debugPrint('[SyncService] Back online — prioritizing catalog sync');
           }
+          unawaited(syncCatalogImmediately(notify: true));
+        } else {
+          _pump();
         }
-        _wasOffline = !online;
-      },
-    );
+      }
+      _wasOffline = !online;
+    });
     _retryTimer ??= Timer.periodic(const Duration(minutes: 5), (_) => _pump());
     // Aggressive foreground polling for near-real-time multi-device sync.
     // The OS naturally throttles this timer when the app is backgrounded.
-    _foregroundTimer ??= Timer.periodic(const Duration(seconds: 15), (_) => _pump());
+    _foregroundTimer ??= Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _pump(),
+    );
 
     // Reconcile any ledger entries that were created offline but never got
     // a corresponding sync op enqueued (e.g., due to app crash).
@@ -258,7 +264,9 @@ class SyncService {
 
   /// Push catalog changes (products, services, variants) immediately.
   /// When offline, ops remain queued and fire on reconnect.
-  Future<CatalogSyncOutcome> syncCatalogImmediately({bool notify = false}) async {
+  Future<CatalogSyncOutcome> syncCatalogImmediately({
+    bool notify = false,
+  }) async {
     final list = await Connectivity().checkConnectivity();
     final online = list.any((r) => r != ConnectivityResult.none);
     if (!online) {
@@ -299,8 +307,9 @@ class SyncService {
     try {
       _safeAddStatus('Syncing catalog...');
       final queue = await db.pendingSyncOps(limit: 200);
-      final catalogQueue =
-          queue.where((op) => _catalogOpTypes.contains(op.opType)).toList();
+      final catalogQueue = queue
+          .where((op) => _catalogOpTypes.contains(op.opType))
+          .toList();
 
       if (kDebugMode) {
         debugPrint(
@@ -479,9 +488,7 @@ class SyncService {
         }
 
         try {
-          _safeAddStatus(
-            'Pushing ${op.opType.replaceAll('_', ' ')}...',
-          );
+          _safeAddStatus('Pushing ${op.opType.replaceAll('_', ' ')}...');
           await _dispatch(op);
           await db.markSynced(op.id);
           processedInBatch++;
@@ -891,10 +898,16 @@ class SyncService {
     final status = error.response?.statusCode;
     if (status == null) return false;
     if (status >= 500) return false;
-    if (status == 401) return false; // Auth handled by interceptor; allow retry after re-auth.
-    if (status == 404) return false; // Server-side delete or missing resource; don't block forever.
+    if (status == 401) {
+      return false; // Auth handled by interceptor; allow retry after re-auth.
+    }
+    if (status == 404) {
+      return false; // Server-side delete or missing resource; don't block forever.
+    }
     if (status == 408) return false;
-    if (status == 429) return false; // Rate-limiting is transient; retry with backoff.
+    if (status == 429) {
+      return false; // Rate-limiting is transient; retry with backoff.
+    }
     if (status == 409) {
       final data = error.response?.data;
       final msg = (data is Map ? data['message']?.toString() : null) ?? '';
@@ -1203,7 +1216,8 @@ class SyncService {
         final status = e.response?.statusCode;
         final isRateLimited = status == 429;
         final isServerError = status != null && status >= 500;
-        final isNetworkError = status == null ||
+        final isNetworkError =
+            status == null ||
             e.type == DioExceptionType.connectionTimeout ||
             e.type == DioExceptionType.sendTimeout ||
             e.type == DioExceptionType.receiveTimeout ||
@@ -1771,8 +1785,8 @@ class SyncService {
         final svc = await db.getServiceById(localId);
         if (svc != null) {
           var coverUploadId = svc.coverUploadId;
-          final imagePath =
-              (svc.imageUrl ?? payload['image_url']?.toString())?.trim();
+          final imagePath = (svc.imageUrl ?? payload['image_url']?.toString())
+              ?.trim();
           if (imagePath != null &&
               imagePath.isNotEmpty &&
               !imagePath.startsWith('http')) {
@@ -1862,7 +1876,8 @@ class SyncService {
               if (refreshed != null) {
                 final refreshedUrls = _decodeStringList(refreshed.galleryUrls);
                 final refreshedIds = _decodeIntList(refreshed.galleryUploadIds);
-                final refreshedCount = refreshedIds.length < refreshedUrls.length
+                final refreshedCount =
+                    refreshedIds.length < refreshedUrls.length
                     ? refreshedIds.length
                     : refreshedUrls.length;
                 remoteUrls
@@ -2323,7 +2338,7 @@ class SyncService {
           final data = res.data;
           final remoteId = data is Map
               ? (data['id'] ?? data['transaction_id'] ?? data['ledger_id'])
-                  ?.toString()
+                    ?.toString()
               : null;
           if (remoteId != null && remoteId.isNotEmpty) {
             await db.markLedgerRemoteId(txId, remoteId);
@@ -2539,7 +2554,10 @@ class SyncService {
           'lines': lines,
         };
 
-        final pushRes = await sellerApi.pushQuotation(body, idempotencyKey: key);
+        final pushRes = await sellerApi.pushQuotation(
+          body,
+          idempotencyKey: key,
+        );
         final localId = id.trim();
         if (localId.isNotEmpty) {
           final pushedData = pushRes.data;
@@ -2917,10 +2935,14 @@ class SyncService {
         await sellerApi.pushPackageRedemption(body, idempotencyKey: key);
         break;
       case 'job_session_complete':
-        await sellerApi.createServiceTimeLog(Map<String, dynamic>.from(payload));
+        await sellerApi.createServiceTimeLog(
+          Map<String, dynamic>.from(payload),
+        );
         break;
       case 'booking_create':
-        await sellerApi.createServiceBooking(Map<String, dynamic>.from(payload));
+        await sellerApi.createServiceBooking(
+          Map<String, dynamic>.from(payload),
+        );
         break;
       case 'booking_reschedule':
         final bookingId = payload['booking_id'] as int?;
@@ -2946,7 +2968,9 @@ class SyncService {
         );
         break;
       case 'availability_exception_create':
-        await sellerApi.addAvailabilityException(Map<String, dynamic>.from(payload));
+        await sellerApi.addAvailabilityException(
+          Map<String, dynamic>.from(payload),
+        );
         break;
       case 'availability_exception_delete':
         final remoteId = payload['remote_id'] as int?;
@@ -3197,7 +3221,8 @@ class SyncService {
                         'price': pkg['price'],
                         if (pkg['delivery_days'] != null)
                           'delivery_days': pkg['delivery_days'],
-                        if (pkg['revisions'] != null) 'revisions': pkg['revisions'],
+                        if (pkg['revisions'] != null)
+                          'revisions': pkg['revisions'],
                         if (pkg['description'] != null)
                           'description': pkg['description'],
                       },
@@ -4009,7 +4034,9 @@ class SyncService {
         return cached;
       }
 
-      final details = MarketplaceOrder.fromJson(Map<String, dynamic>.from(first));
+      final details = MarketplaceOrder.fromJson(
+        Map<String, dynamic>.from(first),
+      );
       final merged = cached == null ? details : cached.merge(details);
       await db.upsertCachedOrder(orderId, jsonEncode(merged.toJson()));
       return merged;
@@ -4066,10 +4093,14 @@ class SyncService {
 
   Future<void> pullAvailability() async {
     final res = await sellerApi.fetchAvailability();
-    final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
+    final data = res.data is Map
+        ? res.data as Map<String, dynamic>
+        : <String, dynamic>{};
     final listRaw = data['data'] ?? const [];
     final list = List<Map<String, dynamic>>.from(
-      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+      (listRaw as Iterable).whereType<Map>().map(
+        (e) => Map<String, dynamic>.from(e),
+      ),
     );
 
     await db.deleteAllAvailabilitySchedules();
@@ -4087,22 +4118,34 @@ class SyncService {
 
   Future<void> pullAvailabilityExceptions() async {
     final res = await sellerApi.fetchAvailabilityExceptions();
-    final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
+    final data = res.data is Map
+        ? res.data as Map<String, dynamic>
+        : <String, dynamic>{};
     final listRaw = data['data'] ?? const [];
     final list = List<Map<String, dynamic>>.from(
-      (listRaw as Iterable).whereType<Map>().map((e) => Map<String, dynamic>.from(e)),
+      (listRaw as Iterable).whereType<Map>().map(
+        (e) => Map<String, dynamic>.from(e),
+      ),
     );
 
     await db.deleteAllAvailabilityExceptions();
     for (final e in list) {
       await db.upsertAvailabilityException(
         AvailabilityExceptionsCompanion.insert(
-          remoteId: e['id'] != null ? drift.Value(e['id'] as int) : const drift.Value.absent(),
+          remoteId: e['id'] != null
+              ? drift.Value(e['id'] as int)
+              : const drift.Value.absent(),
           date: e['date'] as String,
           isAvailable: drift.Value(e['is_available'] as bool? ?? false),
-          startTime: e['start_time'] != null ? drift.Value(e['start_time'] as String) : const drift.Value.absent(),
-          endTime: e['end_time'] != null ? drift.Value(e['end_time'] as String) : const drift.Value.absent(),
-          reason: e['reason'] != null ? drift.Value(e['reason'] as String) : const drift.Value.absent(),
+          startTime: e['start_time'] != null
+              ? drift.Value(e['start_time'] as String)
+              : const drift.Value.absent(),
+          endTime: e['end_time'] != null
+              ? drift.Value(e['end_time'] as String)
+              : const drift.Value.absent(),
+          reason: e['reason'] != null
+              ? drift.Value(e['reason'] as String)
+              : const drift.Value.absent(),
         ),
       );
     }
@@ -4123,7 +4166,8 @@ class SyncService {
       if (lastSyncRaw != null) {
         final lastSync = DateTime.tryParse(lastSyncRaw)?.toUtc();
         if (lastSync != null &&
-            DateTime.now().toUtc().difference(lastSync) < _contactsSyncInterval) {
+            DateTime.now().toUtc().difference(lastSync) <
+                _contactsSyncInterval) {
           // Skip interval check only when contact count changed — new contacts
           // should sync immediately even if the interval hasn't elapsed.
           final lastCountRaw = await secureStorage.read(key: _contactsCountKey);
@@ -4327,7 +4371,8 @@ class SyncService {
               if (ch is! Map<String, dynamic>) continue;
               final type = ch['type']?.toString();
               final value = ch['value_raw']?.toString();
-              final isPrimary = ch['is_primary'] == true || ch['is_primary'] == 1;
+              final isPrimary =
+                  ch['is_primary'] == true || ch['is_primary'] == 1;
               if (value == null || value.isEmpty) continue;
               if (type == 'phone' && (primaryPhone == null || isPrimary)) {
                 primaryPhone = value;

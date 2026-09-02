@@ -14,6 +14,8 @@ final customersStreamProvider = StreamProvider<List<Customer>>((ref) {
   return ref.watch(appDatabaseProvider).watchCustomers();
 });
 
+enum _SmsView { campaign, quick, activity }
+
 class BulkSmsScreen extends ConsumerStatefulWidget {
   const BulkSmsScreen({super.key});
 
@@ -35,6 +37,7 @@ class _BulkSmsScreenState extends ConsumerState<BulkSmsScreen> {
   bool _loading = true;
   String? _error;
   _SmsDashboardData? _dashboard;
+  _SmsView _view = _SmsView.campaign;
 
   @override
   void initState() {
@@ -359,256 +362,287 @@ class _BulkSmsScreenState extends ConsumerState<BulkSmsScreen> {
                 onBuyCredits: _openPurchaseUrl,
               ),
               const SizedBox(height: DesignTokens.spaceMd),
-              Wrap(
-                spacing: DesignTokens.spaceSm,
-                runSpacing: DesignTokens.spaceSm,
-                children: [
-                  _StatCard(
-                    title: 'Campaigns',
-                    value: (_dashboard?.stats.totalCampaigns ?? 0).toString(),
-                    subtitle: 'All time',
-                    icon: Icons.campaign_outlined,
+              SegmentedButton<_SmsView>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: _SmsView.campaign,
+                    label: Text('Campaign'),
                   ),
-                  _StatCard(
-                    title: 'SMS Sent',
-                    value: (_dashboard?.stats.totalSmsSent ?? 0).toString(),
-                    subtitle: 'Delivered attempts',
-                    icon: Icons.sms_outlined,
-                  ),
-                  _StatCard(
-                    title: 'Spent',
-                    value:
-                        'UGX ${(_dashboard?.stats.totalSpent ?? 0).toStringAsFixed(0)}',
-                    subtitle: 'Campaign costs',
-                    icon: Icons.payments_outlined,
-                  ),
-                  _StatCard(
-                    title: 'Queued',
-                    value: (_dashboard?.stats.queuedCampaigns ?? 0).toString(),
-                    subtitle: 'Pending delivery',
-                    icon: Icons.schedule_send_outlined,
+                  ButtonSegment(value: _SmsView.quick, label: Text('Quick')),
+                  ButtonSegment(
+                    value: _SmsView.activity,
+                    label: Text('Activity'),
                   ),
                 ],
+                selected: {_view},
+                onSelectionChanged: (value) =>
+                    setState(() => _view = value.first),
               ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              _SectionCard(
-                title: 'Bulk campaign',
-                trailing: customersAsync.maybeWhen(
-                  data: (_) => Text(
-                    '${recipients.length} recipients',
-                    style: DesignTokens.textSmallBold,
-                  ),
-                  orElse: () => const SizedBox.shrink(),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              if (_view == _SmsView.activity) ...[
+                const SizedBox(height: DesignTokens.spaceMd),
+                Wrap(
+                  spacing: DesignTokens.spaceSm,
+                  runSpacing: DesignTokens.spaceSm,
                   children: [
-                    TextField(
-                      controller: _campaignTitleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Campaign name',
-                        hintText: 'Weekend promo',
-                      ),
+                    _StatCard(
+                      title: 'Campaigns',
+                      value: (_dashboard?.stats.totalCampaigns ?? 0).toString(),
+                      subtitle: 'All time',
+                      icon: Icons.campaign_outlined,
                     ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    TextField(
-                      controller: _campaignMessageController,
-                      maxLines: 4,
-                      maxLength: 500,
-                      decoration: const InputDecoration(
-                        labelText: 'Message',
-                        hintText: 'Write the SMS your customers will receive',
-                      ),
-                      onChanged: (_) => setState(() {}),
+                    _StatCard(
+                      title: 'SMS Sent',
+                      value: (_dashboard?.stats.totalSmsSent ?? 0).toString(),
+                      subtitle: 'Delivered attempts',
+                      icon: Icons.sms_outlined,
                     ),
-                    if ((_dashboard?.templates ?? const <_SmsTemplateData>[])
-                        .isNotEmpty) ...[
+                    _StatCard(
+                      title: 'Spent',
+                      value:
+                          '${(_dashboard?.stats.totalSpent ?? 0).toStringAsFixed(0)} /=',
+                      subtitle: 'Campaign costs',
+                      icon: Icons.payments_outlined,
+                    ),
+                    _StatCard(
+                      title: 'Queued',
+                      value: (_dashboard?.stats.queuedCampaigns ?? 0)
+                          .toString(),
+                      subtitle: 'Pending delivery',
+                      icon: Icons.schedule_send_outlined,
+                    ),
+                  ],
+                ),
+              ],
+              if (_view == _SmsView.campaign) ...[
+                const SizedBox(height: DesignTokens.spaceLg),
+                _SectionCard(
+                  title: 'Bulk campaign',
+                  trailing: customersAsync.maybeWhen(
+                    data: (_) => Text(
+                      '${recipients.length} recipients',
+                      style: DesignTokens.textSmallBold,
+                    ),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _campaignTitleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Campaign name',
+                          hintText: 'Weekend promo',
+                        ),
+                      ),
                       const SizedBox(height: DesignTokens.spaceSm),
-                      Text('Templates', style: DesignTokens.textSmallBold),
+                      TextField(
+                        controller: _campaignMessageController,
+                        maxLines: 4,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Message',
+                          hintText: 'Write the SMS your customers will receive',
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      if ((_dashboard?.templates ?? const <_SmsTemplateData>[])
+                          .isNotEmpty) ...[
+                        const SizedBox(height: DesignTokens.spaceSm),
+                        Text('Templates', style: DesignTokens.textSmallBold),
+                        const SizedBox(height: DesignTokens.spaceXs),
+                        Wrap(
+                          spacing: DesignTokens.spaceXs,
+                          runSpacing: DesignTokens.spaceXs,
+                          children: _dashboard!.templates
+                              .map(
+                                (template) => ActionChip(
+                                  label: Text(template.name),
+                                  onPressed: () {
+                                    _campaignMessageController.text =
+                                        template.message;
+                                    if (_campaignTitleController.text
+                                        .trim()
+                                        .isEmpty) {
+                                      _campaignTitleController.text =
+                                          template.name;
+                                    }
+                                    setState(() {});
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                      const SizedBox(height: DesignTokens.spaceSm),
+                      _InfoRow(
+                        label: 'Estimated cost',
+                        value:
+                            '$campaignSegments segment(s) x ${recipients.length} contacts = $campaignCreditsNeeded credits',
+                      ),
                       const SizedBox(height: DesignTokens.spaceXs),
-                      Wrap(
-                        spacing: DesignTokens.spaceXs,
-                        runSpacing: DesignTokens.spaceXs,
-                        children: _dashboard!.templates
-                            .map(
-                              (template) => ActionChip(
-                                label: Text(template.name),
-                                onPressed: () {
-                                  _campaignMessageController.text =
-                                      template.message;
-                                  if (_campaignTitleController.text
-                                      .trim()
-                                      .isEmpty) {
-                                    _campaignTitleController.text =
-                                        template.name;
-                                  }
-                                  setState(() {});
-                                },
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _confirmConsent,
+                            onChanged: (value) => setState(
+                              () => _confirmConsent = value ?? false,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'I confirm these customers have consented to receive marketing SMS.',
+                              style: DesignTokens.textSmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: DesignTokens.spaceSm),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _savingTemplate
+                                  ? null
+                                  : _saveCurrentAsTemplate,
+                              icon: _savingTemplate
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.bookmark_add_outlined),
+                              label: const Text('Save template'),
+                            ),
+                          ),
+                          const SizedBox(width: DesignTokens.spaceSm),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _sendingCampaign
+                                  ? null
+                                  : () => _sendCampaign(recipients),
+                              icon: _sendingCampaign
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.send_outlined),
+                              label: Text(
+                                _sendingCampaign
+                                    ? 'Sending...'
+                                    : 'Queue campaign',
                               ),
-                            )
-                            .toList(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: DesignTokens.brandAccent,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    _InfoRow(
-                      label: 'Estimated cost',
-                      value:
-                          '$campaignSegments segment(s) x ${recipients.length} contacts = $campaignCreditsNeeded credits',
-                    ),
-                    const SizedBox(height: DesignTokens.spaceXs),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _confirmConsent,
-                          onChanged: (value) =>
-                              setState(() => _confirmConsent = value ?? false),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'I confirm these customers have consented to receive marketing SMS.',
-                            style: DesignTokens.textSmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _savingTemplate
-                                ? null
-                                : _saveCurrentAsTemplate,
-                            icon: _savingTemplate
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.bookmark_add_outlined),
-                            label: const Text('Save template'),
-                          ),
-                        ),
-                        const SizedBox(width: DesignTokens.spaceSm),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _sendingCampaign
-                                ? null
-                                : () => _sendCampaign(recipients),
-                            icon: _sendingCampaign
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.send_outlined),
-                            label: Text(
-                              _sendingCampaign
-                                  ? 'Sending...'
-                                  : 'Queue campaign',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: DesignTokens.brandAccent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              _SectionCard(
-                title: 'Individual SMS',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _singleNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Customer name (optional)',
+              ],
+              if (_view == _SmsView.quick) ...[
+                const SizedBox(height: DesignTokens.spaceLg),
+                _SectionCard(
+                  title: 'Individual SMS',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _singleNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Customer name (optional)',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    TextField(
-                      controller: _singlePhoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone',
-                        hintText: '0756549963 or 256756549963',
+                      const SizedBox(height: DesignTokens.spaceSm),
+                      TextField(
+                        controller: _singlePhoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone',
+                          hintText: '0756549963 or 256756549963',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    TextField(
-                      controller: _singleMessageController,
-                      maxLines: 3,
-                      maxLength: 500,
-                      decoration: const InputDecoration(
-                        labelText: 'Message',
-                        hintText: 'Message for one customer',
+                      const SizedBox(height: DesignTokens.spaceSm),
+                      TextField(
+                        controller: _singleMessageController,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Message',
+                          hintText: 'Message for one customer',
+                        ),
+                        onChanged: (_) => setState(() {}),
                       ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    _InfoRow(
-                      label: 'Estimated credits',
-                      value: singleSegments <= 0
-                          ? '0'
-                          : singleSegments.toString(),
-                    ),
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    ElevatedButton.icon(
-                      onPressed: _sendingSingle ? null : _sendSingleSms,
-                      icon: _sendingSingle
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.sms_outlined),
-                      label: Text(_sendingSingle ? 'Sending...' : 'Send SMS'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: DesignTokens.brandPrimary,
+                      _InfoRow(
+                        label: 'Estimated credits',
+                        value: singleSegments <= 0
+                            ? '0'
+                            : singleSegments.toString(),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: DesignTokens.spaceSm),
+                      ElevatedButton.icon(
+                        onPressed: _sendingSingle ? null : _sendSingleSms,
+                        icon: _sendingSingle
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sms_outlined),
+                        label: Text(_sendingSingle ? 'Sending...' : 'Send SMS'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: DesignTokens.brandPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              _SectionCard(
-                title: 'Recent campaigns',
-                child:
-                    (_dashboard?.campaigns ?? const <_SmsCampaignData>[])
-                        .isEmpty
-                    ? Text('No campaigns yet.', style: DesignTokens.textSmall)
-                    : Column(
-                        children: _dashboard!.campaigns
-                            .map(
-                              (campaign) => _CampaignTile(campaign: campaign),
-                            )
-                            .toList(),
-                      ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              _SectionCard(
-                title: 'Credit activity',
-                child:
-                    (_dashboard?.transactions ?? const <_SmsCreditTxData>[])
-                        .isEmpty
-                    ? Text(
-                        'No SMS credit activity yet.',
-                        style: DesignTokens.textSmall,
-                      )
-                    : Column(
-                        children: _dashboard!.transactions
-                            .map((tx) => _TransactionTile(transaction: tx))
-                            .toList(),
-                      ),
-              ),
+              ],
+              if (_view == _SmsView.activity) ...[
+                const SizedBox(height: DesignTokens.spaceLg),
+                _SectionCard(
+                  title: 'Recent campaigns',
+                  child:
+                      (_dashboard?.campaigns ?? const <_SmsCampaignData>[])
+                          .isEmpty
+                      ? Text('No campaigns yet.', style: DesignTokens.textSmall)
+                      : Column(
+                          children: _dashboard!.campaigns
+                              .map(
+                                (campaign) => _CampaignTile(campaign: campaign),
+                              )
+                              .toList(),
+                        ),
+                ),
+                const SizedBox(height: DesignTokens.spaceLg),
+                _SectionCard(
+                  title: 'Credit activity',
+                  child:
+                      (_dashboard?.transactions ?? const <_SmsCreditTxData>[])
+                          .isEmpty
+                      ? Text(
+                          'No SMS credit activity yet.',
+                          style: DesignTokens.textSmall,
+                        )
+                      : Column(
+                          children: _dashboard!.transactions
+                              .map((tx) => _TransactionTile(transaction: tx))
+                              .toList(),
+                        ),
+                ),
+              ],
             ],
+            const SizedBox(height: 96),
           ],
         ),
       ),
@@ -629,66 +663,47 @@ class _CreditsHero extends StatelessWidget {
     final isLow = credits < threshold;
 
     return Container(
-      padding: DesignTokens.paddingLg,
+      padding: DesignTokens.paddingMd,
       decoration: BoxDecoration(
         borderRadius: DesignTokens.borderRadiusLg,
         gradient: LinearGradient(
-          colors: isLow
-              ? const [DesignTokens.error, DesignTokens.error]
-              : const [DesignTokens.success, DesignTokens.success],
+          colors: const [DesignTokens.brandPrimary, Color(0xFF123B33)],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'SMS Credits',
-            style: DesignTokens.textSmall.copyWith(
-              color: Colors.white.withValues(alpha: 0.84),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: const Icon(Icons.sms_outlined, color: Colors.white),
           ),
-          const SizedBox(height: DesignTokens.spaceXs),
-          Text(
-            credits.toString(),
-            style: DesignTokens.textTitle.copyWith(
-              color: Colors.white,
-              fontSize: 28,
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceXs),
-          Text(
-            isLow
-                ? 'Credits are running low. Top up before you miss customer updates.'
-                : 'Campaigns, POS buyer messages, and seller alerts now share this balance.',
-            style: DesignTokens.textSmall.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: DesignTokens.spaceMd),
-          Wrap(
-            spacing: DesignTokens.spaceSm,
-            runSpacing: DesignTokens.spaceSm,
-            children: [
-              FilledButton.icon(
-                onPressed: onBuyCredits,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: isLow
-                      ? DesignTokens.error
-                      : DesignTokens.success,
-                ),
-                icon: const Icon(Icons.add_card_outlined),
-                label: const Text('Open Sanaa Wallet'),
-              ),
-              if ((dashboard?.credits.moduleUrl ?? '').isNotEmpty)
-                OutlinedButton.icon(
-                  onPressed: onBuyCredits,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white54),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$credits SMS credits',
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: Colors.white,
                   ),
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  label: const Text('Top up here'),
                 ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  isLow ? 'Top up to keep messaging' : 'Ready for campaigns',
+                  style: DesignTokens.textSmall.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onBuyCredits,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            child: const Text('Top up'),
           ),
         ],
       ),
@@ -858,7 +873,7 @@ class _CampaignTile extends StatelessWidget {
             ),
             const SizedBox(height: DesignTokens.spaceSm),
             Text(
-              '${campaign.contactCount} contacts • ${campaign.successCount} sent • ${campaign.failedCount} failed • UGX ${campaign.totalCost.toStringAsFixed(0)}',
+              '${campaign.contactCount} contacts • ${campaign.successCount} sent • ${campaign.failedCount} failed • ${campaign.totalCost.toStringAsFixed(0)} /=',
               style: DesignTokens.textSmall,
             ),
           ],

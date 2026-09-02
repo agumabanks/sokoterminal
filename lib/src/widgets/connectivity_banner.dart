@@ -23,10 +23,7 @@ class ConnectivityBanner extends ConsumerWidget {
           decoration: BoxDecoration(
             color: DesignTokens.warning.withValues(alpha: 0.15),
             border: Border(
-              left: BorderSide(
-                color: DesignTokens.warning,
-                width: 4,
-              ),
+              left: BorderSide(color: DesignTokens.warning, width: 4),
             ),
           ),
           child: isOffline

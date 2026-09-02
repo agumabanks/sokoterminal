@@ -36,13 +36,7 @@ class SmartAdPackage {
   final String? itemId;
 }
 
-enum SmartAdSource {
-  product,
-  service,
-  businessInfo,
-  seasonal,
-  aiGenerated,
-}
+enum SmartAdSource { product, service, businessInfo, seasonal, aiGenerated }
 
 extension SmartAdSourceX on SmartAdSource {
   String get label => switch (this) {
@@ -93,35 +87,44 @@ List<SmartAdPackage> buildSmartAds({
   final out = <SmartAdPackage>[];
 
   // ── Product ads (up to 4) ───────────────────────────────────────────────
-  final products = [...items]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  final products = [...items]
+    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   final productTake = products.take(4).toList();
   for (var i = 0; i < productTake.length; i++) {
     final item = productTake[i];
     final tpl = _pickProductTemplate(item, kit, daySeed + i);
+    final itemLink = item.remoteId != null
+        ? 'https://www.soko24.co/p/${item.remoteId}'
+        : kit.website.isNotEmpty
+        ? normalizeShareUrl(kit.website)
+        : 'https://www.soko24.co';
     final captions = generateAllCaptions(
       productName: item.name,
       price: formatUgPrice(item.price),
       businessName: kit.businessName.isNotEmpty ? kit.businessName : 'Soko 24',
-      shopUrl: item.remoteId != null ? 'soko24.co/p/${item.remoteId}' : 'soko24.co',
+      description: plainOfferDescription(item.description),
+      shopUrl: itemLink,
       whatsapp: kit.whatsapp,
       phone: kit.phone,
       location: kit.location,
-      tagline: kit.tagline,
       seed: daySeed + i,
     );
-    out.add(SmartAdPackage(
-      id: 'smart_product_${item.id}_$i',
-      name: item.name,
-      template: tpl,
-      captions: captions,
-      source: SmartAdSource.product,
-      isService: false,
-      itemId: item.id,
-    ));
+    out.add(
+      SmartAdPackage(
+        id: 'smart_product_${item.id}_$i',
+        name: item.name,
+        template: tpl,
+        captions: captions,
+        source: SmartAdSource.product,
+        isService: false,
+        itemId: item.id,
+      ),
+    );
   }
 
   // ── Service ads (up to 2) ───────────────────────────────────────────────
-  final svcs = [...services]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  final svcs = [...services]
+    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   final serviceTake = svcs.take(2).toList();
   for (var i = 0; i < serviceTake.length; i++) {
     final svc = serviceTake[i];
@@ -130,22 +133,24 @@ List<SmartAdPackage> buildSmartAds({
       productName: svc.title,
       price: formatUgPrice(svc.price),
       businessName: kit.businessName.isNotEmpty ? kit.businessName : 'Soko 24',
-      shopUrl: svc.remoteId != null ? 'soko24.co/service/${svc.remoteId}' : 'soko24.co',
+      description: plainOfferDescription(svc.summary ?? svc.description),
+      shopUrl: resolveServiceShareLink(service: svc, kit: kit),
       whatsapp: kit.whatsapp,
       phone: kit.phone,
       location: kit.location,
-      tagline: kit.tagline,
       seed: daySeed + i + 100,
     );
-    out.add(SmartAdPackage(
-      id: 'smart_service_${svc.id}_$i',
-      name: svc.title,
-      template: tpl,
-      captions: captions,
-      source: SmartAdSource.service,
-      isService: true,
-      itemId: svc.id,
-    ));
+    out.add(
+      SmartAdPackage(
+        id: 'smart_service_${svc.id}_$i',
+        name: svc.title,
+        template: tpl,
+        captions: captions,
+        source: SmartAdSource.service,
+        isService: true,
+        itemId: svc.id,
+      ),
+    );
   }
 
   // ── Business-info ads (up to 3) ─────────────────────────────────────────
@@ -175,14 +180,16 @@ List<SmartAdPackage> buildSmartAds({
         tagline: kit.tagline,
         seed: daySeed + i + 200,
       );
-      out.add(SmartAdPackage(
-        id: 'smart_biz_${tpl.id}_$i',
-        name: tpl.name,
-        template: tpl,
-        captions: captions,
-        source: SmartAdSource.businessInfo,
-        isService: false,
-      ));
+      out.add(
+        SmartAdPackage(
+          id: 'smart_biz_${tpl.id}_$i',
+          name: tpl.name,
+          template: tpl,
+          captions: captions,
+          source: SmartAdSource.businessInfo,
+          isService: false,
+        ),
+      );
     }
   }
 
@@ -203,7 +210,9 @@ List<SmartAdPackage> buildSmartAds({
       final captions = generateAllCaptions(
         productName: season.name,
         price: 'Seasonal Offers',
-        businessName: kit.businessName.isNotEmpty ? kit.businessName : 'Soko 24',
+        businessName: kit.businessName.isNotEmpty
+            ? kit.businessName
+            : 'Soko 24',
         shopUrl: kit.website.isNotEmpty ? kit.website : 'soko24.co',
         whatsapp: kit.whatsapp,
         phone: kit.phone,
@@ -212,14 +221,16 @@ List<SmartAdPackage> buildSmartAds({
         extraHashtags: season.suggestedHashtags,
         seed: daySeed + i + 300,
       );
-      out.add(SmartAdPackage(
-        id: 'smart_season_${season.id}_$i',
-        name: tpl.name,
-        template: tpl,
-        captions: captions,
-        source: SmartAdSource.seasonal,
-        isService: false,
-      ));
+      out.add(
+        SmartAdPackage(
+          id: 'smart_season_${season.id}_$i',
+          name: tpl.name,
+          template: tpl,
+          captions: captions,
+          source: SmartAdSource.seasonal,
+          isService: false,
+        ),
+      );
     }
   }
 
@@ -238,9 +249,7 @@ AdTemplate _applyOverlay(AdTemplate template, List<CanvasElement> overlays) {
     (max, el) => el.zIndex > max ? el.zIndex : max,
   );
   final nextZ = maxZ + 1;
-  final stamped = overlays
-      .map((el) => el.copyWith(zIndex: nextZ))
-      .toList();
+  final stamped = overlays.map((el) => el.copyWith(zIndex: nextZ)).toList();
 
   return AdTemplate(
     id: template.id,
@@ -259,7 +268,7 @@ AdTemplate _applyOverlay(AdTemplate template, List<CanvasElement> overlays) {
 // ---------------------------------------------------------------------------
 
 AdTemplate _pickProductTemplate(Item item, BrandKit kit, int seed) {
-  final ids = [
+  final ids = <String>[
     'tpl_sale_bold',
     'tpl_whatsapp',
     'tpl_new_arrival',
@@ -267,8 +276,6 @@ AdTemplate _pickProductTemplate(Item item, BrandKit kit, int seed) {
     'tpl_story',
     'tpl_minimal',
     'gen_hero_sale_sq',
-    'gen_story_food_sq',
-    'gen_badge_fashion_story',
     'tpl_catalog',
     'gen_diagonal_sale_sq',
     'gen_magazine_new_sq',
@@ -276,6 +283,19 @@ AdTemplate _pickProductTemplate(Item item, BrandKit kit, int seed) {
     'gen_cinematic_story_sq',
     'gen_price_splash_sale_sq',
   ];
+  final productContext =
+      '${item.name} ${item.categoryName ?? ''} ${item.tags ?? ''}'
+          .toLowerCase();
+  if (RegExp(
+    r'\b(food|restaurant|catering|bakery|meal|drink|beverage)\b',
+  ).hasMatch(productContext)) {
+    ids.add('gen_story_food_sq');
+  }
+  if (RegExp(
+    r'\b(fashion|clothing|apparel|shoe|dress|boutique)\b',
+  ).hasMatch(productContext)) {
+    ids.add('gen_badge_fashion_story');
+  }
   final id = ids[seed % ids.length];
   final base = templateById(id) ?? builtInTemplates.first;
   final link = item.remoteId != null
@@ -319,7 +339,9 @@ AdTemplate _pickServiceTemplate(Service svc, BrandKit kit, int seed) {
   final base = templateById(id) ?? builtInTemplates.first;
   final link = svc.remoteId != null
       ? 'soko24.co/service/${svc.remoteId}'
-      : kit.website.isNotEmpty ? kit.website : 'soko24.co';
+      : kit.website.isNotEmpty
+      ? kit.website
+      : 'soko24.co';
   final applied = base.applyProduct(
     productName: svc.title,
     priceFormatted: formatUgPrice(svc.price),

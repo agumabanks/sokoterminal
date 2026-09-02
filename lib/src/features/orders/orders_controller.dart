@@ -48,6 +48,7 @@ class OrdersController extends StateNotifier<OrdersState> {
 
   Future<void> load() async {
     state = OrdersState(loading: true, orders: state.orders);
+    await pullCached();
     try {
       await sync.pullMarketplaceOrders();
       final cachedRows = await db.getCachedOrders();
@@ -228,6 +229,6 @@ class OrdersController extends StateNotifier<OrdersState> {
           ),
         )
         .toList();
-    state = OrdersState(orders: sortOrdersForDisplay(list), loading: false);
+    state = OrdersState(orders: sortOrdersForDisplay(list), loading: true);
   }
 }

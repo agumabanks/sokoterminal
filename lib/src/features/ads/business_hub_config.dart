@@ -192,40 +192,36 @@ BusinessHubType? hubTypeById(String id) {
 }
 
 /// Curated template sections shown in the Templates workspace.
-const templateDiscoverySections = <({
-  String id,
-  String title,
-  String subtitle,
-  IconData icon,
-})>[
-  (
-    id: 'todays_ads',
-    title: "Today's Ads",
-    subtitle: 'Ready to post for your catalog',
-    icon: Icons.bolt_rounded,
-  ),
-  (
-    id: 'top_picks',
-    title: 'Top Picks',
-    subtitle: 'Hand-picked by Soko Studio',
-    icon: Icons.star_rounded,
-  ),
-  (
-    id: 'popular',
-    title: 'Popular',
-    subtitle: 'Used by sellers across Uganda',
-    icon: Icons.trending_up_rounded,
-  ),
-  (
-    id: 'for_you',
-    title: 'More Templates for You',
-    subtitle: 'Based on your business & catalog',
-    icon: Icons.auto_awesome_rounded,
-  ),
-  (
-    id: 'business_hub',
-    title: 'Business Hub',
-    subtitle: 'Logos, menus, invoices & more',
-    icon: Icons.storefront_rounded,
-  ),
-];
+const templateDiscoverySections =
+    <({String id, String title, String subtitle, IconData icon})>[
+      (
+        id: 'todays_ads',
+        title: "Today's Ads",
+        subtitle: 'Ready to post for your catalog',
+        icon: Icons.bolt_rounded,
+      ),
+      (
+        id: 'top_picks',
+        title: 'Top Picks',
+        subtitle: 'Hand-picked by Soko Studio',
+        icon: Icons.star_rounded,
+      ),
+      (
+        id: 'popular',
+        title: 'Popular',
+        subtitle: 'Used by sellers across Uganda',
+        icon: Icons.trending_up_rounded,
+      ),
+      (
+        id: 'for_you',
+        title: 'More Templates for You',
+        subtitle: 'Based on your business & catalog',
+        icon: Icons.auto_awesome_rounded,
+      ),
+      (
+        id: 'business_hub',
+        title: 'Business Hub',
+        subtitle: 'Logos, menus, invoices & more',
+        icon: Icons.storefront_rounded,
+      ),
+    ];

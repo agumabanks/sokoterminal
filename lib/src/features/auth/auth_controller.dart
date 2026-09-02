@@ -75,7 +75,9 @@ class AuthController extends StateNotifier<AuthState> {
       // Subscribe to seller sync topic (best-effort; sellerId may not be stored yet)
       final sellerId = await _storage.readSellerId();
       if (sellerId != null && sellerId.isNotEmpty) {
-        unawaited(FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'));
+        unawaited(
+          FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'),
+        );
       }
       unawaited(
         FCMService.instance.init(sellerApi: ref.read(sellerApiProvider)),
@@ -115,7 +117,10 @@ class AuthController extends StateNotifier<AuthState> {
       await db.clearAllData();
 
       final persistedToken = await _persistAccessToken(token);
-      await _persistTokenMeta(expiresAt: expiresAt, rememberDevice: rememberDevice);
+      await _persistTokenMeta(
+        expiresAt: expiresAt,
+        rememberDevice: rememberDevice,
+      );
 
       // Store seller UUID for identity persistence
       final user = data['user'] is Map<String, dynamic>
@@ -129,7 +134,9 @@ class AuthController extends StateNotifier<AuthState> {
       if (sellerId != null && sellerId.isNotEmpty) {
         await _storage.writeSellerId(sellerId);
         // Subscribe to real-time sync topic for this seller
-        unawaited(FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'));
+        unawaited(
+          FCMService.instance.subscribeToTopic('seller_${sellerId}_pos_sync'),
+        );
       }
       unawaited(
         FCMService.instance.init(sellerApi: ref.read(sellerApiProvider)),
@@ -266,11 +273,7 @@ class AuthController extends StateNotifier<AuthState> {
       // Try backend verification first
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/v2/seller/pos/pin/verify',
-        data: {
-          'phone': normalized,
-          'pin': pin,
-          'remember_me': rememberDevice,
-        },
+        data: {'phone': normalized, 'pin': pin, 'remember_me': rememberDevice},
       );
 
       final data = response.data ?? {};
@@ -284,7 +287,10 @@ class AuthController extends StateNotifier<AuthState> {
         await db.clearAllData();
 
         final persistedToken = await _persistAccessToken(token);
-        await _persistTokenMeta(expiresAt: expiresAt, rememberDevice: rememberDevice);
+        await _persistTokenMeta(
+          expiresAt: expiresAt,
+          rememberDevice: rememberDevice,
+        );
         await _storage.writeLastLoginPhone(normalized);
         debugPrint('[Auth] Quick PIN login succeeded');
         _apiClient.resetLogoutGuard();
@@ -361,7 +367,9 @@ class AuthController extends StateNotifier<AuthState> {
     // Unsubscribe from seller sync topic before clearing data
     final sellerId = await _storage.readSellerId();
     if (sellerId != null && sellerId.isNotEmpty) {
-      unawaited(FCMService.instance.unsubscribeFromTopic('seller_${sellerId}_pos_sync'));
+      unawaited(
+        FCMService.instance.unsubscribeFromTopic('seller_${sellerId}_pos_sync'),
+      );
     }
 
     // Notify backend to revoke the token (best-effort)

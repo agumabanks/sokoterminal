@@ -61,17 +61,53 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
             children: [
               Container(
                 width: double.infinity,
-                padding: DesignTokens.paddingMd,
-                color: DesignTokens.brandPrimary.withValues(alpha: 0.06),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                margin: DesignTokens.paddingScreen,
+                padding: DesignTokens.paddingCard,
+                decoration: BoxDecoration(
+                  color: DesignTokens.brandPrimary,
+                  borderRadius: DesignTokens.borderRadiusLg,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SummaryItem(label: 'Orders', value: '${orders.length}'),
-                    _SummaryItem(
-                      label: 'Needs action',
-                      value: '$needsActionCount',
+                    Text(
+                      needsActionCount == 0
+                          ? 'You’re all caught up'
+                          : '$needsActionCount order${needsActionCount == 1 ? '' : 's'} need you',
+                      style: DesignTokens.textTitle.copyWith(
+                        color: DesignTokens.surfaceWhite,
+                      ),
                     ),
-                    _SummaryItem(label: 'Revenue', value: totalRevenue.toUgx()),
+                    const SizedBox(height: DesignTokens.spaceXs),
+                    Text(
+                      'Marketplace activity updates quietly in the background.',
+                      style: DesignTokens.textCaption.copyWith(
+                        color: DesignTokens.surfaceWhite.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: DesignTokens.spaceLg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryItem(
+                            label: 'Orders',
+                            value: '${orders.length}',
+                          ),
+                        ),
+                        Expanded(
+                          child: _SummaryItem(
+                            label: 'Needs action',
+                            value: '$needsActionCount',
+                          ),
+                        ),
+                        Expanded(
+                          child: _SummaryItem(
+                            label: 'Revenue',
+                            value: totalRevenue.toUgx(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -87,9 +123,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     _OrdersFilterChip(
                       label: 'All',
                       selected: _filter == OrdersListFilter.all,
-                      onTap: () => setState(
-                        () => _filter = OrdersListFilter.all,
-                      ),
+                      onTap: () =>
+                          setState(() => _filter = OrdersListFilter.all),
                     ),
                     const SizedBox(width: DesignTokens.spaceSm),
                     _OrdersFilterChip(
@@ -144,10 +179,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OrderDetailsScreen(
-          orderId: order.id,
-          initialData: order,
-        ),
+        builder: (_) =>
+            OrderDetailsScreen(orderId: order.id, initialData: order),
       ),
     );
   }
@@ -161,10 +194,25 @@ class _SummaryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value, style: DesignTokens.textBodyBold),
+        Text(
+          value,
+          style: DesignTokens.textBodyBold.copyWith(
+            color: DesignTokens.surfaceWhite,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         const SizedBox(height: 2),
-        Text(label, style: DesignTokens.textSmall),
+        Text(
+          label,
+          style: DesignTokens.textSmall.copyWith(
+            color: DesignTokens.surfaceWhite.withValues(alpha: 0.62),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
@@ -194,65 +242,91 @@ class _OrderTile extends StatelessWidget {
         color: DesignTokens.surfaceWhite,
         borderRadius: DesignTokens.borderRadiusMd,
         boxShadow: DesignTokens.shadowSm,
-        border: Border(
-          left: BorderSide(color: statusColor, width: 4),
-        ),
+        border: Border(left: BorderSide(color: statusColor, width: 4)),
       ),
-      child: ListTile(
-        leading: Container(
-          padding: DesignTokens.paddingSm,
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.12),
-            borderRadius: DesignTokens.borderRadiusSm,
-          ),
-          child: Icon(Icons.shopping_bag_outlined, color: statusColor),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                id,
-                style: DesignTokens.textBodyBold.copyWith(
-                  decoration: _isCancelled(status)
-                      ? TextDecoration.lineThrough
-                      : null,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(DesignTokens.radiusFull),
-              ),
-              child: Text(
-                status.toUpperCase().replaceAll('_', ' '),
-                style: DesignTokens.textCaption.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Text(
-          customer,
-          style: DesignTokens.textSmall,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(total.toUgx(), style: DesignTokens.textBodyBold),
-            Text(
-              paymentStatus.toUpperCase(),
-              style: DesignTokens.textSmall.copyWith(color: paymentColor),
-            ),
-          ],
-        ),
+      child: InkWell(
+        borderRadius: DesignTokens.borderRadiusMd,
         onTap: onTap,
+        child: Padding(
+          padding: DesignTokens.paddingCard,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: DesignTokens.borderRadiusSm,
+                    ),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: statusColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: DesignTokens.spaceSm),
+                  Expanded(
+                    child: Text(
+                      id,
+                      style: DesignTokens.textBodyBold.copyWith(
+                        decoration: _isCancelled(status)
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(
+                        DesignTokens.radiusFull,
+                      ),
+                    ),
+                    child: Text(
+                      status.toUpperCase().replaceAll('_', ' '),
+                      style: DesignTokens.textCaption.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: DesignTokens.spaceMd),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      customer,
+                      style: DesignTokens.textSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(total.toUgx(), style: DesignTokens.textBodyBold),
+                ],
+              ),
+              const SizedBox(height: DesignTokens.spaceXs),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  paymentStatus.toUpperCase(),
+                  style: DesignTokens.textCaption.copyWith(
+                    color: paymentColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -326,10 +400,7 @@ class _OrdersFilterChip extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.filter,
-    required this.needsActionCount,
-  });
+  const _EmptyState({required this.filter, required this.needsActionCount});
 
   final OrdersListFilter filter;
   final int needsActionCount;
@@ -359,8 +430,8 @@ class _EmptyState extends StatelessWidget {
             Text(
               filteredEmpty
                   ? needsActionCount == 0
-                      ? 'New marketplace orders that need your attention will appear here first.'
-                      : 'Switch to All to see completed and in-progress orders.'
+                        ? 'New marketplace orders that need your attention will appear here first.'
+                        : 'Switch to All to see completed and in-progress orders.'
                   : 'Your marketplace orders will appear here',
               style: DesignTokens.textBody.copyWith(
                 color: DesignTokens.grayMedium,

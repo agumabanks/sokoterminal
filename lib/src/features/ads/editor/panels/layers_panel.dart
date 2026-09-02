@@ -34,9 +34,7 @@ class LayersPanel extends StatelessWidget {
     if (sorted.isEmpty) {
       return const PanelWrap(
         height: 120,
-        child: Center(
-          child: _SelectElementHint(),
-        ),
+        child: Center(child: _SelectElementHint()),
       );
     }
     return PanelWrap(
@@ -54,7 +52,9 @@ class LayersPanel extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: isSel ? kAccent.withValues(alpha: 0.12) : Colors.transparent,
+              color: isSel
+                  ? kAccent.withValues(alpha: 0.12)
+                  : Colors.transparent,
               child: Row(
                 children: [
                   // Layer type icon
@@ -62,12 +62,16 @@ class LayersPanel extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: isSel ? kAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06),
+                      color: isSel
+                          ? kAccent.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
                       _iconForType(el.type),
-                      color: isSel ? kAccent : (el.isVisible ? Colors.white38 : Colors.white24),
+                      color: isSel
+                          ? kAccent
+                          : (el.isVisible ? Colors.white38 : Colors.white24),
                       size: 16,
                     ),
                   ),
@@ -80,17 +84,28 @@ class LayersPanel extends StatelessWidget {
                         Text(
                           _labelFor(el),
                           style: TextStyle(
-                            color: isSel ? Colors.white : (el.isVisible ? Colors.white60 : Colors.white30),
+                            color: isSel
+                                ? Colors.white
+                                : (el.isVisible
+                                      ? Colors.white60
+                                      : Colors.white30),
                             fontSize: 12,
-                            fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight: isSel
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (el.type == 'image' && el.src != null && el.src!.isNotEmpty)
+                        if (el.type == 'image' &&
+                            el.src != null &&
+                            el.src!.isNotEmpty)
                           Text(
                             el.src!.startsWith('http') ? 'Remote' : 'Local',
-                            style: const TextStyle(color: Colors.white24, fontSize: 9),
+                            style: const TextStyle(
+                              color: Colors.white24,
+                              fontSize: 9,
+                            ),
                           ),
                       ],
                     ),
@@ -99,16 +114,22 @@ class LayersPanel extends StatelessWidget {
                   if (!isTop)
                     GestureDetector(
                       onTap: () => onReorder(el.zIndex, el.zIndex + 1),
-                      child: const Icon(Icons.arrow_upward_rounded,
-                          color: Colors.white24, size: 18),
+                      child: const Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white24,
+                        size: 18,
+                      ),
                     ),
                   if (!isBottom)
                     GestureDetector(
                       onTap: () => onReorder(el.zIndex, el.zIndex - 1),
                       child: const Padding(
                         padding: EdgeInsets.only(left: 4),
-                        child: Icon(Icons.arrow_downward_rounded,
-                            color: Colors.white24, size: 18),
+                        child: Icon(
+                          Icons.arrow_downward_rounded,
+                          color: Colors.white24,
+                          size: 18,
+                        ),
                       ),
                     ),
                   const SizedBox(width: 8),
@@ -116,8 +137,12 @@ class LayersPanel extends StatelessWidget {
                   GestureDetector(
                     onTap: () => onToggleVisibility(el.id),
                     child: Icon(
-                      el.isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                      color: el.isVisible ? (isSel ? kAccent : Colors.white38) : Colors.white24,
+                      el.isVisible
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      color: el.isVisible
+                          ? (isSel ? kAccent : Colors.white38)
+                          : Colors.white24,
                       size: 18,
                     ),
                   ),
@@ -126,8 +151,12 @@ class LayersPanel extends StatelessWidget {
                   GestureDetector(
                     onTap: () => onToggleLock(el.id),
                     child: Icon(
-                      el.isLocked ? Icons.lock_rounded : Icons.lock_open_rounded,
-                      color: el.isLocked ? DesignTokens.warning : Colors.white24,
+                      el.isLocked
+                          ? Icons.lock_rounded
+                          : Icons.lock_open_rounded,
+                      color: el.isLocked
+                          ? DesignTokens.warning
+                          : Colors.white24,
                       size: 18,
                     ),
                   ),
@@ -135,8 +164,11 @@ class LayersPanel extends StatelessWidget {
                   // Delete
                   GestureDetector(
                     onTap: () => onDelete(el.id),
-                    child: const Icon(Icons.delete_outline_rounded,
-                        color: Colors.redAccent, size: 18),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
                   ),
                 ],
               ),

@@ -30,23 +30,13 @@ class HtmlContent extends StatelessWidget {
 
     final hasHtml = serviceHtmlHasMarkup(raw);
     if (!hasHtml) {
-      return Text(
-        raw,
-        maxLines: maxLines,
-        overflow: overflow,
-        style: style,
-      );
+      return Text(raw, maxLines: maxLines, overflow: overflow, style: style);
     }
 
     if (maxLines != null) {
       // Truncated preview — show plain text excerpt
       final plain = raw.replaceAll(RegExp(r'<[^>]+>'), ' ').trim();
-      return Text(
-        plain,
-        maxLines: maxLines,
-        overflow: overflow,
-        style: style,
-      );
+      return Text(plain, maxLines: maxLines, overflow: overflow, style: style);
     }
 
     return ServiceDescriptionArticle(html: raw, compact: compact);

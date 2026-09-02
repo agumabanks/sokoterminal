@@ -3,11 +3,7 @@ import '../core/theme/design_tokens.dart';
 
 /// A reusable error state widget for consistent failure UI across the app.
 class ErrorState extends StatelessWidget {
-  const ErrorState({
-    required this.message,
-    this.onRetry,
-    super.key,
-  });
+  const ErrorState({required this.message, this.onRetry, super.key});
 
   final String message;
   final VoidCallback? onRetry;
@@ -20,14 +16,22 @@ class ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: DesignTokens.error.withValues(alpha: 0.8),
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: DesignTokens.warning.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                size: 24,
+                color: DesignTokens.warning,
+              ),
             ),
             const SizedBox(height: DesignTokens.spaceLg),
             Text(
-              'Something went wrong',
+              'Couldn’t refresh this page',
               style: DesignTokens.textTitle,
               textAlign: TextAlign.center,
             ),
@@ -39,10 +43,10 @@ class ErrorState extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(height: DesignTokens.spaceLg),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
               ),
             ],
           ],

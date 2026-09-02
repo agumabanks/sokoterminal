@@ -35,28 +35,27 @@ class StudioCampaignStats {
     DateTime? lastShareAt,
     DateTime? lastEditAt,
     int? weeklyExports,
-  }) =>
-      StudioCampaignStats(
-        totalExports: totalExports ?? this.totalExports,
-        totalShares: totalShares ?? this.totalShares,
-        totalEdits: totalEdits ?? this.totalEdits,
-        totalTemplateUses: totalTemplateUses ?? this.totalTemplateUses,
-        lastExportAt: lastExportAt ?? this.lastExportAt,
-        lastShareAt: lastShareAt ?? this.lastShareAt,
-        lastEditAt: lastEditAt ?? this.lastEditAt,
-        weeklyExports: weeklyExports ?? this.weeklyExports,
-      );
+  }) => StudioCampaignStats(
+    totalExports: totalExports ?? this.totalExports,
+    totalShares: totalShares ?? this.totalShares,
+    totalEdits: totalEdits ?? this.totalEdits,
+    totalTemplateUses: totalTemplateUses ?? this.totalTemplateUses,
+    lastExportAt: lastExportAt ?? this.lastExportAt,
+    lastShareAt: lastShareAt ?? this.lastShareAt,
+    lastEditAt: lastEditAt ?? this.lastEditAt,
+    weeklyExports: weeklyExports ?? this.weeklyExports,
+  );
 
   Map<String, dynamic> toJson() => {
-        'total_exports': totalExports,
-        'total_shares': totalShares,
-        'total_edits': totalEdits,
-        'total_template_uses': totalTemplateUses,
-        'last_export_at': lastExportAt?.toIso8601String(),
-        'last_share_at': lastShareAt?.toIso8601String(),
-        'last_edit_at': lastEditAt?.toIso8601String(),
-        'weekly_exports': weeklyExports,
-      };
+    'total_exports': totalExports,
+    'total_shares': totalShares,
+    'total_edits': totalEdits,
+    'total_template_uses': totalTemplateUses,
+    'last_export_at': lastExportAt?.toIso8601String(),
+    'last_share_at': lastShareAt?.toIso8601String(),
+    'last_edit_at': lastEditAt?.toIso8601String(),
+    'weekly_exports': weeklyExports,
+  };
 
   factory StudioCampaignStats.fromJson(Map<String, dynamic> j) {
     DateTime? parse(String key) {
@@ -104,13 +103,19 @@ class StudioCampaignAnalytics extends StateNotifier<StudioCampaignStats> {
     if (dt == null) return false;
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    final start = DateTime(
+      startOfWeek.year,
+      startOfWeek.month,
+      startOfWeek.day,
+    );
     return dt.isAfter(start);
   }
 
   Future<void> recordExport() async {
     final now = DateTime.now();
-    final weekly = _isThisWeek(state.lastExportAt) ? state.weeklyExports + 1 : 1;
+    final weekly = _isThisWeek(state.lastExportAt)
+        ? state.weeklyExports + 1
+        : 1;
     state = state.copyWith(
       totalExports: state.totalExports + 1,
       lastExportAt: now,
@@ -136,9 +141,7 @@ class StudioCampaignAnalytics extends StateNotifier<StudioCampaignStats> {
   }
 
   Future<void> recordTemplateUse() async {
-    state = state.copyWith(
-      totalTemplateUses: state.totalTemplateUses + 1,
-    );
+    state = state.copyWith(totalTemplateUses: state.totalTemplateUses + 1);
     await _persist();
   }
 }

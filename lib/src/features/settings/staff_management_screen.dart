@@ -154,7 +154,11 @@ class StaffController extends StateNotifier<StaffState> {
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final res = await _api.createStaff({'name': name, 'role': role, 'pin': pin});
+      final res = await _api.createStaff({
+        'name': name,
+        'role': role,
+        'pin': pin,
+      });
       final data = res.data is Map
           ? Map<String, dynamic>.from(res.data as Map)
           : null;
@@ -199,7 +203,9 @@ class StaffController extends StateNotifier<StaffState> {
           id: drift.Value(id.toString()),
           name: name ?? '',
           pin: pin == null ? const drift.Value.absent() : drift.Value(pin),
-          active: active == null ? const drift.Value.absent() : drift.Value(active),
+          active: active == null
+              ? const drift.Value.absent()
+              : drift.Value(active),
           updatedAt: drift.Value(DateTime.now().toUtc()),
         ),
       );
@@ -264,6 +270,27 @@ class StaffManagementScreen extends ConsumerWidget {
                   ),
                 );
               },
+            ),
+          if (state.initialized)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Material(
+                color: DesignTokens.brandAccentLight,
+                borderRadius: DesignTokens.borderRadiusMd,
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    color: DesignTokens.brandAccent,
+                  ),
+                  title: Text(
+                    '${state.staff.where((member) => member.active).length} active team members',
+                    style: DesignTokens.textBodyBold,
+                  ),
+                  subtitle: const Text('Control what cashiers can see and use'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.go('/home/more/staff-menu-access'),
+                ),
+              ),
             ),
           Expanded(child: _buildBody(context, state, controller)),
         ],

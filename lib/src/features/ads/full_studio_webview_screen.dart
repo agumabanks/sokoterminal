@@ -12,10 +12,7 @@ import '../../core/theme/design_tokens.dart';
 /// Handles loading, generic errors, offline errors, authentication/session
 /// expiry, and provides reload + open-in-browser fallbacks.
 class FullStudioWebViewScreen extends StatefulWidget {
-  const FullStudioWebViewScreen({
-    super.key,
-    required this.initialUrl,
-  });
+  const FullStudioWebViewScreen({super.key, required this.initialUrl});
 
   final String initialUrl;
 
@@ -45,8 +42,7 @@ class _FullStudioWebViewScreenState extends State<FullStudioWebViewScreen> {
             final url = request.url.toLowerCase();
             // If the bridge/session expires we may be redirected to login.
             if (url.contains('/seller/login') ||
-                url.contains('/login') &&
-                    !url.contains('/photo-editor')) {
+                url.contains('/login') && !url.contains('/photo-editor')) {
               _setAuthError();
               return NavigationDecision.prevent;
             }
@@ -219,11 +215,7 @@ class _FullStudioWebViewScreenState extends State<FullStudioWebViewScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                error.icon,
-                color: error.tint,
-                size: 56,
-              ),
+              Icon(error.icon, color: error.tint, size: 56),
               const SizedBox(height: 20),
               Text(
                 error.title,
@@ -295,27 +287,27 @@ class _StudioWebError {
   });
 
   const _StudioWebError.offline()
-      : this(
-          title: 'You\'re offline',
-          message: 'Connect to the internet to use Soko Studio.',
-          icon: Icons.wifi_off_rounded,
-          tint: Colors.orangeAccent,
-        );
+    : this(
+        title: 'You\'re offline',
+        message: 'Connect to the internet to use Soko Studio.',
+        icon: Icons.wifi_off_rounded,
+        tint: Colors.orangeAccent,
+      );
 
   const _StudioWebError.auth()
-      : this(
-          title: 'Session expired',
-          message: 'Your seller session has expired. Please log in again.',
-          icon: Icons.lock_outline_rounded,
-          tint: Colors.redAccent,
-        );
+    : this(
+        title: 'Session expired',
+        message: 'Your seller session has expired. Please log in again.',
+        icon: Icons.lock_outline_rounded,
+        tint: Colors.redAccent,
+      );
 
   _StudioWebError.generic(String? description)
-      : this(
-          title: 'Couldn\'t load Studio',
-          message: 'Something went wrong while loading the editor.',
-          detail: description?.isNotEmpty == true ? description : null,
-          icon: Icons.error_outline_rounded,
-          tint: Colors.redAccent,
-        );
+    : this(
+        title: 'Couldn\'t load Studio',
+        message: 'Something went wrong while loading the editor.',
+        detail: description?.isNotEmpty == true ? description : null,
+        icon: Icons.error_outline_rounded,
+        tint: Colors.redAccent,
+      );
 }

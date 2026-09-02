@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/app_providers.dart';
 import '../../core/settings/staff_menu_visibility.dart';
@@ -23,6 +22,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   String _businessName = 'S';
+  bool _syncing = false;
 
   @override
   void initState() {
@@ -213,19 +213,19 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final growthActions = [
       if (!isStaffSession)
         _MoreAction(
+          title: 'Payment Links',
+          subtitle: 'Create shareable payment links',
+          icon: Icons.link,
+          color: DesignTokens.brandAccent,
+          route: '/home/more/payment-links',
+        ),
+      if (!isStaffSession)
+        _MoreAction(
           title: 'Sanaa Wallet',
           subtitle: 'Credits, add-ons, and balances',
           icon: Icons.account_balance_wallet_outlined,
           color: DesignTokens.success,
           route: '/home/more/wallet',
-        ),
-      if (!isStaffSession)
-        _MoreAction(
-          title: 'Sanaa Finance BNPL',
-          subtitle: 'Let customers pay later',
-          icon: Icons.payments_outlined,
-          color: DesignTokens.brandAccent,
-          route: '/home/more/bnpl-settings',
         ),
       if (!isStaffSession && remoteConfig.ffSokoStudio)
         _MoreAction(
@@ -251,7 +251,6 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           color: DesignTokens.warning,
           route: '/home/more/coupons',
         ),
-      // Expenses is already in Today's Actions at the top
       if (isManager)
         _MoreAction(
           title: 'Insights & Analytics',
@@ -393,17 +392,13 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         title: Text('More', style: DesignTokens.textHeadline),
         actions: [
           IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () async {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Sync started…')));
-              await ref.read(syncServiceProvider).syncNow();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Sync finished')));
-            },
+            icon: _syncing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
+            onPressed: _syncing ? null : _syncNow,
             tooltip: 'Sync data',
           ),
         ],
@@ -412,13 +407,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         padding: DesignTokens.paddingScreen,
         children: [
           _MoreHeroCard(
-            title: isManager ? 'Manager command center' : 'Staff workspace',
-            subtitle: isManager
-                ? 'Run the business, control operations, and shape what staff can access.'
-                : 'Fast access to the parts of terminal work you use during a shift.',
+            title: _businessName,
             roleLabel: isManager ? 'Manager' : 'Staff',
             statusLabel: posSession.isActive
-                ? '${posSession.staffName ?? 'Active session'} connected'
+                ? 'Active on this device'
                 : 'Owner session',
             businessName: _businessName,
           ),
@@ -432,6 +424,38 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             },
           ),
           const SizedBox(height: DesignTokens.spaceLg),
+          if (_query.isNotEmpty &&
+              filteredToday.isEmpty &&
+              filteredCatalog.isEmpty &&
+              filteredGrowth.isEmpty &&
+              filteredData.isEmpty &&
+              filteredControl.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.search_off_rounded,
+                    size: 36,
+                    color: DesignTokens.textTertiary,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No tool matches “$_query”',
+                    style: DesignTokens.textBodyBold,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _query = '');
+                    },
+                    child: const Text('Clear search'),
+                  ),
+                ],
+              ),
+            ),
           if (filteredToday.isNotEmpty) ...[
             _MoreSection(
               title: 'Today',
@@ -499,7 +523,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Seller Terminal · v1.0.4',
+                  'Seller Terminal · v2.0.0',
                   style: DesignTokens.textCaption.copyWith(
                     color: DesignTokens.textTertiary,
                   ),
@@ -517,6 +541,26 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _syncing = true);
+    try {
+      await ref.read(syncServiceProvider).syncNow();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Everything is up to date')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not refresh now. Your saved data is safe.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
   }
 }
 
@@ -550,6 +594,10 @@ class _SearchBar extends StatelessWidget {
               style: DesignTokens.textBody,
               decoration: InputDecoration(
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                filled: false,
                 hintText: 'Search features…',
                 hintStyle: DesignTokens.textBody.copyWith(
                   color: DesignTokens.textTertiary,
@@ -565,7 +613,11 @@ class _SearchBar extends StatelessWidget {
             builder: (context, value, child) {
               if (value.text.isEmpty) return const SizedBox.shrink();
               return IconButton(
-                icon: const Icon(Icons.clear, size: 20, color: DesignTokens.textTertiary),
+                icon: const Icon(
+                  Icons.clear,
+                  size: 20,
+                  color: DesignTokens.textTertiary,
+                ),
                 onPressed: onClear,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -578,171 +630,81 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-class _DotPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.06)
-          ..style = PaintingStyle.fill;
-
-    final randomDots = [
-      const Offset(20, 30),
-      const Offset(60, 80),
-      const Offset(140, 20),
-      const Offset(200, 60),
-      const Offset(260, 40),
-      const Offset(320, 90),
-      const Offset(380, 25),
-      const Offset(450, 70),
-      const Offset(500, 35),
-      const Offset(560, 85),
-      const Offset(620, 15),
-      const Offset(680, 55),
-      const Offset(740, 95),
-      const Offset(800, 30),
-      const Offset(860, 75),
-      const Offset(920, 45),
-      const Offset(980, 85),
-      const Offset(40, 120),
-      const Offset(120, 140),
-      const Offset(220, 130),
-      const Offset(340, 150),
-      const Offset(460, 110),
-      const Offset(580, 145),
-      const Offset(700, 125),
-      const Offset(820, 155),
-      const Offset(940, 115),
-    ];
-
-    for (final dot in randomDots) {
-      if (dot.dx < size.width && dot.dy < size.height) {
-        canvas.drawCircle(dot, 2, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _MoreHeroCard extends StatelessWidget {
   const _MoreHeroCard({
     required this.title,
-    required this.subtitle,
     required this.roleLabel,
     required this.statusLabel,
     required this.businessName,
   });
 
   final String title;
-  final String subtitle;
   final String roleLabel;
   final String statusLabel;
   final String businessName;
 
   @override
   Widget build(BuildContext context) {
-    final avatarLetter =
-        businessName.trim().isNotEmpty ? businessName.trim()[0].toUpperCase() : 'S';
-    final today = DateFormat('EEE d MMM').format(DateTime.now());
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        padding: const EdgeInsets.all(DesignTokens.spaceLg),
-        decoration: BoxDecoration(
-          gradient: DesignTokens.brandGradient,
-          borderRadius: BorderRadius.all(Radius.circular(28)),
-          boxShadow: DesignTokens.shadowMd,
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _DotPatternPainter()),
+    final avatarLetter = businessName.trim().isNotEmpty
+        ? businessName.trim()[0].toUpperCase()
+        : 'S';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: DesignTokens.brandGradient,
+        borderRadius: DesignTokens.borderRadiusLg,
+        boxShadow: DesignTokens.shadowSm,
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white.withValues(alpha: 0.14),
+            child: Text(
+              avatarLetter,
+              style: DesignTokens.textTitle.copyWith(color: Colors.white),
             ),
-            Column(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DesignTokens.spaceMd,
-                        vertical: DesignTokens.spaceSm,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        roleLabel,
-                        style: DesignTokens.textSmallLight.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.white.withValues(alpha: 0.15),
-                      child: Text(
-                        avatarLetter,
-                        style: DesignTokens.textSmallLight.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DesignTokens.spaceLg),
                 Text(
                   title,
-                  style: DesignTokens.textHeadline.copyWith(
-                    color: DesignTokens.canvas,
-                    fontWeight: FontWeight.w800,
+                  style: DesignTokens.textBodyBold.copyWith(
+                    color: Colors.white,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: DesignTokens.spaceSm),
-                Text(subtitle, style: DesignTokens.textBodyLight),
-                const SizedBox(height: DesignTokens.spaceLg),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DesignTokens.spaceMd,
-                    vertical: DesignTokens.spaceMd,
+                const SizedBox(height: 3),
+                Text(
+                  statusLabel,
+                  style: DesignTokens.textCaption.copyWith(
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: DesignTokens.borderRadiusMd,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.verified_outlined,
-                        color: DesignTokens.brandAccent,
-                      ),
-                      const SizedBox(width: DesignTokens.spaceSm),
-                      Expanded(
-                        child: Text(
-                          statusLabel,
-                          style: DesignTokens.textSmallLight.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        today,
-                        style: DesignTokens.textSmallLight.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: DesignTokens.borderRadiusFull,
+            ),
+            child: Text(
+              roleLabel,
+              style: DesignTokens.textCaption.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

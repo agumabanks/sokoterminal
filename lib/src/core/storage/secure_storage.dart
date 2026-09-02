@@ -47,7 +47,11 @@ class SecureStorage {
   final _writeFailures = <String, int>{};
   final _lastErrors = <String, String>{};
 
-  void _recordFailure(Object error, {required String key, required bool isWrite}) {
+  void _recordFailure(
+    Object error, {
+    required String key,
+    required bool isWrite,
+  }) {
     _consecutiveFailures++;
     final errorText = error.toString();
     if (isWrite) {
@@ -101,9 +105,7 @@ class SecureStorage {
           // Fallback: return memory value if available.
           final fallback = _memoryFallback[key];
           if (fallback != null) {
-            debugPrint(
-              '[SecureStorage] Returning memory fallback for $key',
-            );
+            debugPrint('[SecureStorage] Returning memory fallback for $key');
           }
           return fallback;
         }
@@ -154,13 +156,16 @@ class SecureStorage {
   Future<String?> readAccessToken() => _safeRead('access_token');
   Future<void> deleteAccessToken() => _safeDelete('access_token');
 
-  Future<void> writeAccessTokenExpiresAt(DateTime expiresAt) =>
-      _safeWrite('access_token_expires_at', expiresAt.toUtc().toIso8601String());
+  Future<void> writeAccessTokenExpiresAt(DateTime expiresAt) => _safeWrite(
+    'access_token_expires_at',
+    expiresAt.toUtc().toIso8601String(),
+  );
   Future<DateTime?> readAccessTokenExpiresAt() async {
     final raw = await _safeRead('access_token_expires_at');
     if (raw == null || raw.trim().isEmpty) return null;
     return DateTime.tryParse(raw.trim())?.toUtc();
   }
+
   Future<void> deleteAccessTokenExpiresAt() =>
       _safeDelete('access_token_expires_at');
 
@@ -170,6 +175,7 @@ class SecureStorage {
     final raw = await _safeRead('remember_device');
     return raw == '1';
   }
+
   Future<void> deleteRememberDevice() => _safeDelete('remember_device');
 
   Future<void> writeLastLoginPhone(String phone) =>
@@ -215,7 +221,8 @@ class SecureStorage {
   Future<String?> readPosSessionToken() => _safeRead('pos_session_token');
   Future<void> deletePosSessionToken() => _safeDelete('pos_session_token');
 
-  Future<void> writePinHashSalt(String salt) => _safeWrite('pin_hash_salt', salt);
+  Future<void> writePinHashSalt(String salt) =>
+      _safeWrite('pin_hash_salt', salt);
   Future<String?> readPinHashSalt() => _safeRead('pin_hash_salt');
 
   Future<void> writePosStaffRole(int staffId, String role) =>
@@ -298,10 +305,8 @@ class SecureStorage {
       );
     }).toList();
 
-    final totalFailures = _readFailures.values.fold<int>(
-          0,
-          (a, b) => a + b,
-        ) +
+    final totalFailures =
+        _readFailures.values.fold<int>(0, (a, b) => a + b) +
         _writeFailures.values.fold<int>(0, (a, b) => a + b);
 
     return SecureStorageHealth(

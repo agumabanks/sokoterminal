@@ -25,38 +25,122 @@ List<AdTemplate> generateStudioTemplates() {
     'new': (label: 'New Drop', preview: [Color(0xFF0f172a), Color(0xFF0EBE7E)]),
     'promo': (label: 'Promo', preview: [Color(0xFF7c3aed), Color(0xFFf9a8d4)]),
     'event': (label: 'Event', preview: [Color(0xFF1e3a8a), Color(0xFFfbbf24)]),
-    'food': (label: 'Food Special', preview: [Color(0xFF1c1917), Color(0xFFea580c)]),
-    'fashion': (label: 'Fashion Edit', preview: [Color(0xFF18181b), Color(0xFFf472b6)]),
-    'beauty': (label: 'Beauty Glow', preview: [Color(0xFF831843), Color(0xFFfbcfe8)]),
-    'tech': (label: 'Tech Launch', preview: [Color(0xFF0f172a), Color(0xFF38bdf8)]),
-    'service': (label: 'Service Offer', preview: [Color(0xFF0F1D40), Color(0xFF0EBE7E)]),
-    'whatsapp': (label: 'WhatsApp Order', preview: [Color(0xFF14532d), Color(0xFF22c55e)]),
-    'delivery': (label: 'Fast Delivery', preview: [Color(0xFF1e40af), Color(0xFF93c5fd)]),
-    'booking': (label: 'Book Now', preview: [Color(0xFF4c1d95), Color(0xFFc4b5fd)]),
-    'agri': (label: 'Farm Fresh', preview: [Color(0xFF14532d), Color(0xFF86efac)]),
-    'health': (label: 'Wellness', preview: [Color(0xFF0e7490), Color(0xFF99f6e4)]),
-    'realestate': (label: 'Property', preview: [Color(0xFF334155), Color(0xFFfbbf24)]),
-    'professional': (label: 'Business', preview: [Color(0xFFf8fafc), Color(0xFF0a66c2)]),
-    'catalog': (label: 'Catalog', preview: [Color(0xFFf1f5f9), Color(0xFF0EBE7E)]),
-    'luxury': (label: 'Premium', preview: [Color(0xFF09090b), Color(0xFFd4af37)]),
-    'grand': (label: 'Grand Opening', preview: [Color(0xFF7f1d1d), Color(0xFFfacc15)]),
-    'minimal': (label: 'Minimal', preview: [Color(0xFFffffff), Color(0xFF0f172a)]),
+    'food': (
+      label: 'Food Special',
+      preview: [Color(0xFF1c1917), Color(0xFFea580c)],
+    ),
+    'fashion': (
+      label: 'Fashion Edit',
+      preview: [Color(0xFF18181b), Color(0xFFf472b6)],
+    ),
+    'beauty': (
+      label: 'Beauty Glow',
+      preview: [Color(0xFF831843), Color(0xFFfbcfe8)],
+    ),
+    'tech': (
+      label: 'Tech Launch',
+      preview: [Color(0xFF0f172a), Color(0xFF38bdf8)],
+    ),
+    'service': (
+      label: 'Service Offer',
+      preview: [Color(0xFF0F1D40), Color(0xFF0EBE7E)],
+    ),
+    'whatsapp': (
+      label: 'WhatsApp Order',
+      preview: [Color(0xFF14532d), Color(0xFF22c55e)],
+    ),
+    'delivery': (
+      label: 'Fast Delivery',
+      preview: [Color(0xFF1e40af), Color(0xFF93c5fd)],
+    ),
+    'booking': (
+      label: 'Book Now',
+      preview: [Color(0xFF4c1d95), Color(0xFFc4b5fd)],
+    ),
+    'agri': (
+      label: 'Farm Fresh',
+      preview: [Color(0xFF14532d), Color(0xFF86efac)],
+    ),
+    'health': (
+      label: 'Wellness',
+      preview: [Color(0xFF0e7490), Color(0xFF99f6e4)],
+    ),
+    'realestate': (
+      label: 'Property',
+      preview: [Color(0xFF334155), Color(0xFFfbbf24)],
+    ),
+    'professional': (
+      label: 'Business',
+      preview: [Color(0xFFf8fafc), Color(0xFF0a66c2)],
+    ),
+    'catalog': (
+      label: 'Catalog',
+      preview: [Color(0xFFf1f5f9), Color(0xFF0EBE7E)],
+    ),
+    'luxury': (
+      label: 'Premium',
+      preview: [Color(0xFF09090b), Color(0xFFd4af37)],
+    ),
+    'grand': (
+      label: 'Grand Opening',
+      preview: [Color(0xFF7f1d1d), Color(0xFFfacc15)],
+    ),
+    'minimal': (
+      label: 'Minimal',
+      preview: [Color(0xFFffffff), Color(0xFF0f172a)],
+    ),
     // ── New categories for v2 ───────────────────────────────────────────────
-    'education': (label: 'Education', preview: [Color(0xFF1e3a5f), Color(0xFFfbbf24)]),
-    'transport': (label: 'Transport', preview: [Color(0xFF0f172a), Color(0xFFf97316)]),
-    'construction': (label: 'Construction', preview: [Color(0xFF451a03), Color(0xFFfacc15)]),
-    'hospitality': (label: 'Hospitality', preview: [Color(0xFF1c1917), Color(0xFFeab308)]),
-    'retail': (label: 'Retail', preview: [Color(0xFFf8fafc), Color(0xFFdc2626)]),
-    'finance': (label: 'Finance', preview: [Color(0xFF064e3b), Color(0xFF34d399)]),
-    'fitness': (label: 'Fitness', preview: [Color(0xFF111827), Color(0xFFec4899)]),
+    'education': (
+      label: 'Education',
+      preview: [Color(0xFF1e3a5f), Color(0xFFfbbf24)],
+    ),
+    'transport': (
+      label: 'Transport',
+      preview: [Color(0xFF0f172a), Color(0xFFf97316)],
+    ),
+    'construction': (
+      label: 'Construction',
+      preview: [Color(0xFF451a03), Color(0xFFfacc15)],
+    ),
+    'hospitality': (
+      label: 'Hospitality',
+      preview: [Color(0xFF1c1917), Color(0xFFeab308)],
+    ),
+    'retail': (
+      label: 'Retail',
+      preview: [Color(0xFFf8fafc), Color(0xFFdc2626)],
+    ),
+    'finance': (
+      label: 'Finance',
+      preview: [Color(0xFF064e3b), Color(0xFF34d399)],
+    ),
+    'fitness': (
+      label: 'Fitness',
+      preview: [Color(0xFF111827), Color(0xFFec4899)],
+    ),
     'auto': (label: 'Auto', preview: [Color(0xFF1e293b), Color(0xFF3b82f6)]),
     'salon': (label: 'Salon', preview: [Color(0xFFfdf2f8), Color(0xFFbe185d)]),
-    'pharmacy': (label: 'Pharmacy', preview: [Color(0xFFf0fdf4), Color(0xFF16a34a)]),
-    'electronics': (label: 'Electronics', preview: [Color(0xFF030712), Color(0xFF22d3ee)]),
-    'boutique': (label: 'Boutique', preview: [Color(0xFFfaf5ff), Color(0xFFa855f7)]),
+    'pharmacy': (
+      label: 'Pharmacy',
+      preview: [Color(0xFFf0fdf4), Color(0xFF16a34a)],
+    ),
+    'electronics': (
+      label: 'Electronics',
+      preview: [Color(0xFF030712), Color(0xFF22d3ee)],
+    ),
+    'boutique': (
+      label: 'Boutique',
+      preview: [Color(0xFFfaf5ff), Color(0xFFa855f7)],
+    ),
     'cafe': (label: 'Cafe', preview: [Color(0xFFfff7ed), Color(0xFFea580c)]),
-    'photography': (label: 'Photography', preview: [Color(0xFF0a0a0a), Color(0xFFffffff)]),
-    'consultancy': (label: 'Consultancy', preview: [Color(0xFFf8fafc), Color(0xFF0a66c2)]),
+    'photography': (
+      label: 'Photography',
+      preview: [Color(0xFF0a0a0a), Color(0xFFffffff)],
+    ),
+    'consultancy': (
+      label: 'Consultancy',
+      preview: [Color(0xFFf8fafc), Color(0xFF0a66c2)],
+    ),
   };
 
   const palettes = <({String bg, String accent, String text, String muted})>[
@@ -297,7 +381,7 @@ List<CanvasElement> _buildHeroLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: pad,
       y: imgY + imgH + h * 0.105,
       width: w - pad * 2,
@@ -468,7 +552,7 @@ List<CanvasElement> _buildSplitLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 150,000',
+      text: '150,000 /=',
       x: textX,
       y: h * 0.48,
       width: w * 0.4,
@@ -620,7 +704,7 @@ List<CanvasElement> _buildBannerLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 75,000',
+      text: '75,000 /=',
       x: w * 0.05,
       y: h * 0.820,
       width: w * 0.9,
@@ -738,7 +822,7 @@ List<CanvasElement> _buildMinimalLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 120,000',
+      text: '120,000 /=',
       x: w * 0.1,
       y: h * 0.835,
       width: w * 0.5,
@@ -882,7 +966,7 @@ List<CanvasElement> _buildStoryLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 49,000',
+      text: '49,000 /=',
       x: w * 0.18,
       y: h * 0.754,
       width: w * 0.64,
@@ -1029,7 +1113,7 @@ List<CanvasElement> _buildBadgeLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 99,000',
+      text: '99,000 /=',
       x: w * 0.06,
       y: h * 0.810,
       width: w * 0.88,
@@ -1123,7 +1207,7 @@ List<CanvasElement> _buildFooterCtaLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 200,000',
+      text: '200,000 /=',
       x: w * 0.05,
       y: h * 0.77,
       width: w * 0.9,
@@ -1156,7 +1240,9 @@ List<CanvasElement> _buildFooterCtaLayout({
     CanvasElement(
       id: 'cta_text',
       type: 'text',
-      text: category == 'booking' ? 'BOOK NOW · {{PHONE}}' : 'ORDER · {{WHATSAPP}}',
+      text: category == 'booking'
+          ? 'BOOK NOW · {{PHONE}}'
+          : 'ORDER · {{WHATSAPP}}',
       x: w * 0.05,
       y: h * 0.895,
       width: w * 0.9,
@@ -1289,7 +1375,7 @@ List<CanvasElement> _buildLuxuryLayout({
     CanvasElement(
       id: 'price',
       type: 'text',
-      text: 'UGX 150,000',
+      text: '150,000 /=',
       x: w * 0.1,
       y: h * 0.775,
       width: w * 0.8,

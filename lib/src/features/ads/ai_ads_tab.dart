@@ -33,26 +33,26 @@ import 'studio_variable_context.dart';
 /// Unified product/service entry shown in the picker grid.
 class AdCatalogEntry {
   AdCatalogEntry.fromItem(Item item)
-      : id = item.id,
-        remoteId = item.remoteId,
-        name = item.name,
-        price = item.price,
-        imageUrl = item.imageUrl,
-        thumbnailUrl = item.thumbnailUrl,
-        isService = false,
-        _item = item,
-        _service = null;
+    : id = item.id,
+      remoteId = item.remoteId,
+      name = item.name,
+      price = item.price,
+      imageUrl = item.imageUrl,
+      thumbnailUrl = item.thumbnailUrl,
+      isService = false,
+      _item = item,
+      _service = null;
 
   AdCatalogEntry.fromService(Service svc)
-      : id = svc.id,
-        remoteId = svc.remoteId,
-        name = svc.title,
-        price = svc.price,
-        imageUrl = svc.imageUrl,
-        thumbnailUrl = svc.imageUrl,
-        isService = true,
-        _item = null,
-        _service = svc;
+    : id = svc.id,
+      remoteId = svc.remoteId,
+      name = svc.title,
+      price = svc.price,
+      imageUrl = svc.imageUrl,
+      thumbnailUrl = svc.imageUrl,
+      isService = true,
+      _item = null,
+      _service = svc;
 
   final String id;
   final int? remoteId;
@@ -89,8 +89,10 @@ final _fmt = NumberFormat('#,###');
 
 typedef _AiAdsQuery = ({int? productId, int? serviceId});
 
-final _aiAdsProvider =
-    FutureProvider.family<List<dynamic>, _AiAdsQuery>((ref, query) async {
+final _aiAdsProvider = FutureProvider.family<List<dynamic>, _AiAdsQuery>((
+  ref,
+  query,
+) async {
   final api = ref.watch(sellerApiProvider);
   final res = await api.studioListAds(
     productId: query.productId,
@@ -167,11 +169,15 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
     return itemsAsync.when(
       loading: () => const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation(DesignTokens.brandAccent)),
+          valueColor: AlwaysStoppedAnimation(DesignTokens.brandAccent),
+        ),
       ),
       error: (e, _) => Center(
-        child: Text('Error loading catalog: $e',
-            style: const TextStyle(color: Colors.white54))),
+        child: Text(
+          'Error loading catalog: $e',
+          style: const TextStyle(color: Colors.white54),
+        ),
+      ),
       data: (products) {
         final services = servicesAsync.valueOrNull ?? <Service>[];
         final allEntries = <AdCatalogEntry>[
@@ -186,9 +192,10 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
         final filtered = _query.isEmpty
             ? showingItems
             : showingItems
-                .where((e) =>
-                    e.name.toLowerCase().contains(_query.toLowerCase()))
-                .toList();
+                  .where(
+                    (e) => e.name.toLowerCase().contains(_query.toLowerCase()),
+                  )
+                  .toList();
 
         return Column(
           children: [
@@ -202,12 +209,18 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
                 indicatorColor: DesignTokens.brandAccent,
                 indicatorWeight: 2,
                 labelStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
                 tabs: const [
-                  Tab(icon: Icon(Icons.grid_view_rounded, size: 16),
-                      text: 'Template Ads'),
-                  Tab(icon: Icon(Icons.auto_awesome_rounded, size: 16),
-                      text: 'AI Generate'),
+                  Tab(
+                    icon: Icon(Icons.grid_view_rounded, size: 16),
+                    text: 'Template Ads',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.auto_awesome_rounded, size: 16),
+                    text: 'AI Generate',
+                  ),
                 ],
               ),
             ),
@@ -241,17 +254,21 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
                 controller: _tabCtrl,
                 children: [
                   _TemplatesMode(
-                    selectedEntry: filtered.cast<AdCatalogEntry?>()
-                        .firstWhere((e) => e?.id == _selectedId,
-                            orElse: () => null),
+                    selectedEntry: filtered.cast<AdCatalogEntry?>().firstWhere(
+                      (e) => e?.id == _selectedId,
+                      orElse: () => null,
+                    ),
                     kit: kit,
                     activeCategory: _templateCategory,
                     onCategoryChanged: (c) =>
                         setState(() => _templateCategory = c),
-                    onEdit: (tpl) => _openEditor(tpl,
-                        filtered.cast<AdCatalogEntry?>()
-                            .firstWhere((e) => e?.id == _selectedId,
-                                orElse: () => null)),
+                    onEdit: (tpl) => _openEditor(
+                      tpl,
+                      filtered.cast<AdCatalogEntry?>().firstWhere(
+                        (e) => e?.id == _selectedId,
+                        orElse: () => null,
+                      ),
+                    ),
                   ),
                   _AIMode(
                     selectedId: _selectedId,
@@ -270,10 +287,16 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
                     }),
                     onGenerate: _generateAds,
                     onDeleteAd: _deleteAd,
-                    onRefresh: () => ref.invalidate(_aiAdsProvider((
-                      productId: _selectedIsService ? null : _selectedRemoteId,
-                      serviceId: _selectedIsService ? _selectedRemoteId : null,
-                    ))),
+                    onRefresh: () => ref.invalidate(
+                      _aiAdsProvider((
+                        productId: _selectedIsService
+                            ? null
+                            : _selectedRemoteId,
+                        serviceId: _selectedIsService
+                            ? _selectedRemoteId
+                            : null,
+                      )),
+                    ),
                   ),
                 ],
               ),
@@ -310,13 +333,15 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
           behavior: SnackBarBehavior.floating,
           backgroundColor: DesignTokens.success,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-          content: const Row(children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Expanded(
-                child: Text('AI ads queued — ready in 1-2 minutes!')),
-          ]),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Expanded(child: Text('AI ads queued — ready in 1-2 minutes!')),
+            ],
+          ),
         ),
       );
       _startPolling();
@@ -336,8 +361,7 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
   void _startPolling() {
     _pollTimer?.cancel();
     var attempts = 0;
-    _pollTimer =
-        Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       attempts++;
       if (attempts > 18) {
         timer.cancel();
@@ -353,10 +377,12 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
         if (data is Map && data['pending_count'] == 0) {
           timer.cancel();
           if (mounted) {
-            ref.invalidate(_aiAdsProvider((
-              productId: _selectedIsService ? null : _selectedRemoteId,
-              serviceId: _selectedIsService ? _selectedRemoteId : null,
-            )));
+            ref.invalidate(
+              _aiAdsProvider((
+                productId: _selectedIsService ? null : _selectedRemoteId,
+                serviceId: _selectedIsService ? _selectedRemoteId : null,
+              )),
+            );
           }
         }
       } catch (_) {}
@@ -366,10 +392,12 @@ class _AIAdsTabState extends ConsumerState<AIAdsTab>
   Future<void> _deleteAd(int adId) async {
     try {
       await ref.read(sellerApiProvider).studioDeleteAd(adId);
-      ref.invalidate(_aiAdsProvider((
-        productId: _selectedIsService ? null : _selectedRemoteId,
-        serviceId: _selectedIsService ? _selectedRemoteId : null,
-      )));
+      ref.invalidate(
+        _aiAdsProvider((
+          productId: _selectedIsService ? null : _selectedRemoteId,
+          serviceId: _selectedIsService ? _selectedRemoteId : null,
+        )),
+      );
     } catch (_) {}
   }
 }
@@ -418,37 +446,52 @@ class _ProductGrid extends StatelessWidget {
                   onChanged: onQueryChanged,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
-                    hintText:
-                        showServices ? 'Search services…' : 'Search products…',
+                    hintText: showServices
+                        ? 'Search services…'
+                        : 'Search products…',
                     hintStyle: const TextStyle(
-                        color: Colors.white30, fontSize: 12),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        color: Colors.white38, size: 18),
+                      color: Colors.white30,
+                      fontSize: 12,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: Colors.white38,
+                      size: 18,
+                    ),
                     suffixIcon: query.isNotEmpty
                         ? GestureDetector(
                             onTap: () {
                               searchCtrl.clear();
                               onQueryChanged('');
                             },
-                            child: const Icon(Icons.close_rounded,
-                                color: Colors.white38, size: 16),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white38,
+                              size: 16,
+                            ),
                           )
                         : null,
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.07),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 12),
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Colors.white10)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Colors.white10),
+                    ),
                     enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: Colors.white10)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Colors.white10),
+                    ),
                     focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                            color: DesignTokens.brandAccent)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: DesignTokens.brandAccent,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -458,7 +501,9 @@ class _ProductGrid extends StatelessWidget {
                   onTap: () => onToggle(!showServices),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(10),
@@ -467,7 +512,9 @@ class _ProductGrid extends StatelessWidget {
                     child: Text(
                       showServices ? 'Products' : 'Services',
                       style: const TextStyle(
-                          color: Colors.white60, fontSize: 11),
+                        color: Colors.white60,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ),
@@ -519,11 +566,13 @@ class _ProductGrid extends StatelessWidget {
                           // Image
                           ClipRRect(
                             borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(11)),
+                              top: Radius.circular(11),
+                            ),
                             child: entry.imageUrl?.isNotEmpty == true
                                 ? OfflineCachedImage(
                                     imageUrl: entry.imageUrl!,
-                                    width: 90, height: 74,
+                                    width: 90,
+                                    height: 74,
                                     fit: BoxFit.cover,
                                     errorWidget: _noImg(entry.isService),
                                   )
@@ -531,8 +580,7 @@ class _ProductGrid extends StatelessWidget {
                           ),
                           Expanded(
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(6, 4, 6, 4),
+                              padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -550,7 +598,7 @@ class _ProductGrid extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    'UGX ${_fmt.format(entry.price.round())}',
+                                    '${_fmt.format(entry.price.round())} /=',
                                     style: TextStyle(
                                       color: isSel
                                           ? DesignTokens.brandAccent
@@ -577,15 +625,15 @@ class _ProductGrid extends StatelessWidget {
   }
 
   Widget _noImg(bool isService) => Container(
-        width: 90, height: 74,
-        color: Colors.white.withValues(alpha: 0.05),
-        child: Icon(
-          isService
-              ? Icons.room_service_outlined
-              : Icons.inventory_2_outlined,
-          color: Colors.white24, size: 24,
-        ),
-      );
+    width: 90,
+    height: 74,
+    color: Colors.white.withValues(alpha: 0.05),
+    child: Icon(
+      isService ? Icons.room_service_outlined : Icons.inventory_2_outlined,
+      color: Colors.white24,
+      size: 24,
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -609,9 +657,7 @@ class _TemplatesMode extends StatelessWidget {
 
   List<AdTemplate> get _filtered => activeCategory == 'all'
       ? builtInTemplates
-      : builtInTemplates
-          .where((t) => t.category == activeCategory)
-          .toList();
+      : builtInTemplates.where((t) => t.category == activeCategory).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -623,8 +669,11 @@ class _TemplatesMode extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
               children: [
-                const Icon(Icons.touch_app_rounded,
-                    color: DesignTokens.brandAccent, size: 16),
+                const Icon(
+                  Icons.touch_app_rounded,
+                  color: DesignTokens.brandAccent,
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -632,9 +681,10 @@ class _TemplatesMode extends StatelessWidget {
                         ? 'Tap a template to create an ad for "${selectedEntry!.name}"'
                         : 'Select a product above, then tap any template',
                     style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 11,
-                        height: 1.4),
+                      color: Colors.white54,
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -659,7 +709,9 @@ class _TemplatesMode extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: active
                           ? DesignTokens.brandAccent
@@ -669,22 +721,22 @@ class _TemplatesMode extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(cat.icon,
-                            size: 11,
-                            color: active
-                                ? Colors.white
-                                : Colors.white38),
+                        Icon(
+                          cat.icon,
+                          size: 11,
+                          color: active ? Colors.white : Colors.white38,
+                        ),
                         const SizedBox(width: 4),
-                        Text(cat.label,
-                            style: TextStyle(
-                              color: active
-                                  ? Colors.white
-                                  : Colors.white38,
-                              fontSize: 11,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            )),
+                        Text(
+                          cat.label,
+                          style: TextStyle(
+                            color: active ? Colors.white : Colors.white38,
+                            fontSize: 11,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -705,8 +757,9 @@ class _TemplatesMode extends StatelessWidget {
                     child: Text(
                       'No templates in this category',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          fontSize: 13),
+                        color: Colors.white.withValues(alpha: 0.3),
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -714,30 +767,25 @@ class _TemplatesMode extends StatelessWidget {
             : SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 32),
                 sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) {
-                      final tpl = _filtered[i];
-                      final preview = selectedEntry != null
-                          ? tpl.applyProduct(
-                              productName: selectedEntry!.name,
-                              priceFormatted:
-                                  'UGX ${_fmt.format(selectedEntry!.price.round())}',
-                              imageUrl:
-                                  selectedEntry!.imageUrl ?? '',
-                            )
-                          : tpl;
+                  delegate: SliverChildBuilderDelegate((_, i) {
+                    final tpl = _filtered[i];
+                    final preview = selectedEntry != null
+                        ? tpl.applyProduct(
+                            productName: selectedEntry!.name,
+                            priceFormatted:
+                                '${_fmt.format(selectedEntry!.price.round())} /=',
+                            imageUrl: selectedEntry!.imageUrl ?? '',
+                          )
+                        : tpl;
 
-                      return _TemplateCard(
-                        template: tpl,
-                        preview: preview,
-                        hasEntry: selectedEntry != null,
-                        onTap: () => onEdit(tpl),
-                      );
-                    },
-                    childCount: _filtered.length,
-                  ),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    return _TemplateCard(
+                      template: tpl,
+                      preview: preview,
+                      hasEntry: selectedEntry != null,
+                      onTap: () => onEdit(tpl),
+                    );
+                  }, childCount: _filtered.length),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
@@ -780,41 +828,51 @@ class _TemplateCard extends StatelessWidget {
             Expanded(
               child: Stack(
                 children: [
-                  Positioned.fill(
-                    child: CanvasPreview(template: preview),
-                  ),
+                  Positioned.fill(child: CanvasPreview(template: preview)),
                   if (hasEntry)
                     Positioned(
-                      right: 6, top: 6,
+                      right: 6,
+                      top: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: DesignTokens.brandAccent,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text('Use →',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w700)),
+                        child: const Text(
+                          'Use →',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     )
                   else
                     Positioned(
-                      right: 6, top: 6,
+                      right: 6,
+                      top: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text('Edit',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600)),
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -828,9 +886,10 @@ class _TemplateCard extends StatelessWidget {
                   Text(
                     template.name,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -839,26 +898,30 @@ class _TemplateCard extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color:
-                              Colors.white.withValues(alpha: 0.07),
+                          color: Colors.white.withValues(alpha: 0.07),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           template.category.toUpperCase(),
                           style: const TextStyle(
-                              color: Colors.white30,
-                              fontSize: 7,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4),
+                            color: Colors.white30,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
                         ),
                       ),
                       const Spacer(),
                       Text(
                         '${template.canvasWidth.toInt()}×${template.canvasHeight.toInt()}',
                         style: const TextStyle(
-                            color: Colors.white24, fontSize: 7),
+                          color: Colors.white24,
+                          fontSize: 7,
+                        ),
                       ),
                     ],
                   ),
@@ -904,29 +967,38 @@ class _AIMode extends ConsumerWidget {
   final VoidCallback onRefresh;
 
   static const _styles = [
-    ('sale',    'Flash Deal',    Icons.flash_on_rounded,          Color(0xFFFF4757)),
-    ('new',     'New Arrival',   Icons.fiber_new_rounded,         Color(0xFF3B82F6)),
-    ('promo',   'Special Offer', Icons.local_offer_rounded,       DesignTokens.warning),
-    ('story',   'Brand Story',   Icons.auto_stories_rounded,      Color(0xFF8B5CF6)),
-    ('minimal', 'Premium',       Icons.diamond_outlined,          Color(0xFF64748B)),
-    ('whatsapp','WhatsApp',      Icons.chat_rounded,              Color(0xFF25D366)),
-    ('booking', 'Book Now',      Icons.calendar_today_rounded,    Color(0xFF14B8A6)),
-    ('catalog', 'Collection',    Icons.collections_bookmark_rounded, Color(0xFF6366F1)),
+    ('sale', 'Flash Deal', Icons.flash_on_rounded, Color(0xFFFF4757)),
+    ('new', 'New Arrival', Icons.fiber_new_rounded, Color(0xFF3B82F6)),
+    ('promo', 'Special Offer', Icons.local_offer_rounded, DesignTokens.warning),
+    ('story', 'Brand Story', Icons.auto_stories_rounded, Color(0xFF8B5CF6)),
+    ('minimal', 'Premium', Icons.diamond_outlined, Color(0xFF64748B)),
+    ('whatsapp', 'WhatsApp', Icons.chat_rounded, Color(0xFF25D366)),
+    ('booking', 'Book Now', Icons.calendar_today_rounded, Color(0xFF14B8A6)),
+    (
+      'catalog',
+      'Collection',
+      Icons.collections_bookmark_rounded,
+      Color(0xFF6366F1),
+    ),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final adsAsync = ref.watch(_aiAdsProvider((
-      productId: selectedIsService ? null : selectedRemoteId,
-      serviceId: selectedIsService ? selectedRemoteId : null,
-    )));
-    final canGenerate = !generating && llmAvailable &&
-        selectedStyles.isNotEmpty && selectedRemoteId != null;
+    final adsAsync = ref.watch(
+      _aiAdsProvider((
+        productId: selectedIsService ? null : selectedRemoteId,
+        serviceId: selectedIsService ? selectedRemoteId : null,
+      )),
+    );
+    final canGenerate =
+        !generating &&
+        llmAvailable &&
+        selectedStyles.isNotEmpty &&
+        selectedRemoteId != null;
 
     return CustomScrollView(
       slivers: [
-        if (!llmAvailable)
-          SliverToBoxAdapter(child: _LlmBanner()),
+        if (!llmAvailable) SliverToBoxAdapter(child: _LlmBanner()),
 
         // ── Style chips ──────────────────────────────────────────────────
         SliverToBoxAdapter(
@@ -935,15 +1007,19 @@ class _AIMode extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Select Ad Styles',
-                    style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8)),
+                const Text(
+                  'Select Ad Styles',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
-                  spacing: 8, runSpacing: 8,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: _styles.map((s) {
                     final key = s.$1;
                     final label = s.$2;
@@ -955,38 +1031,38 @@ class _AIMode extends ConsumerWidget {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 7),
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
                         decoration: BoxDecoration(
                           color: active
                               ? color.withValues(alpha: 0.2)
                               : Colors.white.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: active
-                                ? color
-                                : Colors.white12,
+                            color: active ? color : Colors.white12,
                             width: active ? 1.5 : 1,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(icon,
-                                size: 14,
-                                color: active
-                                    ? color
-                                    : Colors.white38),
+                            Icon(
+                              icon,
+                              size: 14,
+                              color: active ? color : Colors.white38,
+                            ),
                             const SizedBox(width: 6),
-                            Text(label,
-                                style: TextStyle(
-                                  color: active
-                                      ? color
-                                      : Colors.white38,
-                                  fontSize: 12,
-                                  fontWeight: active
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                )),
+                            Text(
+                              label,
+                              style: TextStyle(
+                                color: active ? color : Colors.white38,
+                                fontSize: 12,
+                                fontWeight: active
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1010,7 +1086,11 @@ class _AIMode extends ConsumerWidget {
                 decoration: BoxDecoration(
                   gradient: canGenerate
                       ? const LinearGradient(
-                          colors: [DesignTokens.brandAccent, DesignTokens.success])
+                          colors: [
+                            DesignTokens.brandAccent,
+                            DesignTokens.success,
+                          ],
+                        )
                       : null,
                   color: canGenerate
                       ? null
@@ -1023,18 +1103,23 @@ class _AIMode extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             SizedBox(
-                              width: 16, height: 16,
+                              width: 16,
+                              height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor: AlwaysStoppedAnimation(
-                                    Colors.white),
+                                  Colors.white,
+                                ),
                               ),
                             ),
                             SizedBox(width: 10),
-                            Text('Generating…',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              'Generating…',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       )
@@ -1042,20 +1127,22 @@ class _AIMode extends ConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.auto_awesome_rounded,
-                                color: canGenerate
-                                    ? Colors.white
-                                    : Colors.white24,
-                                size: 18),
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              color: canGenerate
+                                  ? Colors.white
+                                  : Colors.white24,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               selectedId == null
                                   ? 'Select a product above'
                                   : selectedRemoteId == null
-                                      ? 'Sync product to server first'
-                                      : selectedStyles.isEmpty
-                                          ? 'Pick at least one style'
-                                          : 'Generate ${selectedStyles.length} AI Ad${selectedStyles.length > 1 ? 's' : ''}',
+                                  ? 'Sync product to server first'
+                                  : selectedStyles.isEmpty
+                                  ? 'Pick at least one style'
+                                  : 'Generate ${selectedStyles.length} AI Ad${selectedStyles.length > 1 ? 's' : ''}',
                               style: TextStyle(
                                 color: canGenerate
                                     ? Colors.white
@@ -1080,8 +1167,8 @@ class _AIMode extends ConsumerWidget {
               child: Center(
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation(DesignTokens.brandAccent)),
+                  valueColor: AlwaysStoppedAnimation(DesignTokens.brandAccent),
+                ),
               ),
             ),
           ),
@@ -1090,14 +1177,16 @@ class _AIMode extends ConsumerWidget {
             if (selectedRemoteId == null) {
               return SliverToBoxAdapter(
                 child: _EmptyAdsCard(
-                  message: 'Select a product or service above to see your AI-generated ads here.',
+                  message:
+                      'Select a product or service above to see your AI-generated ads here.',
                 ),
               );
             }
             if (ads.isEmpty) {
               return SliverToBoxAdapter(
                 child: _EmptyAdsCard(
-                  message: 'No AI ads yet for this item.\nTap Generate above to create some.',
+                  message:
+                      'No AI ads yet for this item.\nTap Generate above to create some.',
                 ),
               );
             }
@@ -1113,10 +1202,13 @@ class _AIMode extends ConsumerWidget {
                   final adServiceId = ad['service_id'] as int?;
                   final adRemoteId = adProductId ?? adServiceId;
                   final byAd = entries.cast<AdCatalogEntry?>().firstWhere(
-                    (e) => e?.remoteId == adRemoteId && e?.isService == (adServiceId != null),
+                    (e) =>
+                        e?.remoteId == adRemoteId &&
+                        e?.isService == (adServiceId != null),
                     orElse: () => null,
                   );
-                  final entry = byAd ??
+                  final entry =
+                      byAd ??
                       entries.cast<AdCatalogEntry?>().firstWhere(
                         (e) => e?.id == selectedId,
                         orElse: () => entries.isNotEmpty ? entries.first : null,
@@ -1153,19 +1245,20 @@ class _LlmBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: DesignTokens.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: DesignTokens.warning.withValues(alpha: 0.3)),
+        border: Border.all(color: DesignTokens.warning.withValues(alpha: 0.3)),
       ),
       child: const Row(
         children: [
-          Icon(Icons.warning_amber_rounded,
-              color: DesignTokens.warning, size: 18),
+          Icon(
+            Icons.warning_amber_rounded,
+            color: DesignTokens.warning,
+            size: 18,
+          ),
           SizedBox(width: 8),
           Expanded(
             child: Text(
               'AI generation is offline — use Template Ads instead.',
-              style: TextStyle(
-                  color: DesignTokens.warning, fontSize: 11),
+              style: TextStyle(color: DesignTokens.warning, fontSize: 11),
             ),
           ),
         ],
@@ -1194,13 +1287,19 @@ class _EmptyAdsCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.auto_awesome_outlined,
-              color: Colors.white24, size: 40),
+          const Icon(
+            Icons.auto_awesome_outlined,
+            color: Colors.white24,
+            size: 40,
+          ),
           const SizedBox(height: 12),
           Text(
             message ?? 'No AI ads yet',
             style: const TextStyle(
-                color: Colors.white38, fontSize: 13, height: 1.5),
+              color: Colors.white38,
+              fontSize: 13,
+              height: 1.5,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1245,11 +1344,15 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
       // Try to render canvas to PNG
       RenderRepaintBoundary? boundary;
       if (_canvasKey.currentContext != null) {
-        boundary = _canvasKey.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+        boundary =
+            _canvasKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary?;
       }
       if (boundary != null) {
         final image = await boundary.toImage(pixelRatio: 2.5);
-        final data = await image.toByteData(format: dart_ui.ImageByteFormat.png);
+        final data = await image.toByteData(
+          format: dart_ui.ImageByteFormat.png,
+        );
         if (data != null && mounted) {
           final bytes = data.buffer.asUint8List();
           final dir = await getTemporaryDirectory();
@@ -1264,22 +1367,28 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                   category: styleKey,
                 )
               : AdTemplate(
-                  id: 'ai_${ad['id']}', name: item.name,
-                  category: styleKey, canvasWidth: 1080, canvasHeight: 1080,
-                  background: '#0F1D40', elements: [],
+                  id: 'ai_${ad['id']}',
+                  name: item.name,
+                  category: styleKey,
+                  canvasWidth: 1080,
+                  canvasHeight: 1080,
+                  background: '#0F1D40',
+                  elements: [],
                 );
           if (!mounted) return;
-          await Navigator.of(context).push(MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (_) => StudioShareSheet(
-              adFile: file,
-              template: tpl,
-              kit: kit,
-              initialProduct: item,
-              isService: widget.isService,
-              exportTitle: item.name,
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => StudioShareSheet(
+                adFile: file,
+                template: tpl,
+                kit: kit,
+                initialProduct: item,
+                isService: widget.isService,
+                exportTitle: item.name,
+              ),
             ),
-          ));
+          );
           return;
         }
       }
@@ -1337,38 +1446,45 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                        color: accent.withValues(alpha: 0.4)),
+                    border: Border.all(color: accent.withValues(alpha: 0.4)),
                   ),
                   child: Text(
-                    ad['style_label'] as String? ??
-                        styleKey.toUpperCase(),
+                    ad['style_label'] as String? ?? styleKey.toUpperCase(),
                     style: TextStyle(
-                        color: accent,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700),
+                      color: accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const Spacer(),
                 if (isPending)
                   const SizedBox(
-                    width: 14, height: 14,
+                    width: 14,
+                    height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
-                      valueColor: AlwaysStoppedAnimation(
-                          DesignTokens.warning),
+                      valueColor: AlwaysStoppedAnimation(DesignTokens.warning),
                     ),
                   )
                 else if (isFailed)
-                  const Icon(Icons.error_outline_rounded,
-                      color: Colors.redAccent, size: 16)
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 16,
+                  )
                 else
-                  const Icon(Icons.check_circle_outline_rounded,
-                      color: DesignTokens.brandAccent, size: 16),
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: DesignTokens.brandAccent,
+                    size: 16,
+                  ),
               ],
             ),
           ),
@@ -1382,12 +1498,16 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome_rounded,
-                        color: Colors.white24, size: 32),
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Colors.white24,
+                      size: 32,
+                    ),
                     SizedBox(height: 8),
-                    Text('AI is creating your ad…',
-                        style: TextStyle(
-                            color: Colors.white38, fontSize: 12)),
+                    Text(
+                      'AI is creating your ad…',
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -1427,9 +1547,10 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                     Text(
                       (ad['ad_copy'] as Map)['headline'].toString(),
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700),
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1439,9 +1560,10 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                       child: Text(
                         (ad['ad_copy'] as Map)['body'].toString(),
                         style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 12,
-                            height: 1.4),
+                          color: Colors.white60,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1465,11 +1587,15 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                       final canvasJson = ad['canvas_json'] as String?;
                       if (canvasJson == null || canvasJson.length < 5) return;
                       try {
-                        final decoded = jsonDecode(canvasJson) as Map<String, dynamic>;
+                        final decoded =
+                            jsonDecode(canvasJson) as Map<String, dynamic>;
                         final tpl = AdTemplate.fromCanvasJson(
                           decoded,
                           id: 'ai_${ad['id']}',
-                          name: ad['name'] as String? ?? ad['style_label'] as String? ?? 'AI Ad',
+                          name:
+                              ad['name'] as String? ??
+                              ad['style_label'] as String? ??
+                              'AI Ad',
                           category: styleKey,
                         );
                         launchStudioEditor(
@@ -1490,11 +1616,15 @@ class _AIAdCardState extends ConsumerState<_AIAdCard> {
                       final cJson = ad['canvas_json'] as String?;
                       if (cJson == null || cJson.length < 5) return;
                       try {
-                        final decoded = jsonDecode(cJson) as Map<String, dynamic>;
+                        final decoded =
+                            jsonDecode(cJson) as Map<String, dynamic>;
                         final tpl = AdTemplate.fromCanvasJson(
                           decoded,
                           id: 'ai_saved_${ad['id']}_${DateTime.now().millisecondsSinceEpoch}',
-                          name: ad['name'] as String? ?? ad['style_label'] as String? ?? 'AI Ad',
+                          name:
+                              ad['name'] as String? ??
+                              ad['style_label'] as String? ??
+                              'AI Ad',
                           category: styleKey,
                         );
                         ref.read(savedTemplatesProvider.notifier).save(tpl);
@@ -1562,11 +1692,14 @@ class _ActionBtn extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 14),
             const SizedBox(width: 5),
-            Text(label,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

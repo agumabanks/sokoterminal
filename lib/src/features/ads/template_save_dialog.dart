@@ -36,8 +36,18 @@ class _TemplateSaveDialogState extends State<TemplateSaveDialog>
   String _category = 'sale';
 
   static const _categories = [
-    'sale', 'promo', 'new', 'event', 'grand', 'booking',
-    'health', 'agri', 'delivery', 'story', 'catalog', 'other',
+    'sale',
+    'promo',
+    'new',
+    'event',
+    'grand',
+    'booking',
+    'health',
+    'agri',
+    'delivery',
+    'story',
+    'catalog',
+    'other',
   ];
 
   @override
@@ -66,98 +76,99 @@ class _TemplateSaveDialogState extends State<TemplateSaveDialog>
         color: DesignTokens.brandPrimary,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            _handle(),
-            _header(),
-            _tabBar(),
-            _tabViews(),
-          ],
+          children: [_handle(), _header(), _tabBar(), _tabViews()],
         ),
       ),
     );
   }
 
   Widget _handle() => Center(
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          width: 36, height: 4,
-          decoration: BoxDecoration(
-            color: Colors.white24,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      );
+    child: Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      width: 36,
+      height: 4,
+      decoration: BoxDecoration(
+        color: Colors.white24,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    ),
+  );
 
   Widget _header() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-        child: Row(
-          children: [
-            const Icon(Icons.bookmark_add_rounded, color: DesignTokens.brandAccent, size: 22),
-            const SizedBox(width: 10),
-            const Text('Save Template',
-                style: TextStyle(color: Colors.white, fontSize: 17,
-                    fontWeight: FontWeight.w700)),
-            const Spacer(),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel',
-                  style: TextStyle(color: Colors.white38)),
-            ),
-          ],
+    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.bookmark_add_rounded,
+          color: DesignTokens.brandAccent,
+          size: 22,
         ),
-      );
+        const SizedBox(width: 10),
+        const Text(
+          'Save Template',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+        ),
+      ],
+    ),
+  );
 
   Widget _tabBar() => TabBar(
-        controller: _tabs,
-        labelColor: DesignTokens.brandAccent,
-        unselectedLabelColor: Colors.white54,
-        indicatorColor: DesignTokens.brandAccent,
-        indicatorSize: TabBarIndicatorSize.label,
-        tabs: const [
-          Tab(text: 'My Templates'),
-          Tab(text: 'Community'),
-          Tab(text: 'Marketplace'),
-        ],
-      );
+    controller: _tabs,
+    labelColor: DesignTokens.brandAccent,
+    unselectedLabelColor: Colors.white54,
+    indicatorColor: DesignTokens.brandAccent,
+    indicatorSize: TabBarIndicatorSize.label,
+    tabs: const [
+      Tab(text: 'My Templates'),
+      Tab(text: 'Community'),
+      Tab(text: 'Marketplace'),
+    ],
+  );
 
   Widget _tabViews() => SizedBox(
-        height: 340,
-        child: TabBarView(
-          controller: _tabs,
-          children: [
-            _LocalSaveTab(
-              nameCtrl: _nameCtrl,
-              category: _category,
-              onCategoryChanged: (c) => setState(() => _category = c),
-              onSave: () => widget.onSaveLocal(_nameCtrl.text.trim()),
-              categories: _categories,
-            ),
-            _CommunityTab(
-              nameCtrl: _nameCtrl,
-              onShare: () =>
-                  widget.onShareCommunity(_nameCtrl.text.trim()),
-            ),
-            _MarketplaceTab(
-              nameCtrl: _nameCtrl,
-              priceCtrl: _priceCtrl,
-              category: _category,
-              onCategoryChanged: (c) => setState(() => _category = c),
-              onPublish: () {
-                final price = int.tryParse(_priceCtrl.text) ?? 0;
-                widget.onPublishMarketplace(_nameCtrl.text.trim(), price);
-              },
-              categories: _categories,
-            ),
-          ],
+    height: 340,
+    child: TabBarView(
+      controller: _tabs,
+      children: [
+        _LocalSaveTab(
+          nameCtrl: _nameCtrl,
+          category: _category,
+          onCategoryChanged: (c) => setState(() => _category = c),
+          onSave: () => widget.onSaveLocal(_nameCtrl.text.trim()),
+          categories: _categories,
         ),
-      );
+        _CommunityTab(
+          nameCtrl: _nameCtrl,
+          onShare: () => widget.onShareCommunity(_nameCtrl.text.trim()),
+        ),
+        _MarketplaceTab(
+          nameCtrl: _nameCtrl,
+          priceCtrl: _priceCtrl,
+          category: _category,
+          onCategoryChanged: (c) => setState(() => _category = c),
+          onPublish: () {
+            final price = int.tryParse(_priceCtrl.text) ?? 0;
+            widget.onPublishMarketplace(_nameCtrl.text.trim(), price);
+          },
+          categories: _categories,
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -193,9 +204,10 @@ class _LocalSaveTab extends StatelessWidget {
           _FieldLabel('Category'),
           const SizedBox(height: 8),
           _CategoryChips(
-              selected: category,
-              categories: categories,
-              onSelect: onCategoryChanged),
+            selected: category,
+            categories: categories,
+            onSelect: onCategoryChanged,
+          ),
           const Spacer(),
           FilledButton(
             onPressed: onSave,
@@ -204,8 +216,10 @@ class _LocalSaveTab extends StatelessWidget {
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
-            child: const Text('Save to My Templates',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            child: const Text(
+              'Save to My Templates',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
           ),
         ],
       ),
@@ -218,10 +232,7 @@ class _LocalSaveTab extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _CommunityTab extends StatelessWidget {
-  const _CommunityTab({
-    required this.nameCtrl,
-    required this.onShare,
-  });
+  const _CommunityTab({required this.nameCtrl, required this.onShare});
 
   final TextEditingController nameCtrl;
   final VoidCallback onShare;
@@ -238,17 +249,27 @@ class _CommunityTab extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.blueAccent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: Colors.blueAccent.withValues(alpha: 0.2),
+              ),
             ),
             child: const Row(
               children: [
-                Icon(Icons.people_alt_rounded, color: DesignTokens.info, size: 20),
+                Icon(
+                  Icons.people_alt_rounded,
+                  color: DesignTokens.info,
+                  size: 20,
+                ),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Save to your cloud account and share with other Soko sellers. '
                     'Your design syncs across devices and can be remixed by the community.',
-                    style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -266,8 +287,10 @@ class _CommunityTab extends StatelessWidget {
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
-            child: const Text('Share to Community',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            child: const Text(
+              'Share to Community',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -319,7 +342,7 @@ class _MarketplaceTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel('Price (UGX)'),
+                    _FieldLabel('Price (/=)'),
                     const SizedBox(height: 6),
                     _TextField(
                       ctrl: priceCtrl,
@@ -348,12 +371,22 @@ class _MarketplaceTab extends StatelessWidget {
                         child: DropdownButton<String>(
                           value: category,
                           dropdownColor: const Color(0xFF1A2340),
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          items: categories.map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c[0].toUpperCase() + c.substring(1)),
-                          )).toList(),
-                          onChanged: (v) => v != null ? onCategoryChanged(v) : null,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                          items: categories
+                              .map(
+                                (c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(
+                                    c[0].toUpperCase() + c.substring(1),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              v != null ? onCategoryChanged(v) : null,
                         ),
                       ),
                     ),
@@ -371,13 +404,20 @@ class _MarketplaceTab extends StatelessWidget {
             ),
             child: const Row(
               children: [
-                Icon(Icons.monetization_on_outlined,
-                    color: DesignTokens.brandAccent, size: 16),
+                Icon(
+                  Icons.monetization_on_outlined,
+                  color: DesignTokens.brandAccent,
+                  size: 16,
+                ),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'You earn 80% of each sale. Soko keeps 20% as a platform fee.',
-                    style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -391,9 +431,14 @@ class _MarketplaceTab extends StatelessWidget {
               minimumSize: const Size.fromHeight(50),
               shape: const StadiumBorder(),
             ),
-            child: const Text('List on Marketplace',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15,
-                    color: Colors.white)),
+            child: const Text(
+              'List on Marketplace',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -410,9 +455,15 @@ class _FieldLabel extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Text(text,
-      style: const TextStyle(color: Colors.white54, fontSize: 11,
-          fontWeight: FontWeight.w600, letterSpacing: 0.5));
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(
+      color: Colors.white54,
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+    ),
+  );
 }
 
 class _TextField extends StatelessWidget {
@@ -429,22 +480,22 @@ class _TextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-        controller: ctrl,
-        keyboardType: inputType,
-        inputFormatters: inputFormatters,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white24),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.07),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        ),
-      );
+    controller: ctrl,
+    keyboardType: inputType,
+    inputFormatters: inputFormatters,
+    style: const TextStyle(color: Colors.white, fontSize: 14),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white24),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.07),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    ),
+  );
 }
 
 class _CategoryChips extends StatelessWidget {
@@ -459,38 +510,35 @@ class _CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: categories.map((c) {
-          final isSel = c == selected;
-          return GestureDetector(
-            onTap: () => onSelect(c),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSel
-                    ? DesignTokens.brandAccent.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSel
-                      ? DesignTokens.brandAccent
-                      : Colors.transparent,
-                  width: 1.2,
-                ),
-              ),
-              child: Text(
-                c[0].toUpperCase() + c.substring(1),
-                style: TextStyle(
-                  color: isSel ? DesignTokens.brandAccent : Colors.white60,
-                  fontSize: 12,
-                  fontWeight: isSel ? FontWeight.w700 : FontWeight.normal,
-                ),
-              ),
+    spacing: 6,
+    runSpacing: 6,
+    children: categories.map((c) {
+      final isSel = c == selected;
+      return GestureDetector(
+        onTap: () => onSelect(c),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSel
+                ? DesignTokens.brandAccent.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSel ? DesignTokens.brandAccent : Colors.transparent,
+              width: 1.2,
             ),
-          );
-        }).toList(),
+          ),
+          child: Text(
+            c[0].toUpperCase() + c.substring(1),
+            style: TextStyle(
+              color: isSel ? DesignTokens.brandAccent : Colors.white60,
+              fontSize: 12,
+              fontWeight: isSel ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
+        ),
       );
+    }).toList(),
+  );
 }

@@ -124,10 +124,7 @@ class _ActionTileState extends State<ActionTile> {
                       end: _pressed ? const Offset(4, 0) : Offset.zero,
                     ),
                     builder: (context, offset, child) {
-                      return Transform.translate(
-                        offset: offset,
-                        child: child,
-                      );
+                      return Transform.translate(offset: offset, child: child);
                     },
                     child: Icon(
                       Icons.chevron_right,

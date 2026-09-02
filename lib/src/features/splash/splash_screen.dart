@@ -130,7 +130,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _checkAuthAndSync() async {
     debugPrint('[Splash] _checkAuthAndSync START');
-    if (!mounted) { debugPrint('[Splash] not mounted at start'); return; }
+    if (!mounted) {
+      debugPrint('[Splash] not mounted at start');
+      return;
+    }
     final secureStorage = ref.read(secureStorageProvider);
     final token = await secureStorage.readAccessToken();
     final expiresAt = await secureStorage.readAccessTokenExpiresAt();
@@ -146,7 +149,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // offline for up to 90 days and only forces re-auth after the deadline.
     if (expiresAt != null && DateTime.now().toUtc().isAfter(expiresAt)) {
       debugPrint('[Splash] Token expired locally, redirecting to login');
-      DioAuthUtils.notifyAuthExpired(detail: 'Session expired — please sign in again');
+      DioAuthUtils.notifyAuthExpired(
+        detail: 'Session expired — please sign in again',
+      );
       await secureStorage.deleteAccessToken();
       await secureStorage.deleteAccessTokenExpiresAt();
       if (mounted) context.go('/login');
@@ -177,7 +182,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
     }
 
-    if (!mounted) { debugPrint('[Splash] not mounted after token check'); return; }
+    if (!mounted) {
+      debugPrint('[Splash] not mounted after token check');
+      return;
+    }
 
     // Seed expense categories on first launch (no-op if already seeded)
     final db = ref.read(appDatabaseProvider);
@@ -205,7 +213,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         } on DioException catch (e) {
           final status = e.response?.statusCode;
           if (DioAuthUtils.isAuthStatus(status)) {
-            debugPrint('[Splash] Staff token invalid, redirecting to staff login');
+            debugPrint(
+              '[Splash] Staff token invalid, redirecting to staff login',
+            );
             DioAuthUtils.notifyAuthExpired();
             await secureStorage.deleteAccessToken();
             if (mounted) context.go('/staff-login');
@@ -216,13 +226,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         }
       }
     } else {
-      if (!mounted) { debugPrint('[Splash] not mounted before staff check'); return; }
+      if (!mounted) {
+        debugPrint('[Splash] not mounted before staff check');
+        return;
+      }
       setState(() => _status = 'Checking staff session…');
       debugPrint('[Splash] POS session already loading via provider...');
       // PosSessionController already auto-loads in its provider constructor;
       // we just wait briefly for it to settle rather than firing a second load().
       await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) { debugPrint('[Splash] not mounted after pos session load'); return; }
+      if (!mounted) {
+        debugPrint('[Splash] not mounted after pos session load');
+        return;
+      }
       final posSession = ref.read(posSessionProvider);
       debugPrint('[Splash] posSession.isActive=${posSession.isActive}');
 
@@ -232,7 +248,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final connectivity = await Connectivity().checkConnectivity();
       final online = connectivity.any((r) => r != ConnectivityResult.none);
       if (online) {
-        if (!mounted) { debugPrint('[Splash] not mounted before fetchStaff'); return; }
+        if (!mounted) {
+          debugPrint('[Splash] not mounted before fetchStaff');
+          return;
+        }
         setState(() => _status = 'Checking staff setup…');
         debugPrint('[Splash] fetching staff...');
         try {
@@ -270,7 +289,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
 
     await sub.cancel();
-    if (!mounted) { debugPrint('[Splash] not mounted after sync'); return; }
+    if (!mounted) {
+      debugPrint('[Splash] not mounted after sync');
+      return;
+    }
 
     debugPrint('[Splash] checking business setup...');
     bool setupCompleted = false;
@@ -285,7 +307,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     } catch (e) {
       debugPrint('[Splash] refreshFromLocalCache ERROR: $e');
     }
-    if (!mounted) { debugPrint('[Splash] not mounted after setup check'); return; }
+    if (!mounted) {
+      debugPrint('[Splash] not mounted after setup check');
+      return;
+    }
 
     final setupRequired =
         ref
@@ -295,9 +320,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final destination = setupRequired && !setupCompleted
         ? '/home/more/business-setup'
         : '/home/checkout';
-    debugPrint('[Splash] setupRequired=$setupRequired destination=$destination');
+    debugPrint(
+      '[Splash] setupRequired=$setupRequired destination=$destination',
+    );
 
-    if (!mounted) { debugPrint('[Splash] not mounted before navigation'); return; }
+    if (!mounted) {
+      debugPrint('[Splash] not mounted before navigation');
+      return;
+    }
     debugPrint('[Splash] NAVIGATING to $destination');
     context.go(destination);
     debugPrint('[Splash] _checkAuthAndSync END');
@@ -334,10 +364,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     stage: _statusStage,
                   ),
                   const SizedBox(height: 56),
-                  _SplashStatus(
-                    status: _status,
-                    stage: _statusStage,
-                  ),
+                  _SplashStatus(status: _status, stage: _statusStage),
                   const Spacer(flex: 4),
                 ],
               ),
@@ -359,10 +386,7 @@ class _Vignette extends StatelessWidget {
         gradient: RadialGradient(
           center: Alignment(0, -0.2),
           radius: 0.85,
-          colors: [
-            DesignTokens.brandPrimary,
-            DesignTokens.brandPrimary,
-          ],
+          colors: [DesignTokens.brandPrimary, DesignTokens.brandPrimary],
           stops: [0, 1],
         ),
       ),

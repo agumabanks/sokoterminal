@@ -137,7 +137,6 @@ class SellerApi {
     return client.get('/v2/seller/products/edit/$productId');
   }
 
-  // Uploads
   Future<Response<dynamic>> fetchSellerFiles({
     String? type,
     String sort = 'newest',
@@ -238,8 +237,14 @@ class SellerApi {
     return client.post('/v2/service-provider/provider/bookings', data: data);
   }
 
-  Future<Response<dynamic>> rescheduleServiceBooking(int id, Map<String, dynamic> data) {
-    return client.post('/v2/service-provider/provider/bookings/$id/reschedule', data: data);
+  Future<Response<dynamic>> rescheduleServiceBooking(
+    int id,
+    Map<String, dynamic> data,
+  ) {
+    return client.post(
+      '/v2/service-provider/provider/bookings/$id/reschedule',
+      data: data,
+    );
   }
 
   // Time Logs
@@ -264,10 +269,15 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> fetchServiceClientHistory(int clientId) {
-    return client.get('/v2/service-provider/provider/clients/$clientId/history');
+    return client.get(
+      '/v2/service-provider/provider/clients/$clientId/history',
+    );
   }
 
-  Future<Response<dynamic>> updateServiceClientNotes(int clientId, String notes) {
+  Future<Response<dynamic>> updateServiceClientNotes(
+    int clientId,
+    String notes,
+  ) {
     return client.post(
       '/v2/service-provider/provider/clients/$clientId/notes',
       data: {'notes': notes},
@@ -279,20 +289,32 @@ class SellerApi {
     return client.get('/v2/service-provider/provider/availability');
   }
 
-  Future<Response<dynamic>> updateAvailability(List<Map<String, dynamic>> schedules) {
-    return client.post('/v2/service-provider/provider/availability', data: {'schedules': schedules});
+  Future<Response<dynamic>> updateAvailability(
+    List<Map<String, dynamic>> schedules,
+  ) {
+    return client.post(
+      '/v2/service-provider/provider/availability',
+      data: {'schedules': schedules},
+    );
   }
 
   Future<Response<dynamic>> fetchAvailabilityExceptions() {
     return client.get('/v2/service-provider/provider/availability/exceptions');
   }
 
-  Future<Response<dynamic>> addAvailabilityException(Map<String, dynamic> data) {
-    return client.post('/v2/service-provider/provider/availability/exceptions', data: data);
+  Future<Response<dynamic>> addAvailabilityException(
+    Map<String, dynamic> data,
+  ) {
+    return client.post(
+      '/v2/service-provider/provider/availability/exceptions',
+      data: data,
+    );
   }
 
   Future<Response<dynamic>> deleteAvailabilityException(int id) {
-    return client.delete('/v2/service-provider/provider/availability/exceptions/$id');
+    return client.delete(
+      '/v2/service-provider/provider/availability/exceptions/$id',
+    );
   }
 
   Future<Response<dynamic>> fetchAvailableSlots({
@@ -725,6 +747,10 @@ class SellerApi {
     return client.get('/v2/seller/profile');
   }
 
+  Future<Response<dynamic>> updateSellerAvatar(int uploadId) {
+    return client.post('/v2/seller/profile/avatar', data: {'avatar': uploadId});
+  }
+
   Future<Response<dynamic>> updateProfile(Map<String, dynamic> payload) {
     return client.post('/v2/profile/update', data: payload);
   }
@@ -1017,8 +1043,14 @@ class SellerApi {
     return client.delete('/v2/seller/crm/contacts/$contactId/notes/$noteId');
   }
 
-  Future<Response<dynamic>> toggleContactNotePin(String contactId, String noteId) {
-    return client.patch('/v2/seller/crm/contacts/$contactId/notes/$noteId/pin', data: {});
+  Future<Response<dynamic>> toggleContactNotePin(
+    String contactId,
+    String noteId,
+  ) {
+    return client.patch(
+      '/v2/seller/crm/contacts/$contactId/notes/$noteId/pin',
+      data: {},
+    );
   }
 
   // CRM Marketing
@@ -1338,10 +1370,10 @@ class SellerApi {
     required String imageUrl,
     bool edgeSmoothing = true,
   }) {
-    return client.post('/v2/seller/studio/remove-bg', data: {
-      'image_url': imageUrl,
-      'edge_smoothing': edgeSmoothing,
-    });
+    return client.post(
+      '/v2/seller/studio/remove-bg',
+      data: {'image_url': imageUrl, 'edge_smoothing': edgeSmoothing},
+    );
   }
 
   Future<Response<dynamic>> studioWebEntry({
@@ -1387,12 +1419,15 @@ class SellerApi {
     List<String>? styles,
     int count = 3,
   }) {
-    return client.post('/v2/seller/studio/ads/generate', data: {
-      if (productId != null) 'product_id': productId,
-      if (serviceId != null) 'service_id': serviceId,
-      if (styles != null) 'styles': styles,
-      'count': count,
-    });
+    return client.post(
+      '/v2/seller/studio/ads/generate',
+      data: {
+        if (productId != null) 'product_id': productId,
+        if (serviceId != null) 'service_id': serviceId,
+        if (styles != null) 'styles': styles,
+        'count': count,
+      },
+    );
   }
 
   Future<Response<dynamic>> studioAdStatus({int? productId, int? serviceId}) {
@@ -1441,9 +1476,10 @@ class SellerApi {
   }
 
   Future<Response<dynamic>> recordStudioTemplateUse(String templateId) {
-    return client.post('/v2/seller/studio/template-use', data: {
-      'template_id': templateId,
-    });
+    return client.post(
+      '/v2/seller/studio/template-use',
+      data: {'template_id': templateId},
+    );
   }
 
   Future<Response<dynamic>> fetchStudioCloudStorage() {
@@ -1494,6 +1530,73 @@ class SellerApi {
     final payload = _extractData(res.data);
     if (payload.isEmpty) return null;
     return ServiceBnplPayload.fromJson(payload);
+  }
+
+  // ─── Payment Links ───────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> generatePaymentLink({
+    required String type,
+    required int remoteId,
+    double? amount,
+    String? expiresAt,
+  }) async {
+    final path = type == 'service'
+        ? '/v2/seller/payment-links/service/$remoteId'
+        : '/v2/seller/payment-links/product/$remoteId';
+    final res = await client.post(
+      path,
+      data: {
+        if (amount != null) 'amount': amount,
+        if (expiresAt != null) 'expires_at': expiresAt,
+      },
+    );
+    final data = _extractData(res.data);
+    if (data['success'] == true) {
+      return Map<String, dynamic>.from(data['link'] as Map);
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchPaymentLinks() async {
+    final res = await client.get('/v2/seller/payment-links');
+    final data = _extractData(res.data);
+    if (data['links'] is List) {
+      return (data['links'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> getPaymentLinkPayments(int linkId) async {
+    final res = await client.get('/v2/seller/payment-links/$linkId/payments');
+    final data = _extractData(res.data);
+    if (data['success'] == true) {
+      return {
+        'payments': (data['payments'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList(),
+        'summary': Map<String, dynamic>.from(data['summary'] as Map? ?? {}),
+      };
+    }
+    return null;
+  }
+
+  Future<bool> deactivatePaymentLink(int linkId) async {
+    final res = await client.post('/v2/seller/payment-links/$linkId/deactivate');
+    final data = _extractData(res.data);
+    return data['success'] == true;
+  }
+
+  // ─── Marketing ─────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> generateMarketingContent(Map<String, dynamic> itemData) async {
+    final res = await client.post('/v2/seller/ai/marketing-content', data: itemData);
+    final data = _extractData(res.data);
+    if (data['success'] == true) {
+      return data['content'] as Map<String, dynamic>?;
+    }
+    return null;
   }
 
   static Map<String, dynamic> _extractData(dynamic data) {

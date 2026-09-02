@@ -41,15 +41,16 @@ class StudioCloudQuota {
     return '${(bytesUsed / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  String get quotaLabel => '${(quotaBytes / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB';
+  String get quotaLabel =>
+      '${(quotaBytes / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB';
 
   factory StudioCloudQuota.fromJson(Map<String, dynamic> j) => StudioCloudQuota(
-        bytesUsed: (j['bytes_used'] as num?)?.toInt() ?? 0,
-        quotaBytes: (j['quota_bytes'] as num?)?.toInt() ?? sanaaCloudQuotaBytes,
-        designCount: (j['design_count'] as num?)?.toInt() ?? 0,
-        label: j['label']?.toString() ?? 'Sanaa Cloud',
-        tier: j['tier']?.toString() ?? 'basic',
-      );
+    bytesUsed: (j['bytes_used'] as num?)?.toInt() ?? 0,
+    quotaBytes: (j['quota_bytes'] as num?)?.toInt() ?? sanaaCloudQuotaBytes,
+    designCount: (j['design_count'] as num?)?.toInt() ?? 0,
+    label: j['label']?.toString() ?? 'Sanaa Cloud',
+    tier: j['tier']?.toString() ?? 'basic',
+  );
 
   static const fallback = StudioCloudQuota(
     bytesUsed: 0,
@@ -64,8 +65,8 @@ final studioDesignStorageProvider = Provider<StudioDesignStorage>((ref) {
 
 final yourDesignsProvider =
     StateNotifierProvider<YourDesignsNotifier, YourDesignsState>((ref) {
-  return YourDesignsNotifier(ref);
-});
+      return YourDesignsNotifier(ref);
+    });
 
 class YourDesignsState {
   const YourDesignsState({
@@ -85,13 +86,12 @@ class YourDesignsState {
     StudioCloudQuota? quota,
     bool? syncing,
     DateTime? lastSyncedAt,
-  }) =>
-      YourDesignsState(
-        designs: designs ?? this.designs,
-        quota: quota ?? this.quota,
-        syncing: syncing ?? this.syncing,
-        lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
-      );
+  }) => YourDesignsState(
+    designs: designs ?? this.designs,
+    quota: quota ?? this.quota,
+    syncing: syncing ?? this.syncing,
+    lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+  );
 }
 
 class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
@@ -132,10 +132,7 @@ class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
   Future<bool> saveDesign(AdTemplate template) async {
     await _storage.saveLocal(template);
     state = state.copyWith(
-      designs: [
-        template,
-        ...state.designs.where((d) => d.id != template.id),
-      ],
+      designs: [template, ...state.designs.where((d) => d.id != template.id)],
     );
     try {
       await _storage.pushToCloud(template);
@@ -144,7 +141,9 @@ class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
-        unawaited(telemetry.recordError(e, st, hint: 'studio_save_design_cloud'));
+        unawaited(
+          telemetry.recordError(e, st, hint: 'studio_save_design_cloud'),
+        );
       }
       return false;
     }
@@ -159,7 +158,9 @@ class YourDesignsNotifier extends StateNotifier<YourDesignsState> {
       cloudOk = false;
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
-        unawaited(telemetry.recordError(e, st, hint: 'studio_delete_design_cloud'));
+        unawaited(
+          telemetry.recordError(e, st, hint: 'studio_delete_design_cloud'),
+        );
       }
     }
     state = state.copyWith(
@@ -194,24 +195,29 @@ class StudioDesignStorage {
     final dir = await designsDirectory();
     if (!await dir.exists()) return [];
 
-    final files = dir
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.json'))
-        .toList()
-      ..sort(
-        (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
-      );
+    final files =
+        dir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.json'))
+            .toList()
+          ..sort(
+            (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+          );
 
     final designs = <AdTemplate>[];
     for (final file in files) {
       try {
         final raw = await file.readAsString();
-        designs.add(AdTemplate.fromJson(jsonDecode(raw) as Map<String, dynamic>));
+        designs.add(
+          AdTemplate.fromJson(jsonDecode(raw) as Map<String, dynamic>),
+        );
       } catch (e, st) {
         final telemetry = Telemetry.instance;
         if (telemetry != null) {
-          unawaited(telemetry.recordError(e, st, hint: 'studio_load_local_design'));
+          unawaited(
+            telemetry.recordError(e, st, hint: 'studio_load_local_design'),
+          );
         }
       }
     }
@@ -253,7 +259,9 @@ class StudioDesignStorage {
       } catch (e, st) {
         final telemetry = Telemetry.instance;
         if (telemetry != null) {
-          unawaited(telemetry.recordError(e, st, hint: 'studio_pull_cloud_design'));
+          unawaited(
+            telemetry.recordError(e, st, hint: 'studio_pull_cloud_design'),
+          );
         }
       }
     }
@@ -265,8 +273,7 @@ class StudioDesignStorage {
     for (final c in cloud) {
       byId[c.id] = c;
     }
-    return byId.values.toList()
-      ..sort((a, b) => b.id.compareTo(a.id));
+    return byId.values.toList()..sort((a, b) => b.id.compareTo(a.id));
   }
 
   Future<void> deleteFromCloud(String id) async {
@@ -285,7 +292,9 @@ class StudioDesignStorage {
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
-        unawaited(telemetry.recordError(e, st, hint: 'studio_fetch_cloud_quota'));
+        unawaited(
+          telemetry.recordError(e, st, hint: 'studio_fetch_cloud_quota'),
+        );
       }
     }
     return StudioCloudQuota.fallback;

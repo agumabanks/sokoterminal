@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker_android/image_picker_android.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -33,7 +35,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // Background isolate cannot easily access Riverpod providers / database.
     // The 15-second foreground polling will catch up when the app opens.
     if (kDebugMode) {
-      debugPrint('[FCM] Sync hint in background — will sync on next foreground');
+      debugPrint(
+        '[FCM] Sync hint in background — will sync on next foreground',
+      );
     }
   }
 }
@@ -41,13 +45,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: DesignTokens.tabBarBackground,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  ));
+  // Use Android's permissionless Photo Picker for every gallery flow. On
+  // devices without the native/backported picker, AndroidX falls back to a
+  // system document picker that grants access only to the selected media.
+  final imagePicker = ImagePickerPlatform.instance;
+  if (imagePicker is ImagePickerAndroid) {
+    imagePicker.useAndroidPhotoPicker = true;
+  }
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: DesignTokens.canvas,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: DesignTokens.tabBarBackground,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   // Initialize Firebase Core first
   final firebaseEnabled = await FirebaseRuntime.instance.prepare();
@@ -59,7 +73,9 @@ Future<void> main() async {
       debugPrint('[Main] Firebase Core initialized');
 
       // Register background message handler before any other FCM setup
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
       debugPrint('[Main] FCM background handler registered');
 
       await FirebaseAnalyticsService.instance.init();

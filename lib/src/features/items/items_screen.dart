@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../core/app_providers.dart';
@@ -20,6 +21,7 @@ import '../../widgets/sync_status_chip.dart';
 import '../ads/studio_editor_launcher.dart';
 import '../ads/studio_providers.dart';
 import '../ads/studio_screen.dart';
+import '../payment_links/payment_links_screen.dart';
 import 'add_product_screen.dart';
 import 'stock_history_sheet.dart';
 import 'product_preview_screen.dart';
@@ -49,9 +51,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
       backgroundColor: DesignTokens.surfaceGrouped,
       appBar: AppBar(
         title: Text('Products', style: DesignTokens.textTitle),
-        actions: [
-          const SyncStatusBadge(),
-        ],
+        actions: [const SyncStatusBadge()],
       ),
       floatingActionButton: _RotatingFab(
         onPressed: () => unawaited(_showItemEditor(context, null)),
@@ -103,7 +103,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                               const SizedBox(height: 6),
                               GestureDetector(
                                 onTap: () async {
-                                  await ref.read(syncServiceProvider).pullPosDelta();
+                                  await ref
+                                      .read(syncServiceProvider)
+                                      .pullPosDelta();
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
@@ -145,7 +147,11 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search, size: 20, color: DesignTokens.textTertiary),
+                  const Icon(
+                    Icons.search,
+                    size: 20,
+                    color: DesignTokens.textTertiary,
+                  ),
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: TextField(
@@ -158,7 +164,8 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
-                          vertical: DesignTokens.spaceMd - DesignTokens.spaceXxs,
+                          vertical:
+                              DesignTokens.spaceMd - DesignTokens.spaceXxs,
                         ),
                       ),
                     ),
@@ -210,12 +217,16 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                       onToggleOnline: (v) => _toggleOnline(item, v),
                       onCreateAd: () => _createAdForItem(item),
                       onDesignInStudio: () => unawaited(_designInStudio(item)),
+                      onPaymentLink: () => _generatePaymentLink(item),
+                      onVideoAd: () => _createVideoAd(item),
                       onLongPress: () {
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
                           shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
                           ),
                           builder: (_) => StockHistorySheet(itemId: item.id),
                         );
@@ -229,6 +240,32 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _generatePaymentLink(Item item) async {
+    final remoteId = item.remoteId;
+    if (remoteId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Product must be synced first.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    await showGeneratePaymentLinkSheet(
+      context,
+      ref,
+      type: 'product',
+      remoteId: remoteId,
+      title: item.name,
+      defaultAmount: item.price,
+    );
+  }
+
+  Future<void> _createVideoAd(Item item) async {
+    if (!mounted) return;
+    context.go('/home/more/video-ad');
   }
 
   Future<void> _showItemEditor(
@@ -511,7 +548,11 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                         remoteId: remoteId,
                       );
                       if (remoteId != null) {
-                        unawaited(ref.read(syncServiceProvider).syncCatalogImmediately());
+                        unawaited(
+                          ref
+                              .read(syncServiceProvider)
+                              .syncCatalogImmediately(),
+                        );
                       }
 
                       if (!context.mounted) return;
@@ -609,9 +650,9 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
   void _createAdForItem(Item item) {
     Haptics.selection();
     ref.read(studioProductProvider.notifier).state = item;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const StudioScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const StudioScreen()));
   }
 
   Future<void> _designInStudio(Item item) async {
@@ -636,7 +677,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
     if (item.shippingFee == null) missing.add('shipping fee');
     return missing;
   }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -654,6 +694,8 @@ class _ItemCard extends StatelessWidget {
     this.onLongPress,
     this.onCreateAd,
     this.onDesignInStudio,
+    this.onPaymentLink,
+    this.onVideoAd,
   });
 
   final Item item;
@@ -665,12 +707,15 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onCreateAd;
   final VoidCallback? onDesignInStudio;
+  final VoidCallback? onPaymentLink;
+  final VoidCallback? onVideoAd;
 
   @override
   Widget build(BuildContext context) {
     final threshold = item.lowStockWarning ?? 5;
     final outOfStock = item.stockEnabled && item.stockQty <= 0;
-    final lowStock = item.stockEnabled && item.stockQty > 0 && item.stockQty <= threshold;
+    final lowStock =
+        item.stockEnabled && item.stockQty > 0 && item.stockQty <= threshold;
     final imageUrl = (item.thumbnailUrl ?? item.imageUrl)?.trim();
 
     final Color stockColor;
@@ -705,7 +750,12 @@ class _ItemCard extends StatelessWidget {
               children: [
                 const Icon(Icons.edit_outlined, size: 22),
                 const SizedBox(height: DesignTokens.spaceXs),
-                Text('Edit', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  'Edit',
+                  style: DesignTokens.textCaption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -719,7 +769,12 @@ class _ItemCard extends StatelessWidget {
               children: [
                 const Icon(Icons.preview_outlined, size: 22),
                 const SizedBox(height: DesignTokens.spaceXs),
-                Text('Preview', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  'Preview',
+                  style: DesignTokens.textCaption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -740,7 +795,12 @@ class _ItemCard extends StatelessWidget {
               children: [
                 const Icon(Icons.inventory_2_outlined, size: 22),
                 const SizedBox(height: DesignTokens.spaceXs),
-                Text('Stock', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  'Stock',
+                  style: DesignTokens.textCaption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -756,7 +816,12 @@ class _ItemCard extends StatelessWidget {
               children: [
                 const Icon(Icons.delete_outline, size: 22),
                 const SizedBox(height: DesignTokens.spaceXs),
-                Text('Delete', style: DesignTokens.textCaption.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  'Delete',
+                  style: DesignTokens.textCaption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -819,6 +884,8 @@ class _ItemCard extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     item.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                     style: DesignTokens.textBody.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: DesignTokens.textPrimary,
@@ -836,7 +903,9 @@ class _ItemCard extends StatelessWidget {
                               children: [
                                 Text(
                                   item.price.toUgx(),
-                                  style: DesignTokens.textMono.copyWith(fontSize: 14),
+                                  style: DesignTokens.textMono.copyWith(
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 const SizedBox(width: DesignTokens.spaceMd),
                                 GestureDetector(
@@ -870,40 +939,72 @@ class _ItemCard extends StatelessWidget {
               ),
             ),
 
-            if (onCreateAd != null)
-              GestureDetector(
-                onTap: onCreateAd,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.campaign_outlined,
-                    color: DesignTokens.brandPrimary,
-                    size: 22,
+            SizedBox(
+              width: 86,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _LiveToggle(
+                    value: item.publishedOnline,
+                    onChanged: onToggleOnline,
                   ),
-                ),
-              ),
-            if (onDesignInStudio != null)
-              Tooltip(
-                message: 'Design in Studio',
-                child: GestureDetector(
-                  onTap: onDesignInStudio,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.design_services_rounded,
-                      color: DesignTokens.brandPrimary,
-                      size: 22,
-                    ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Product actions',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (value) {
+                      if (value == 'ad') onCreateAd?.call();
+                      if (value == 'studio') onDesignInStudio?.call();
+                      if (value == 'preview') onPreview();
+                      if (value == 'stock') onStockTap();
+                      if (value == 'payment-link') onPaymentLink?.call();
+                      if (value == 'video-ad') onVideoAd?.call();
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'preview',
+                        child: _ProductMenuItem(
+                          icon: Icons.visibility_outlined,
+                          label: 'Preview',
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'stock',
+                        child: _ProductMenuItem(
+                          icon: Icons.inventory_2_outlined,
+                          label: 'Adjust stock',
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'video-ad',
+                        child: const _ProductMenuItem(
+                          icon: Icons.videocam_outlined,
+                          label: 'Video ad',
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'payment-link',
+                        child: const _ProductMenuItem(
+                          icon: Icons.link,
+                          label: 'Payment link',
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'ad',
+                        child: _ProductMenuItem(
+                          icon: Icons.campaign_outlined,
+                          label: 'Create ad',
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'studio',
+                        child: _ProductMenuItem(
+                          icon: Icons.design_services_rounded,
+                          label: 'Open Studio',
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(right: DesignTokens.spaceMd),
-              child: _LiveToggle(
-                value: item.publishedOnline,
-                onChanged: onToggleOnline,
+                ],
               ),
             ),
           ],
@@ -917,6 +1018,20 @@ class _ItemCard extends StatelessWidget {
       Icons.inventory_2_outlined,
       color: DesignTokens.textTertiary,
       size: 20,
+    );
+  }
+}
+
+class _ProductMenuItem extends StatelessWidget {
+  const _ProductMenuItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [Icon(icon, size: 20), const SizedBox(width: 12), Text(label)],
     );
   }
 }
@@ -1060,7 +1175,9 @@ class _LiveToggle extends StatelessWidget {
                   Text(
                     'Draft',
                     style: DesignTokens.textCaption.copyWith(
-                      color: !value ? DesignTokens.grayDark : Colors.transparent,
+                      color: !value
+                          ? DesignTokens.grayDark
+                          : Colors.transparent,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1103,4 +1220,3 @@ class _RotatingFabState extends State<_RotatingFab> {
     );
   }
 }
-

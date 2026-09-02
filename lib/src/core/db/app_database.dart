@@ -116,7 +116,8 @@ class ServiceJobSessions extends Table {
   RealColumn get laborCharge => real().withDefault(const Constant(0))();
   RealColumn get finalCharge => real().withDefault(const Constant(0))();
   TextColumn get photosJson => text().nullable()();
-  TextColumn get pipelineStage => text().withDefault(const Constant('booked'))();
+  TextColumn get pipelineStage =>
+      text().withDefault(const Constant('booked'))();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt =>
       dateTime().clientDefault(() => DateTime.now().toUtc())();
@@ -364,7 +365,8 @@ class BusinessProfiles extends Table {
   TextColumn get paybillNumber => text().nullable()();
   TextColumn get receiptPaymentMethodsJson => text().nullable()();
   TextColumn get deliveryProfileJson => text().nullable()();
-  IntColumn get verificationStatus => integer().withDefault(const Constant(0))();
+  IntColumn get verificationStatus =>
+      integer().withDefault(const Constant(0))();
   // Tax settings
   BoolColumn get taxEnabled => boolean().withDefault(const Constant(false))();
   RealColumn get taxRate => real().withDefault(const Constant(0))();
@@ -743,7 +745,8 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Creates an in-memory database for testing.
-  factory AppDatabase.forTesting(QueryExecutor executor) = AppDatabase._internal;
+  factory AppDatabase.forTesting(QueryExecutor executor) =
+      AppDatabase._internal;
 
   @override
   int get schemaVersion => 38;
@@ -764,183 +767,183 @@ class AppDatabase extends _$AppDatabase {
   );
 
   Future<void> _runSchemaUpgrade(Migrator migrator, int from, int to) async {
-      if (from < 2) {
-        await migrator.createTable(roles);
-        await migrator.createTable(staff);
-        await migrator.createTable(outlets);
-        await migrator.createTable(ledgerEntries);
-        await migrator.createTable(ledgerLines);
-        await migrator.createTable(payments);
-        await migrator.createTable(cashMovements);
-        await migrator.createTable(shifts);
-        await migrator.createTable(auditLogs);
-      }
-      if (from < 3) {
-        await migrator.createTable(syncCursors);
-      }
-      if (from < 4) {
-        await migrator.createTable(cachedOrders);
-      }
-      if (from < 5) {
-        await migrator.addColumn(syncOps, syncOps.lastError);
-        await migrator.addColumn(ledgerEntries, ledgerEntries.customerId);
-        await migrator.createTable(printJobs);
-      }
-      if (from < 6) {
-        await migrator.addColumn(services, services.category);
-      }
-      if (from < 7) {
-        await migrator.createTable(serviceVariants);
-        await migrator.createTable(quotations);
-        await migrator.createTable(quotationLines);
-        await migrator.createTable(receiptTemplates);
-      }
-      if (from < 8) {
-        await migrator.addColumn(items, items.imageUrl);
-      }
-      if (from < 9) {
-        // Add remoteId mapping columns
-        await migrator.addColumn(items, items.remoteId);
-        await migrator.addColumn(services, services.remoteId);
-        await migrator.addColumn(customers, customers.remoteId);
-        await migrator.addColumn(customers, customers.synced);
-        // Add receipt template alignment columns
-        await migrator.addColumn(receiptTemplates, receiptTemplates.name);
-        await migrator.addColumn(receiptTemplates, receiptTemplates.style);
-        await migrator.addColumn(receiptTemplates, receiptTemplates.isActive);
-      }
-      if (from < 10) {
-        await migrator.addColumn(ledgerEntries, ledgerEntries.originalEntryId);
-      }
-      if (from < 11) {
-        await migrator.createTable(quotationTemplates);
-      }
-      if (from < 12) {
-        await migrator.addColumn(ledgerEntries, ledgerEntries.receiptNumber);
-      }
-      if (from < 13) {
-        // Marketplace fields for Items
-        await migrator.addColumn(items, items.categoryId);
-        await migrator.addColumn(items, items.categoryName);
-        await migrator.addColumn(items, items.brandId);
-        await migrator.addColumn(items, items.brandName);
-        await migrator.addColumn(items, items.unit);
-        await migrator.addColumn(items, items.weight);
-        await migrator.addColumn(items, items.minPurchaseQty);
-        await migrator.addColumn(items, items.tags);
-        await migrator.addColumn(items, items.description);
-        await migrator.addColumn(items, items.thumbnailUrl);
-        await migrator.addColumn(items, items.galleryUrls);
-        await migrator.addColumn(items, items.discount);
-        await migrator.addColumn(items, items.discountType);
-        await migrator.addColumn(items, items.shippingDays);
-        await migrator.addColumn(items, items.shippingFee);
-        await migrator.addColumn(items, items.refundable);
-        await migrator.addColumn(items, items.cashOnDelivery);
-        await migrator.addColumn(items, items.lowStockWarning);
-      }
-      if (from < 14) {
-        await migrator.addColumn(items, items.thumbnailUploadId);
-        await migrator.addColumn(items, items.galleryUploadIds);
-      }
-      if (from < 15) {
-        await migrator.createTable(itemStocks);
-      }
-      if (from < 16) {
-        await migrator.addColumn(ledgerLines, ledgerLines.variant);
-      }
-      if (from < 17) {
-        await migrator.createTable(cachedServiceBookings);
-      }
-      if (from < 18) {
-        await migrator.createTable(suppliers);
-      }
-      if (from < 19) {
-        await migrator.createTable(expenses);
-        await migrator.addColumn(cashMovements, cashMovements.linkedExpenseId);
-      }
-      if (from < 20) {
-        await migrator.createTable(deviceContacts);
-      }
-      if (from < 21) {
-        await migrator.createTable(stockAlerts);
-      }
-      if (from < 22) {
-        await migrator.addColumn(customers, customers.isWalkIn);
-      }
-      if (from < 23) {
-        await migrator.createTable(localBookings);
-      }
-      if (from < 24) {
-        await migrator.createTable(servicePackages);
-        await migrator.createTable(customerPackages);
-        await migrator.createTable(packageRedemptions);
-      }
-      if (from < 25) {
-        await migrator.createTable(customerMemberships);
-      }
-      if (from < 26) {
-        await migrator.createTable(expenseCategories);
-      }
-      if (from < 27) {
-        // Schema version 27 intentionally has no table mutation.
-      }
-      if (from < 28) {
-        await migrator.addColumn(cashMovements, cashMovements.remoteId);
-        await migrator.addColumn(cashMovements, cashMovements.idempotencyKey);
-      }
-      if (from < 29) {
-        await migrator.addColumn(services, services.imageUrl);
-      }
-      if (from < 30) {
-        await migrator.createTable(businessProfiles);
-      }
-      if (from < 31) {
-        await migrator.createTable(appSettings);
-      }
-      if (from < 32) {
-        await migrator.createTable(availabilitySchedules);
-        await migrator.createTable(availabilityExceptions);
-      }
-      if (from < 33) {
-        await migrator.createTable(parkedSales);
-      }
-      if (from < 34) {
-        await migrator.addColumn(services, services.coverUploadId);
-        await migrator.addColumn(services, services.galleryUrls);
-        await migrator.addColumn(services, services.galleryUploadIds);
-      }
-      if (from < 35) {
-        await migrator.addColumn(services, services.categoryId);
-        await migrator.addColumn(services, services.summary);
-        await migrator.addColumn(services, services.serviceType);
-        await migrator.addColumn(services, services.deliveryTimeframe);
-        await migrator.addColumn(services, services.moderationStatus);
-        await migrator.addColumn(services, services.slug);
-        await migrator.addColumn(services, services.pricingPackages);
-      }
-      if (from < 36) {
-        await migrator.addColumn(parkedSales, parkedSales.label);
-        await migrator.addColumn(parkedSales, parkedSales.saleKind);
-      }
-      if (from < 37) {
-        // Tax module
-        await migrator.addColumn(businessProfiles, businessProfiles.taxEnabled);
-        await migrator.addColumn(businessProfiles, businessProfiles.taxRate);
-        await migrator.addColumn(businessProfiles, businessProfiles.taxLabel);
-        await migrator.addColumn(
-          businessProfiles,
-          businessProfiles.taxInclusionMode,
-        );
-        await migrator.addColumn(items, items.taxRate);
-        await migrator.addColumn(ledgerEntries, ledgerEntries.taxRate);
-        await migrator.addColumn(ledgerLines, ledgerLines.taxRate);
-      }
-      if (from < 38) {
-        // Studio deep-link mapping for quotations and receipts/ledger entries.
-        await migrator.addColumn(quotations, quotations.remoteId);
-        await migrator.addColumn(ledgerEntries, ledgerEntries.remoteId);
-      }
+    if (from < 2) {
+      await migrator.createTable(roles);
+      await migrator.createTable(staff);
+      await migrator.createTable(outlets);
+      await migrator.createTable(ledgerEntries);
+      await migrator.createTable(ledgerLines);
+      await migrator.createTable(payments);
+      await migrator.createTable(cashMovements);
+      await migrator.createTable(shifts);
+      await migrator.createTable(auditLogs);
+    }
+    if (from < 3) {
+      await migrator.createTable(syncCursors);
+    }
+    if (from < 4) {
+      await migrator.createTable(cachedOrders);
+    }
+    if (from < 5) {
+      await migrator.addColumn(syncOps, syncOps.lastError);
+      await migrator.addColumn(ledgerEntries, ledgerEntries.customerId);
+      await migrator.createTable(printJobs);
+    }
+    if (from < 6) {
+      await migrator.addColumn(services, services.category);
+    }
+    if (from < 7) {
+      await migrator.createTable(serviceVariants);
+      await migrator.createTable(quotations);
+      await migrator.createTable(quotationLines);
+      await migrator.createTable(receiptTemplates);
+    }
+    if (from < 8) {
+      await migrator.addColumn(items, items.imageUrl);
+    }
+    if (from < 9) {
+      // Add remoteId mapping columns
+      await migrator.addColumn(items, items.remoteId);
+      await migrator.addColumn(services, services.remoteId);
+      await migrator.addColumn(customers, customers.remoteId);
+      await migrator.addColumn(customers, customers.synced);
+      // Add receipt template alignment columns
+      await migrator.addColumn(receiptTemplates, receiptTemplates.name);
+      await migrator.addColumn(receiptTemplates, receiptTemplates.style);
+      await migrator.addColumn(receiptTemplates, receiptTemplates.isActive);
+    }
+    if (from < 10) {
+      await migrator.addColumn(ledgerEntries, ledgerEntries.originalEntryId);
+    }
+    if (from < 11) {
+      await migrator.createTable(quotationTemplates);
+    }
+    if (from < 12) {
+      await migrator.addColumn(ledgerEntries, ledgerEntries.receiptNumber);
+    }
+    if (from < 13) {
+      // Marketplace fields for Items
+      await migrator.addColumn(items, items.categoryId);
+      await migrator.addColumn(items, items.categoryName);
+      await migrator.addColumn(items, items.brandId);
+      await migrator.addColumn(items, items.brandName);
+      await migrator.addColumn(items, items.unit);
+      await migrator.addColumn(items, items.weight);
+      await migrator.addColumn(items, items.minPurchaseQty);
+      await migrator.addColumn(items, items.tags);
+      await migrator.addColumn(items, items.description);
+      await migrator.addColumn(items, items.thumbnailUrl);
+      await migrator.addColumn(items, items.galleryUrls);
+      await migrator.addColumn(items, items.discount);
+      await migrator.addColumn(items, items.discountType);
+      await migrator.addColumn(items, items.shippingDays);
+      await migrator.addColumn(items, items.shippingFee);
+      await migrator.addColumn(items, items.refundable);
+      await migrator.addColumn(items, items.cashOnDelivery);
+      await migrator.addColumn(items, items.lowStockWarning);
+    }
+    if (from < 14) {
+      await migrator.addColumn(items, items.thumbnailUploadId);
+      await migrator.addColumn(items, items.galleryUploadIds);
+    }
+    if (from < 15) {
+      await migrator.createTable(itemStocks);
+    }
+    if (from < 16) {
+      await migrator.addColumn(ledgerLines, ledgerLines.variant);
+    }
+    if (from < 17) {
+      await migrator.createTable(cachedServiceBookings);
+    }
+    if (from < 18) {
+      await migrator.createTable(suppliers);
+    }
+    if (from < 19) {
+      await migrator.createTable(expenses);
+      await migrator.addColumn(cashMovements, cashMovements.linkedExpenseId);
+    }
+    if (from < 20) {
+      await migrator.createTable(deviceContacts);
+    }
+    if (from < 21) {
+      await migrator.createTable(stockAlerts);
+    }
+    if (from < 22) {
+      await migrator.addColumn(customers, customers.isWalkIn);
+    }
+    if (from < 23) {
+      await migrator.createTable(localBookings);
+    }
+    if (from < 24) {
+      await migrator.createTable(servicePackages);
+      await migrator.createTable(customerPackages);
+      await migrator.createTable(packageRedemptions);
+    }
+    if (from < 25) {
+      await migrator.createTable(customerMemberships);
+    }
+    if (from < 26) {
+      await migrator.createTable(expenseCategories);
+    }
+    if (from < 27) {
+      // Schema version 27 intentionally has no table mutation.
+    }
+    if (from < 28) {
+      await migrator.addColumn(cashMovements, cashMovements.remoteId);
+      await migrator.addColumn(cashMovements, cashMovements.idempotencyKey);
+    }
+    if (from < 29) {
+      await migrator.addColumn(services, services.imageUrl);
+    }
+    if (from < 30) {
+      await migrator.createTable(businessProfiles);
+    }
+    if (from < 31) {
+      await migrator.createTable(appSettings);
+    }
+    if (from < 32) {
+      await migrator.createTable(availabilitySchedules);
+      await migrator.createTable(availabilityExceptions);
+    }
+    if (from < 33) {
+      await migrator.createTable(parkedSales);
+    }
+    if (from < 34) {
+      await migrator.addColumn(services, services.coverUploadId);
+      await migrator.addColumn(services, services.galleryUrls);
+      await migrator.addColumn(services, services.galleryUploadIds);
+    }
+    if (from < 35) {
+      await migrator.addColumn(services, services.categoryId);
+      await migrator.addColumn(services, services.summary);
+      await migrator.addColumn(services, services.serviceType);
+      await migrator.addColumn(services, services.deliveryTimeframe);
+      await migrator.addColumn(services, services.moderationStatus);
+      await migrator.addColumn(services, services.slug);
+      await migrator.addColumn(services, services.pricingPackages);
+    }
+    if (from < 36) {
+      await migrator.addColumn(parkedSales, parkedSales.label);
+      await migrator.addColumn(parkedSales, parkedSales.saleKind);
+    }
+    if (from < 37) {
+      // Tax module
+      await migrator.addColumn(businessProfiles, businessProfiles.taxEnabled);
+      await migrator.addColumn(businessProfiles, businessProfiles.taxRate);
+      await migrator.addColumn(businessProfiles, businessProfiles.taxLabel);
+      await migrator.addColumn(
+        businessProfiles,
+        businessProfiles.taxInclusionMode,
+      );
+      await migrator.addColumn(items, items.taxRate);
+      await migrator.addColumn(ledgerEntries, ledgerEntries.taxRate);
+      await migrator.addColumn(ledgerLines, ledgerLines.taxRate);
+    }
+    if (from < 38) {
+      // Studio deep-link mapping for quotations and receipts/ledger entries.
+      await migrator.addColumn(quotations, quotations.remoteId);
+      await migrator.addColumn(ledgerEntries, ledgerEntries.remoteId);
+    }
   }
 
   // Expense Categories
@@ -1069,8 +1072,13 @@ class AppDatabase extends _$AppDatabase {
     await into(services).insertOnConflictUpdate(companion);
   }
 
-  Future<void> updateServiceFields(String id, ServicesCompanion companion) async {
-    await (update(services)..where((tbl) => tbl.id.equals(id))).write(companion);
+  Future<void> updateServiceFields(
+    String id,
+    ServicesCompanion companion,
+  ) async {
+    await (update(
+      services,
+    )..where((tbl) => tbl.id.equals(id))).write(companion);
   }
 
   Future<void> markServiceSynced(String id) async {
@@ -1098,10 +1106,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> pruneSyncedRemoteServicesNotIn(Iterable<String> keepIds) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(services)
-              ..where((t) => t.remoteId.isNotNull() & t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      services,
+    )..where((t) => t.remoteId.isNotNull() & t.synced.equals(true))).get();
 
     for (final service in candidates) {
       if (keep.contains(service.id)) continue;
@@ -1139,10 +1146,9 @@ class AppDatabase extends _$AppDatabase {
     serviceJobSessions,
   )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
-  Future<List<ServiceJobSession>> getAllJobSessions() =>
-      (select(serviceJobSessions)
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+  Future<List<ServiceJobSession>> getAllJobSessions() => (select(
+    serviceJobSessions,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
 
   Future<List<ServiceJobSession>> getJobSessionsForService(String serviceId) =>
       (select(serviceJobSessions)
@@ -1195,13 +1201,14 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> pruneSyncedServiceVariantsNotIn(Iterable<String> keepIds) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(serviceVariants)
-              ..where((t) => t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      serviceVariants,
+    )..where((t) => t.synced.equals(true))).get();
     for (final variant in candidates) {
       if (keep.contains(variant.id)) continue;
-      await (delete(serviceVariants)..where((t) => t.id.equals(variant.id))).go();
+      await (delete(
+        serviceVariants,
+      )..where((t) => t.id.equals(variant.id))).go();
     }
   }
 
@@ -1282,10 +1289,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> markQuotationRemoteId(String localId, String remoteId) async {
     await (update(quotations)..where((t) => t.id.equals(localId))).write(
-      QuotationsCompanion(
-        remoteId: Value(remoteId),
-        synced: const Value(true),
-      ),
+      QuotationsCompanion(remoteId: Value(remoteId), synced: const Value(true)),
     );
   }
 
@@ -1296,17 +1300,16 @@ class AppDatabase extends _$AppDatabase {
     await into(receiptTemplates).insertOnConflictUpdate(companion);
   }
 
-  Future<void> pruneSyncedServicePackagesNotIn(
-    Iterable<String> keepIds,
-  ) async {
+  Future<void> pruneSyncedServicePackagesNotIn(Iterable<String> keepIds) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(servicePackages)
-              ..where((t) => t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      servicePackages,
+    )..where((t) => t.synced.equals(true))).get();
     for (final package in candidates) {
       if (keep.contains(package.id)) continue;
-      await (delete(servicePackages)..where((t) => t.id.equals(package.id))).go();
+      await (delete(
+        servicePackages,
+      )..where((t) => t.id.equals(package.id))).go();
     }
   }
 
@@ -1314,10 +1317,9 @@ class AppDatabase extends _$AppDatabase {
     Iterable<String> keepIds,
   ) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(customerPackages)
-              ..where((t) => t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      customerPackages,
+    )..where((t) => t.synced.equals(true))).get();
     for (final customerPackage in candidates) {
       if (keep.contains(customerPackage.id)) continue;
       await (delete(
@@ -1330,10 +1332,9 @@ class AppDatabase extends _$AppDatabase {
     Iterable<String> keepIds,
   ) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(packageRedemptions)
-              ..where((t) => t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      packageRedemptions,
+    )..where((t) => t.synced.equals(true))).get();
     for (final redemption in candidates) {
       if (keep.contains(redemption.id)) continue;
       await (delete(
@@ -1745,22 +1746,27 @@ class AppDatabase extends _$AppDatabase {
       // 1. Re-read and validate stock inside the transaction
       final shortages = <String>[];
       for (final delta in stockDeltas) {
-        final item = await (select(items)
-              ..where((tbl) => tbl.id.equals(delta.itemId)))
-            .getSingleOrNull();
+        final item = await (select(
+          items,
+        )..where((tbl) => tbl.id.equals(delta.itemId))).getSingleOrNull();
         if (item == null || !item.stockEnabled) continue;
 
         final variant = (delta.variant ?? '').trim();
         var available = variant.isEmpty ? item.stockQty : 0;
-        final stockRow = await (select(itemStocks)
-              ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
-            .getSingleOrNull();
+        final stockRow =
+            await (select(itemStocks)..where(
+                  (t) =>
+                      t.itemId.equals(delta.itemId) & t.variant.equals(variant),
+                ))
+                .getSingleOrNull();
         if (stockRow != null) {
           available = stockRow.stockQty;
         }
         if (available < delta.quantity) {
           final label = variant.isEmpty ? item.name : '${item.name} • $variant';
-          shortages.add('$label (stock $available, requested ${delta.quantity})');
+          shortages.add(
+            '$label (stock $available, requested ${delta.quantity})',
+          );
         }
       }
       if (shortages.isNotEmpty) {
@@ -1779,9 +1785,9 @@ class AppDatabase extends _$AppDatabase {
       // 3. Decrement stock inside the same transaction
       final now = DateTime.now().toUtc();
       for (final delta in stockDeltas) {
-        final item = await (select(items)
-              ..where((tbl) => tbl.id.equals(delta.itemId)))
-            .getSingleOrNull();
+        final item = await (select(
+          items,
+        )..where((tbl) => tbl.id.equals(delta.itemId))).getSingleOrNull();
         if (item == null || !item.stockEnabled) continue;
 
         await into(inventoryLogs).insert(
@@ -1793,27 +1799,33 @@ class AppDatabase extends _$AppDatabase {
         );
 
         final updatedQty = item.stockQty - delta.quantity;
-        await (update(items)
-              ..where((tbl) => tbl.id.equals(delta.itemId)))
-            .write(
+        await (update(
+          items,
+        )..where((tbl) => tbl.id.equals(delta.itemId))).write(
           ItemsCompanion(stockQty: Value(updatedQty), updatedAt: Value(now)),
         );
 
         final variant = (delta.variant ?? '').trim();
         if (variant.isNotEmpty) {
-          final row = await (select(itemStocks)
-                ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
-              .getSingleOrNull();
+          final row =
+              await (select(itemStocks)..where(
+                    (t) =>
+                        t.itemId.equals(delta.itemId) &
+                        t.variant.equals(variant),
+                  ))
+                  .getSingleOrNull();
           if (row != null) {
             final nextVariantQty = row.stockQty - delta.quantity;
-            await (update(itemStocks)
-                  ..where((t) => t.itemId.equals(delta.itemId) & t.variant.equals(variant)))
+            await (update(itemStocks)..where(
+                  (t) =>
+                      t.itemId.equals(delta.itemId) & t.variant.equals(variant),
+                ))
                 .write(
-              ItemStocksCompanion(
-                stockQty: Value(nextVariantQty),
-                updatedAt: Value(now),
-              ),
-            );
+                  ItemStocksCompanion(
+                    stockQty: Value(nextVariantQty),
+                    updatedAt: Value(now),
+                  ),
+                );
           }
         }
       }
@@ -1987,9 +1999,7 @@ class AppDatabase extends _$AppDatabase {
   /// Used to show per-item/service sync status badges.
   Stream<SyncOp?> watchSyncOpForLocalId(String localId) {
     return (select(syncOps)
-          ..where(
-            (tbl) => tbl.payload.like('%"local_id":"$localId"%'),
-          )
+          ..where((tbl) => tbl.payload.like('%"local_id":"$localId"%'))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
           ..limit(1))
         .watchSingleOrNull();
@@ -2083,7 +2093,8 @@ class AppDatabase extends _$AppDatabase {
         await (update(syncOps)..where(
               (t) =>
                   (t.status.equals('pending') | t.status.equals('blocked')) &
-                  (t.lastTriedAt.isNull() | t.lastTriedAt.isSmallerThanValue(threshold)),
+                  (t.lastTriedAt.isNull() |
+                      t.lastTriedAt.isSmallerThanValue(threshold)),
             ))
             .write(
               const SyncOpsCompanion(
@@ -2322,8 +2333,12 @@ class AppDatabase extends _$AppDatabase {
           .write(const TransactionLinesCompanion(itemId: Value(null)));
       await (update(ledgerLines)..where((tbl) => tbl.itemId.equals(itemId)))
           .write(const LedgerLinesCompanion(itemId: Value(null)));
-      await (delete(itemStocks)..where((tbl) => tbl.itemId.equals(itemId))).go();
-      await (delete(stockAlerts)..where((tbl) => tbl.itemId.equals(itemId))).go();
+      await (delete(
+        itemStocks,
+      )..where((tbl) => tbl.itemId.equals(itemId))).go();
+      await (delete(
+        stockAlerts,
+      )..where((tbl) => tbl.itemId.equals(itemId))).go();
       await (delete(
         inventoryLogs,
       )..where((tbl) => tbl.itemId.equals(itemId))).go();
@@ -2333,10 +2348,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> pruneSyncedRemoteItemsNotIn(Iterable<String> keepIds) async {
     final keep = keepIds.toSet();
-    final candidates =
-        await (select(items)
-              ..where((t) => t.remoteId.isNotNull() & t.synced.equals(true)))
-            .get();
+    final candidates = await (select(
+      items,
+    )..where((t) => t.remoteId.isNotNull() & t.synced.equals(true))).get();
     for (final item in candidates) {
       if (keep.contains(item.id)) continue;
       await deleteItemAndDetach(item.id);
@@ -2359,7 +2373,8 @@ class AppDatabase extends _$AppDatabase {
         if (payload is! Map<String, dynamic>) continue;
         final localId = payload['local_id']?.toString();
         final serviceId =
-            payload['service_id']?.toString() ?? payload['serviceId']?.toString();
+            payload['service_id']?.toString() ??
+            payload['serviceId']?.toString();
         if (localId == localServiceId || serviceId == localServiceId) {
           await (delete(syncOps)..where((tbl) => tbl.id.equals(op.id))).go();
         }
@@ -2720,8 +2735,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteAvailabilityException(int id) async {
-    await (delete(availabilityExceptions)
-      ..where((t) => t.id.equals(id))).go();
+    await (delete(availabilityExceptions)..where((t) => t.id.equals(id))).go();
   }
 
   Future<void> deleteAllAvailabilityExceptions() async {
@@ -2820,13 +2834,20 @@ class AppDatabase extends _$AppDatabase {
   /// Compute local POS stats for a walk-in/offline customer by their local DB id.
   /// Returns a record with totalOrders, totalRevenue, and avgOrderValue
   /// derived entirely from [LedgerEntries] rows where customerId matches.
-  Future<({int totalOrders, double totalRevenue, double avgOrderValue, DateTime? lastPurchaseAt})>
-      getLocalCustomerStats(String customerId) async {
-    final rows = await (select(ledgerEntries)
-          ..where(
-            (e) => e.customerId.equals(customerId) & e.type.equals('sale'),
-          ))
-        .get();
+  Future<
+    ({
+      int totalOrders,
+      double totalRevenue,
+      double avgOrderValue,
+      DateTime? lastPurchaseAt,
+    })
+  >
+  getLocalCustomerStats(String customerId) async {
+    final rows =
+        await (select(ledgerEntries)..where(
+              (e) => e.customerId.equals(customerId) & e.type.equals('sale'),
+            ))
+            .get();
 
     final totalOrders = rows.length;
     final totalRevenue = rows.fold<double>(0, (sum, e) => sum + e.total);
@@ -2878,10 +2899,7 @@ class AppDatabase extends _$AppDatabase {
       await deletePendingItemOps(itemId);
       await deleteItemAndDetach(itemId);
       if (remoteId != null) {
-        await enqueueSync(
-          'item_delete',
-          jsonEncode({'remote_id': remoteId}),
-        );
+        await enqueueSync('item_delete', jsonEncode({'remote_id': remoteId}));
       }
     });
   }
@@ -3044,7 +3062,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> clearActiveCartSale() async {
     await (delete(parkedSales)..where(
-          (t) => t.id.equals(activeCartSaleId) | t.saleKind.equals(activeCartSaleKind),
+          (t) =>
+              t.id.equals(activeCartSaleId) |
+              t.saleKind.equals(activeCartSaleKind),
         ))
         .go();
   }
@@ -3214,57 +3234,183 @@ class ParkedSales extends Table {
   Set<Column<Object>>? get primaryKey => {id};
 }
 
-
 // ─── Built-in expense category seeds ──────────────────────────────────────────
 const _expenseCategorySeeds = <String>[
-  'Shop Rent', 'Office Rent', 'Electricity Bill', 'Water Bill', 'Internet / WiFi',
-  'Phone Bill', 'Generator Fuel', 'Generator Maintenance', 'Cleaning & Sanitation',
-  'Waste Disposal', 'Security Guard', 'CCTV / Alarm Service', 'Premises Insurance',
-  'Property Taxes', 'Repairs & Maintenance', 'Plumbing Repairs', 'Electrical Repairs',
-  'Pest Control', 'Air Conditioning Service', 'Fire Extinguisher Refill',
-  'Staff Salaries', 'Staff Wages (Daily)', 'Casual Labour', 'Staff Overtime',
-  'Staff Bonuses', 'Staff Commission', 'Staff Allowances', 'Staff Transport',
-  'Staff Uniforms', 'Staff Meals / Lunch', 'Staff Training', 'Staff Medical',
-  'Staff Loan Advance', 'NSSF Contributions', 'PAYE Tax', 'Recruitment Costs',
-  'Stock Purchase', 'Raw Materials', 'Packaging Materials', 'Bags & Wrapping',
-  'Labels & Stickers', 'Spoilage / Wastage', 'Stock Insurance', 'Cold Storage',
+  'Shop Rent',
+  'Office Rent',
+  'Electricity Bill',
+  'Water Bill',
+  'Internet / WiFi',
+  'Phone Bill',
+  'Generator Fuel',
+  'Generator Maintenance',
+  'Cleaning & Sanitation',
+  'Waste Disposal',
+  'Security Guard',
+  'CCTV / Alarm Service',
+  'Premises Insurance',
+  'Property Taxes',
+  'Repairs & Maintenance',
+  'Plumbing Repairs',
+  'Electrical Repairs',
+  'Pest Control',
+  'Air Conditioning Service',
+  'Fire Extinguisher Refill',
+  'Staff Salaries',
+  'Staff Wages (Daily)',
+  'Casual Labour',
+  'Staff Overtime',
+  'Staff Bonuses',
+  'Staff Commission',
+  'Staff Allowances',
+  'Staff Transport',
+  'Staff Uniforms',
+  'Staff Meals / Lunch',
+  'Staff Training',
+  'Staff Medical',
+  'Staff Loan Advance',
+  'NSSF Contributions',
+  'PAYE Tax',
+  'Recruitment Costs',
+  'Stock Purchase',
+  'Raw Materials',
+  'Packaging Materials',
+  'Bags & Wrapping',
+  'Labels & Stickers',
+  'Spoilage / Wastage',
+  'Stock Insurance',
+  'Cold Storage',
   'Fumigation',
-  'Fuel', 'Vehicle Hire', 'Boda Boda / Taxi', 'Bus Fare', 'Delivery Costs',
-  'Courier Fees', 'Customs & Import Duties', 'Clearing Charges', 'Freight / Shipping',
-  'Vehicle Maintenance', 'Vehicle Insurance', 'Car Wash', 'Parking Fees', 'Toll Fees',
+  'Fuel',
+  'Vehicle Hire',
+  'Boda Boda / Taxi',
+  'Bus Fare',
+  'Delivery Costs',
+  'Courier Fees',
+  'Customs & Import Duties',
+  'Clearing Charges',
+  'Freight / Shipping',
+  'Vehicle Maintenance',
+  'Vehicle Insurance',
+  'Car Wash',
+  'Parking Fees',
+  'Toll Fees',
   'Loading / Offloading',
-  'Advertising (Online)', 'Facebook / Instagram Ads', 'Google Ads', 'TikTok Ads',
-  'Radio Advertising', 'TV Advertising', 'Newspaper Adverts', 'Flyers & Brochures',
-  'Banners & Signage', 'Business Cards', 'Branded T-Shirts', 'Promotional Items',
-  'Sponsorships', 'Event Costs', 'Photography & Videography', 'Content Creation',
-  'Social Media Management', 'Website / App Costs', 'Domain & Hosting',
-  'SMS Marketing', 'WhatsApp Marketing',
-  'Equipment Purchase', 'Equipment Hire / Rental', 'Equipment Maintenance',
-  'Computer / Laptop', 'Printer', 'Printer Ink & Toner', 'POS Machine',
-  'POS Machine Maintenance', 'Software Subscription', 'Accounting Software',
-  'Phone / Tablet Purchase', 'UPS / Inverter', 'Cloud Storage',
-  'Bank Charges', 'Mobile Money Charges', 'ATM Withdrawal Fees', 'Loan Repayment',
-  'Loan Interest', 'Credit Card Fees', 'Payment Gateway Fees', 'Insurance Premium',
-  'Business License', 'Trade License', 'Health License', 'URA Tax Payment',
-  'VAT Filing Costs', 'KCCA Fees', 'Local Council Fees', 'Accountant / Audit Fees',
-  'Legal Fees', 'Company Registration',
-  'Office Supplies', 'Pens & Stationery', 'Books & Notebooks', 'Printing (Office)',
-  'Photocopying', 'Postage / Courier',
-  'Client Entertainment', 'Client Gifts', 'Tea & Coffee (Office)', 'Staff Refreshments',
-  'Business Lunch', 'Business Dinner', 'Hotel Accommodation', 'Travel Expenses', 'Airfare',
-  'Medical Expenses', 'First Aid Supplies', 'Safety Equipment', 'Protective Gear (PPE)',
+  'Advertising (Online)',
+  'Facebook / Instagram Ads',
+  'Google Ads',
+  'TikTok Ads',
+  'Radio Advertising',
+  'TV Advertising',
+  'Newspaper Adverts',
+  'Flyers & Brochures',
+  'Banners & Signage',
+  'Business Cards',
+  'Branded T-Shirts',
+  'Promotional Items',
+  'Sponsorships',
+  'Event Costs',
+  'Photography & Videography',
+  'Content Creation',
+  'Social Media Management',
+  'Website / App Costs',
+  'Domain & Hosting',
+  'SMS Marketing',
+  'WhatsApp Marketing',
+  'Equipment Purchase',
+  'Equipment Hire / Rental',
+  'Equipment Maintenance',
+  'Computer / Laptop',
+  'Printer',
+  'Printer Ink & Toner',
+  'POS Machine',
+  'POS Machine Maintenance',
+  'Software Subscription',
+  'Accounting Software',
+  'Phone / Tablet Purchase',
+  'UPS / Inverter',
+  'Cloud Storage',
+  'Bank Charges',
+  'Mobile Money Charges',
+  'ATM Withdrawal Fees',
+  'Loan Repayment',
+  'Loan Interest',
+  'Credit Card Fees',
+  'Payment Gateway Fees',
+  'Insurance Premium',
+  'Business License',
+  'Trade License',
+  'Health License',
+  'URA Tax Payment',
+  'VAT Filing Costs',
+  'KCCA Fees',
+  'Local Council Fees',
+  'Accountant / Audit Fees',
+  'Legal Fees',
+  'Company Registration',
+  'Office Supplies',
+  'Pens & Stationery',
+  'Books & Notebooks',
+  'Printing (Office)',
+  'Photocopying',
+  'Postage / Courier',
+  'Client Entertainment',
+  'Client Gifts',
+  'Tea & Coffee (Office)',
+  'Staff Refreshments',
+  'Business Lunch',
+  'Business Dinner',
+  'Hotel Accommodation',
+  'Travel Expenses',
+  'Airfare',
+  'Medical Expenses',
+  'First Aid Supplies',
+  'Safety Equipment',
+  'Protective Gear (PPE)',
   'Medical Insurance',
-  'Cooking Gas / LPG', 'Cooking Oil', 'Charcoal', 'Firewood', 'Food Ingredients',
-  'Disposable Plates & Cups', 'Food Containers', 'Market Fees', 'Health Inspection Fee',
-  'Beauty Products Stock', 'Hair Extensions', 'Wigs & Weaves', 'Nail Products',
+  'Cooking Gas / LPG',
+  'Cooking Oil',
+  'Charcoal',
+  'Firewood',
+  'Food Ingredients',
+  'Disposable Plates & Cups',
+  'Food Containers',
+  'Market Fees',
+  'Health Inspection Fee',
+  'Beauty Products Stock',
+  'Hair Extensions',
+  'Wigs & Weaves',
+  'Nail Products',
   'Salon Equipment',
-  'Building Materials', 'Cement & Bricks', 'Iron Sheets', 'Sand & Gravel',
-  'Paint & Varnish', 'Labour (Construction)', 'Scaffold Hire', 'Machinery Hire',
-  'Seeds', 'Fertiliser', 'Pesticides', 'Farm Labour', 'Land Hire', 'Veterinary Costs',
-  'Animal Feed', 'Livestock Purchase', 'Farm Equipment',
-  'Motorcycle Service', 'Tyre Replacement', 'Road Licence Renewal',
+  'Building Materials',
+  'Cement & Bricks',
+  'Iron Sheets',
+  'Sand & Gravel',
+  'Paint & Varnish',
+  'Labour (Construction)',
+  'Scaffold Hire',
+  'Machinery Hire',
+  'Seeds',
+  'Fertiliser',
+  'Pesticides',
+  'Farm Labour',
+  'Land Hire',
+  'Veterinary Costs',
+  'Animal Feed',
+  'Livestock Purchase',
+  'Farm Equipment',
+  'Motorcycle Service',
+  'Tyre Replacement',
+  'Road Licence Renewal',
   'Third Party Insurance',
-  'Petty Cash', 'Miscellaneous', 'Fines / Penalties', 'Donations / Charity',
-  'Association Dues', 'Trade Fair Costs', 'Consultancy Fees', 'Subscription Services',
-  'Bad Debts Written Off', 'Other Expenses',
+  'Petty Cash',
+  'Miscellaneous',
+  'Fines / Penalties',
+  'Donations / Charity',
+  'Association Dues',
+  'Trade Fair Costs',
+  'Consultancy Fees',
+  'Subscription Services',
+  'Bad Debts Written Off',
+  'Other Expenses',
 ];

@@ -52,7 +52,10 @@ String normalizeServiceDescriptionHtml(String? html) {
 
   // Summernote / Word paste artifacts
   result = result
-      .replaceAll(RegExp(r'<!\[if[\s\S]*?<!\[endif\]>', caseSensitive: false), '')
+      .replaceAll(
+        RegExp(r'<!\[if[\s\S]*?<!\[endif\]>', caseSensitive: false),
+        '',
+      )
       .replaceAll(RegExp(r'<o:p>\s*</o:p>', caseSensitive: false), '')
       .replaceAll(RegExp(r'</?o:[^>]+>', caseSensitive: false), '')
       .replaceAll(RegExp(r'class="Mso[^"]*"', caseSensitive: false), '')
@@ -70,8 +73,14 @@ String normalizeServiceDescriptionHtml(String? html) {
   result = result.replaceAll(RegExp(r'</font>', caseSensitive: false), '');
 
   // Strip spans/divs wrappers that only carry presentation styles
-  final spanPattern = RegExp(r'<span[^>]*>([\s\S]*?)</span>', caseSensitive: false);
-  final divPattern = RegExp(r'<div[^>]*>([\s\S]*?)</div>', caseSensitive: false);
+  final spanPattern = RegExp(
+    r'<span[^>]*>([\s\S]*?)</span>',
+    caseSensitive: false,
+  );
+  final divPattern = RegExp(
+    r'<div[^>]*>([\s\S]*?)</div>',
+    caseSensitive: false,
+  );
   for (var i = 0; i < 4; i++) {
     if (!spanPattern.hasMatch(result)) break;
     result = result.replaceAllMapped(spanPattern, (m) => m.group(1) ?? '');
@@ -129,10 +138,7 @@ String sanitizePastedServiceHtml(String html) {
   var result = normalizeServiceDescriptionHtml(html);
 
   // Paste often brings nested tables from Word — flatten simple single-cell rows
-  result = result.replaceAll(
-    RegExp(r'<table[^>]*>', caseSensitive: false),
-    '',
-  );
+  result = result.replaceAll(RegExp(r'<table[^>]*>', caseSensitive: false), '');
   result = result.replaceAll(RegExp(r'</table>', caseSensitive: false), '');
   result = result.replaceAll(RegExp(r'<tbody[^>]*>', caseSensitive: false), '');
   result = result.replaceAll(RegExp(r'</tbody>', caseSensitive: false), '');

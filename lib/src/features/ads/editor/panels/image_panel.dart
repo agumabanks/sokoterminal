@@ -41,13 +41,15 @@ class ImagePanel extends StatelessWidget {
             runSpacing: 10,
             children: [
               PanelAction(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                  onTap: onPickGallery),
+                icon: Icons.photo_library_rounded,
+                label: 'Gallery',
+                onTap: onPickGallery,
+              ),
               PanelAction(
-                  icon: Icons.camera_alt_rounded,
-                  label: 'Camera',
-                  onTap: onPickCamera),
+                icon: Icons.camera_alt_rounded,
+                label: 'Camera',
+                onTap: onPickCamera,
+              ),
               PanelAction(
                 icon: Icons.folder_special_rounded,
                 label: 'Catalog',
@@ -84,15 +86,17 @@ class ImagePanel extends StatelessWidget {
                   icon: Icons.refresh_rounded,
                   label: 'Reset',
                   color: Colors.orangeAccent,
-                  onTap: () => onUpdate!(el.copyWith(
-                    flipX: false,
-                    flipY: false,
-                    rotation: 0.0,
-                    opacity: 1.0,
-                    cornerRadius: 0.0,
-                    imageFit: 'cover',
-                    imageFilter: null,
-                  )),
+                  onTap: () => onUpdate!(
+                    el.copyWith(
+                      flipX: false,
+                      flipY: false,
+                      rotation: 0.0,
+                      opacity: 1.0,
+                      cornerRadius: 0.0,
+                      imageFit: 'cover',
+                      imageFilter: null,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -116,8 +120,10 @@ class ImagePanel extends StatelessWidget {
             // Opacity slider
             Row(
               children: [
-                const Text('Opacity',
-                    style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const Text(
+                  'Opacity',
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                ),
                 Expanded(
                   child: Slider(
                     value: el.opacity.clamp(0.1, 1.0),
@@ -127,15 +133,19 @@ class ImagePanel extends StatelessWidget {
                     onChanged: (v) => onUpdate!(el.copyWith(opacity: v)),
                   ),
                 ),
-                Text('${(el.opacity * 100).round()}%',
-                    style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                Text(
+                  '${(el.opacity * 100).round()}%',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
               ],
             ),
             // Corner radius slider
             Row(
               children: [
-                const Text('Corners',
-                    style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const Text(
+                  'Corners',
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                ),
                 Expanded(
                   child: Slider(
                     value: (el.cornerRadius ?? 0).clamp(0, 80),
@@ -145,8 +155,10 @@ class ImagePanel extends StatelessWidget {
                     onChanged: (v) => onUpdate!(el.copyWith(cornerRadius: v)),
                   ),
                 ),
-                Text('${(el.cornerRadius ?? 0).round()}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                Text(
+                  '${(el.cornerRadius ?? 0).round()}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
               ],
             ),
           ],
@@ -196,7 +208,9 @@ class _FitModeSelector extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: selected ? kAccent.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.06),
+              color: selected
+                  ? kAccent.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: selected ? kAccent : Colors.white24,
@@ -206,7 +220,11 @@ class _FitModeSelector extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(o.$2, color: selected ? kAccent : Colors.white54, size: 14),
+                Icon(
+                  o.$2,
+                  color: selected ? kAccent : Colors.white54,
+                  size: 14,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   o.$3,
@@ -251,7 +269,9 @@ class _FilterSelector extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: o.$3?.withValues(alpha: 0.25) ?? Colors.white.withValues(alpha: 0.1),
+                  color:
+                      o.$3?.withValues(alpha: 0.25) ??
+                      Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: selected ? kAccent : Colors.white24,
@@ -260,9 +280,15 @@ class _FilterSelector extends StatelessWidget {
                 ),
                 child: Center(
                   child: o.$1 == null
-                      ? Icon(Icons.no_photography_outlined, color: selected ? kAccent : Colors.white54, size: 18)
+                      ? Icon(
+                          Icons.no_photography_outlined,
+                          color: selected ? kAccent : Colors.white54,
+                          size: 18,
+                        )
                       : Icon(
-                          o.$1 == 'grayscale' ? Icons.filter_b_and_w : Icons.wb_sunny_outlined,
+                          o.$1 == 'grayscale'
+                              ? Icons.filter_b_and_w
+                              : Icons.wb_sunny_outlined,
                           color: selected ? kAccent : o.$3,
                           size: 20,
                         ),

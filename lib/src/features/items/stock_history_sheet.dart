@@ -60,7 +60,9 @@ class StockHistorySheet extends ConsumerWidget {
                     itemBuilder: (context, i) {
                       final log = logs[i];
                       final isPositive = log.delta > 0;
-                      final date = DateFormat('dd MMM, HH:mm').format(log.createdAt.toLocal());
+                      final date = DateFormat(
+                        'dd MMM, HH:mm',
+                      ).format(log.createdAt.toLocal());
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -76,8 +78,12 @@ class StockHistorySheet extends ConsumerWidget {
                               height: 36,
                               decoration: BoxDecoration(
                                 color: isPositive
-                                    ? DesignTokens.success.withValues(alpha: 0.12)
-                                    : DesignTokens.error.withValues(alpha: 0.12),
+                                    ? DesignTokens.success.withValues(
+                                        alpha: 0.12,
+                                      )
+                                    : DesignTokens.error.withValues(
+                                        alpha: 0.12,
+                                      ),
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
@@ -86,7 +92,9 @@ class StockHistorySheet extends ConsumerWidget {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: isPositive ? DesignTokens.success : DesignTokens.error,
+                                    color: isPositive
+                                        ? DesignTokens.success
+                                        : DesignTokens.error,
                                   ),
                                 ),
                               ),
@@ -97,7 +105,8 @@ class StockHistorySheet extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    log.note ?? (isPositive ? 'Stock In' : 'Stock Out'),
+                                    log.note ??
+                                        (isPositive ? 'Stock In' : 'Stock Out'),
                                     style: DesignTokens.textBody,
                                   ),
                                   Text(

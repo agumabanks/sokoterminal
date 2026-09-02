@@ -23,11 +23,11 @@ class BugReportSync {
         );
         final body = res.data;
         if (body is Map && body['success'] == true) {
-          final accepted = (body['accepted'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
+          final accepted =
+              (body['accepted'] as List?)?.map((e) => e.toString()).toList() ??
               const <String>[];
-          final duplicates = (body['duplicates'] as List?)
+          final duplicates =
+              (body['duplicates'] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               const <String>[];

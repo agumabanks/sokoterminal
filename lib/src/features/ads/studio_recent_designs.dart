@@ -11,9 +11,9 @@ const maxRecentDesigns = 12;
 
 final recentDesignsProvider =
     StateNotifierProvider<RecentDesignsNotifier, List<AdTemplate>>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return RecentDesignsNotifier(prefs);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return RecentDesignsNotifier(prefs);
+    });
 
 class RecentDesignsNotifier extends StateNotifier<List<AdTemplate>> {
   RecentDesignsNotifier(this._prefs) : super([]) {

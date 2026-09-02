@@ -51,28 +51,31 @@ Future<bool> requireManagerPin(
     final db = ref.read(appDatabaseProvider);
     final pinHash = PinHashService(storage: ref.read(secureStorageProvider));
     final hashedPin = await pinHash.hash(entered);
-    final manager = await (db.select(db.staff)
-          ..where((t) => t.pin.equals(hashedPin))
-          ..where((t) => t.active.equals(true))
-          ..limit(1))
-        .getSingleOrNull();
+    final manager =
+        await (db.select(db.staff)
+              ..where((t) => t.pin.equals(hashedPin))
+              ..where((t) => t.active.equals(true))
+              ..limit(1))
+            .getSingleOrNull();
 
     if (manager == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Incorrect PIN')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
       }
       return false;
     }
 
     // Verify role is manager
     if (manager.roleId != null) {
-      final role = await (db.select(db.roles)
-            ..where((t) => t.id.equals(manager.roleId!))
-            ..limit(1))
-          .getSingleOrNull();
-      final isManager = role?.name.toLowerCase() == 'manager' ||
+      final role =
+          await (db.select(db.roles)
+                ..where((t) => t.id.equals(manager.roleId!))
+                ..limit(1))
+              .getSingleOrNull();
+      final isManager =
+          role?.name.toLowerCase() == 'manager' ||
           (role?.canRefund == true &&
               role?.canVoid == true &&
               role?.canPriceOverride == true);

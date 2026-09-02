@@ -10,5 +10,5 @@ final studioProductProvider = StateProvider<Item?>((ref) => null);
 /// Lightweight local Studio usage analytics (exports, shares, edits, template uses).
 final studioCampaignAnalyticsProvider =
     StateNotifierProvider<StudioCampaignAnalytics, StudioCampaignStats>(
-  (ref) => StudioCampaignAnalytics(ref.read(sharedPreferencesProvider)),
-);
+      (ref) => StudioCampaignAnalytics(ref.read(sharedPreferencesProvider)),
+    );

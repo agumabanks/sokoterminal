@@ -24,25 +24,25 @@ import 'full_studio_webview_screen.dart';
 
 /// Starter canvas for photo edit / remove-background flows.
 AdTemplate photoEditStarter(String imageSrc) => AdTemplate(
-      id: 'photo_edit_${DateTime.now().millisecondsSinceEpoch}',
-      name: 'Photo Edit',
-      category: 'photo',
-      canvasWidth: 1080,
-      canvasHeight: 1080,
-      background: '#ffffff',
-      elements: [
-        CanvasElement(
-          id: 'photo_main',
-          type: 'image',
-          src: imageSrc,
-          x: 40,
-          y: 40,
-          width: 1000,
-          height: 1000,
-          cornerRadius: 8,
-        ),
-      ],
-    );
+  id: 'photo_edit_${DateTime.now().millisecondsSinceEpoch}',
+  name: 'Photo Edit',
+  category: 'photo',
+  canvasWidth: 1080,
+  canvasHeight: 1080,
+  background: '#ffffff',
+  elements: [
+    CanvasElement(
+      id: 'photo_main',
+      type: 'image',
+      src: imageSrc,
+      x: 40,
+      y: 40,
+      width: 1000,
+      height: 1000,
+      cornerRadius: 8,
+    ),
+  ],
+);
 
 /// Open the studio editor with full product/brand variable wiring.
 Future<void> launchStudioEditor(
@@ -64,29 +64,41 @@ Future<void> launchStudioEditor(
   } catch (e, st) {
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
-      unawaited(telemetry.recordError(e, st, hint: 'studio_resolve_product_link'));
+      unawaited(
+        telemetry.recordError(e, st, hint: 'studio_resolve_product_link'),
+      );
     }
     // Continue with empty link — editor still works offline.
   }
-  final applied = template.applyProduct(
-    productName: product?.name ?? '',
-    priceFormatted: product != null ? formatUgPrice(product.price) : '',
-    imageUrl: product?.imageUrl ?? '',
-    shopUrl: productLink,
-    whatsappNumber: kit.whatsapp,
-    phoneNumber: kit.phone,
-    businessName: kit.businessName,
-    location: kit.location,
-    tagline: kit.tagline,
-  );
+  // A saved/recent design already contains the seller's resolved text and
+  // images. Re-applying an empty product used to wipe those values when the
+  // seller reopened a recent design without selecting a product first.
+  final applied = product == null
+      ? template
+      : template.applyProduct(
+          productName: product.name,
+          priceFormatted: formatUgPrice(product.price),
+          imageUrl: product.imageUrl ?? '',
+          shopUrl: productLink,
+          whatsappNumber: kit.whatsapp,
+          phoneNumber: kit.phone,
+          businessName: kit.businessName,
+          location: kit.location,
+          tagline: kit.tagline,
+        );
 
   final telemetry = Telemetry.instance;
   if (telemetry != null) {
-    unawaited(telemetry.event('studio_editor_open', props: {
-      'template_id': template.id,
-      'template_name': template.name,
-      'has_product': product != null,
-    }));
+    unawaited(
+      telemetry.event(
+        'studio_editor_open',
+        props: {
+          'template_id': template.id,
+          'template_name': template.name,
+          'has_product': product != null,
+        },
+      ),
+    );
   }
 
   if (!context.mounted) return;
@@ -102,15 +114,18 @@ Future<void> launchStudioEditor(
           Haptics.success();
           ref.read(savedTemplatesProvider.notifier).save(edited);
           await ref.read(recentDesignsProvider.notifier).add(edited);
-          final cloudOk =
-              await ref.read(yourDesignsProvider.notifier).saveDesign(edited);
+          final cloudOk = await ref
+              .read(yourDesignsProvider.notifier)
+              .saveDesign(edited);
           if (!context.mounted) return;
           if (popOnSave) Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(cloudOk
-                  ? 'Design saved — device folder & Sanaa Cloud'
-                  : 'Design saved locally (cloud sync when online)'),
+              content: Text(
+                cloudOk
+                    ? 'Design saved — device folder & Sanaa Cloud'
+                    : 'Design saved locally (cloud sync when online)',
+              ),
             ),
           );
         },
@@ -130,15 +145,18 @@ Future<File?> launchStudioForService(
   AdTemplate? template,
 }) async {
   final kit = ref.read(brandKitProvider);
-  final baseTemplate = template ??
+  final baseTemplate =
+      template ??
       templateById('tpl_service_bold') ??
       builtInTemplates.firstWhere(
         (t) => t.category == 'service',
         orElse: () => blankCanvas(adSizes.first),
       );
 
-  final shopUrl = service.remoteId != null
-      ? 'https://soko24.co/s/${service.remoteId}'
+  final shopUrl = (service.slug ?? '').trim().isNotEmpty
+      ? 'https://www.soko24.co/service/${service.slug!.trim()}'
+      : service.remoteId != null
+      ? 'https://www.soko24.co/s/${service.remoteId}'
       : '';
 
   final applied = baseTemplate.applyService(
@@ -196,7 +214,10 @@ Future<void> launchFullStudioWeb(
   final connectivity = await Connectivity().checkConnectivity();
   if (connectivity.contains(ConnectivityResult.none)) {
     if (!context.mounted) return;
-    _showStudioError(context, 'No internet connection. Please connect and try again.');
+    _showStudioError(
+      context,
+      'No internet connection. Please connect and try again.',
+    );
     return;
   }
 
@@ -226,14 +247,17 @@ Future<void> launchFullStudioWeb(
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
       unawaited(
-        telemetry.event('studio_web_open', props: {
-          if (productId != null) 'product_id': productId,
-          if (serviceId != null) 'service_id': serviceId,
-          if (quotationId != null) 'quotation_id': quotationId,
-          if (receiptId != null) 'receipt_id': receiptId,
-          'brand_kit': brandKit,
-          'open_panel': openPanel,
-        }),
+        telemetry.event(
+          'studio_web_open',
+          props: {
+            if (productId != null) 'product_id': productId,
+            if (serviceId != null) 'service_id': serviceId,
+            if (quotationId != null) 'quotation_id': quotationId,
+            if (receiptId != null) 'receipt_id': receiptId,
+            'brand_kit': brandKit,
+            'open_panel': openPanel,
+          },
+        ),
       );
     }
 
@@ -248,9 +272,7 @@ Future<void> launchFullStudioWeb(
     debugPrint('[launchFullStudioWeb] error: $e\n$st');
     final telemetry = Telemetry.instance;
     if (telemetry != null) {
-      unawaited(
-        telemetry.recordError(e, st, hint: 'launch_full_studio_web'),
-      );
+      unawaited(telemetry.recordError(e, st, hint: 'launch_full_studio_web'));
     }
     if (!context.mounted) return;
     final message = _userFacingStudioError(e);
@@ -452,10 +474,5 @@ Future<void> launchFullStudioWebForBrandKit(
   String openPanel = 'brand-kit',
 }) async {
   _logStudioEntityResolve(entityType: 'brand_kit', success: true);
-  await launchFullStudioWeb(
-    context,
-    ref,
-    brandKit: true,
-    openPanel: openPanel,
-  );
+  await launchFullStudioWeb(context, ref, brandKit: true, openPanel: openPanel);
 }

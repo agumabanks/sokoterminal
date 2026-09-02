@@ -160,9 +160,36 @@ class _ReceiptTemplatesScreenState
       onRefresh: controller.load,
       child: ListView.builder(
         padding: DesignTokens.paddingScreen,
-        itemCount: state.templates.length,
+        itemCount: state.templates.length + 1,
         itemBuilder: (context, index) {
-          final template = state.templates[index];
+          if (index == 0) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: DesignTokens.brandAccentLight,
+                borderRadius: DesignTokens.borderRadiusLg,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.auto_awesome_outlined,
+                    color: DesignTokens.brandAccent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Your active template is used for every printed, PDF and shared sales receipt.',
+                      style: DesignTokens.textSmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final template = state.templates[index - 1];
           return _TemplateCard(
             template: template,
             onTap: () => _editTemplate(template),
@@ -356,7 +383,10 @@ class _TemplateCard extends StatelessWidget {
                       children: [
                         Icon(Icons.delete_outline, color: DesignTokens.error),
                         SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: DesignTokens.error)),
+                        Text(
+                          'Delete',
+                          style: TextStyle(color: DesignTokens.error),
+                        ),
                       ],
                     ),
                   ),

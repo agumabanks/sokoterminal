@@ -4,13 +4,15 @@ class TaxCalculator {
   ///
   /// When [inclusive] is true, the tax is extracted from the subtotal.
   /// When false, the tax is added on top of the subtotal.
-  static double taxAmount(double subtotal, double ratePercent,
-      {bool inclusive = false}) {
+  static double taxAmount(
+    double subtotal,
+    double ratePercent, {
+    bool inclusive = false,
+  }) {
     if (subtotal <= 0 || ratePercent <= 0) return 0;
     if (inclusive) {
       // tax-included: tax = subtotal - (subtotal / (1 + rate/100))
-      return (subtotal - (subtotal / (1 + ratePercent / 100)))
-          .roundToDouble();
+      return (subtotal - (subtotal / (1 + ratePercent / 100))).roundToDouble();
     }
     // tax-exclusive: tax = subtotal * rate/100
     return (subtotal * (ratePercent / 100)).roundToDouble();

@@ -26,7 +26,12 @@ class AvailabilityScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _DayConfig {
-  _DayConfig({required this.dayOfWeek, required this.start, required this.end, required this.isAvailable});
+  _DayConfig({
+    required this.dayOfWeek,
+    required this.start,
+    required this.end,
+    required this.isAvailable,
+  });
   final int dayOfWeek; // 0=Mon … 6=Sun (UI order)
   TimeOfDay start;
   TimeOfDay end;
@@ -41,12 +46,15 @@ class _AvailabilityScheduleScreenState
   @override
   void initState() {
     super.initState();
-    _days = List.generate(7, (i) => _DayConfig(
-      dayOfWeek: i,
-      start: const TimeOfDay(hour: 9, minute: 0),
-      end: const TimeOfDay(hour: 17, minute: 0),
-      isAvailable: i < 5, // Mon-Fri default
-    ));
+    _days = List.generate(
+      7,
+      (i) => _DayConfig(
+        dayOfWeek: i,
+        start: const TimeOfDay(hour: 9, minute: 0),
+        end: const TimeOfDay(hour: 17, minute: 0),
+        isAvailable: i < 5, // Mon-Fri default
+      ),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadFromState());
   }
 
@@ -110,7 +118,10 @@ class _AvailabilityScheduleScreenState
     setState(() {
       for (final d in _days) {
         d.isAvailable = source.isAvailable;
-        d.start = TimeOfDay(hour: source.start.hour, minute: source.start.minute);
+        d.start = TimeOfDay(
+          hour: source.start.hour,
+          minute: source.start.minute,
+        );
         d.end = TimeOfDay(hour: source.end.hour, minute: source.end.minute);
       }
     });
@@ -129,13 +140,15 @@ class _AvailabilityScheduleScreenState
       };
     }).toList();
 
-    await ref.read(availabilityControllerProvider.notifier).updateSchedules(schedules);
+    await ref
+        .read(availabilityControllerProvider.notifier)
+        .updateSchedules(schedules);
     setState(() => _saving = false);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Availability saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Availability saved')));
     }
   }
 
@@ -161,12 +174,19 @@ class _AvailabilityScheduleScreenState
           if (_saving)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             )
           else
             TextButton(
               onPressed: _save,
-              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Save',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
         ],
       ),
@@ -181,13 +201,18 @@ class _AvailabilityScheduleScreenState
                 color: DesignTokens.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(state.error!, style: const TextStyle(color: DesignTokens.error)),
+              child: Text(
+                state.error!,
+                style: const TextStyle(color: DesignTokens.error),
+              ),
             ),
           ...List.generate(7, (i) {
             final day = _days[i];
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -198,7 +223,9 @@ class _AvailabilityScheduleScreenState
                         Expanded(
                           child: Text(
                             _dayNames[i],
-                            style: DesignTokens.textBody.copyWith(fontWeight: FontWeight.w600),
+                            style: DesignTokens.textBody.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         Switch(
@@ -217,7 +244,10 @@ class _AvailabilityScheduleScreenState
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('—', style: TextStyle(color: DesignTokens.grayMedium)),
+                            child: Text(
+                              '—',
+                              style: TextStyle(color: DesignTokens.grayMedium),
+                            ),
                           ),
                           _TimeChip(
                             label: _fmt(day.end),
@@ -238,7 +268,9 @@ class _AvailabilityScheduleScreenState
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AvailabilityExceptionsScreen()),
+              MaterialPageRoute(
+                builder: (_) => const AvailabilityExceptionsScreen(),
+              ),
             ),
             icon: const Icon(Icons.block),
             label: const Text('Block Dates / Custom Hours'),
@@ -246,7 +278,9 @@ class _AvailabilityScheduleScreenState
               backgroundColor: DesignTokens.brandPrimary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],

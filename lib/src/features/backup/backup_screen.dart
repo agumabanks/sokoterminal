@@ -128,7 +128,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.warning),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.warning,
+            ),
             child: const Text('Restore'),
           ),
         ],
@@ -180,7 +182,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: DesignTokens.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DesignTokens.error,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -270,8 +274,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                           Text(
                             'Secure your business data',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onPrimary.withValues(alpha: 
-                                0.8,
+                              color: theme.colorScheme.onPrimary.withValues(
+                                alpha: 0.8,
                               ),
                             ),
                           ),
@@ -513,7 +517,9 @@ class _BackupCard extends StatelessWidget {
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: const Text('Delete'),
-                  style: TextButton.styleFrom(foregroundColor: DesignTokens.error),
+                  style: TextButton.styleFrom(
+                    foregroundColor: DesignTokens.error,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(

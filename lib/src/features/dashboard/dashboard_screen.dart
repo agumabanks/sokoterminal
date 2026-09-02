@@ -19,7 +19,10 @@ final dashboardMetricsProvider = FutureProvider<DashboardMetrics>((ref) async {
 
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
-  final todayRevenue = await db.ledgerEntryTotalByType('sale', since: todayStart);
+  final todayRevenue = await db.ledgerEntryTotalByType(
+    'sale',
+    since: todayStart,
+  );
   final todayCount = await db.ledgerEntryCountByType('sale', since: todayStart);
 
   // Estimate gross profit assuming ~40% margin when cost data unavailable
@@ -49,8 +52,9 @@ final _recentLedgerProvider = FutureProvider<List<_RecentSale>>((ref) async {
   final sales = entries.where((e) => e.type == 'sale').take(5).toList();
   final result = <_RecentSale>[];
   for (final entry in sales) {
-    final payments =
-        await (db.select(db.payments)..where((p) => p.entryId.equals(entry.id))).get();
+    final payments = await (db.select(
+      db.payments,
+    )..where((p) => p.entryId.equals(entry.id))).get();
     final method = payments.isNotEmpty ? payments.first.method : 'cash';
     result.add(_RecentSale(entry: entry, paymentMethod: method));
   }
@@ -91,9 +95,8 @@ class DashboardScreen extends ConsumerWidget {
     final businessProfile = ref.watch(_businessProfileProvider);
     final recentSales = ref.watch(_recentLedgerProvider);
 
-    final isOnline = connectivity.asData?.value.any(
-          (r) => r != ConnectivityResult.none,
-        ) ??
+    final isOnline =
+        connectivity.asData?.value.any((r) => r != ConnectivityResult.none) ??
         true;
 
     return Scaffold(
@@ -118,7 +121,8 @@ class DashboardScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           Text(
-                            businessProfile.asData?.value?.shopName ?? 'My Business',
+                            businessProfile.asData?.value?.shopName ??
+                                'My Business',
                             style: DesignTokens.textDisplay.copyWith(
                               color: DesignTokens.surfaceWhite,
                               fontSize: 28,
@@ -126,7 +130,9 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: DesignTokens.spaceXs),
                           Text(
-                            _getGreeting(businessProfile.asData?.value?.sellerName),
+                            _getGreeting(
+                              businessProfile.asData?.value?.sellerName,
+                            ),
                             style: DesignTokens.textSmallLight,
                           ),
                           const SizedBox(height: DesignTokens.spaceMd),
@@ -173,34 +179,16 @@ class DashboardScreen extends ConsumerWidget {
                     // ── 7-day Sparkline ───────────────────────────────────
                     const SizedBox(height: 72, child: _SparklineChart()),
                     const SizedBox(height: DesignTokens.spaceSm),
-                    // ── KPI Row: Transactions | Avg Order | Gross Profit ──
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _KpiCard(
-                            label: 'Transactions',
-                            value: m.transactions.toString(),
-                            icon: Icons.receipt_long_outlined,
-                            iconColor: DesignTokens.info,
-                          ),
+                    _KpiStrip(
+                      items: [
+                        (label: 'Sales', value: m.transactions.toString()),
+                        (
+                          label: 'Average',
+                          value: '${_formatNumber(m.averageSale)} /=',
                         ),
-                        const SizedBox(width: DesignTokens.spaceSm),
-                        Expanded(
-                          child: _KpiCard(
-                            label: 'Avg Order',
-                            value: 'UGX ${_formatNumber(m.averageSale)}',
-                            icon: Icons.trending_up,
-                            iconColor: DesignTokens.info,
-                          ),
-                        ),
-                        const SizedBox(width: DesignTokens.spaceSm),
-                        Expanded(
-                          child: _KpiCard(
-                            label: 'Est. Profit',
-                            value: 'UGX ${_formatNumber(m.grossProfit)}',
-                            icon: Icons.savings_outlined,
-                            iconColor: DesignTokens.brandAccent,
-                          ),
+                        (
+                          label: 'Est. profit',
+                          value: '${_formatNumber(m.grossProfit)} /=',
                         ),
                       ],
                     ),
@@ -213,10 +201,16 @@ class DashboardScreen extends ConsumerWidget {
                             width: double.infinity,
                             padding: DesignTokens.paddingCard,
                             decoration: BoxDecoration(
-                              color: DesignTokens.brandAccent.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
+                              color: DesignTokens.brandAccent.withValues(
+                                alpha: 0.08,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                DesignTokens.radiusMd,
+                              ),
                               border: Border.all(
-                                color: DesignTokens.brandAccent.withValues(alpha: 0.2),
+                                color: DesignTokens.brandAccent.withValues(
+                                  alpha: 0.2,
+                                ),
                               ),
                             ),
                             child: Row(
@@ -258,7 +252,22 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(height: DesignTokens.spaceLg),
                         ],
                       ),
-                    Text('Quick Actions', style: DesignTokens.textTitle),
+                    Row(
+                      children: [
+                        Text(
+                          'Run your business',
+                          style: DesignTokens.textTitle,
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Today',
+                          style: DesignTokens.textCaption.copyWith(
+                            color: DesignTokens.brandAccent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: DesignTokens.spaceMd),
                     Column(
                       children: [
@@ -266,7 +275,7 @@ class DashboardScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: SizedBox(
-                                height: 80,
+                                height: 112,
                                 child: _QuickActionTile(
                                   icon: Icons.point_of_sale,
                                   label: 'New Sale',
@@ -279,7 +288,7 @@ class DashboardScreen extends ConsumerWidget {
                             const SizedBox(width: DesignTokens.spaceSm),
                             Expanded(
                               child: SizedBox(
-                                height: 80,
+                                height: 112,
                                 child: _QuickActionTile(
                                   icon: Icons.shopping_bag_outlined,
                                   label: 'Orders',
@@ -296,7 +305,7 @@ class DashboardScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: SizedBox(
-                                height: 80,
+                                height: 112,
                                 child: _QuickActionTile(
                                   icon: Icons.inventory_2_outlined,
                                   label: 'Products',
@@ -309,7 +318,7 @@ class DashboardScreen extends ConsumerWidget {
                             const SizedBox(width: DesignTokens.spaceSm),
                             Expanded(
                               child: SizedBox(
-                                height: 80,
+                                height: 112,
                                 child: _QuickActionTile(
                                   icon: Icons.bar_chart,
                                   label: 'Reports',
@@ -480,10 +489,7 @@ class _AnimatedValue extends StatelessWidget {
       duration: const Duration(milliseconds: 900),
       curve: Curves.easeOutQuart,
       builder: (context, animated, child) {
-        return Text(
-          formatter(animated),
-          style: style,
-        );
+        return Text(formatter(animated), style: style);
       },
     );
   }
@@ -538,7 +544,8 @@ class _SparklineChart extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -754,39 +761,45 @@ class _QuickActionTile extends StatelessWidget {
             boxShadow: DesignTokens.shadowSm,
           ),
           child: Padding(
-            padding: DesignTokens.paddingMd,
-            child: Row(
+            padding: const EdgeInsets.all(12),
+            child: Stack(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: DesignTokens.spaceMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        label,
-                        style: DesignTokens.textBodyBold,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(9),
                       ),
-                      Text(
-                        subtitle,
-                        style: DesignTokens.textCaption,
-                      ),
-                    ],
-                  ),
+                      child: Icon(icon, color: color, size: 19),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      style: DesignTokens.textBodyBold,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      subtitle,
+                      style: DesignTokens.textCaption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.chevron_right,
-                  color: DesignTokens.textTertiary,
-                  size: 20,
+                const Positioned(
+                  right: 0,
+                  top: 4,
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: DesignTokens.textTertiary,
+                    size: 17,
+                  ),
                 ),
               ],
             ),
@@ -839,7 +852,7 @@ class _HeroRevenueCard extends StatelessWidget {
           const SizedBox(height: 8),
           _AnimatedValue(
             value: metrics.todayRevenue,
-            formatter: (v) => 'UGX ${formatter(v)}',
+            formatter: (v) => '${formatter(v)} /=',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 36,
@@ -848,27 +861,19 @@ class _HeroRevenueCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              const Icon(Icons.receipt_outlined, color: Colors.white70, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                '${metrics.todayTransactions} transaction${metrics.todayTransactions == 1 ? '' : 's'} today',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              _RevenueMetaPill(
+                icon: Icons.receipt_outlined,
+                label:
+                    '${metrics.todayTransactions} transaction${metrics.todayTransactions == 1 ? '' : 's'} today',
               ),
-              const SizedBox(width: 16),
-              Container(
-                width: 1,
-                height: 12,
-                color: Colors.white38,
-              ),
-              const SizedBox(width: 16),
-              const Icon(Icons.show_chart, color: Colors.white70, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                'Total UGX ${formatter(metrics.grossSales)}',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              _RevenueMetaPill(
+                icon: Icons.show_chart,
+                label: 'All time ${formatter(metrics.grossSales)} /=',
               ),
             ],
           ),
@@ -878,57 +883,86 @@ class _HeroRevenueCard extends StatelessWidget {
   }
 }
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.iconColor,
-  });
+class _RevenueMetaPill extends StatelessWidget {
+  const _RevenueMetaPill({required this.icon, required this.label});
 
-  final String label;
-  final String value;
   final IconData icon;
-  final Color iconColor;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── KPI Card ─────────────────────────────────────────────────────────────────
+class _KpiStrip extends StatelessWidget {
+  const _KpiStrip({required this.items});
+
+  final List<({String label, String value})> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: DesignTokens.surfaceRaised,
         borderRadius: DesignTokens.borderRadiusMd,
-        border: Border.all(color: DesignTokens.grayLight.withValues(alpha: 0.6)),
+        boxShadow: DesignTokens.shadowSm,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: List.generate(items.length * 2 - 1, (index) {
+          if (index.isOdd) {
+            return const SizedBox(
+              height: 38,
+              child: VerticalDivider(
+                width: 1,
+                color: DesignTokens.dividerSolid,
+              ),
+            );
+          }
+          final item = items[index ~/ 2];
+          return Expanded(
+            child: Column(
+              children: [
+                Text(
+                  item.value,
+                  style: DesignTokens.textBodyBold.copyWith(fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.label,
+                  style: DesignTokens.textCaption.copyWith(fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: DesignTokens.textBodyBold.copyWith(
-              fontSize: 14,
-              color: DesignTokens.grayDark,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: DesignTokens.textCaption.copyWith(fontSize: 11),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -945,7 +979,13 @@ class _RecentSaleRow extends StatelessWidget {
     // Build initials from note or show generic receipt icon
     final note = sale.entry.note ?? '';
     final initials = note.trim().isNotEmpty
-        ? note.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        ? note
+              .trim()
+              .split(' ')
+              .map((w) => w.isNotEmpty ? w[0] : '')
+              .take(2)
+              .join()
+              .toUpperCase()
         : '';
     final hasInitials = initials.isNotEmpty;
 
@@ -996,7 +1036,7 @@ class _RecentSaleRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'UGX ${_formatCurrency(sale.entry.total)}',
+                '${_formatCurrency(sale.entry.total)} /=',
                 style: DesignTokens.textMono.copyWith(
                   fontSize: 14,
                   color: DesignTokens.grayDark,
@@ -1088,7 +1128,11 @@ class _InsightCard extends StatelessWidget {
             if (trailing != null)
               trailing!
             else
-              const Icon(Icons.chevron_right, color: DesignTokens.textTertiary, size: 20),
+              const Icon(
+                Icons.chevron_right,
+                color: DesignTokens.textTertiary,
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -1121,7 +1165,9 @@ Color _syncColor(SyncStatus status) {
     case SyncState.offline:
       return DesignTokens.warning;
     case SyncState.idle:
-      return status.pendingCount > 0 ? DesignTokens.warning : DesignTokens.brandAccent;
+      return status.pendingCount > 0
+          ? DesignTokens.warning
+          : DesignTokens.brandAccent;
   }
 }
 

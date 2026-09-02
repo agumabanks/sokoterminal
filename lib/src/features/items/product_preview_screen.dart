@@ -332,7 +332,9 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                       onPressed: isOutOfStock
                           ? null
                           : () {
-                              final cart = ref.read(cartControllerProvider.notifier);
+                              final cart = ref.read(
+                                cartControllerProvider.notifier,
+                              );
                               final String? msg;
                               if (_hasVariants(stocks) &&
                                   _selectedVariant.trim().isNotEmpty) {
@@ -347,14 +349,16 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                                 msg = cart.addItem(
                                   item: item,
                                   quantity: _qty,
-                                  availableStock: stockEnabled ? stockNow : null,
+                                  availableStock: stockEnabled
+                                      ? stockNow
+                                      : null,
                                 );
                               }
                               if (!context.mounted) return;
                               if (msg != null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(msg)),
-                                );
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(SnackBar(content: Text(msg)));
                                 return;
                               }
                               ScaffoldMessenger.of(context).showSnackBar(

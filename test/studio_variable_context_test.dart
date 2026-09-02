@@ -41,7 +41,7 @@ void main() {
 
     expect(resolved, contains('Sanaa Media'));
     expect(resolved, contains('Logo Design'));
-    expect(resolved, contains('UGX'));
+    expect(resolved, contains('25,000 /='));
     expect(resolved, contains('0706272481'));
     expect(resolved, contains('soko24.co/p/99'));
   });

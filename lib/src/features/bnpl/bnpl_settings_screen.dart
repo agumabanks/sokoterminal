@@ -63,8 +63,10 @@ class _BnplSettingsScreenState extends ConsumerState<BnplSettingsScreen> {
       body: statusAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Text('Unable to load BNPL status: $e',
-              style: DesignTokens.textBody),
+          child: Text(
+            'Unable to load BNPL status: $e',
+            style: DesignTokens.textBody,
+          ),
         ),
         data: (status) => ListView(
           padding: DesignTokens.paddingScreen,
@@ -98,29 +100,29 @@ class _StatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, color, title, subtitle) = switch (status.status) {
       'active' => (
-          Icons.check_circle_outline,
-          DesignTokens.success,
-          'Active',
-          'You are enrolled in Sanaa Finance BNPL. Buyers can pay later on eligible products and services.',
-        ),
+        Icons.check_circle_outline,
+        DesignTokens.success,
+        'Active',
+        'You are enrolled in Sanaa Finance BNPL. Buyers can pay later on eligible products and services.',
+      ),
       'pending' => (
-          Icons.hourglass_top_outlined,
-          DesignTokens.warning,
-          'Pending approval',
-          'Your enrollment request is being reviewed. You will be notified once it is approved.',
-        ),
+        Icons.hourglass_top_outlined,
+        DesignTokens.warning,
+        'Pending approval',
+        'Your enrollment request is being reviewed. You will be notified once it is approved.',
+      ),
       'suspended' => (
-          Icons.block_outlined,
-          DesignTokens.error,
-          'Suspended',
-          'Your BNPL access is temporarily suspended. Contact support for assistance.',
-        ),
+        Icons.block_outlined,
+        DesignTokens.error,
+        'Suspended',
+        'Your BNPL access is temporarily suspended. Contact support for assistance.',
+      ),
       _ => (
-          Icons.account_balance_wallet_outlined,
-          DesignTokens.grayMedium,
-          'Not enrolled',
-          'Let customers buy now and pay later with Sanaa Finance BNPL.',
-        ),
+        Icons.account_balance_wallet_outlined,
+        DesignTokens.grayMedium,
+        'Not enrolled',
+        'Let customers buy now and pay later with Sanaa Finance BNPL.',
+      ),
     };
 
     return Container(
@@ -147,8 +149,10 @@ class _StatusCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: DesignTokens.textTitle.copyWith(color: color)),
+                Text(
+                  title,
+                  style: DesignTokens.textTitle.copyWith(color: color),
+                ),
                 const SizedBox(height: DesignTokens.spaceXs),
                 Text(subtitle, style: DesignTokens.textSmall),
               ],
@@ -180,7 +184,9 @@ class _InfoCard extends StatelessWidget {
           Text('How it works', style: DesignTokens.textBodyBold),
           const SizedBox(height: DesignTokens.spaceSm),
           _bullet('You get paid in full at checkout.'),
-          _bullet('Sanaa Finance collects installment payments from the buyer.'),
+          _bullet(
+            'Sanaa Finance collects installment payments from the buyer.',
+          ),
           _bullet('You control which products and services offer BNPL.'),
           if (status.isActive) ...[
             const SizedBox(height: DesignTokens.spaceMd),

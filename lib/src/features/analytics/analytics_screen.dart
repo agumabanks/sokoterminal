@@ -52,7 +52,7 @@ class AnalyticsScreen extends ConsumerWidget {
         Expanded(
           child: _StatCard(
             label: 'Revenue (7d)',
-            value: 'UGX ${NumberFormat.compact().format(total7d)}',
+            value: '${NumberFormat.compact().format(total7d)} /=',
             icon: Icons.payments_outlined,
             color: DesignTokens.success,
           ),
@@ -62,7 +62,7 @@ class AnalyticsScreen extends ConsumerWidget {
           child: _StatCard(
             label: 'Stock Value',
             value:
-                'UGX ${NumberFormat.compact().format(state.totalInventoryValue)}',
+                '${NumberFormat.compact().format(state.totalInventoryValue)} /=',
             icon: Icons.inventory_2_outlined,
             color: DesignTokens.brandAccent,
           ),
@@ -206,7 +206,7 @@ class AnalyticsScreen extends ConsumerWidget {
                   style: DesignTokens.textSmall,
                 ),
                 trailing: Text(
-                  'UGX ${NumberFormat.compact().format(p.revenue)}',
+                  '${NumberFormat.compact().format(p.revenue)} /=',
                   style: DesignTokens.textBodyBold.copyWith(
                     color: DesignTokens.brandAccent,
                   ),

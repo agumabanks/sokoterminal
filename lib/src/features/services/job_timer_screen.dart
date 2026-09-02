@@ -139,7 +139,9 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
 
     final note = _noteCtrl.text.trim();
     final materialsJson = _costs.isNotEmpty
-        ? jsonEncode(_costs.map((c) => {'item': c.name, 'cost': c.amount}).toList())
+        ? jsonEncode(
+            _costs.map((c) => {'item': c.name, 'cost': c.amount}).toList(),
+          )
         : null;
 
     final saved = _activeSession!.copyWith(
@@ -161,7 +163,9 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
       'ended_at': saved.endedAt?.toUtc().toIso8601String(),
       'duration_minutes': saved.durationMinutes,
       'description': note,
-      'materials': _costs.map((c) => {'item': c.name, 'cost': c.amount}).toList(),
+      'materials': _costs
+          .map((c) => {'item': c.name, 'cost': c.amount})
+          .toList(),
       'final_charge': charge,
     });
     unawaited(sync.syncNow());
@@ -175,7 +179,7 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
         title: const Text('Job Complete'),
         content: Text(
           'Duration: ${_fmtDuration(saved.durationMinutes ?? 0)}\n'
-          'Charge: UGX ${charge.toStringAsFixed(0)}',
+          'Charge: ${charge.toStringAsFixed(0)} /=',
         ),
         actions: [
           TextButton(
@@ -194,10 +198,12 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
       // Add to cart
       final service = await db.getServiceById(saved.serviceId);
       if (service != null) {
-        ref.read(cartControllerProvider.notifier).addService(
-          service: service,
-          variantPrice: charge > 0 ? charge : null,
-        );
+        ref
+            .read(cartControllerProvider.notifier)
+            .addService(
+              service: service,
+              variantPrice: charge > 0 ? charge : null,
+            );
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -222,13 +228,12 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final hasActive = _activeSession != null && _activeSession!.endedAt == null;
-    final isCompleted = _activeSession != null && _activeSession!.endedAt != null;
+    final isCompleted =
+        _activeSession != null && _activeSession!.endedAt != null;
 
     return Scaffold(
       backgroundColor: DesignTokens.surface,
@@ -253,7 +258,9 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
                       style: TextStyle(
                         fontSize: 64,
                         fontWeight: FontWeight.w200,
-                        color: hasActive ? DesignTokens.brandAccent : DesignTokens.textPrimary,
+                        color: hasActive
+                            ? DesignTokens.brandAccent
+                            : DesignTokens.textPrimary,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
@@ -301,7 +308,7 @@ class _JobTimerScreenState extends ConsumerState<JobTimerScreen> {
                       controller: _chargeCtrl,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: 'Charge Amount (UGX)',
+                        labelText: 'Charge Amount (/=)',
                         prefixIcon: Icon(Icons.money),
                       ),
                     ),
@@ -426,7 +433,7 @@ class _CostsSectionState extends State<_CostsSection> {
                     child: TextField(
                       decoration: const InputDecoration(
                         hintText: 'Cost',
-                        prefixText: 'UGX ',
+                        suffixText: ' /=',
                         contentPadding: EdgeInsets.symmetric(horizontal: 12),
                       ),
                       keyboardType: TextInputType.number,
@@ -434,11 +441,16 @@ class _CostsSectionState extends State<_CostsSection> {
                         c.amount = double.tryParse(v) ?? 0;
                         widget.onChanged();
                       },
-                      controller: TextEditingController(text: c.amount.toStringAsFixed(0)),
+                      controller: TextEditingController(
+                        text: c.amount.toStringAsFixed(0),
+                      ),
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: DesignTokens.error),
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: DesignTokens.error,
+                    ),
                     onPressed: () {
                       widget.costs.removeAt(i);
                       widget.onChanged();

@@ -66,7 +66,9 @@ class StudioSettingsScreen extends ConsumerWidget {
               selected: appearance == option,
               onTap: () {
                 Haptics.selection();
-                ref.read(studioAppearanceProvider.notifier).setAppearance(option);
+                ref
+                    .read(studioAppearanceProvider.notifier)
+                    .setAppearance(option);
               },
             ),
           const SizedBox(height: 28),
@@ -86,9 +88,9 @@ class StudioSettingsScreen extends ConsumerWidget {
             child: InkWell(
               onTap: () {
                 Haptics.selection();
-                Navigator.of(context).push(
-                  studioPageRoute(const BrandKitScreen()),
-                );
+                Navigator.of(
+                  context,
+                ).push(studioPageRoute(const BrandKitScreen()));
               },
               borderRadius: BorderRadius.circular(14),
               child: Container(
@@ -221,8 +223,8 @@ class _AppearanceTile extends StatelessWidget {
                     option == StudioAppearance.monochromeLight
                         ? Icons.wb_sunny_outlined
                         : option == StudioAppearance.monochromeDark
-                            ? Icons.nights_stay_outlined
-                            : Icons.auto_awesome_rounded,
+                        ? Icons.nights_stay_outlined
+                        : Icons.auto_awesome_rounded,
                     color: preview.textPrimary,
                     size: 20,
                   ),
@@ -251,7 +253,11 @@ class _AppearanceTile extends StatelessWidget {
                   ),
                 ),
                 if (selected)
-                  Icon(Icons.check_circle_rounded, color: preview.accent, size: 22),
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: preview.accent,
+                    size: 22,
+                  ),
               ],
             ),
           ),
@@ -367,16 +373,16 @@ class _WatermarkCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.info_outline_rounded,
-                    color: theme.textMuted, size: 14),
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: theme.textMuted,
+                  size: 14,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'No business logo set. Upload one in Brand Kit.',
-                    style: TextStyle(
-                      color: theme.textMuted,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: theme.textMuted, fontSize: 11),
                   ),
                 ),
               ],
@@ -422,7 +428,8 @@ class _NotificationsCard extends StatelessWidget {
             theme: theme,
             label: 'Remind me about new inventory',
             value: prefs.suggestFromInventory,
-            onChanged: (v) => onChanged(prefs.copyWith(suggestFromInventory: v)),
+            onChanged: (v) =>
+                onChanged(prefs.copyWith(suggestFromInventory: v)),
           ),
           const SizedBox(height: 12),
           _ToggleRow(
@@ -434,12 +441,20 @@ class _NotificationsCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.info_outline_rounded, color: theme.textMuted, size: 14),
+              Icon(
+                Icons.info_outline_rounded,
+                color: theme.textMuted,
+                size: 14,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Reminders are scheduled for 10:00 AM, 2:00 PM and 6:00 PM based on your device time.',
-                  style: TextStyle(color: theme.textMuted, fontSize: 11, height: 1.4),
+                  style: TextStyle(
+                    color: theme.textMuted,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ],

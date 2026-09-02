@@ -163,7 +163,7 @@ class CouponsScreen extends ConsumerWidget {
                   final coupon = state.items[index];
                   final label = coupon.discountType == 'percent'
                       ? '${coupon.discount.toStringAsFixed(0)}% off'
-                      : 'UGX ${coupon.discount.toStringAsFixed(0)} off';
+                      : '${coupon.discount.toStringAsFixed(0)} /= off';
                   return _CouponCard(
                     coupon: coupon,
                     label: label,
@@ -178,7 +178,7 @@ class CouponsScreen extends ConsumerWidget {
   void _showDetails(BuildContext context, WidgetRef ref, CouponDto coupon) {
     final label = coupon.discountType == 'percent'
         ? '${coupon.discount.toStringAsFixed(0)}% off'
-        : 'UGX ${coupon.discount.toStringAsFixed(0)} off';
+        : '${coupon.discount.toStringAsFixed(0)} /= off';
     BottomSheetModal.show(
       context: context,
       title: coupon.code,
@@ -295,7 +295,7 @@ class CouponsScreen extends ConsumerWidget {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
-                        labelText: 'Min buy (UGX)',
+                        labelText: 'Min buy (/=)',
                         prefixIcon: Icon(Icons.shopping_cart_outlined),
                       ),
                     ),
@@ -307,7 +307,7 @@ class CouponsScreen extends ConsumerWidget {
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
-                        labelText: 'Max discount (UGX)',
+                        labelText: 'Max discount (/=)',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
                     ),

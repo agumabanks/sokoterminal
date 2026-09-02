@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 /// Formats numeric input with comma separators (e.g. 50000 -> 50,000).
 ///
-/// Use this for UGX amount and quantity fields. The raw value (digits only)
+/// Use this for /= amount and quantity fields. The raw value (digits only)
 /// is available via [unformat].
 class CommaNumberFormatter extends TextInputFormatter {
   const CommaNumberFormatter();
@@ -55,10 +55,13 @@ class CommaNumberFormatter extends TextInputFormatter {
 
     // Calculate new cursor position
     // Count how many digits are before the old cursor
-    final oldTextBeforeCursor =
-        oldValue.text.substring(0, oldValue.selection.baseOffset);
-    final digitsBeforeCursor =
-        oldTextBeforeCursor.replaceAll(RegExp(r'[^0-9]'), '').length;
+    final oldTextBeforeCursor = oldValue.text.substring(
+      0,
+      oldValue.selection.baseOffset,
+    );
+    final digitsBeforeCursor = oldTextBeforeCursor
+        .replaceAll(RegExp(r'[^0-9]'), '')
+        .length;
 
     // In the formatted text, find position where that many digits have appeared
     int digitCount = 0;

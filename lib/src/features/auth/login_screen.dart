@@ -149,9 +149,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           for (final value in fieldErrors.values) {
             if (value is List) {
               lines.addAll(
-                value.map((entry) => entry.toString().trim()).where(
-                  (entry) => entry.isNotEmpty,
-                ),
+                value
+                    .map((entry) => entry.toString().trim())
+                    .where((entry) => entry.isNotEmpty),
               );
             } else if (value != null) {
               final text = value.toString().trim();
@@ -494,7 +494,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             Positioned(
               top: -140,
               right: -120,
-              child: _GlowBlob(color: _accent.withValues(alpha: 0.16), size: 420),
+              child: _GlowBlob(
+                color: _accent.withValues(alpha: 0.16),
+                size: 420,
+              ),
             ),
             Positioned(
               bottom: -160,
@@ -733,10 +736,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               text: (_hasPin && !_usePassword)
                   ? 'Unlock'
                   : _cooldownSeconds > 0
-                      ? 'Wait $_cooldownSeconds s'
-                      : 'Login',
+                  ? 'Wait $_cooldownSeconds s'
+                  : 'Login',
               isLoading: _isLoading || _cooldownSeconds > 0,
-              onTap: () { _handleAuthSubmit(); },
+              onTap: () {
+                _handleAuthSubmit();
+              },
             ),
             if (_hasPin) ...[
               const SizedBox(height: 8),

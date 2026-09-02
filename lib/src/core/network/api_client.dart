@@ -422,9 +422,7 @@ class ApiClient {
 
   Future<void> _performLogout(String path) async {
     if (_isLoggingOut) {
-      debugPrint(
-        '[HTTP] Auth expired for $path; logout already in progress',
-      );
+      debugPrint('[HTTP] Auth expired for $path; logout already in progress');
       return;
     }
     _isLoggingOut = true;

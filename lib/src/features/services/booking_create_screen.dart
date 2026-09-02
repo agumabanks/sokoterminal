@@ -23,7 +23,8 @@ class BookingCreateScreen extends ConsumerStatefulWidget {
   final DateTime? preselectedDate;
 
   @override
-  ConsumerState<BookingCreateScreen> createState() => _BookingCreateScreenState();
+  ConsumerState<BookingCreateScreen> createState() =>
+      _BookingCreateScreenState();
 }
 
 class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
@@ -83,7 +84,9 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
 
   Future<void> _loadSlots() async {
     if (_selectedServiceId == null) return;
-    final service = await ref.read(appDatabaseProvider).getServiceById(_selectedServiceId!);
+    final service = await ref
+        .read(appDatabaseProvider)
+        .getServiceById(_selectedServiceId!);
     if (service == null) return;
 
     setState(() {
@@ -101,8 +104,12 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
         date: dateStr,
         timezone: DateTime.now().timeZoneName,
       );
-      final data = res.data is Map ? res.data as Map<String, dynamic> : <String, dynamic>{};
-      final slotsData = data['data'] is Map ? data['data'] as Map<String, dynamic> : <String, dynamic>{};
+      final data = res.data is Map
+          ? res.data as Map<String, dynamic>
+          : <String, dynamic>{};
+      final slotsData = data['data'] is Map
+          ? data['data'] as Map<String, dynamic>
+          : <String, dynamic>{};
       final slots = List<String>.from(slotsData['slots'] ?? []);
       setState(() {
         _availableSlots = slots;
@@ -121,7 +128,8 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
         _availableSlots = slots;
         _loadingSlots = false;
         if (slots.isEmpty) {
-          _slotsError = 'No slots available. Check your working hours or try another date.';
+          _slotsError =
+              'No slots available. Check your working hours or try another date.';
         }
       });
     }
@@ -280,11 +288,13 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
                   prefixIcon: Icon(Icons.room_service_outlined),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Select a service')),
-                  ...services.map((s) => DropdownMenuItem(
-                    value: s.id,
-                    child: Text(s.title),
-                  )),
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Select a service'),
+                  ),
+                  ...services.map(
+                    (s) => DropdownMenuItem(value: s.id, child: Text(s.title)),
+                  ),
                 ],
                 onChanged: (v) {
                   setState(() {
@@ -384,7 +394,13 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
                 color: DesignTokens.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(_slotsError!, style: const TextStyle(color: DesignTokens.warning, fontSize: 13)),
+              child: Text(
+                _slotsError!,
+                style: const TextStyle(
+                  color: DesignTokens.warning,
+                  fontSize: 13,
+                ),
+              ),
             ),
           if (_availableSlots.isEmpty && !_loadingSlots)
             const Text(
@@ -422,7 +438,11 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.error_outline, color: DesignTokens.error, size: 18),
+                  Icon(
+                    Icons.error_outline,
+                    color: DesignTokens.error,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -442,7 +462,9 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
             children: [30, 60, 90, 120, 180, 240].map((min) {
               final selected = _durationMinutes == min;
               return ChoiceChip(
-                label: Text('${min ~/ 60}h${min % 60 > 0 ? ' ${min % 60}m' : ''}'),
+                label: Text(
+                  '${min ~/ 60}h${min % 60 > 0 ? ' ${min % 60}m' : ''}',
+                ),
                 selected: selected,
                 onSelected: (_) {
                   setState(() => _durationMinutes = min);
@@ -450,7 +472,9 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
                 },
                 selectedColor: DesignTokens.brandAccent.withValues(alpha: 0.15),
                 labelStyle: TextStyle(
-                  color: selected ? DesignTokens.brandAccent : DesignTokens.textPrimary,
+                  color: selected
+                      ? DesignTokens.brandAccent
+                      : DesignTokens.textPrimary,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),
               );
@@ -491,7 +515,7 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
             controller: _priceCtrl,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              labelText: 'Price (UGX)',
+              labelText: 'Price (/=)',
               prefixIcon: Icon(Icons.money),
             ),
           ),
@@ -513,7 +537,14 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
           ElevatedButton.icon(
             onPressed: (_saving || _hasConflict) ? null : _save,
             icon: _saving
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Icon(Icons.save),
             label: Text(_saving ? 'Saving...' : 'Create Booking'),
             style: ElevatedButton.styleFrom(
@@ -574,7 +605,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
           children: [
             const SizedBox(height: 12),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: DesignTokens.grayLight,
                 borderRadius: BorderRadius.circular(2),
@@ -610,7 +642,10 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                     borderRadius: DesignTokens.borderRadiusMd,
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
                 ),
               ),
             ),
@@ -623,15 +658,24 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                       ),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
                       itemCount: _filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: DesignTokens.hairline),
+                      separatorBuilder: (_, __) => const Divider(
+                        height: 1,
+                        color: DesignTokens.hairline,
+                      ),
                       itemBuilder: (context, index) {
                         final c = _filtered[index];
-                        final initial = c.name.isNotEmpty ? c.name[0].toUpperCase() : '?';
+                        final initial = c.name.isNotEmpty
+                            ? c.name[0].toUpperCase()
+                            : '?';
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: DesignTokens.brandAccent.withValues(alpha: 0.12),
+                            backgroundColor: DesignTokens.brandAccent
+                                .withValues(alpha: 0.12),
                             child: Text(
                               initial,
                               style: const TextStyle(

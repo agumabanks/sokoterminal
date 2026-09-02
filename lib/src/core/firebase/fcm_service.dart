@@ -11,12 +11,13 @@ import 'fcm_navigation.dart';
 import 'firebase_runtime.dart';
 
 typedef FcmNavigateCallback = void Function(String route);
-typedef FcmForegroundBannerCallback = void Function({
-  required String title,
-  String? body,
-  String? actionLabel,
-  VoidCallback? onAction,
-});
+typedef FcmForegroundBannerCallback =
+    void Function({
+      required String title,
+      String? body,
+      String? actionLabel,
+      VoidCallback? onAction,
+    });
 typedef FcmSyncHintCallback = Future<void> Function();
 
 /// Firebase Cloud Messaging service for push notifications.
@@ -38,13 +39,15 @@ class FCMService {
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<RemoteMessage>? _openedAppSub;
 
-  final _foregroundMessageController = StreamController<RemoteMessage>.broadcast();
+  final _foregroundMessageController =
+      StreamController<RemoteMessage>.broadcast();
 
   /// Broadcast stream of FCM messages received while the app is in the foreground.
   /// Consumers (e.g. [NotificationsController]) should listen here rather than
   /// subscribing to [FirebaseMessaging.onMessage] directly to avoid leaks and
   /// duplicate UI (double SnackBars, double navigation).
-  Stream<RemoteMessage> get foregroundMessages => _foregroundMessageController.stream;
+  Stream<RemoteMessage> get foregroundMessages =>
+      _foregroundMessageController.stream;
 
   FirebaseMessaging? get _messagingOrNull {
     if (!FirebaseRuntime.instance.firebaseEnabled) return null;
@@ -104,7 +107,9 @@ class FCMService {
       });
 
       await _foregroundSub?.cancel();
-      _foregroundSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      _foregroundSub = FirebaseMessaging.onMessage.listen(
+        _handleForegroundMessage,
+      );
 
       await _openedAppSub?.cancel();
       _openedAppSub = FirebaseMessaging.onMessageOpenedApp.listen(
@@ -194,9 +199,7 @@ class FCMService {
         type == 'marketplace_order') {
       return 'orders_channel';
     }
-    if (type == 'sync_hint' ||
-        type == 'sync' ||
-        type == 'sync_health') {
+    if (type == 'sync_hint' || type == 'sync' || type == 'sync_health') {
       return 'sync_channel';
     }
     return 'general_channel';

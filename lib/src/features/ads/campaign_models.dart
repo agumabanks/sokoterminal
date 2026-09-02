@@ -1,5 +1,3 @@
-
-
 // ---------------------------------------------------------------------------
 // Campaign Models — 360° Marketing Shell
 // ---------------------------------------------------------------------------
@@ -112,15 +110,22 @@ class Campaign {
       (g) => g.name == j['goal'],
       orElse: () => CampaignGoal.awareness,
     ),
-    startDate: DateTime.tryParse(j['startDate']?.toString() ?? '') ?? DateTime.now(),
-    endDate: j['endDate'] != null ? DateTime.tryParse(j['endDate'].toString()) : null,
+    startDate:
+        DateTime.tryParse(j['startDate']?.toString() ?? '') ?? DateTime.now(),
+    endDate: j['endDate'] != null
+        ? DateTime.tryParse(j['endDate'].toString())
+        : null,
     status: CampaignStatus.values.firstWhere(
       (s) => s.name == j['status'],
       orElse: () => CampaignStatus.draft,
     ),
-    templateIds: (j['templateIds'] as List? ?? []).map((e) => e.toString()).toList(),
+    templateIds: (j['templateIds'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList(),
     notes: j['notes']?.toString() ?? '',
-    createdAt: j['createdAt'] != null ? DateTime.tryParse(j['createdAt'].toString()) : null,
+    createdAt: j['createdAt'] != null
+        ? DateTime.tryParse(j['createdAt'].toString())
+        : null,
   );
 }
 
@@ -164,7 +169,9 @@ class ScheduledPost {
     id: j['id']?.toString() ?? '',
     campaignId: j['campaignId']?.toString() ?? '',
     title: j['title']?.toString() ?? '',
-    scheduledDate: DateTime.tryParse(j['scheduledDate']?.toString() ?? '') ?? DateTime.now(),
+    scheduledDate:
+        DateTime.tryParse(j['scheduledDate']?.toString() ?? '') ??
+        DateTime.now(),
     platform: j['platform']?.toString() ?? 'whatsapp',
     templateId: j['templateId']?.toString(),
     caption: j['caption']?.toString(),

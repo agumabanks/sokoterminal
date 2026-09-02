@@ -282,7 +282,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Refund of ${NumberFormat.currency(symbol: 'UGX ', decimalDigits: 0).format(_refundTotal)} processed',
+            'Refund of ${NumberFormat("#,##0 '/='").format(_refundTotal)} processed',
           ),
           backgroundColor: DesignTokens.success,
         ),
@@ -365,10 +365,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   }
 
   Widget _buildRefundView() {
-    final currencyFormat = NumberFormat.currency(
-      symbol: 'UGX ',
-      decimalDigits: 0,
-    );
+    final currencyFormat = NumberFormat("#,##0 '/='");
     final dateFormat = DateFormat('MMM dd, yyyy HH:mm');
 
     return Column(
@@ -485,10 +482,7 @@ class _SaleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      symbol: 'UGX ',
-      decimalDigits: 0,
-    );
+    final currencyFormat = NumberFormat("#,##0 '/='");
     final dateFormat = DateFormat('MMM dd, HH:mm');
 
     return Card(
@@ -528,10 +522,7 @@ class _RefundLineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      symbol: 'UGX ',
-      decimalDigits: 0,
-    );
+    final currencyFormat = NumberFormat("#,##0 '/='");
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

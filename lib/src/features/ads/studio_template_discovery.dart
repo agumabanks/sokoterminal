@@ -23,19 +23,16 @@ class TemplateDiscoverySection {
   final String subtitle;
   final List<String> templateIds;
 
-  List<AdTemplate> resolveTemplates() => templateIds
-      .map(templateById)
-      .whereType<AdTemplate>()
-      .toList();
+  List<AdTemplate> resolveTemplates() =>
+      templateIds.map(templateById).whereType<AdTemplate>().toList();
 
   factory TemplateDiscoverySection.fromJson(Map<String, dynamic> j) =>
       TemplateDiscoverySection(
         id: j['id']?.toString() ?? '',
         title: j['title']?.toString() ?? '',
         subtitle: j['subtitle']?.toString() ?? '',
-        templateIds: (j['template_ids'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ??
+        templateIds:
+            (j['template_ids'] as List?)?.map((e) => e.toString()).toList() ??
             const [],
       );
 }
@@ -45,38 +42,39 @@ List<TemplateDiscoverySection> localTemplateDiscoveryFallback() {
   return templateDiscoverySections.map((meta) {
     final ids = switch (meta.id) {
       'todays_ads' => [
-          'tpl_whatsapp',
-          'tpl_sale_bold',
-          'tpl_story',
-          'gen_hero_sale_pin',
-        ],
+        'tpl_whatsapp',
+        'tpl_sale_bold',
+        'tpl_story',
+        'gen_hero_sale_pin',
+      ],
       'top_picks' => [
-          'hub_logo_monogram',
-          'hub_menu_classic',
-          'hub_invoice_a4',
-          'tpl_sale_bold',
-          'tpl_story',
-          'hub_business_card',
-        ],
+        'hub_logo_monogram',
+        'hub_menu_classic',
+        'hub_invoice_a4',
+        'tpl_sale_bold',
+        'tpl_story',
+        'hub_business_card',
+      ],
       'popular' => [
-          'tpl_whatsapp',
-          'tpl_promo',
-          'hub_event_flyer',
-          'hub_service_flyer',
-          'tpl_new_arrival',
-        ],
+        'tpl_whatsapp',
+        'tpl_promo',
+        'hub_event_flyer',
+        'hub_service_flyer',
+        'tpl_new_arrival',
+      ],
       'for_you' => [
-          'hub_collage_grid',
-          'tpl_minimal',
-          'hub_brochure_cover',
-          'tpl_booking',
-        ],
+        'hub_collage_grid',
+        'tpl_minimal',
+        'hub_brochure_cover',
+        'tpl_booking',
+      ],
       'business_hub' => businessHubTemplates.map((t) => t.id).toList(),
-      'browse_all' => builtInTemplates
-          .where((t) => t.category != 'blank' && t.category != 'photo')
-          .map((t) => t.id)
-          .take(48)
-          .toList(),
+      'browse_all' =>
+        builtInTemplates
+            .where((t) => t.category != 'blank' && t.category != 'photo')
+            .map((t) => t.id)
+            .take(48)
+            .toList(),
       _ => <String>[],
     };
     return TemplateDiscoverySection(
@@ -90,27 +88,33 @@ List<TemplateDiscoverySection> localTemplateDiscoveryFallback() {
 
 final templateDiscoveryProvider =
     FutureProvider.autoDispose<List<TemplateDiscoverySection>>((ref) async {
-  final api = ref.watch(sellerApiProvider);
-  try {
-    final res = await api.fetchStudioCatalog();
-    final body = res.data;
-    if (body is Map && body['success'] == true && body['sections'] is List) {
-      return (body['sections'] as List)
-          .whereType<Map>()
-          .map((m) => TemplateDiscoverySection.fromJson(
-                Map<String, dynamic>.from(m),
-              ))
-          .where((s) => s.templateIds.isNotEmpty)
-          .toList();
-    }
-  } catch (e, st) {
-    final telemetry = Telemetry.instance;
-    if (telemetry != null) {
-      unawaited(telemetry.recordError(e, st, hint: 'studio_template_discovery'));
-    }
-  }
-  return localTemplateDiscoveryFallback();
-});
+      final api = ref.watch(sellerApiProvider);
+      try {
+        final res = await api.fetchStudioCatalog();
+        final body = res.data;
+        if (body is Map &&
+            body['success'] == true &&
+            body['sections'] is List) {
+          return (body['sections'] as List)
+              .whereType<Map>()
+              .map(
+                (m) => TemplateDiscoverySection.fromJson(
+                  Map<String, dynamic>.from(m),
+                ),
+              )
+              .where((s) => s.templateIds.isNotEmpty)
+              .toList();
+        }
+      } catch (e, st) {
+        final telemetry = Telemetry.instance;
+        if (telemetry != null) {
+          unawaited(
+            telemetry.recordError(e, st, hint: 'studio_template_discovery'),
+          );
+        }
+      }
+      return localTemplateDiscoveryFallback();
+    });
 
 final templateUseRecorderProvider = Provider<TemplateUseRecorder>((ref) {
   return TemplateUseRecorder(ref.read(sellerApiProvider));
@@ -127,7 +131,9 @@ class TemplateUseRecorder {
     } catch (e, st) {
       final telemetry = Telemetry.instance;
       if (telemetry != null) {
-        unawaited(telemetry.recordError(e, st, hint: 'studio_record_template_use'));
+        unawaited(
+          telemetry.recordError(e, st, hint: 'studio_record_template_use'),
+        );
       }
     }
   }

@@ -10,6 +10,8 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../widgets/error_state.dart';
+import '../../widgets/loading_state.dart';
 import '../invoices/invoice_providers.dart';
 import '../orders/marketplace_order.dart';
 import '../orders/order_details_screen.dart';
@@ -471,8 +473,11 @@ class _POSTransactionsList extends ConsumerWidget {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const LoadingState(label: 'Opening sales…'),
+      error: (e, _) => ErrorState(
+        message: 'Your saved sales are safe. Try opening them again.',
+        onRetry: () => ref.invalidate(filteredLedgerProvider(dateFilter)),
+      ),
     );
   }
 
@@ -583,7 +588,11 @@ class _POSTransactionTile extends ConsumerWidget {
               onPressed: () => _printReceipt(context, ref, entry.id),
             ),
             entry.synced
-                ? const Icon(Icons.cloud_done, color: DesignTokens.success, size: 18)
+                ? const Icon(
+                    Icons.cloud_done,
+                    color: DesignTokens.success,
+                    size: 18,
+                  )
                 : const Icon(
                     Icons.cloud_upload,
                     color: DesignTokens.warning,
@@ -942,22 +951,23 @@ class _OnlineOrdersFilterPanel extends StatelessWidget {
             Wrap(
               spacing: DesignTokens.spaceSm,
               runSpacing: DesignTokens.spaceSm,
-              children: const [
-                ('', 'All'),
-                ('pending', 'Pending'),
-                ('confirmed', 'Confirmed'),
-                ('on_the_way', 'On the way'),
-                ('delivered', 'Delivered'),
-                ('cancelled', 'Cancelled'),
-              ].map((entry) {
-                final value = entry.$1;
-                final label = entry.$2;
-                return _InlineFilterChip(
-                  label: label,
-                  selected: state.onlineDeliveryStatus == value,
-                  onTap: () => onDeliveryChanged(value),
-                );
-              }).toList(),
+              children:
+                  const [
+                    ('', 'All'),
+                    ('pending', 'Pending'),
+                    ('confirmed', 'Confirmed'),
+                    ('on_the_way', 'On the way'),
+                    ('delivered', 'Delivered'),
+                    ('cancelled', 'Cancelled'),
+                  ].map((entry) {
+                    final value = entry.$1;
+                    final label = entry.$2;
+                    return _InlineFilterChip(
+                      label: label,
+                      selected: state.onlineDeliveryStatus == value,
+                      onTap: () => onDeliveryChanged(value),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: DesignTokens.spaceMd),
             Text('Payment status', style: DesignTokens.textSmallBold),
@@ -965,19 +975,20 @@ class _OnlineOrdersFilterPanel extends StatelessWidget {
             Wrap(
               spacing: DesignTokens.spaceSm,
               runSpacing: DesignTokens.spaceSm,
-              children: const [
-                ('', 'All'),
-                ('paid', 'Paid'),
-                ('unpaid', 'Unpaid'),
-              ].map((entry) {
-                final value = entry.$1;
-                final label = entry.$2;
-                return _InlineFilterChip(
-                  label: label,
-                  selected: state.onlinePaymentStatus == value,
-                  onTap: () => onPaymentChanged(value),
-                );
-              }).toList(),
+              children:
+                  const [
+                    ('', 'All'),
+                    ('paid', 'Paid'),
+                    ('unpaid', 'Unpaid'),
+                  ].map((entry) {
+                    final value = entry.$1;
+                    final label = entry.$2;
+                    return _InlineFilterChip(
+                      label: label,
+                      selected: state.onlinePaymentStatus == value,
+                      onTap: () => onPaymentChanged(value),
+                    );
+                  }).toList(),
             ),
           ],
         ),
@@ -1196,7 +1207,9 @@ class _OnlineOrderTile extends ConsumerWidget {
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Invoice export failed: $e')),
+                            SnackBar(
+                              content: Text('Invoice export failed: $e'),
+                            ),
                           );
                         }
                       },
@@ -1242,10 +1255,8 @@ class _OnlineOrderTile extends ConsumerWidget {
     if (order.id == 0) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OrderDetailsScreen(
-          orderId: order.id,
-          initialData: order,
-        ),
+        builder: (_) =>
+            OrderDetailsScreen(orderId: order.id, initialData: order),
       ),
     );
   }
