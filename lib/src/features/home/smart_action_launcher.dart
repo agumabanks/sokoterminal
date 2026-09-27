@@ -26,13 +26,6 @@ class SellerQuickAction {
 
 const sellerQuickActions = <SellerQuickAction>[
   SellerQuickAction(
-    id: 'video-ad',
-    label: 'Video Ad',
-    subtitle: 'Create video ad',
-    icon: Icons.videocam_outlined,
-    color: DesignTokens.brandAccent,
-  ),
-  SellerQuickAction(
     id: 'marketing',
     label: 'Marketing',
     subtitle: 'Stickers, video, content',

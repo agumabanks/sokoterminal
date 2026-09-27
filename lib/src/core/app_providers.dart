@@ -37,7 +37,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     secureStorage: storage,
     onAuthExpired: () {
       // Lazy-import to avoid circular dependency:
-      // The auth controller will handle clearing state and navigating to login.
+      // The auth controller preserves local access and reports cloud reauthentication.
       try {
         ref.read(authLogoutCallbackProvider)?.call();
       } catch (_) {}
@@ -45,7 +45,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   );
 });
 
-// Callback set by auth_controller to handle 401-triggered logout.
+// Legacy provider name: callback now reports cloud reauthentication, never logout.
 final authLogoutCallbackProvider = StateProvider<void Function()?>(
   (ref) => null,
 );

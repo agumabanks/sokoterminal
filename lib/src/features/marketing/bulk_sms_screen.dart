@@ -340,8 +340,16 @@ class _BulkSmsScreenState extends ConsumerState<BulkSmsScreen> {
       body: RefreshIndicator(
         onRefresh: _loadDashboard,
         child: ListView(
-          padding: DesignTokens.paddingScreen,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            120 + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
+            _CreditsHero(dashboard: _dashboard, onBuyCredits: _openPurchaseUrl),
+            const SizedBox(height: 16),
             if (_loading && _dashboard == null)
               const Padding(
                 padding: EdgeInsets.only(top: 80),
@@ -357,19 +365,17 @@ class _BulkSmsScreenState extends ConsumerState<BulkSmsScreen> {
                 child: Text(_error!, style: DesignTokens.textSmall),
               )
             else ...[
-              _CreditsHero(
-                dashboard: _dashboard,
-                onBuyCredits: _openPurchaseUrl,
-              ),
-              const SizedBox(height: DesignTokens.spaceMd),
               SegmentedButton<_SmsView>(
                 showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(
                     value: _SmsView.campaign,
-                    label: Text('Campaign'),
+                    label: Text('Bulk SMS'),
                   ),
-                  ButtonSegment(value: _SmsView.quick, label: Text('Quick')),
+                  ButtonSegment(
+                    value: _SmsView.quick,
+                    label: Text('One person'),
+                  ),
                   ButtonSegment(
                     value: _SmsView.activity,
                     label: Text('Activity'),
@@ -498,51 +504,11 @@ class _BulkSmsScreenState extends ConsumerState<BulkSmsScreen> {
                         ],
                       ),
                       const SizedBox(height: DesignTokens.spaceSm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _savingTemplate
-                                  ? null
-                                  : _saveCurrentAsTemplate,
-                              icon: _savingTemplate
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.bookmark_add_outlined),
-                              label: const Text('Save template'),
-                            ),
-                          ),
-                          const SizedBox(width: DesignTokens.spaceSm),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _sendingCampaign
-                                  ? null
-                                  : () => _sendCampaign(recipients),
-                              icon: _sendingCampaign
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.send_outlined),
-                              label: Text(
-                                _sendingCampaign
-                                    ? 'Sending...'
-                                    : 'Queue campaign',
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: DesignTokens.brandAccent,
-                              ),
-                            ),
-                          ),
-                        ],
+                      SmsCampaignActions(
+                        saving: _savingTemplate,
+                        sending: _sendingCampaign,
+                        onSave: _saveCurrentAsTemplate,
+                        onSend: () => _sendCampaign(recipients),
                       ),
                     ],
                   ),
@@ -687,7 +653,9 @@ class _CreditsHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$credits SMS credits',
+                  dashboard == null
+                      ? 'Loading SMS balance…'
+                      : '$credits SMS credits',
                   style: DesignTokens.textBodyBold.copyWith(
                     color: Colors.white,
                   ),
@@ -703,7 +671,7 @@ class _CreditsHero extends StatelessWidget {
           TextButton(
             onPressed: onBuyCredits,
             style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: const Text('Top up'),
+            child: const Text('Buy SMS'),
           ),
         ],
       ),
@@ -1112,4 +1080,49 @@ double _asDouble(Object? value) {
   if (value is double) return value;
   if (value is int) return value.toDouble();
   return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+/// Full-width actions stay readable on narrow phones and with larger text.
+class SmsCampaignActions extends StatelessWidget {
+  const SmsCampaignActions({
+    super.key,
+    required this.saving,
+    required this.sending,
+    required this.onSave,
+    required this.onSend,
+  });
+  final bool saving, sending;
+  final VoidCallback onSave, onSend;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ElevatedButton.icon(
+        onPressed: sending ? null : onSend,
+        icon: const Icon(Icons.send_outlined),
+        label: Text(sending ? 'Queuing…' : 'Queue campaign'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: DesignTokens.brandAccent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      OutlinedButton.icon(
+        onPressed: saving ? null : onSave,
+        icon: const Icon(Icons.bookmark_add_outlined),
+        label: Text(saving ? 'Saving…' : 'Save template'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    ],
+  );
 }

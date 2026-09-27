@@ -9,7 +9,7 @@ import app_links
 import audioplayers_darwin
 import blue_thermal_printer
 import connectivity_plus
-import ffmpeg_kit_flutter_min_gpl
+import ffmpeg_kit_flutter_new
 import file_picker
 import file_selector_macos
 import firebase_analytics

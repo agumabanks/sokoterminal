@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/db/app_database.dart';
+import '../items/wholesale_pricing.dart';
 import '../../core/app_providers.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
@@ -53,6 +54,8 @@ class CartLine {
     this.variant,
     this.availableStock,
     this.quantity = 1,
+    this.retailPrice,
+    this.wholesaleRangesJson,
   });
 
   final String id;
@@ -63,6 +66,8 @@ class CartLine {
   final String? variant;
   final int? availableStock;
   final int quantity;
+  final double? retailPrice;
+  final String? wholesaleRangesJson;
 
   double get total => (price * quantity).roundToDouble();
 
@@ -70,7 +75,17 @@ class CartLine {
     return CartLine(
       id: id,
       title: title,
-      price: price ?? this.price,
+      price:
+          price ??
+          (quantity != null && wholesaleRangesJson != null
+              ? wholesaleUnitPrice(
+                  retailPrice ?? this.price,
+                  wholesaleRangesJson,
+                  quantity,
+                )
+              : this.price),
+      retailPrice: retailPrice,
+      wholesaleRangesJson: wholesaleRangesJson,
       itemId: itemId,
       serviceId: serviceId,
       variant: variant,
@@ -124,6 +139,8 @@ class CartController extends StateNotifier<CartState> {
                 'variant': l.variant,
                 'availableStock': l.availableStock,
                 'quantity': l.quantity,
+                'retailPrice': l.retailPrice,
+                'wholesaleRangesJson': l.wholesaleRangesJson,
               },
             )
             .toList(),
@@ -160,6 +177,8 @@ class CartController extends StateNotifier<CartState> {
               variant: json['variant'] as String?,
               availableStock: json['availableStock'] as int?,
               quantity: json['quantity'] as int,
+              retailPrice: (json['retailPrice'] as num?)?.toDouble(),
+              wholesaleRangesJson: json['wholesaleRangesJson'] as String?,
             ),
           )
           .toList();
@@ -216,7 +235,13 @@ class CartController extends StateNotifier<CartState> {
           CartLine(
             id: _uuid.v4(),
             title: item.name,
-            price: item.price,
+            price: wholesaleUnitPrice(
+              item.price,
+              item.wholesaleRangesJson,
+              nextQty,
+            ),
+            retailPrice: item.price,
+            wholesaleRangesJson: item.wholesaleRangesJson,
             itemId: item.id,
             variant: '',
             availableStock: maxQty,
@@ -278,7 +303,9 @@ class CartController extends StateNotifier<CartState> {
         CartLine(
           id: _uuid.v4(),
           title: normalized.isEmpty ? item.name : '${item.name} • $normalized',
-          price: price,
+          price: wholesaleUnitPrice(price, item.wholesaleRangesJson, nextQty),
+          retailPrice: price,
+          wholesaleRangesJson: item.wholesaleRangesJson,
           itemId: item.id,
           variant: normalized,
           availableStock: maxQty,
@@ -636,41 +663,6 @@ class CartController extends StateNotifier<CartState> {
       }
 
       try {
-        await _syncService.enqueue('ledger_push', {
-          'entry_id': transactionId,
-          'idempotency_key': idempotencyKey,
-          'type': 'sale',
-          'subtotal': total,
-          'discount': 0,
-          'tax': 0,
-          'total': total,
-          'note': notes,
-          'occurred_at': occurredAt.toIso8601String(),
-          'customer_id': resolvedCustomer?.id,
-          'payments': payments
-              .map(
-                (p) => {
-                  'method': p.method,
-                  'amount': p.amount,
-                  if (p.externalRef != null) 'external_ref': p.externalRef,
-                },
-              )
-              .toList(),
-          'lines': state.lines
-              .map(
-                (e) => {
-                  'product_id': e.itemId,
-                  'service_id': e.serviceId,
-                  'name': e.title,
-                  if (e.variant != null && e.variant!.trim().isNotEmpty)
-                    'variation': e.variant,
-                  'price': e.price,
-                  'quantity': e.quantity,
-                  'subtotal': e.total,
-                },
-              )
-              .toList(),
-        });
         unawaited(_syncService.syncNow());
       } catch (e) {
         debugPrint('[Checkout] Ledger sync enqueue failed: $e');

@@ -200,9 +200,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void _openQuickAction(String actionId) {
     unawaited(() async {
       switch (actionId) {
-        case 'video-ad':
-          if (mounted) context.go('/home/more/video-ad');
-          return;
         case 'marketing':
           if (mounted) context.go('/home/more/marketing');
           return;
@@ -437,7 +434,7 @@ class _IOSTabBar extends StatelessWidget {
     _TabItem(
       iconOutlined: Icons.notifications_none_outlined,
       iconFilled: Icons.notifications,
-      label: 'Stock',
+      label: 'Alerts',
     ),
     _TabItem(
       iconOutlined: Icons.grid_view_outlined,

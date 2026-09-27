@@ -1,13 +1,15 @@
 import 'dart:async';
+import '../../core/amara/terminal_identity_publisher.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/auth/offline_credentials.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/auth/pos_staff_prefs.dart';
 import '../../core/firebase/fcm_service.dart';
 import '../../core/network/api_client.dart';
-import '../../core/network/dio_auth_utils.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/util/phone_normalizer.dart';
@@ -17,14 +19,26 @@ import '../checkout/cart_controller.dart';
 enum AuthStatus { unknown, authenticated, unauthenticated, loading, error }
 
 class AuthState {
-  const AuthState({required this.status, this.message, this.token});
+  const AuthState({
+    required this.status,
+    this.message,
+    this.token,
+    this.syncRequired = false,
+  });
 
   final AuthStatus status;
+  final bool syncRequired;
   final String? token;
   final String? message;
 
-  AuthState copyWith({AuthStatus? status, String? message, String? token}) {
+  AuthState copyWith({
+    AuthStatus? status,
+    String? message,
+    String? token,
+    bool? syncRequired,
+  }) {
     return AuthState(
+      syncRequired: syncRequired ?? this.syncRequired,
       status: status ?? this.status,
       message: message ?? this.message,
       token: token ?? this.token,
@@ -57,12 +71,36 @@ class AuthController extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
   final SecureStorage _storage;
 
+  late final _amaraIdentity = TerminalIdentityPublisher(
+    fetch: () async {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        '/v2/seller/amara/identity',
+      );
+      return response.data?['assertion']?.toString() ?? '';
+    },
+  );
+  @override
+  set state(AuthState value) {
+    super.state = value;
+    unawaited(
+      _amaraIdentity.setAuthenticated(
+        value.status == AuthStatus.authenticated && !value.syncRequired,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _amaraIdentity.dispose();
+    super.dispose();
+  }
+
   Future<void> bootstrap() async {
-    // Register the 401 logout callback so the API client can trigger logout.
+    // Cloud authentication failure must never destroy the local session.
     // Deferred to avoid modifying another provider during initialization.
     Future.microtask(() {
       ref.read(authLogoutCallbackProvider.notifier).state = () {
-        logout();
+        markSyncAuthenticationRequired();
       };
     });
 
@@ -71,7 +109,11 @@ class AuthController extends StateNotifier<AuthState> {
       debugPrint(
         '[Auth] Restored persisted access token (${token.length} chars)',
       );
-      state = AuthState(status: AuthStatus.authenticated, token: token);
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        token: token,
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+      );
       // Subscribe to seller sync topic (best-effort; sellerId may not be stored yet)
       final sellerId = await _storage.readSellerId();
       if (sellerId != null && sellerId.isNotEmpty) {
@@ -100,6 +142,18 @@ class AuthController extends StateNotifier<AuthState> {
       final rawIdentifier = emailOrPhone.trim();
       final isEmail = emailOrPhone.contains('@');
       final normalizedPhone = isEmail ? null : normalizeUgPhone(emailOrPhone);
+      if (await _isOffline()) {
+        if (await _unlockLocally(
+          isEmail ? rawIdentifier : normalizedPhone!,
+          password,
+          pin: false,
+        )) {
+          return;
+        }
+        throw Exception(
+          'Cannot unlock offline. Use the password previously verified on this device, or connect to sign in.',
+        );
+      }
       final response = await _performSellerLoginRequest(
         isEmail: isEmail,
         identifier: isEmail ? emailOrPhone.trim() : (normalizedPhone ?? ''),
@@ -111,16 +165,18 @@ class AuthController extends StateNotifier<AuthState> {
       final token = _extractAccessToken(data);
       final expiresAt = _extractExpiresAt(data);
 
-      // Ensure local database is cleared before starting a new session
-      // This prevents data bleeding between different users on the same device
-      final db = ref.read(appDatabaseProvider);
-      await db.clearAllData();
+      await _prepareAccount(data, isEmail ? rawIdentifier : normalizedPhone!);
 
       final persistedToken = await _persistAccessToken(token);
       await _persistTokenMeta(
         expiresAt: expiresAt,
         rememberDevice: rememberDevice,
       );
+
+      await OfflineCredentials(
+        _storage,
+      ).save(isEmail ? rawIdentifier : normalizedPhone!, password, pin: false);
+      await _storage.delete(key: 'sync_auth_required');
 
       // Store seller UUID for identity persistence
       final user = data['user'] is Map<String, dynamic>
@@ -159,17 +215,43 @@ class AuthController extends StateNotifier<AuthState> {
       unawaited(ref.read(syncServiceProvider).syncNow());
       unawaited(ref.read(migrationProvider.notifier).checkForBackups());
     } on DioException catch (e) {
+      if (_isTransportFailure(e) &&
+          await _unlockLocally(
+            emailOrPhone.contains('@')
+                ? emailOrPhone.trim()
+                : normalizeUgPhone(emailOrPhone),
+            password,
+            pin: false,
+          )) {
+        return;
+      }
       state = AuthState(
         status: AuthStatus.error,
+        token: await _storage.readAccessToken(),
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
         message: e.response?.data?['message']?.toString() ?? 'Login failed',
       );
     } catch (e) {
-      state = AuthState(status: AuthStatus.error, message: e.toString());
+      state = AuthState(
+        status: AuthStatus.error,
+        token: await _storage.readAccessToken(),
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+        message: e.toString(),
+      );
     }
   }
 
   Future<Map<String, dynamic>> checkUserExistence(String phone) async {
     final normalized = normalizeUgPhone(phone);
+    final local = await OfflineCredentials(_storage).account(normalized);
+    if (local != null) {
+      return {
+        'exists': true,
+        'has_pin': local['pin'] != null,
+        'has_password': true,
+        'local': true,
+      };
+    }
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/v2/seller/pos/auth/check',
@@ -226,9 +308,17 @@ class AuthController extends StateNotifier<AuthState> {
         throw Exception(message ?? 'Registration failed');
       }
       final db = ref.read(appDatabaseProvider);
+      if (await db.hasUnsyncedWork()) {
+        throw StateError(
+          'This device has unsynced work. Sign in to the existing shop to recover it first.',
+        );
+      }
       await db.clearAllData();
       final persistedToken = await _persistAccessToken(token);
       await _storage.writeLastLoginPhone(phone);
+      await OfflineCredentials(
+        _storage,
+      ).save(normalizeUgPhone(phone), pin, pin: false);
       final user = data['user'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['user'] as Map<String, dynamic>)
           : null;
@@ -255,9 +345,19 @@ class AuthController extends StateNotifier<AuthState> {
           errorMsg = message.toString();
         }
       }
-      state = AuthState(status: AuthStatus.error, message: errorMsg);
+      state = AuthState(
+        status: AuthStatus.error,
+        token: await _storage.readAccessToken(),
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+        message: errorMsg,
+      );
     } catch (e) {
-      state = AuthState(status: AuthStatus.error, message: e.toString());
+      state = AuthState(
+        status: AuthStatus.error,
+        token: await _storage.readAccessToken(),
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+        message: e.toString(),
+      );
     }
   }
 
@@ -270,7 +370,13 @@ class AuthController extends StateNotifier<AuthState> {
     final normalized = normalizeUgPhone(phone);
 
     try {
-      // Try backend verification first
+      if (await _isOffline()) {
+        if (await _unlockLocally(normalized, pin, pin: true)) return;
+        throw Exception(
+          'Cannot unlock offline. Use the PIN previously verified on this device, or connect to sign in.',
+        );
+      }
+      // Online login validates with the server.
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/v2/seller/pos/pin/verify',
         data: {'phone': normalized, 'pin': pin, 'remember_me': rememberDevice},
@@ -281,10 +387,7 @@ class AuthController extends StateNotifier<AuthState> {
         final token = _extractAccessToken(data);
         final expiresAt = _extractExpiresAt(data);
 
-        // Ensure local database is cleared before starting a new session
-        // This prevents data bleeding between different users on the same device
-        final db = ref.read(appDatabaseProvider);
-        await db.clearAllData();
+        await _prepareAccount(data, normalized);
 
         final persistedToken = await _persistAccessToken(token);
         await _persistTokenMeta(
@@ -292,6 +395,12 @@ class AuthController extends StateNotifier<AuthState> {
           rememberDevice: rememberDevice,
         );
         await _storage.writeLastLoginPhone(normalized);
+        await OfflineCredentials(_storage).save(normalized, pin, pin: true);
+        await _storage.delete(key: 'sync_auth_required');
+        final user = data['user'];
+        if (user is Map && user['id'] != null) {
+          await _storage.writeSellerId(user['id'].toString());
+        }
         debugPrint('[Auth] Quick PIN login succeeded');
         _apiClient.resetLogoutGuard();
         state = AuthState(
@@ -303,19 +412,23 @@ class AuthController extends StateNotifier<AuthState> {
         unawaited(ref.read(migrationProvider.notifier).checkForBackups());
         return;
       }
+      throw Exception(data['message']?.toString() ?? 'PIN login failed');
     } catch (e) {
-      // Fallback to local check if backend fails (e.g. offline) or returns specific error?
-      // For now, let's stick to strict backend verification as requested "saved to backend too"
-
-      // However, if we want to support offline PIN login later, we'd check _storage here.
-      // Given the requirement "pin saved to backend... user to do more with less clicks",
-      // backend verification is key for security and cross-device.
-
-      String msg = 'PIN login failed';
+      if (e is DioException &&
+          _isTransportFailure(e) &&
+          await _unlockLocally(normalized, pin, pin: true)) {
+        return;
+      }
+      String msg = e.toString().replaceFirst('Exception: ', '');
       if (e is DioException) {
         msg = e.response?.data?['message']?.toString() ?? msg;
       }
-      state = AuthState(status: AuthStatus.error, message: msg);
+      state = AuthState(
+        status: AuthStatus.error,
+        token: await _storage.readAccessToken(),
+        syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+        message: msg,
+      );
       return;
     }
   }
@@ -341,7 +454,7 @@ class AuthController extends StateNotifier<AuthState> {
 
       await Future.wait([
         _storage.writeSellerQuickPhone(normalized),
-        _storage.writeSellerQuickPin(p),
+        OfflineCredentials(_storage).save(normalized, p, pin: true),
         _storage.writeLastLoginPhone(normalized),
       ]);
     } catch (e) {
@@ -355,6 +468,21 @@ class AuthController extends StateNotifier<AuthState> {
   Future<String?> getQuickPinPhone() => _storage.readSellerQuickPhone();
 
   Future<void> logout() async {
+    if (await ref.read(appDatabaseProvider).hasUnsyncedWork()) {
+      throw StateError(
+        'Sync pending changes before signing out. You can lock the screen or switch staff without deleting your work.',
+      );
+    }
+    await ref.read(syncServiceProvider).dispose();
+    ref.invalidate(syncServiceProvider);
+    if (await ref.read(appDatabaseProvider).hasUnsyncedWork()) {
+      ref.read(syncServiceProvider).start();
+      throw StateError(
+        'Changes are still waiting to sync. Your local data has been kept.',
+      );
+    }
+    state = AuthState.unauthenticated;
+    await _amaraIdentity.setAuthenticated(false);
     debugPrint('[Auth] Clearing local session state');
 
     // Reset the logout callback so late-fired interceptor errors
@@ -378,11 +506,6 @@ class AuthController extends StateNotifier<AuthState> {
     } catch (e) {
       debugPrint('[Auth] Server logout failed or offline: $e');
     }
-
-    // Stop sync timers and streams before clearing data to prevent
-    // race conditions where sync pumps against a partially-cleared DB.
-    await ref.read(syncServiceProvider).dispose();
-    ref.invalidate(syncServiceProvider);
 
     // Clear cart in-memory state so the next seller doesn't see leftovers.
     ref.read(cartControllerProvider.notifier).clear();
@@ -414,29 +537,78 @@ class AuthController extends StateNotifier<AuthState> {
   /// Attempts to refresh the access token immediately.
   /// Returns true if a new token was obtained.
   Future<bool> refreshToken() async {
-    try {
-      final response = await _apiClient.post<Map<String, dynamic>>(
-        '/v2/auth/refresh',
+    return _apiClient.refreshAccessToken();
+  }
+
+  Future<void> markSyncAuthenticationRequired() async {
+    await _storage.write(key: 'sync_auth_required', value: '1');
+    if (mounted) {
+      state = state.copyWith(
+        syncRequired: true,
+        message: 'Sign in to resume cloud sync. Offline work is available.',
       );
-      final newToken = response.data?['access_token'];
-      final expiresAt = _extractExpiresAt(response.data ?? {});
-      if (newToken != null && newToken is String && newToken.isNotEmpty) {
-        await _storage.writeAccessToken(newToken);
-        await _persistTokenMeta(expiresAt: expiresAt);
-        state = state.copyWith(token: newToken);
-        return true;
-      }
-    } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
-      if (DioAuthUtils.isAuthStatus(statusCode)) {
-        DioAuthUtils.notifyAuthExpired();
-        await logout();
-      }
-      debugPrint('[Auth] Token refresh failed: $statusCode');
-    } catch (e) {
-      debugPrint('[Auth] Token refresh error: $e');
     }
-    return false;
+  }
+
+  Future<bool> _isOffline() async => (await Connectivity().checkConnectivity())
+      .every((r) => r == ConnectivityResult.none);
+
+  bool _isTransportFailure(DioException e) =>
+      e.response == null &&
+      const {
+        DioExceptionType.connectionError,
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.sendTimeout,
+      }.contains(e.type);
+
+  Future<bool> _unlockLocally(
+    String identifier,
+    String secret, {
+    required bool pin,
+  }) async {
+    if (!await OfflineCredentials(
+      _storage,
+    ).verify(identifier, secret, pin: pin)) {
+      return false;
+    }
+    state = AuthState(
+      status: AuthStatus.authenticated,
+      token: await _storage.readAccessToken(),
+      message: 'Unlocked offline',
+      syncRequired: await _storage.read(key: 'sync_auth_required') == '1',
+    );
+    return true;
+  }
+
+  Future<void> _prepareAccount(
+    Map<String, dynamic> data,
+    String identifier,
+  ) async {
+    final token = await _storage.readAccessToken();
+    if (token == null || token.isEmpty) {
+      if (await ref.read(appDatabaseProvider).hasUnsyncedWork()) {
+        throw StateError(
+          'This device has unsynced work. Recover the existing account before switching accounts.',
+        );
+      }
+      await ref.read(appDatabaseProvider).clearAllData();
+      await _storage.delete(key: OfflineCredentials.key);
+      return;
+    }
+    final user = data['user'];
+    final incomingId = user is Map ? user['id']?.toString() : null;
+    final existingId = await _storage.readSellerId();
+    final same = incomingId != null && existingId != null
+        ? incomingId == existingId
+        : await OfflineCredentials(_storage).account(identifier) != null ||
+              await _storage.readLastLoginPhone() == identifier;
+    if (!same || await _storage.read(key: 'login_type') == 'staff') {
+      throw Exception(
+        'Sign out of the current account before switching accounts.',
+      );
+    }
+    // Same seller: preserve sales, stock, staff and all pending sync operations.
   }
 
   String _extractAccessToken(

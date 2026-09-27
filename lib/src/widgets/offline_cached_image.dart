@@ -29,6 +29,15 @@ class OfflineCachedImage extends StatefulWidget {
 class _OfflineCachedImageState extends State<OfflineCachedImage> {
   late Future<File?> _fileFuture;
 
+  int get _cacheWidth {
+    final width = widget.width;
+    if (width == null || !width.isFinite || width <= 0) return 1200;
+    return (width * MediaQuery.devicePixelRatioOf(context)).round().clamp(
+      160,
+      1600,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,8 +65,8 @@ class _OfflineCachedImageState extends State<OfflineCachedImage> {
       final path = scheme == 'file' ? uri!.toFilePath() : raw;
       final file = File(path);
       if (!file.existsSync()) return _fallback();
-      return Image.file(
-        file,
+      return Image(
+        image: ResizeImage(FileImage(file), width: _cacheWidth),
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
@@ -70,8 +79,8 @@ class _OfflineCachedImageState extends State<OfflineCachedImage> {
       builder: (context, snapshot) {
         final file = snapshot.data;
         if (file != null && file.existsSync()) {
-          return Image.file(
-            file,
+          return Image(
+            image: ResizeImage(FileImage(file), width: _cacheWidth),
             width: widget.width,
             height: widget.height,
             fit: widget.fit,
@@ -85,6 +94,7 @@ class _OfflineCachedImageState extends State<OfflineCachedImage> {
 
         return Image.network(
           raw,
+          cacheWidth: _cacheWidth,
           width: widget.width,
           height: widget.height,
           fit: widget.fit,

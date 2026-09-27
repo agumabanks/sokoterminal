@@ -1,3 +1,5 @@
+import '../../widgets/service_description_article.dart';
+import '../payment_links/payment_links_screen.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,6 +16,7 @@ import '../../core/util/formatters.dart';
 import '../../widgets/offline_cached_image.dart';
 import '../ads/studio_editor_launcher.dart';
 import 'add_product_screen.dart';
+import 'wholesale_pricing.dart';
 
 final _previewItemProvider = StreamProvider.family<Item?, String>((
   ref,
@@ -155,6 +158,19 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                         );
                       },
                     ),
+                    if (item.remoteId != null)
+                      IconButton(
+                        tooltip: 'Create payment link',
+                        icon: const Icon(Icons.link),
+                        onPressed: () => showGeneratePaymentLinkSheet(
+                          context,
+                          ref,
+                          type: 'product',
+                          remoteId: item.remoteId!,
+                          title: item.name,
+                          defaultAmount: item.price,
+                        ),
+                      ),
                     IconButton(
                       tooltip: 'Design in Studio',
                       icon: const Icon(Icons.design_services_rounded),
@@ -208,6 +224,24 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(item.name, style: DesignTokens.textTitle),
+                        if (wholesaleRanges(
+                          item.wholesaleRangesJson,
+                        ).isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Wholesale prices per item',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          for (final range in wholesaleRanges(
+                            item.wholesaleRangesJson,
+                          ))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Text(
+                                '${range['min_qty']}–${range['max_qty']} items: ${(double.tryParse('${range['price']}') ?? 0).toUgx()} each',
+                              ),
+                            ),
+                        ],
                         const SizedBox(height: DesignTokens.spaceSm),
                         Row(
                           children: [
@@ -461,10 +495,9 @@ class _OverviewTab extends StatelessWidget {
       children: [
         _Section(
           title: 'Description',
-          child: Text(
-            desc.isEmpty ? 'No description yet.' : desc,
-            style: DesignTokens.textBody,
-          ),
+          child: desc.isEmpty
+              ? const Text('No description yet.')
+              : ServiceDescriptionArticle(html: desc),
         ),
         if (tags.isNotEmpty) ...[
           const SizedBox(height: DesignTokens.spaceMd),

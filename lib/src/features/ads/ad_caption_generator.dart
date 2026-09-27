@@ -183,12 +183,13 @@ String _instagramCaption({
   required String? tagline,
   required int hash,
 }) {
+  // Natural hooks — no clickbait
   final hooks = [
-    'New drop alert 🚨',
-    'You need this in your life ✨',
-    'This just landed 🔥',
-    'Obsessed with this 😍',
-    'Your cart is calling 🛒',
+    'New arrival',
+    'Just in',
+    'Fresh stock',
+    'Quality find',
+    'Check this out',
   ];
   final hook = hooks[hash % hooks.length];
 
@@ -199,12 +200,11 @@ String _instagramCaption({
     if (desc.isNotEmpty) '',
     if (desc.isNotEmpty) desc,
     '',
-    '💰 $price',
+    if (price.isNotEmpty) '💰 $price',
     if (tagline?.isNotEmpty == true) '',
     if (tagline?.isNotEmpty == true) tagline!,
     '',
-    '🛒 Tap the link in bio to shop',
-    if (contact.isNotEmpty) 'Or $contact',
+    if (contact.isNotEmpty) contact,
     if (loc.isNotEmpty) loc,
     '',
     '— $businessName',

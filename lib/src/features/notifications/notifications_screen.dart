@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import '../../core/sync/sync_service.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import 'notifications_controller.dart';
+import '../../core/firebase/fcm_navigation.dart';
 
 /// Notification category for filtering
 enum NotificationCategory { all, orders, payments, stock, system }
@@ -160,8 +162,47 @@ class NotificationsScreen extends ConsumerWidget {
                                         style: DesignTokens.textSmall,
                                       ),
                                       trailing: const Icon(Icons.chevron_right),
-                                      onTap: () =>
-                                          context.go('/home/more/low-stock'),
+                                      onTap: () => showModalBottomSheet<void>(
+                                        context: context,
+                                        showDragHandle: true,
+                                        backgroundColor: Colors.white,
+                                        isScrollControlled: true,
+                                        useSafeArea: true,
+                                        builder: (sheet) => SafeArea(
+                                          child: SingleChildScrollView(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                Text(
+                                                  item.name,
+                                                  style: Theme.of(
+                                                    context,
+                                                  ).textTheme.titleLarge,
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Text(
+                                                  '${item.stockQty} items left. Your reorder reminder is set at $threshold.',
+                                                ),
+                                                const SizedBox(height: 16),
+                                                FilledButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(sheet);
+                                                    context.go(
+                                                      '/home/more/low-stock',
+                                                    );
+                                                  },
+                                                  child: const Text(
+                                                    'Manage stock',
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   );
                                 },
@@ -250,8 +291,55 @@ class NotificationsScreen extends ConsumerWidget {
     NotificationDto notification,
   ) async {
     if (!notification.isRead) {
-      await controller.markRead(notification.id);
+      unawaited(controller.markRead(notification.id));
     }
+    if (!context.mounted) return;
+    final open = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                notification.title.isEmpty
+                    ? 'Notification'
+                    : notification.title,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              if (notification.dateLabel.isNotEmpty) ...[
+                Text(notification.dateLabel, style: DesignTokens.textCaption),
+                const SizedBox(height: 12),
+              ],
+              SelectableText(
+                notification.body.isEmpty
+                    ? 'No additional details for this alert.'
+                    : stripHtml(notification.body),
+              ),
+              const SizedBox(height: 20),
+              if ((notification.data['link']?.toString().isNotEmpty ?? false) ||
+                  FcmNavigation.routeForMessageData(notification.data) != null)
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  child: const Text('Open related page'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetContext, false),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (open != true || !context.mounted) return;
     final link = notification.data['link']?.toString();
     if (link != null && link.isNotEmpty) {
       final uri = Uri.tryParse(link);
@@ -270,15 +358,9 @@ class NotificationsScreen extends ConsumerWidget {
   ) async {
     await controller.deleteNotification(notification.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Notification deleted'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => controller.load(), // Reload to restore
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: const Text('Notification deleted')));
   }
 }
 

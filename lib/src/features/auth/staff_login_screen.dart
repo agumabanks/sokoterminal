@@ -1,3 +1,4 @@
+import '../../core/auth/pos_session_controller.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -8,8 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/app_providers.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/auth/pos_staff_prefs.dart';
-import '../../core/db/app_database.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/phone_normalizer.dart';
 import 'auth_controller.dart';
@@ -139,28 +140,57 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
       }
 
       // Get current shop_id to check if switching
-      final currentShopId = await secureStorage.read(key: 'staff_shop_id');
+      final currentShopId =
+          await secureStorage.read(key: 'staff_shop_id') ??
+          (await db.getBusinessProfile())?.shopId?.toString();
       final isShopSwitch = currentShopId != null && currentShopId != shopId;
 
       if (isShopSwitch) {
         // Clear local database when switching shops
-        await _clearLocalDatabase(db);
+        if (await db.hasUnsyncedWork()) {
+          throw Exception(
+            'Sync this shop’s pending work before signing into another shop.',
+          );
+        }
+        await ref.read(syncServiceProvider).dispose();
+        ref.invalidate(syncServiceProvider);
+        if (await db.hasUnsyncedWork()) {
+          ref.read(syncServiceProvider).start();
+          throw StateError('This shop still has unsynced work.');
+        }
+        await db.clearAllData();
         // Reset staff initialization flag so splash re-runs staff setup flow
         final prefs = ref.read(sharedPreferencesProvider);
         await prefs.remove(posStaffInitializedPrefKey);
       }
 
       // Store authentication data
+      final sessionToken = data['pos_session_token']?.toString();
+      final expiresAt = DateTime.tryParse(data['expires_at']?.toString() ?? '');
+      if (sessionToken == null || expiresAt == null) {
+        throw Exception('Staff session could not be started.');
+      }
+      await secureStorage.writePosSessionToken(sessionToken);
+      await secureStorage.writePosSessionMeta(
+        staffId: int.parse('${staff!['id']}'),
+        staffName: '${staff['name']}',
+        staffRole: '${staff['role']}',
+        expiresAt: expiresAt,
+      );
+      await secureStorage.writeSellerId('${data['seller_id']}');
       await secureStorage.writeAccessToken(token);
+      await secureStorage.writeAccessTokenExpiresAt(expiresAt);
+      ref.invalidate(posSessionProvider);
+
       await ref.read(authControllerProvider.notifier).bootstrap();
       await secureStorage.write(key: 'staff_shop_id', value: shopId);
       await secureStorage.write(
         key: 'staff_id',
-        value: staff?['id']?.toString() ?? '',
+        value: staff['id']?.toString() ?? '',
       );
       await secureStorage.write(
         key: 'staff_name',
-        value: staff?['name']?.toString() ?? '',
+        value: staff['name']?.toString() ?? '',
       );
       await secureStorage.write(key: 'staff_phone', value: phone);
       await secureStorage.write(key: 'login_type', value: 'staff');
@@ -183,28 +213,6 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
         }
       }
     }
-  }
-
-  Future<void> _clearLocalDatabase(AppDatabase db) async {
-    // Clear all shop-specific data
-    await db.transaction(() async {
-      await db.delete(db.items).go();
-      await db.delete(db.itemStocks).go();
-      await db.delete(db.services).go();
-      await db.delete(db.serviceVariants).go();
-      await db.delete(db.customers).go();
-      await db.delete(db.quotations).go();
-      await db.delete(db.quotationLines).go();
-      await db.delete(db.ledgerEntries).go();
-      await db.delete(db.ledgerLines).go();
-      await db.delete(db.payments).go();
-      await db.delete(db.shifts).go();
-      await db.delete(db.cashMovements).go();
-      await db.delete(db.expenses).go();
-      await db.delete(db.syncOps).go();
-      await db.delete(db.staff).go();
-      await db.delete(db.roles).go();
-    });
   }
 
   @override
@@ -276,7 +284,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Enter your phone and 6-digit PIN',
+                                    'Enter the shop login number and your own staff PIN. Ask the owner to add you in Staff & Roles.',
                                     style: GoogleFonts.inter(
                                       color: Colors.white.withValues(
                                         alpha: 0.62,
@@ -423,7 +431,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           ),
           filled: false,
           fillColor: Colors.transparent,
-          hintText: 'Phone number',
+          hintText: 'Shop login phone number',
           hintStyle: TextStyle(
             color: Colors.white.withValues(alpha: 0.28),
             fontWeight: FontWeight.w500,
@@ -432,7 +440,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
         ),
         validator: (value) {
           if (value == null || value.trim().isEmpty) {
-            return 'Please enter your phone number';
+            return 'Enter the shop login phone number';
           }
           return null;
         },
@@ -459,7 +467,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
         ),
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(6),
+          LengthLimitingTextInputFormatter(8),
         ],
         decoration: InputDecoration(
           border: InputBorder.none,
@@ -469,7 +477,7 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           ),
           filled: false,
           fillColor: Colors.transparent,
-          hintText: '6-Digit PIN',
+          hintText: 'Your staff PIN',
           hintStyle: TextStyle(
             color: Colors.white.withValues(alpha: 0.28),
             fontWeight: FontWeight.w500,
@@ -485,8 +493,8 @@ class _StaffLoginScreenState extends ConsumerState<StaffLoginScreen>
           if (value == null || value.trim().isEmpty) {
             return 'Please enter your PIN';
           }
-          if (value.length != 6) {
-            return 'PIN must be 6 digits';
+          if (value.length < 4 || value.length > 8) {
+            return 'PIN must be 4–8 digits';
           }
           return null;
         },

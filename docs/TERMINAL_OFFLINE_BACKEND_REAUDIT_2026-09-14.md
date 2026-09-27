@@ -1,0 +1,73 @@
+# Terminal offline-first and backend re-audit
+
+Date: 14 September 2026. Scope: the current, already dirty Terminal working tree and the active Laravel backend. This is a source, contract, automated-test and build audit, **not certification that every feature works on a phone or that the app is ready for Play submission**. No store upload, live payment, customer message or authenticated production transaction was performed. No Android device was connected.
+
+## Confirmed fixes
+
+| Area | Finding and resulting change | Evidence |
+|---|---|---|
+| Startup | Prior work removed age-based full refreshes, empty-product/service-only full refreshes and splash waiting for catalogue sync. Persisted cursors survive restarts. | `features/splash/splash_screen.dart`, `features/checkout/checkout_screen.dart`, `core/sync/sync_service.dart` |
+| Snapshot cleanup | Server product/service IDs were compared with local UUIDs, deleting valid offline-created catalogue rows. Compare remote IDs; retain rows referenced by unacknowledged sales. | `offline_integrity_regression_test.dart` |
+| Delta consistency | Applying rows and advancing cursors were separate writes. Now apply products, services, related POS records, snapshot pruning and all collection cursors in one Drift transaction. A simulated cursor-write failure rolls back the catalogue update. | `offline_integrity_regression_test.dart` |
+| Deletions across terminals | Delta responses did not identify removed products/services. Client requests a backward-compatible ID-only manifest on the first page; backend returns `snapshot.catalog_complete` and current IDs. The client prunes only when completeness is explicitly asserted. Older backends remain compatible but do not gain this deletion reconciliation. | `PosSyncController.php`, `seller_api.dart`, `pos_dtos.dart`, manifest regression |
+| Timestamp boundary | Server timestamps have second precision. Requests overlap the previous cursor by one second, using UTC, so writes within the boundary second are replayed safely. | 10,000-product warm-delta regression |
+| Media | Downloading cached images occupied the data-sync cycle. Media prefetch now runs separately with one active prefetch task. Data sync and queued sales can continue while an image host is slow. | `sync_service.dart` |
+| Sale durability | Sales committed before queue insertion; a crash could strand a receipt until startup repair. Receipt, payments, stock and an upload operation now commit atomically. Payload is built from the durable ledger, preserving tax/subtotal instead of sending tax as zero. | Outbox-failure and tax-preservation regressions |
+| Stock | Default/empty variant stock was validated but not decremented. Repeated lines were independently validated and could jointly exceed available stock. Update default variants and validate consolidated quantities. | Stock and duplicate-line regressions |
+| Offline conflicts | A cloud pull could overwrite stock still affected by an unacknowledged sale. Preserve catalogue rows with pending ledger references; normal reconciliation resumes after acceptance. | `sync_service.dart` |
+| Stock idempotency | Every adjustment reused the product ID as the request key. Different adjustments now get different operation-scoped keys; retries retain the same key. | Stock idempotency regression |
+| Refund durability | Refund receipt, returned stock and upload were separate. Now save all atomically, block repeated taps, reject cumulative over-refunds and quantities not sold. | Refund rollback and cumulative-quantity regressions |
+| Backend refunds | Distinct request keys could refund a sale repeatedly. Lock the original sale inside the existing idempotency transaction and check cumulative amount and quantities. | Backend unit tests and HTTP integration test; duplicate refund leaves stock unchanged |
+| Variant contract | Ledger request validation omitted `variation`/`sku`, and `PosLedgerLine` omitted them from fillable attributes. Variants are now accepted and retained for stock movements and later refunds. | HTTP sale/refund test uses a named `red` variant |
+| HTTP reads | Fan-out ignored query parameters and could combine different requests. Slow requests could replace earlier completion trackers. Identify reads by full URI, retain the first tracker, and handle errors even with no duplicate listener. | Network regression tests |
+| Auth errors | Generic 403 permission failures were labelled expired logins. Only 401 is treated as cloud-auth expiry; 403 shows permission feedback. | Network regression test |
+| Account changes | Logout/settings/shop switching could erase pending or blocked work and unsynced sales. Check centrally before destructive logout and after draining sync. Protect orphaned products/services and local debt records too. Error feedback is shown to the user. | Database guard and lifecycle tests |
+| Account isolation | `clearAllData()` omitted debts/payments, supplier debts, job sessions, availability, render jobs and seller events. Include these tables. Drain tracked sync before account cleanup so late responses cannot repopulate the next shop. | Cleanup and delayed-pull regressions |
+| Expense categories | An existing early handler sent the request but ignored the acknowledgement, keeping temporary rows. Consolidated the handler, validated the acknowledgement and replaced the temporary category with the server row. | Category acknowledgement regression |
+| Receipt settings | Backend Shop lacked an array cast for `receipt_payment_methods`, causing array-to-string errors and incorrect sync serialization. Added the cast. | Backend round-trip test |
+| Delivery | Terminal called a missing `request-soko-delivery` route. Connected the existing ownership-checking controller under seller/full-seller middleware and `seller-write` throttling. | Registered route/middleware inspection; no live dispatch |
+| Backups | Backup screen claimed restore success without importing anything; migration importer also replaced only a subset of tables. Both restore entry points now report unavailable and preserve device data. Cloud-backup copy explicitly excludes unsynced device data. Fixed dismissing a pending restore prompt. | `features/backup` |
+| Build health | Fixed video-effects compile errors by using scene duration for sticker timing. Removed unused symbols and applied analyzer-provided style fixes. Catalogue export ignores duplicate taps while generating. | Analyzer and Android debug build |
+
+No schema version or production database structure was changed in this audit. Backend model casts, validation, routes and controller logic changed; new SQLite schema setup is confined to test fixtures. The Terminal was already at schema version 41 before these fixes.
+
+## Coverage and limitations
+
+The repository inventory includes 241 feature Dart files across accounting, ads/Studio, analytics, auctions, auth, backup, BNPL, catalogue, chat, checkout, contacts, coupons, customers, dashboard, delivery, expenses, home, inbox, invoices, items, Madeni, marketing, money, notifications, onboarding, orders, payment links/payments, procurement, profile, quotations, receipts, refunds, reports, services, settings, setup, shifts, shop scanning, splash, today, transactions, verification, wallet, wholesale and widgets. Cross-cutting review concentrated on the database, network client, API wrappers, outbox dispatch, authentication/session lifecycle, startup, sales/refunds, cached stock and backup paths. Existing feature tests were run across the repository; this does not mean every screen received an authenticated manual walkthrough.
+
+Compared literal seller API calls with 325 registered backend seller routes (before the new delivery route). The script is a heuristic: dynamically constructed endpoints, payload fields and authorization behavior need separate checks. Checked POS backend controllers, stock service, idempotency service, models, route middleware and tests. All original idempotency, staff scoping, demo and feature-flag boundaries remain relevant.
+
+Printing uses a durable local print queue with retries, but physical Bluetooth/USB behavior, permission denial and printer recovery were not exercised. Cached marketplace orders and service bookings remain available locally; remote order actions, wallet/payment confirmation, AI and messaging require connectivity. These must not be advertised as fully offline.
+
+## Remaining release blockers and follow-up
+
+1. **Complete backup and debt recovery.** Madeni/customer debts and supplier debts are stored locally without a completed upload contract. The new logout guard protects those rows, which means a seller with local-only debts cannot completely log out merely by waiting for sync. Provide a verified full-device export/restore or implement debt sync before calling these records cloud-backed. Restore remains intentionally unavailable; do not claim backup restoration works.
+2. **Service-package upload contracts are missing.** Backend `pos/customer-packages` and `pos/package-redemptions` routes are commented out as unimplemented. Terminal API methods/outbox handlers exist. No literal feature caller of the package upload operation was found in the scan, but queued or future uses cannot succeed. Implement and test purchase/redemption accounting and conflict behavior before enabling them.
+3. **Multi-terminal stock adjustments need a delta contract.** The existing manual adjustment endpoint sends an absolute stock snapshot. Operation-specific keys fix replay collisions but do not solve concurrent absolute writes by two terminals. Offline sales can also conflict when two devices sell the same last unit; the backend currently rejects insufficient stock. Define the seller-facing conflict resolution workflow and test it with two devices.
+4. **Broader backend suite is not green.** Initial POS-filter run: 7 passed, 20 failed, largely with stale SQLite fixtures (`users.phone`, product model columns, Shop soft-delete columns). The focused refund fixture was updated for current schema/session requirements and passes separately. Do not describe the entire backend as verified. Test fixtures share a persistent SQLite file and can contaminate each other; standardize isolation and current model fixtures.
+5. **Remaining endpoint mismatches.** `seller-package/offline-payment` has no registered seller API route. `shop/update` is an obsolete fallback; primary `shop-update` exists. The former relates to paid functionality and requires alignment with the Play billing decision, not blindly exposing a purchase route.
+6. **Staff startup still checks the network.** Catalogue no longer gates opening, but the staff-setup check can still delay splash. Replacing it needs a reviewed cached staff/session policy that does not bypass newly configured staff restrictions. No phone startup latency claim is made.
+7. **Manifest and initial bootstrap scale.** Product/service bodies are incremental, but the current ID manifest is proportional to catalogue size and full initial sync assembles all pages in memory. Related small collections still have unpaginated paths. Consider versioned manifests, bounded tombstones and durable per-page staging for much larger shops. Host-side 10,000-row tests are not evidence of low-end phone memory/startup performance.
+8. **Other local/cloud conflicts and deletion domains.** Logout still exposes unauthenticated state before asynchronous storage cleanup finishes; serialize account transitions and prevent new login/writes during cleanup, with a lifecycle regression test.  Product/service safeguards are improved, but customer/service-package/availability reconciliation, local edits made during upload, and some legacy absolute stock paths need explicit conflict tests. The new catalogue manifest covers products and services only.
+9. **Security and Play items from the prior audit remain open.** Trusted signing-certificate validation for the exported Amara identity provider; exact contact/privacy disclosures; digital-plan billing distribution; AI report/moderation workflow; account deletion completion and retention; release manifest/16 KB testing; Console declarations. These were not certified by this code audit. See `PLAY_STORE_COMPLIANCE_AUDIT_2026-09-14.md`.
+10. **Incomplete UI actions.** Today still has receipt-share and mark-as-credit “coming soon” actions. The unused image-catalog helper returns null; the active catalogue screen exports a PDF. Remove misleading affordances or finish the respective workflows before presenting them as available features.
+11. **Physical release checks.** Test a signed release on a low-end phone: airplane-mode restart, expired cloud token/local unlock, 10,000+ products and services, sale/refund/receipt/shift, kill during queued upload, reconnect, retry after 401/403/429/5xx, account switch, photo/contact/location denial, printer reconnect and two-device stock conflicts. `adb devices -l` returned no device in this session.
+
+## Verification results
+
+Verified on 2026-09-14 against the final audited source:
+
+| Check | Result | Evidence |
+|---|---|---|
+| Complete Terminal test suite | **226 passed** | [Flutter tests](../reports/terminal-reaudit-2026-09-14/flutter-test.log) |
+| Flutter analyzer | **No issues found** | [Analyzer](../reports/terminal-reaudit-2026-09-14/flutter-analyze.log) |
+| Android debug APK | **Built successfully**, final build 123.4 seconds | [Build log](../reports/terminal-reaudit-2026-09-14/android-debug-build.log) |
+| Focused backend refund/reference, refund-limit and Shop cast tests | **5 tests, 24 assertions passed**; one existing PHPUnit configuration deprecation | [Backend tests](../reports/terminal-reaudit-2026-09-14/backend-focused-tests.log) |
+| 10,000-item cached catalogue regression | Preserved cached rows and applied a one-product delta in **836 ms on this server** | Included in Flutter test log; not phone launch timing |
+| Delivery route | Registered under authenticated full-seller access and seller-write throttling | Local route inspection; no delivery dispatched |
+
+Debug artifact: `build/app/outputs/flutter-apk/app-debug.apk`.
+
+SHA-256: `1430cfbd92fa5466bc547e483ac820cb9737ee10f707576cd1953d5fe957ccee`.
+
+Test logs contain expected simulated failures from rollback/error-path tests. Focused backend tests used isolated SQLite. The initial broader backend failures remain open as described above. No signed release bundle, physical-device certification, Play upload, commit or push was performed. Backend source changes require the normal deployment/cache refresh process before a deployed app can rely on the added server behavior; release signing and publication are separate from this debug build.

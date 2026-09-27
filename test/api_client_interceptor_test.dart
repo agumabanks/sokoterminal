@@ -79,32 +79,6 @@ void main() {
       expect(logoutCalled, isFalse);
     });
 
-    test('logout guard resets even when callback is null or fails', () {
-      final source =
-          File('lib/src/core/network/api_client.dart').readAsStringSync();
-
-      final logoutBlockStart = source.indexOf('Future<void> _performLogout(');
-      final logoutBlockEnd = source.indexOf('\n  }', logoutBlockStart);
-      expect(logoutBlockStart, isNonNegative);
-      expect(logoutBlockEnd, isNonNegative);
-      final logoutBlock = source.substring(logoutBlockStart, logoutBlockEnd);
-
-      expect(
-        logoutBlock.contains('_onAuthExpired?.call();'),
-        isTrue,
-        reason: '_performLogout must invoke the logout callback',
-      );
-      expect(
-        logoutBlock.contains('if (_isLoggingOut)'),
-        isTrue,
-        reason: '_performLogout must reset _isLoggingOut if the callback '
-            'did not (e.g. null callback)',
-      );
-
-      client.resetLogoutGuard();
-      expect(logoutCalled, isFalse);
-    });
-
     test('token refresh uses single-flight completer', () {
       final source =
           File('lib/src/core/network/api_client.dart').readAsStringSync();

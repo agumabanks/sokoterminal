@@ -84,7 +84,12 @@ class ServiceBookingsScreen extends ConsumerWidget {
               final price =
                   double.tryParse(booking['price']?.toString() ?? '') ?? 0;
 
-              final actions = _actionsForStatus(status);
+              // A locally queued booking has no server ID yet; it is visible
+              // immediately but cannot be mutated through remote actions.
+              final isPendingSync = booking['pending_sync'] == true;
+              final actions = isPendingSync
+                  ? const <_BookingAction>[]
+                  : _actionsForStatus(status);
 
               return Card(
                 child: ListTile(
@@ -103,7 +108,9 @@ class ServiceBookingsScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _StatusChip(status: status),
+                          _StatusChip(
+                            status: isPendingSync ? 'pending_sync' : status,
+                          ),
                           const SizedBox(height: 6),
                           Text(
                             '${price.toStringAsFixed(0)} /=',

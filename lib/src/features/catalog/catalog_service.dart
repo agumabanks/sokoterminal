@@ -1,6 +1,4 @@
-import 'dart:typed_data';
-
-import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -11,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/db/app_database.dart';
 import '../../core/media/offline_media_cache.dart';
 import 'catalog_template.dart';
+import 'catalog_pdf_image.dart';
 import 'shop_share_link.dart';
 
 class CatalogService {
@@ -37,8 +36,12 @@ class CatalogService {
     // Load fonts with graceful fallback when offline
     pw.Font? baseFont, boldFont;
     try {
-      baseFont = await PdfGoogleFonts.nunitoRegular();
-      boldFont = await PdfGoogleFonts.nunitoBold();
+      final fonts = await Future.wait([
+        PdfGoogleFonts.nunitoRegular(),
+        PdfGoogleFonts.nunitoBold(),
+      ]).timeout(const Duration(seconds: 3));
+      baseFont = fonts[0];
+      boldFont = fonts[1];
     } catch (_) {}
     final doc = pw.Document(
       theme: baseFont != null && boldFont != null
@@ -178,39 +181,31 @@ class CatalogService {
     Iterable<String> sources,
   ) async {
     final imageCache = <String, pw.MemoryImage>{};
-    final jobs = sources.take(_maxOfflinePdfImages).map((source) async {
+    final downloadBudget = Stopwatch()..start();
+    // Only one source photo and decoder in memory at a time.
+    for (final source in sources.take(_maxOfflinePdfImages)) {
       final raw = source.trim();
-      if (raw.isEmpty) return;
+      if (raw.isEmpty) continue;
       try {
-        final bytes = await OfflineMediaCache.instance.resolveBytes(raw);
-        if (bytes != null && bytes.isNotEmpty) {
-          final prepared = _preparePdfImage(bytes);
+        final remainingMs = 8000 - downloadBudget.elapsedMilliseconds;
+        final file = await OfflineMediaCache.instance
+            .resolve(raw, downloadIfMissing: remainingMs > 0)
+            .timeout(
+              Duration(milliseconds: remainingMs > 0 ? remainingMs : 1000),
+            );
+        if (file == null || await file.length() > catalogImageByteLimit) {
+          continue;
+        }
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          final prepared = await compute(prepareCatalogPdfImage, bytes);
           if (prepared != null) {
             imageCache[raw] = pw.MemoryImage(prepared);
           }
         }
       } catch (_) {}
-    });
-    await Future.wait(jobs);
+    }
     return imageCache;
-  }
-
-  /// Normalises phone photos, WebP files and oversized marketplace images to
-  /// a compact JPEG that the PDF renderer can embed consistently.
-  Uint8List? _preparePdfImage(Uint8List source) {
-    final decoded = img.decodeImage(source);
-    if (decoded == null) return null;
-    final baked = img.bakeOrientation(decoded);
-    final longestSide = baked.width > baked.height ? baked.width : baked.height;
-    final ready = longestSide > 1400
-        ? img.copyResize(
-            baked,
-            width: baked.width >= baked.height ? 1400 : null,
-            height: baked.height > baked.width ? 1400 : null,
-            interpolation: img.Interpolation.cubic,
-          )
-        : baked;
-    return Uint8List.fromList(img.encodeJpg(ready, quality: 90));
   }
 
   bool _isSupportedMediaSource(String? value) {

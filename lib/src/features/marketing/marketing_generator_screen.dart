@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_providers.dart';
+import '../ads/ai_content_report_button.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/haptics.dart';
 import '../../widgets/empty_state.dart';
@@ -178,6 +179,7 @@ class _MarketingGeneratorScreenState extends ConsumerState<MarketingGeneratorScr
                   child: ListView(
                     padding: DesignTokens.paddingScreen,
                     children: [
+                      AiContentReportButton(reportToken: _content!['_report_token'] as String?),
                       _ContentCard(
                         icon: Icons.chat,
                         label: 'WhatsApp',

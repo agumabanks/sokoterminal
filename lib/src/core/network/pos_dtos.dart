@@ -32,6 +32,7 @@ class PosSyncPullResponse {
     required this.since,
     required this.outletId,
     required this.isFullSnapshot,
+    this.hasCatalogManifest = false,
     required this.snapshotProductIds,
     required this.snapshotServiceIds,
     required this.snapshotServiceVariantIds,
@@ -67,6 +68,7 @@ class PosSyncPullResponse {
   final DateTime since;
   final String outletId;
   final bool isFullSnapshot;
+  final bool hasCatalogManifest;
   final List<String> snapshotProductIds;
   final List<String> snapshotServiceIds;
   final List<String> snapshotServiceVariantIds;
@@ -140,6 +142,7 @@ class PosSyncPullResponse {
       since: DateTime.parse(sinceRaw.toString()).toUtc(),
       outletId: outletId,
       isFullSnapshot: _asBool(snapshot['full']),
+      hasCatalogManifest: _asBool(snapshot['catalog_complete']),
       snapshotProductIds: _parseStringList(snapshot['product_ids']),
       snapshotServiceIds: _parseStringList(snapshot['service_ids']),
       snapshotServiceVariantIds: _parseStringList(
@@ -251,7 +254,9 @@ class PosSyncExpense {
 }
 
 class PosSyncProduct {
+  final List<dynamic> wholesaleRanges;
   PosSyncProduct({
+    this.wholesaleRanges = const [],
     required this.id,
     required this.name,
     required this.unitPrice,
@@ -315,6 +320,9 @@ class PosSyncProduct {
 
   factory PosSyncProduct.fromJson(Map<String, dynamic> json) {
     return PosSyncProduct(
+      wholesaleRanges: json['wholesale_ranges'] is List
+          ? json['wholesale_ranges'] as List
+          : [],
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       unitPrice: _asDouble(json['unit_price']),

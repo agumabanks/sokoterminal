@@ -68,6 +68,17 @@ class SyncService {
   bool _wasOffline = false;
   bool _isDisposed = false;
   Future<void>? _pullInFlight;
+  Future<void>? _mediaCacheInFlight;
+  final Set<Future<void>> _activeWork = {};
+
+  Future<void> _trackWork(Future<void> Function() run) {
+    if (_isDisposed) return Future.value();
+    late final Future<void> tracked;
+    tracked = run().whenComplete(() => _activeWork.remove(tracked));
+    _activeWork.add(tracked);
+    return tracked;
+  }
+
   DateTime? _lastCatalogMutationAt;
 
   void _safeAddStatus(String status) {
@@ -81,7 +92,6 @@ class SyncService {
   static const _contactsSyncInterval = Duration(hours: 4); // reduced from 12h
   static const _contactsCountKey = 'device_contacts_last_count';
   static const _lastCrmContactsPullKey = 'last_crm_contacts_pull_at';
-  static const _maxCatalogSyncAge = Duration(days: 4);
   static const List<String> _pullCursorKeys = [
     'products',
     'services',
@@ -143,10 +153,9 @@ class SyncService {
 
     // Reconcile any ledger entries that were created offline but never got
     // a corresponding sync op enqueued (e.g., due to app crash).
-    unawaited(_reconcileUnsyncedLedgerEntries());
+    unawaited(_trackWork(_reconcileUnsyncedLedgerEntries));
 
-    // Every launch should reconcile local POS data with the seller's cloud
-    // account. If the catalog is stale, bootstrap again from epoch.
+    // Reconcile in the background using the persisted delta cursor.
     unawaited(_ensureInitialDataLoaded());
   }
 
@@ -187,30 +196,10 @@ class SyncService {
 
   Future<void> _ensureInitialDataLoaded() async {
     try {
-      final items = await db.getAllItems();
-      final services = await db.getAllServices();
-      final lastCatalogSync = await _oldestLastPulledAt(_pullCursorKeys);
-      final now = DateTime.now().toUtc();
-      final catalogStale =
-          lastCatalogSync == null ||
-          now.difference(lastCatalogSync.toUtc()) > _maxCatalogSyncAge;
-      final needsBootstrap = items.isEmpty && services.isEmpty;
-
-      if (needsBootstrap || catalogStale) {
-        if (kDebugMode) {
-          debugPrint(
-            '[SyncService] Triggering full catalog sync (needsBootstrap: $needsBootstrap, catalogStale: $catalogStale, items: ${items.length}, services: ${services.length})',
-          );
-        }
-        await forceFullResync();
-      } else {
-        if (kDebugMode) {
-          debugPrint(
-            '[SyncService] Catalog warm start (${items.length} items, ${services.length} services) - running delta sync',
-          );
-        }
-        await _pump();
-      }
+      // Persisted cursors remain valid across restarts and long offline periods.
+      // The pull uses epoch automatically when no complete cursor exists.
+      // Empty shops are valid too; do not repeatedly bootstrap them.
+      await _pump();
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (DioAuthUtils.isAuthStatus(status)) {
@@ -225,16 +214,6 @@ class SyncService {
       }
       rethrow;
     }
-  }
-
-  Future<DateTime?> _oldestLastPulledAt(Iterable<String> keys) async {
-    DateTime? oldest;
-    for (final key in keys) {
-      final value = await db.getLastPulledAt(key);
-      if (value == null) return null;
-      oldest = oldest == null || value.isBefore(oldest) ? value : oldest;
-    }
-    return oldest;
   }
 
   /// Test hook: dispatches one sync op without connectivity/rate-limit guards.
@@ -300,7 +279,9 @@ class SyncService {
     return CatalogSyncOutcome.synced;
   }
 
-  Future<void> _pushCatalogOpsOnly() async {
+  Future<void> _pushCatalogOpsOnly() => _trackWork(_pushCatalogOpsInternal);
+
+  Future<void> _pushCatalogOpsInternal() async {
     if (_isDisposed) return;
 
     _isPumping = true;
@@ -431,7 +412,16 @@ class SyncService {
     }
   }
 
-  Future<void> _pump() async {
+  Future<void> _pump() => _trackWork(_pumpInternal);
+
+  Future<void> _pumpInternal() async {
+    if (await secureStorage.read(key: 'sync_auth_required') == '1') {
+      _safeAddStatus(
+        'Cloud sync paused — sign in again. Offline work is available.',
+      );
+      return;
+    }
+
     if (_isDisposed || _isPumping) {
       _pumpQueued = true;
       return;
@@ -1428,14 +1418,6 @@ class SyncService {
       return;
     }
 
-    if (op.opType == 'expense_category_create') {
-      await sellerApi.pushExpenseCategory(
-        payload,
-        idempotencyKey: op.id.toString(),
-      );
-      return;
-    }
-
     switch (op.opType) {
       case 'item_create':
       case 'item_update':
@@ -1458,6 +1440,11 @@ class SyncService {
         );
 
         final upsertPayload = <String, dynamic>{
+          if (item?.wholesaleRangesJson != null) ...{
+            'wholesale_enabled':
+                (jsonDecode(item!.wholesaleRangesJson!) as List).isNotEmpty,
+            'wholesale_ranges': jsonDecode(item.wholesaleRangesJson!),
+          },
           if (remoteId != null) 'product_id': remoteId,
           'name': (payload['name'] ?? item?.name ?? '').toString(),
           'unit_price': _asDouble(payload['unit_price'] ?? item?.price ?? 0),
@@ -1573,6 +1560,7 @@ class SyncService {
                   '(status ${e.response?.statusCode}): ${e.error}. '
                   'Local path preserved — will retry on next sync.',
                 );
+                rethrow;
               }
             } else {
               // File was deleted externally — clear it to unblock sync.
@@ -1644,6 +1632,7 @@ class SyncService {
                   '[SyncService] Gallery upload failed for $localId path=$path '
                   '(status ${e.response?.statusCode}): ${e.error}. Keeping for retry.',
                 );
+                rethrow;
               }
             }
             if (mutated) {
@@ -1676,7 +1665,7 @@ class SyncService {
 
         final res = await sellerApi.upsertPosCatalogProduct(
           upsertPayload,
-          idempotencyKey: localId,
+          idempotencyKey: 'catalog:$localId:${op.id}',
         );
 
         if (res.data is! Map<String, dynamic>) {
@@ -1814,6 +1803,7 @@ class SyncService {
                   '(status ${e.response?.statusCode}): ${e.error}. '
                   'Local path preserved — will retry on next sync.',
                 );
+                rethrow;
               }
             }
           } else if (coverUploadId != null) {
@@ -1869,6 +1859,7 @@ class SyncService {
                   '[SyncService] Service gallery upload failed for $localId '
                   '(status ${e.response?.statusCode}): ${e.error}.',
                 );
+                rethrow;
               }
             }
             if (mutated) {
@@ -2117,7 +2108,7 @@ class SyncService {
 
         final res = await sellerApi.upsertPosCatalogProduct(
           upsertPayload,
-          idempotencyKey: localId,
+          idempotencyKey: 'stock:$localId:${op.id}',
         );
         if (res.data is Map<String, dynamic>) {
           final productId = _asNullableInt(
@@ -2195,6 +2186,34 @@ class SyncService {
             error: 'Audit log ack idempotency mismatch',
           );
         }
+        break;
+      case 'expense_category_create':
+        final response = await sellerApi.pushExpenseCategory(
+          {'name': payload['name'], 'type': payload['type'] ?? 'expense'},
+          idempotencyKey:
+              payload['idempotency_key']?.toString() ??
+              'expense-category:${op.id}',
+        );
+        final data = response.data is Map ? response.data['data'] : null;
+        if (data is! Map || _asNullableInt(data['id']) == null) {
+          throw FormatException('Invalid expense category acknowledgement');
+        }
+        await db.transaction(() async {
+          await (db.delete(db.expenseCategories)..where(
+                (t) =>
+                    t.id.isSmallerThanValue(0) &
+                    t.name.equals(payload['name'].toString()),
+              ))
+              .go();
+          await db.upsertExpenseCategory(
+            ExpenseCategoriesCompanion(
+              id: drift.Value(_asNullableInt(data['id'])!),
+              name: drift.Value(data['name'].toString()),
+              type: drift.Value(data['type']?.toString() ?? 'expense'),
+              isActive: const drift.Value(true),
+            ),
+          );
+        });
         break;
       case 'expense_push':
         final key =
@@ -2793,28 +2812,39 @@ class SyncService {
         }
         break;
       case 'delivery_profile_push':
-        await sellerApi.upsertDeliveryProfile(payload);
+        final deliveryResponse = await sellerApi.upsertDeliveryProfile(payload);
+        final deliveryBody = deliveryResponse.data;
+        if (deliveryBody is! Map ||
+            deliveryBody['result'] != true ||
+            deliveryBody['profile'] is! Map) {
+          throw StateError(
+            'Delivery settings were not accepted by the server.',
+          );
+        }
+        final savedDelivery = Map<String, dynamic>.from(
+          deliveryBody['profile'] as Map,
+        );
         final existingProfile = await db.getBusinessProfile();
         if (existingProfile != null) {
           await db.upsertBusinessProfile(
             existingProfile
                 .copyWith(
-                  shippingCost: payload['base_fee'] is num
-                      ? drift.Value((payload['base_fee'] as num).toDouble())
+                  shippingCost: savedDelivery['base_fee'] != null
+                      ? drift.Value(_asDouble(savedDelivery['base_fee']))
                       : const drift.Value.absent(),
-                  selfDeliveryActive: payload.containsKey('enabled')
-                      ? _asBool(payload['enabled'])
+                  selfDeliveryActive: savedDelivery.containsKey('enabled')
+                      ? _asBool(savedDelivery['enabled'])
                       : existingProfile.selfDeliveryActive,
-                  deliveryRadiusKm: payload['radius_km'] is num
-                      ? drift.Value((payload['radius_km'] as num).toDouble())
+                  deliveryRadiusKm: savedDelivery['radius_km'] != null
+                      ? drift.Value(_asDouble(savedDelivery['radius_km']))
                       : const drift.Value.absent(),
-                  deliveryPickupLatitude: payload['origin_lat'] is num
-                      ? drift.Value((payload['origin_lat'] as num).toDouble())
+                  deliveryPickupLatitude: savedDelivery['origin_lat'] != null
+                      ? drift.Value(_asDouble(savedDelivery['origin_lat']))
                       : const drift.Value.absent(),
-                  deliveryPickupLongitude: payload['origin_lng'] is num
-                      ? drift.Value((payload['origin_lng'] as num).toDouble())
+                  deliveryPickupLongitude: savedDelivery['origin_lng'] != null
+                      ? drift.Value(_asDouble(savedDelivery['origin_lng']))
                       : const drift.Value.absent(),
-                  deliveryProfileJson: drift.Value(jsonEncode(payload)),
+                  deliveryProfileJson: drift.Value(jsonEncode(savedDelivery)),
                   updatedAt: DateTime.now().toUtc(),
                   synced: true,
                 )
@@ -2940,9 +2970,13 @@ class SyncService {
         );
         break;
       case 'booking_create':
-        await sellerApi.createServiceBooking(
-          Map<String, dynamic>.from(payload),
-        );
+        final body = Map<String, dynamic>.from(payload);
+        final localCacheId = body.remove('local_cache_id');
+        await sellerApi.createServiceBooking(body);
+        final cacheId = localCacheId is num ? localCacheId.toInt() : null;
+        if (cacheId != null && cacheId < 0) {
+          await db.deleteCachedServiceBooking(cacheId);
+        }
         break;
       case 'booking_reschedule':
         final bookingId = payload['booking_id'] as int?;
@@ -2991,8 +3025,9 @@ class SyncService {
   }
 
   Future<void> pullPosDelta() {
+    if (_isDisposed) return Future.value();
     if (_pullInFlight != null) return _pullInFlight!;
-    final future = _pullPosDeltaInternal();
+    final future = _trackWork(_pullPosDeltaInternal);
     _pullInFlight = future.whenComplete(() => _pullInFlight = null);
     return _pullInFlight!;
   }
@@ -3014,7 +3049,13 @@ class SyncService {
         debugPrint('[SyncService] Pulling delta since $since');
       }
 
-      final res = await sellerApi.pullPosSync(since: since);
+      // Server timestamps have second precision. Overlap the boundary so a
+      // write later in the same second cannot fall between consecutive pulls.
+      final requestSince = since.millisecondsSinceEpoch > 1000
+          ? since.toUtc().subtract(const Duration(seconds: 1))
+          : since.toUtc();
+      final res = await sellerApi.pullPosSync(since: requestSince);
+      if (_isDisposed) return;
       if (res.data is! Map<String, dynamic>) {
         throw DioException(
           requestOptions: res.requestOptions,
@@ -3056,301 +3097,748 @@ class SyncService {
         );
       }
 
-      _safeAddStatus('Syncing products...');
-      if (pull.products.isEmpty) {
-        if (kDebugMode) {
-          debugPrint('[SyncService] WARNING: No products in sync response!');
+      // Apply rows, snapshot removals and cursors as one durable unit.
+      await db.transaction(() async {
+        _safeAddStatus('Syncing products...');
+        if (pull.products.isEmpty) {
+          if (kDebugMode) {
+            debugPrint('[SyncService] WARNING: No products in sync response!');
+          }
         }
-      }
 
-      for (final p in pull.products) {
-        if (p.id.isEmpty) continue;
-        final remoteId = int.tryParse(p.id);
-        final existing = remoteId != null
-            ? await db.getItemByRemoteId(remoteId)
-            : null;
-        final localId = existing?.id ?? p.id;
-        final displayPrice = p.stocks.isEmpty
-            ? p.unitPrice
-            : p.stocks.map((s) => s.price).reduce((a, b) => a < b ? a : b);
-        final displayStock = p.stocks.isEmpty
-            ? p.currentStock
-            : p.stocks.fold<int>(0, (sum, s) => sum + s.qty);
-        final discountType = p.discountType == null
-            ? null
-            : (p.discountType == 'amount' ? 'flat' : p.discountType);
-        await db.upsertItem(
-          ItemsCompanion.insert(
-            id: drift.Value(localId),
-            remoteId: remoteId != null
-                ? drift.Value(remoteId)
-                : const drift.Value.absent(),
-            name: p.name.isEmpty ? 'Product' : p.name,
-            price: displayPrice,
-            cost: p.purchasePrice != null
-                ? drift.Value(p.purchasePrice)
-                : const drift.Value.absent(),
-            stockQty: drift.Value(displayStock),
-            imageUrl: drift.Value(p.imageUrl),
-            thumbnailUrl: (p.thumbnailUrl ?? p.imageUrl) != null
-                ? drift.Value(p.thumbnailUrl ?? p.imageUrl)
-                : const drift.Value.absent(),
-            thumbnailUploadId: p.thumbnailUploadId != null
-                ? drift.Value(p.thumbnailUploadId)
-                : const drift.Value.absent(),
-            galleryUrls: p.galleryUrls.isNotEmpty
-                ? drift.Value(jsonEncode(p.galleryUrls))
-                : const drift.Value.absent(),
-            galleryUploadIds: p.photoUploadIds.isNotEmpty
-                ? drift.Value(jsonEncode(p.photoUploadIds))
-                : const drift.Value.absent(),
-            publishedOnline: drift.Value(p.published),
-            categoryId: p.categoryId != null
-                ? drift.Value(p.categoryId.toString())
-                : const drift.Value.absent(),
-            brandId: p.brandId != null
-                ? drift.Value(p.brandId.toString())
-                : const drift.Value.absent(),
-            unit: p.unit != null
-                ? drift.Value(p.unit)
-                : const drift.Value.absent(),
-            weight: p.weight != null
-                ? drift.Value(p.weight)
-                : const drift.Value.absent(),
-            minPurchaseQty: p.minQty != null
-                ? drift.Value(p.minQty!)
-                : const drift.Value.absent(),
-            tags: p.tags != null
-                ? drift.Value(p.tags)
-                : const drift.Value.absent(),
-            description: p.description != null
-                ? drift.Value(p.description)
-                : const drift.Value.absent(),
-            discount: p.discount != null
-                ? drift.Value(p.discount)
-                : const drift.Value.absent(),
-            discountType: discountType != null
-                ? drift.Value(discountType)
-                : const drift.Value.absent(),
-            shippingDays: p.estShippingDays != null
-                ? drift.Value(p.estShippingDays)
-                : const drift.Value.absent(),
-            shippingFee: p.shippingCost != null
-                ? drift.Value(p.shippingCost)
-                : const drift.Value.absent(),
-            refundable: drift.Value(p.refundable ?? false),
-            cashOnDelivery: drift.Value(p.cashOnDelivery ?? true),
-            lowStockWarning: p.lowStockQuantity != null
-                ? drift.Value(p.lowStockQuantity)
-                : const drift.Value.absent(),
-            barcode: p.barcode != null
-                ? drift.Value(p.barcode)
-                : const drift.Value.absent(),
-            taxRate: p.taxRate != null
-                ? drift.Value(p.taxRate)
-                : const drift.Value.absent(),
-            updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
-            synced: const drift.Value(true),
-          ),
-        );
+        // A failed or queued offline sale still owns its local stock change.
+        // The backend touches product timestamps when that sale is accepted.
+        final pendingStockItems =
+            (await db
+                    .customSelect(
+                      'SELECT DISTINCT l.item_id FROM ledger_lines l JOIN ledger_entries e '
+                      'ON e.id = l.entry_id WHERE e.synced = 0 AND l.item_id IS NOT NULL',
+                    )
+                    .get())
+                .map((row) => row.read<String>('item_id'))
+                .toSet();
 
-        // Upsert variant stocks (product_stocks). If backend didn't send any,
-        // treat the product as a single-stock item.
-        final incomingStocks = p.stocks.isNotEmpty
-            ? p.stocks
-            : [
-                PosSyncProductStock(
-                  id: 0,
-                  variant: '',
-                  price: p.unitPrice,
-                  qty: p.currentStock,
-                ),
-              ];
-
-        final variants = <String>[];
-        for (final s in incomingStocks) {
-          final variant = s.variant;
-          variants.add(variant);
-          await db.upsertItemStock(
-            ItemStocksCompanion.insert(
-              itemId: localId,
-              variant: variant,
-              remoteStockId: s.id > 0
-                  ? drift.Value(s.id)
+        for (final p in pull.products) {
+          if (p.id.isEmpty) continue;
+          final remoteId = int.tryParse(p.id);
+          final existing = remoteId != null
+              ? await db.getItemByRemoteId(remoteId)
+              : null;
+          if (existing != null &&
+              (!existing.synced || pendingStockItems.contains(existing.id))) {
+            continue;
+          }
+          final localId = existing?.id ?? p.id;
+          final displayPrice = p.stocks.isEmpty
+              ? p.unitPrice
+              : p.stocks.map((s) => s.price).reduce((a, b) => a < b ? a : b);
+          final displayStock = p.stocks.isEmpty
+              ? p.currentStock
+              : p.stocks.fold<int>(0, (sum, s) => sum + s.qty);
+          final discountType = p.discountType == null
+              ? null
+              : (p.discountType == 'amount' ? 'flat' : p.discountType);
+          await db.upsertItem(
+            ItemsCompanion.insert(
+              id: drift.Value(localId),
+              remoteId: remoteId != null
+                  ? drift.Value(remoteId)
                   : const drift.Value.absent(),
-              price: s.price,
-              stockQty: drift.Value(s.qty),
-              sku: drift.Value(s.sku),
-              imageUploadId: s.imageUploadId != null
-                  ? drift.Value(s.imageUploadId)
+              name: p.name.isEmpty ? 'Product' : p.name,
+              price: displayPrice,
+              cost: p.purchasePrice != null
+                  ? drift.Value(p.purchasePrice)
                   : const drift.Value.absent(),
-              imageUrl: drift.Value(s.imageUrl),
-              updatedAt: drift.Value(
-                s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc(),
-              ),
+              stockQty: drift.Value(displayStock),
+              imageUrl: drift.Value(p.imageUrl),
+              thumbnailUrl: drift.Value(p.thumbnailUrl ?? p.imageUrl),
+              thumbnailUploadId: drift.Value(p.thumbnailUploadId),
+              galleryUrls: drift.Value(jsonEncode(p.galleryUrls)),
+              galleryUploadIds: drift.Value(jsonEncode(p.photoUploadIds)),
+              wholesaleRangesJson: drift.Value(jsonEncode(p.wholesaleRanges)),
+              publishedOnline: drift.Value(p.published),
+              categoryId: p.categoryId != null
+                  ? drift.Value(p.categoryId.toString())
+                  : const drift.Value.absent(),
+              brandId: p.brandId != null
+                  ? drift.Value(p.brandId.toString())
+                  : const drift.Value.absent(),
+              unit: p.unit != null
+                  ? drift.Value(p.unit)
+                  : const drift.Value.absent(),
+              weight: p.weight != null
+                  ? drift.Value(p.weight)
+                  : const drift.Value.absent(),
+              minPurchaseQty: p.minQty != null
+                  ? drift.Value(p.minQty!)
+                  : const drift.Value.absent(),
+              tags: p.tags != null
+                  ? drift.Value(p.tags)
+                  : const drift.Value.absent(),
+              description: drift.Value(p.description),
+              discount: p.discount != null
+                  ? drift.Value(p.discount)
+                  : const drift.Value.absent(),
+              discountType: discountType != null
+                  ? drift.Value(discountType)
+                  : const drift.Value.absent(),
+              shippingDays: p.estShippingDays != null
+                  ? drift.Value(p.estShippingDays)
+                  : const drift.Value.absent(),
+              shippingFee: p.shippingCost != null
+                  ? drift.Value(p.shippingCost)
+                  : const drift.Value.absent(),
+              refundable: drift.Value(p.refundable ?? false),
+              cashOnDelivery: drift.Value(p.cashOnDelivery ?? true),
+              lowStockWarning: p.lowStockQuantity != null
+                  ? drift.Value(p.lowStockQuantity)
+                  : const drift.Value.absent(),
+              barcode: p.barcode != null
+                  ? drift.Value(p.barcode)
+                  : const drift.Value.absent(),
+              taxRate: p.taxRate != null
+                  ? drift.Value(p.taxRate)
+                  : const drift.Value.absent(),
+              updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
+              synced: const drift.Value(true),
             ),
           );
 
-          // Keep low-stock alerts in sync even if no local inventory movements
-          // occurred (e.g., after a server-side stock adjustment).
-          final threshold = p.lowStockQuantity ?? 5;
-          await db.upsertOrResolveStockAlert(
-            itemId: localId,
-            variant: variant,
-            stockQty: s.qty,
-            threshold: threshold,
-          );
-        }
-        await db.deleteItemStocksNotIn(localId, variants);
-      }
+          // Upsert variant stocks (product_stocks). If backend didn't send any,
+          // treat the product as a single-stock item.
+          final incomingStocks = p.stocks.isNotEmpty
+              ? p.stocks
+              : [
+                  PosSyncProductStock(
+                    id: 0,
+                    variant: '',
+                    price: p.unitPrice,
+                    qty: p.currentStock,
+                  ),
+                ];
 
-      for (final s in pull.services) {
-        if (s.id.isEmpty) continue;
-        final remoteId = int.tryParse(s.id);
-        final existing = remoteId != null
-            ? await db.getServiceByRemoteId(remoteId)
-            : null;
-        final localId = existing?.id ?? s.id;
-        final pricingPackagesJson = s.pricingPackages.isNotEmpty
-            ? jsonEncode(
-                s.pricingPackages
-                    .map(
-                      (pkg) => {
-                        'tier': pkg['tier'],
-                        'remote_id': pkg['id'],
-                        'price': pkg['price'],
-                        if (pkg['delivery_days'] != null)
-                          'delivery_days': pkg['delivery_days'],
-                        if (pkg['revisions'] != null)
-                          'revisions': pkg['revisions'],
-                        if (pkg['description'] != null)
-                          'description': pkg['description'],
-                      },
-                    )
-                    .toList(),
-              )
-            : null;
-
-        await db.upsertService(
-          ServicesCompanion.insert(
-            id: drift.Value(localId),
-            remoteId: remoteId != null
-                ? drift.Value(remoteId)
-                : const drift.Value.absent(),
-            title: s.title.isEmpty ? 'Service' : s.title,
-            price: s.price,
-            cost: s.purchasePrice != null
-                ? drift.Value(s.purchasePrice)
-                : const drift.Value.absent(),
-            description: drift.Value(s.description),
-            imageUrl: drift.Value(s.imageUrl),
-            coverUploadId: s.coverUploadId != null
-                ? drift.Value(s.coverUploadId)
-                : const drift.Value.absent(),
-            galleryUrls: s.galleryUrls.isNotEmpty
-                ? drift.Value(jsonEncode(s.galleryUrls))
-                : const drift.Value.absent(),
-            galleryUploadIds: s.photoUploadIds.isNotEmpty
-                ? drift.Value(jsonEncode(s.photoUploadIds))
-                : const drift.Value.absent(),
-            durationMinutes: drift.Value(s.durationMinutes),
-            categoryId: s.categoryId != null
-                ? drift.Value(s.categoryId)
-                : const drift.Value.absent(),
-            summary: drift.Value(s.summary),
-            serviceType: drift.Value(s.serviceType),
-            deliveryTimeframe: drift.Value(s.deliveryTimeframe),
-            moderationStatus: drift.Value(s.moderationStatus),
-            slug: drift.Value(s.slug),
-            pricingPackages: pricingPackagesJson != null
-                ? drift.Value(pricingPackagesJson)
-                : const drift.Value.absent(),
-            category: drift.Value(s.category),
-            publishedOnline: drift.Value(s.published),
-            updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
-            synced: const drift.Value(true),
-          ),
-        );
-      }
-
-      // Upsert service variants from pull
-      for (final v in pull.serviceVariants) {
-        if (v.id.isEmpty || v.serviceId.isEmpty) continue;
-        await db.upsertServiceVariant(
-          ServiceVariantsCompanion(
-            id: drift.Value(v.id),
-            serviceId: drift.Value(v.serviceId),
-            name: drift.Value(v.name),
-            price: drift.Value(v.price),
-            unit: drift.Value(v.unit),
-            isDefault: drift.Value(v.isDefault),
-            updatedAt: drift.Value(v.updatedAt ?? DateTime.now().toUtc()),
-            synced: const drift.Value(true),
-          ),
-        );
-      }
-
-      // Upsert service packages from pull
-      for (final p in pull.servicePackages) {
-        if (p.id.isEmpty) continue;
-        await db
-            .into(db.servicePackages)
-            .insertOnConflictUpdate(
-              ServicePackagesCompanion(
-                id: drift.Value(p.id),
-                serviceId: drift.Value(p.serviceId),
-                name: drift.Value(p.name),
-                totalSessions: drift.Value(p.totalSessions),
-                price: drift.Value(p.price),
-                validityDays: drift.Value(p.validityDays),
-                active: drift.Value(p.active),
-                updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
-                synced: const drift.Value(true),
+          final variants = <String>[];
+          for (final s in incomingStocks) {
+            final variant = s.variant;
+            variants.add(variant);
+            await db.upsertItemStock(
+              ItemStocksCompanion.insert(
+                itemId: localId,
+                variant: variant,
+                remoteStockId: s.id > 0
+                    ? drift.Value(s.id)
+                    : const drift.Value.absent(),
+                price: s.price,
+                stockQty: drift.Value(s.qty),
+                sku: drift.Value(s.sku),
+                imageUploadId: s.imageUploadId != null
+                    ? drift.Value(s.imageUploadId)
+                    : const drift.Value.absent(),
+                imageUrl: drift.Value(s.imageUrl),
+                updatedAt: drift.Value(
+                  s.updatedAt ?? p.updatedAt ?? DateTime.now().toUtc(),
+                ),
               ),
             );
-      }
 
-      _safeAddStatus('Syncing customers...');
-      for (final c in pull.customers) {
-        if (c.id.isEmpty) continue;
-        final existingById = await db.getCustomerById(c.id);
-        final existingByRemote = existingById == null
-            ? await db.getCustomerByRemoteId(c.id)
-            : null;
-        final localId = existingById?.id ?? existingByRemote?.id ?? c.id;
+            // Keep low-stock alerts in sync even if no local inventory movements
+            // occurred (e.g., after a server-side stock adjustment).
+            final threshold = p.lowStockQuantity ?? 5;
+            await db.upsertOrResolveStockAlert(
+              itemId: localId,
+              variant: variant,
+              stockQty: s.qty,
+              threshold: threshold,
+            );
+          }
+          await db.deleteItemStocksNotIn(localId, variants);
+        }
 
-        await db.upsertCustomer(
-          CustomersCompanion.insert(
-            id: drift.Value(localId),
-            remoteId: drift.Value(c.id),
-            name: c.name.isEmpty ? 'Customer' : c.name,
-            phone: drift.Value(c.phone),
-            email: drift.Value(c.email),
-            synced: const drift.Value(true),
-            updatedAt: drift.Value(c.updatedAt ?? DateTime.now().toUtc()),
+        for (final s in pull.services) {
+          if (s.id.isEmpty) continue;
+          final remoteId = int.tryParse(s.id);
+          final existing = remoteId != null
+              ? await db.getServiceByRemoteId(remoteId)
+              : null;
+          if (existing != null && !existing.synced) continue;
+          final localId = existing?.id ?? s.id;
+          final pricingPackagesJson = s.pricingPackages.isNotEmpty
+              ? jsonEncode(
+                  s.pricingPackages
+                      .map(
+                        (pkg) => {
+                          'tier': pkg['tier'],
+                          'remote_id': pkg['id'],
+                          'price': pkg['price'],
+                          if (pkg['delivery_days'] != null)
+                            'delivery_days': pkg['delivery_days'],
+                          if (pkg['revisions'] != null)
+                            'revisions': pkg['revisions'],
+                          if (pkg['description'] != null)
+                            'description': pkg['description'],
+                        },
+                      )
+                      .toList(),
+                )
+              : null;
+
+          await db.upsertService(
+            ServicesCompanion.insert(
+              id: drift.Value(localId),
+              remoteId: remoteId != null
+                  ? drift.Value(remoteId)
+                  : const drift.Value.absent(),
+              title: s.title.isEmpty ? 'Service' : s.title,
+              price: s.price,
+              cost: s.purchasePrice != null
+                  ? drift.Value(s.purchasePrice)
+                  : const drift.Value.absent(),
+              description: drift.Value(s.description),
+              imageUrl: drift.Value(s.imageUrl),
+              coverUploadId: drift.Value(s.coverUploadId),
+              galleryUrls: drift.Value(jsonEncode(s.galleryUrls)),
+              galleryUploadIds: drift.Value(jsonEncode(s.photoUploadIds)),
+              durationMinutes: drift.Value(s.durationMinutes),
+              categoryId: s.categoryId != null
+                  ? drift.Value(s.categoryId)
+                  : const drift.Value.absent(),
+              summary: drift.Value(s.summary),
+              serviceType: drift.Value(s.serviceType),
+              deliveryTimeframe: drift.Value(s.deliveryTimeframe),
+              moderationStatus: drift.Value(s.moderationStatus),
+              slug: drift.Value(s.slug),
+              pricingPackages: pricingPackagesJson != null
+                  ? drift.Value(pricingPackagesJson)
+                  : const drift.Value.absent(),
+              category: drift.Value(s.category),
+              publishedOnline: drift.Value(s.published),
+              updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
+              synced: const drift.Value(true),
+            ),
+          );
+        }
+
+        // Upsert service variants from pull
+        for (final v in pull.serviceVariants) {
+          if (v.id.isEmpty || v.serviceId.isEmpty) continue;
+          await db.upsertServiceVariant(
+            ServiceVariantsCompanion(
+              id: drift.Value(v.id),
+              serviceId: drift.Value(v.serviceId),
+              name: drift.Value(v.name),
+              price: drift.Value(v.price),
+              unit: drift.Value(v.unit),
+              isDefault: drift.Value(v.isDefault),
+              updatedAt: drift.Value(v.updatedAt ?? DateTime.now().toUtc()),
+              synced: const drift.Value(true),
+            ),
+          );
+        }
+
+        // Upsert service packages from pull
+        for (final p in pull.servicePackages) {
+          if (p.id.isEmpty) continue;
+          await db
+              .into(db.servicePackages)
+              .insertOnConflictUpdate(
+                ServicePackagesCompanion(
+                  id: drift.Value(p.id),
+                  serviceId: drift.Value(p.serviceId),
+                  name: drift.Value(p.name),
+                  totalSessions: drift.Value(p.totalSessions),
+                  price: drift.Value(p.price),
+                  validityDays: drift.Value(p.validityDays),
+                  active: drift.Value(p.active),
+                  updatedAt: drift.Value(p.updatedAt ?? DateTime.now().toUtc()),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        _safeAddStatus('Syncing customers...');
+        for (final c in pull.customers) {
+          if (c.id.isEmpty) continue;
+          final existingById = await db.getCustomerById(c.id);
+          final existingByRemote = existingById == null
+              ? await db.getCustomerByRemoteId(c.id)
+              : null;
+          final localId = existingById?.id ?? existingByRemote?.id ?? c.id;
+
+          await db.upsertCustomer(
+            CustomersCompanion.insert(
+              id: drift.Value(localId),
+              remoteId: drift.Value(c.id),
+              name: c.name.isEmpty ? 'Customer' : c.name,
+              phone: drift.Value(c.phone),
+              email: drift.Value(c.email),
+              synced: const drift.Value(true),
+              updatedAt: drift.Value(c.updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
+
+        _safeAddStatus('Syncing suppliers...');
+        for (final s in pull.suppliers) {
+          if (s.id <= 0) continue;
+          await db.upsertSupplier(
+            SuppliersCompanion.insert(
+              id: drift.Value(s.id),
+              name: s.name.isEmpty ? 'Supplier' : s.name,
+              contactName: drift.Value(s.contactName),
+              phone: drift.Value(s.phone),
+              email: drift.Value(s.email),
+              address: drift.Value(s.address),
+              notes: drift.Value(s.notes),
+              active: drift.Value(s.active),
+              updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
+
+        _safeAddStatus('Syncing expenses...');
+        for (final e in pull.expenses) {
+          if (e.id <= 0) continue;
+
+          final clientId = (e.clientExpenseId ?? '').trim();
+          Expense? existing;
+          String localId;
+
+          if (clientId.isNotEmpty) {
+            existing = await db.getExpenseById(clientId);
+            localId = existing?.id ?? clientId;
+          } else {
+            existing = await db.getExpenseByRemoteId(e.id);
+            localId = existing?.id ?? e.id.toString();
+          }
+
+          final occurredAt =
+              e.occurredAt ?? e.updatedAt ?? DateTime.now().toUtc();
+          await db.upsertExpense(
+            ExpensesCompanion.insert(
+              id: drift.Value(localId),
+              remoteId: drift.Value(e.id),
+              outletId: pull.outletId.trim().isNotEmpty
+                  ? drift.Value(pull.outletId)
+                  : const drift.Value.absent(),
+              staffId: const drift.Value.absent(),
+              amount: e.amount,
+              method: e.method.trim().isEmpty ? 'cash' : e.method.trim(),
+              category: e.category.trim().isEmpty ? 'other' : e.category.trim(),
+              supplierId: e.supplierId != null
+                  ? drift.Value(e.supplierId)
+                  : const drift.Value.absent(),
+              note: drift.Value(e.note),
+              occurredAt: drift.Value(occurredAt),
+              synced: const drift.Value(true),
+              updatedAt: drift.Value(e.updatedAt ?? DateTime.now().toUtc()),
+            ),
+          );
+        }
+
+        // Sync quotations (pulled from server)
+        _safeAddStatus('Syncing quotations...');
+        for (final q in pull.quotations) {
+          if (q.id.isEmpty) continue;
+
+          // Upsert quotation using insertOnConflictUpdate
+          await db
+              .into(db.quotations)
+              .insertOnConflictUpdate(
+                QuotationsCompanion(
+                  id: drift.Value(q.id),
+                  number: drift.Value(q.quotationNumber),
+                  customerId: drift.Value(q.customerId),
+                  validUntil: drift.Value(
+                    DateTime.now().add(Duration(days: q.validityDays)),
+                  ),
+                  totalAmount: drift.Value(q.total),
+                  notes: drift.Value(q.notes),
+                  remoteId: drift.Value(q.id),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        // Sync customer packages
+        _safeAddStatus('Syncing packages...');
+        for (final p in pull.customerPackages) {
+          if (p.id.isEmpty) continue;
+          await db
+              .into(db.customerPackages)
+              .insertOnConflictUpdate(
+                CustomerPackagesCompanion(
+                  id: drift.Value(p.id),
+                  packageId: drift.Value(p.packageId),
+                  customerId: drift.Value(p.customerId),
+                  remainingSessions: drift.Value(p.remainingSessions),
+                  expiresAt: drift.Value(p.expiresAt),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        // Sync redemptions
+        for (final r in pull.packageRedemptions) {
+          if (r.id.isEmpty) continue;
+          await db
+              .into(db.packageRedemptions)
+              .insertOnConflictUpdate(
+                PackageRedemptionsCompanion(
+                  id: drift.Value(r.id),
+                  customerPackageId: drift.Value(r.customerPackageId),
+                  sessionsUsed: drift.Value(r.sessionsUsed),
+                  note: drift.Value(r.note),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        // Sync shifts (pulled from server)
+        _safeAddStatus('Syncing shifts...');
+        for (final s in pull.shifts) {
+          if (s.id.isEmpty) continue;
+
+          await db
+              .into(db.shifts)
+              .insertOnConflictUpdate(
+                ShiftsCompanion(
+                  id: drift.Value(s.id),
+                  outletId: drift.Value(s.outletId?.toString()),
+                  staffId: drift.Value(s.staffId?.toString()),
+                  openedAt: drift.Value(s.openedAt),
+                  closedAt: drift.Value(s.closedAt),
+                  openingFloat: drift.Value(s.openingFloat),
+                  closingFloat: drift.Value(s.closingFloat ?? 0),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        // Sync cash movements (pulled from server)
+        _safeAddStatus('Syncing cash movements...');
+        for (final m in pull.cashMovements) {
+          if (m.id <= 0) continue;
+          final key = m.idempotencyKey.trim();
+          final existingByRemote = await db.getCashMovementByRemoteId(m.id);
+          if (existingByRemote != null) {
+            await db.updateCashMovement(
+              existingByRemote.id,
+              CashMovementsCompanion(
+                idempotencyKey: key.isEmpty
+                    ? const drift.Value.absent()
+                    : drift.Value(key),
+                type: drift.Value(
+                  m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+                ),
+                amount: drift.Value(m.amount),
+                note: drift.Value(m.note),
+                createdAt: drift.Value(
+                  m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+                ),
+              ),
+            );
+            continue;
+          }
+
+          if (key.isNotEmpty) {
+            final existingByKey = await db.getCashMovementByIdempotencyKey(key);
+            if (existingByKey != null) {
+              await db.updateCashMovement(
+                existingByKey.id,
+                CashMovementsCompanion(
+                  remoteId: drift.Value(m.id),
+                  idempotencyKey: drift.Value(key),
+                  type: drift.Value(
+                    m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+                  ),
+                  amount: drift.Value(m.amount),
+                  note: drift.Value(m.note),
+                  createdAt: drift.Value(
+                    m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+                  ),
+                ),
+              );
+              continue;
+            }
+          }
+
+          await db
+              .into(db.cashMovements)
+              .insert(
+                CashMovementsCompanion.insert(
+                  remoteId: drift.Value(m.id),
+                  idempotencyKey: key.isEmpty
+                      ? const drift.Value.absent()
+                      : drift.Value(key),
+                  outletId: pull.outletId.trim().isNotEmpty
+                      ? drift.Value(pull.outletId)
+                      : const drift.Value.absent(),
+                  staffId: m.staffId != null
+                      ? drift.Value(m.staffId.toString())
+                      : const drift.Value.absent(),
+                  type: m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
+                  amount: m.amount,
+                  note: drift.Value(m.note),
+                  createdAt: drift.Value(
+                    m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
+                  ),
+                ),
+              );
+        }
+
+        _safeAddStatus('Syncing settings...');
+        for (final setting in pull.settings) {
+          if (setting.key.isEmpty) continue;
+          await db.upsertAppSetting(
+            AppSettingsCompanion.insert(
+              key: setting.key,
+              valueJson: drift.Value(jsonEncode(setting.value)),
+              updatedAt: drift.Value(
+                setting.updatedAt ?? DateTime.now().toUtc(),
+              ),
+            ),
+          );
+        }
+
+        final outlet = pull.outlet;
+        if (outlet != null && outlet.id.isNotEmpty) {
+          await db.upsertOutlet(
+            OutletsCompanion.insert(
+              id: drift.Value(outlet.id),
+              name: outlet.name.isEmpty ? 'Default outlet' : outlet.name,
+              address: drift.Value(outlet.address),
+              phone: drift.Value(outlet.phone),
+              updatedAt: drift.Value(
+                outlet.updatedAt ?? DateTime.now().toUtc(),
+              ),
+            ),
+          );
+        }
+
+        final businessProfile = pull.businessProfile;
+        if (businessProfile != null && businessProfile.shopName.isNotEmpty) {
+          _safeAddStatus('Syncing business profile...');
+          // Preserve locally-configured tax settings; backend does not own them.
+          final existingProfile = await db.getBusinessProfile();
+          await db.upsertBusinessProfile(
+            BusinessProfilesCompanion.insert(
+              id: kPrimaryBusinessProfileId,
+              sellerId: drift.Value(
+                businessProfile.sellerId.trim().isEmpty
+                    ? null
+                    : businessProfile.sellerId,
+              ),
+              sellerName: drift.Value(businessProfile.sellerName),
+              sellerEmail: drift.Value(businessProfile.sellerEmail),
+              sellerPhone: drift.Value(businessProfile.sellerPhone),
+              shopId: drift.Value(businessProfile.shopId),
+              shopName: businessProfile.shopName,
+              shopAddress: drift.Value(businessProfile.shopAddress),
+              shopPhone: drift.Value(businessProfile.shopPhone),
+              logoUploadId: businessProfile.logoUploadId != null
+                  ? drift.Value(businessProfile.logoUploadId)
+                  : const drift.Value.absent(),
+              logoUrl: drift.Value(businessProfile.logoUrl),
+              metaTitle: drift.Value(businessProfile.metaTitle),
+              metaDescription: drift.Value(businessProfile.metaDescription),
+              thermalPrinterWidth: businessProfile.thermalPrinterWidth != null
+                  ? drift.Value(businessProfile.thermalPrinterWidth)
+                  : const drift.Value.absent(),
+              shippingCost: businessProfile.shippingCost != null
+                  ? drift.Value(businessProfile.shippingCost)
+                  : const drift.Value.absent(),
+              selfDeliveryActive: drift.Value(
+                businessProfile.selfDeliveryActive,
+              ),
+              deliveryRadiusKm: businessProfile.deliveryRadiusKm != null
+                  ? drift.Value(businessProfile.deliveryRadiusKm)
+                  : const drift.Value.absent(),
+              deliveryPickupLatitude:
+                  businessProfile.deliveryPickupLatitude != null
+                  ? drift.Value(businessProfile.deliveryPickupLatitude)
+                  : const drift.Value.absent(),
+              deliveryPickupLongitude:
+                  businessProfile.deliveryPickupLongitude != null
+                  ? drift.Value(businessProfile.deliveryPickupLongitude)
+                  : const drift.Value.absent(),
+              cashOnDeliveryEnabled: drift.Value(
+                businessProfile.cashOnDeliveryEnabled,
+              ),
+              bankPaymentEnabled: drift.Value(
+                businessProfile.bankPaymentEnabled,
+              ),
+              mobileMoneyEnabled: drift.Value(
+                businessProfile.mobileMoneyEnabled,
+              ),
+              bankName: drift.Value(businessProfile.bankName),
+              bankAccName: drift.Value(businessProfile.bankAccName),
+              bankAccNo: drift.Value(businessProfile.bankAccNo),
+              bankRoutingNo: drift.Value(businessProfile.bankRoutingNo),
+              mtnMerchantCode: drift.Value(businessProfile.mtnMerchantCode),
+              airtelMerchantCode: drift.Value(
+                businessProfile.airtelMerchantCode,
+              ),
+              paybillNumber: drift.Value(businessProfile.paybillNumber),
+              receiptPaymentMethodsJson: drift.Value(
+                jsonEncode(businessProfile.receiptPaymentMethods),
+              ),
+              deliveryProfileJson: drift.Value(
+                jsonEncode(businessProfile.deliveryProfile),
+              ),
+              verificationStatus: drift.Value(
+                businessProfile.verificationStatus ?? 0,
+              ),
+              taxEnabled: drift.Value(existingProfile?.taxEnabled ?? false),
+              taxRate: drift.Value(existingProfile?.taxRate ?? 0),
+              taxLabel: drift.Value(existingProfile?.taxLabel ?? 'VAT'),
+              taxInclusionMode: drift.Value(
+                existingProfile?.taxInclusionMode ?? 'exclusive',
+              ),
+              updatedAt: drift.Value(
+                businessProfile.updatedAt ?? DateTime.now().toUtc(),
+              ),
+              synced: const drift.Value(true),
+            ),
+          );
+          // Cache verification status separately for easy UI access
+          if (businessProfile.verificationStatus != null) {
+            await db.upsertAppSetting(
+              AppSettingsCompanion(
+                key: const drift.Value('shop_verification_status'),
+                valueJson: drift.Value(
+                  businessProfile.verificationStatus.toString(),
+                ),
+              ),
+            );
+          }
+        }
+
+        for (final t in pull.receiptTemplates) {
+          await db
+              .into(db.receiptTemplates)
+              .insertOnConflictUpdate(
+                ReceiptTemplatesCompanion.insert(
+                  id: drift.Value(t.id),
+                  name: drift.Value(t.name),
+                  style: drift.Value(t.style),
+                  headerText: drift.Value(t.headerMessage),
+                  colorHex: drift.Value(t.headerColor),
+                  footerText: drift.Value(t.footerMessage),
+                  showLogo: drift.Value(t.showLogo),
+                  showQr: drift.Value(t.showQr),
+                  isActive: drift.Value(t.isActive),
+                  updatedAt: drift.Value(t.updatedAt),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        for (final t in pull.quotationTemplates) {
+          await db
+              .into(db.quotationTemplates)
+              .insertOnConflictUpdate(
+                QuotationTemplatesCompanion.insert(
+                  id: drift.Value(t.id),
+                  name: drift.Value(t.name),
+                  style: drift.Value(t.style),
+                  headerText: drift.Value(t.headerMessage), // Matches DTO
+                  colorHex: drift.Value(t.headerColor),
+                  footerText: drift.Value(t.footerMessage),
+                  showLogo: drift.Value(t.showLogo),
+                  showQr: drift.Value(t.showQr),
+                  isActive: drift.Value(t.isActive),
+                  updatedAt: drift.Value(t.updatedAt),
+                  synced: const drift.Value(true),
+                ),
+              );
+        }
+
+        _safeAddStatus('Syncing transactions...');
+        for (final e in pull.ledgerEntries) {
+          if (e.clientEntryId.isEmpty) continue;
+
+          final List<LedgerLinesCompanion> lines = e.lines
+              .map(
+                (l) => LedgerLinesCompanion.insert(
+                  entryId: e.clientEntryId,
+                  title: l.title,
+                  quantity: l.quantity,
+                  unitPrice: l.price,
+                  lineTotal: l.total,
+                  itemId: drift.Value(l.itemId),
+                  serviceId: drift.Value(l.serviceId),
+                  variant: drift.Value(l.variation),
+                ),
+              )
+              .toList();
+
+          final List<PaymentsCompanion> payments = e.payments
+              .map(
+                (p) => PaymentsCompanion.insert(
+                  entryId: e.clientEntryId,
+                  method: p.method,
+                  amount: p.amount,
+                ),
+              )
+              .toList();
+
+          await db.upsertLedgerEntryFromSync(
+            entry: LedgerEntriesCompanion.insert(
+              id: drift.Value(e.clientEntryId),
+              idempotencyKey:
+                  e.clientEntryId, // Use client ID as idempotency key for now
+              type: e.type,
+              subtotal: drift.Value(e.subtotal),
+              discount: drift.Value(e.discount),
+              tax: drift.Value(e.tax),
+              total: drift.Value(e.total),
+              note: drift.Value(e.note),
+              synced: const drift.Value(true),
+              remoteAck: drift.Value(
+                jsonEncode({
+                  'server_entry_id': e.id,
+                  'received_at': e.updatedAt?.toIso8601String(),
+                }),
+              ),
+              remoteId: drift.Value(e.id),
+              customerId: drift.Value(e.customerId),
+              createdAt: drift.Value(e.occurredAt ?? DateTime.now().toUtc()),
+            ),
+            lines: lines,
+            payments: payments,
+          );
+        }
+
+        if (pull.sellerProfile != null) {
+          _safeAddStatus('Syncing profile...');
+          await secureStorage.write(
+            key: 'seller_profile',
+            value: jsonEncode({
+              'id': pull.sellerProfile!.id,
+              'name': pull.sellerProfile!.name,
+              'email': pull.sellerProfile!.email,
+              'phone': pull.sellerProfile!.phone,
+              'business_name': pull.sellerProfile!.businessName,
+            }),
+          );
+        }
+
+        // Rows, removals and every collection cursor commit together.
+        // A failed apply leaves the previous complete sync position intact.
+        await Future.wait(
+          _pullCursorKeys.map(
+            (key) => db.setLastPulledAt(key, pull.receivedAt),
           ),
         );
-      }
 
-      _safeAddStatus('Syncing suppliers...');
-      for (final s in pull.suppliers) {
-        if (s.id <= 0) continue;
-        await db.upsertSupplier(
-          SuppliersCompanion.insert(
-            id: drift.Value(s.id),
-            name: s.name.isEmpty ? 'Supplier' : s.name,
-            contactName: drift.Value(s.contactName),
-            phone: drift.Value(s.phone),
-            email: drift.Value(s.email),
-            address: drift.Value(s.address),
-            notes: drift.Value(s.notes),
-            active: drift.Value(s.active),
-            updatedAt: drift.Value(s.updatedAt ?? DateTime.now().toUtc()),
-          ),
-        );
-      }
+        if (pull.isFullSnapshot) {
+          await _applyFullSnapshotPruning(pull);
+        } else if (pull.hasCatalogManifest) {
+          await db.pruneSyncedRemoteItemsNotIn(pull.snapshotProductIds);
+          await db.pruneSyncedRemoteServicesNotIn(pull.snapshotServiceIds);
+        }
+      });
 
-      _safeAddStatus('Syncing expenses...');
       // Sync expense categories if receiving full snapshot or if relevant
       try {
         final posToken = await secureStorage.readPosSessionToken();
@@ -3386,433 +3874,6 @@ class SyncService {
         // Don't fail the whole sync for this
       }
 
-      for (final e in pull.expenses) {
-        if (e.id <= 0) continue;
-
-        final clientId = (e.clientExpenseId ?? '').trim();
-        Expense? existing;
-        String localId;
-
-        if (clientId.isNotEmpty) {
-          existing = await db.getExpenseById(clientId);
-          localId = existing?.id ?? clientId;
-        } else {
-          existing = await db.getExpenseByRemoteId(e.id);
-          localId = existing?.id ?? e.id.toString();
-        }
-
-        final occurredAt =
-            e.occurredAt ?? e.updatedAt ?? DateTime.now().toUtc();
-        await db.upsertExpense(
-          ExpensesCompanion.insert(
-            id: drift.Value(localId),
-            remoteId: drift.Value(e.id),
-            outletId: pull.outletId.trim().isNotEmpty
-                ? drift.Value(pull.outletId)
-                : const drift.Value.absent(),
-            staffId: const drift.Value.absent(),
-            amount: e.amount,
-            method: e.method.trim().isEmpty ? 'cash' : e.method.trim(),
-            category: e.category.trim().isEmpty ? 'other' : e.category.trim(),
-            supplierId: e.supplierId != null
-                ? drift.Value(e.supplierId)
-                : const drift.Value.absent(),
-            note: drift.Value(e.note),
-            occurredAt: drift.Value(occurredAt),
-            synced: const drift.Value(true),
-            updatedAt: drift.Value(e.updatedAt ?? DateTime.now().toUtc()),
-          ),
-        );
-      }
-
-      // Sync quotations (pulled from server)
-      _safeAddStatus('Syncing quotations...');
-      for (final q in pull.quotations) {
-        if (q.id.isEmpty) continue;
-
-        // Upsert quotation using insertOnConflictUpdate
-        await db
-            .into(db.quotations)
-            .insertOnConflictUpdate(
-              QuotationsCompanion(
-                id: drift.Value(q.id),
-                number: drift.Value(q.quotationNumber),
-                customerId: drift.Value(q.customerId),
-                validUntil: drift.Value(
-                  DateTime.now().add(Duration(days: q.validityDays)),
-                ),
-                totalAmount: drift.Value(q.total),
-                notes: drift.Value(q.notes),
-                remoteId: drift.Value(q.id),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      // Sync customer packages
-      _safeAddStatus('Syncing packages...');
-      for (final p in pull.customerPackages) {
-        if (p.id.isEmpty) continue;
-        await db
-            .into(db.customerPackages)
-            .insertOnConflictUpdate(
-              CustomerPackagesCompanion(
-                id: drift.Value(p.id),
-                packageId: drift.Value(p.packageId),
-                customerId: drift.Value(p.customerId),
-                remainingSessions: drift.Value(p.remainingSessions),
-                expiresAt: drift.Value(p.expiresAt),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      // Sync redemptions
-      for (final r in pull.packageRedemptions) {
-        if (r.id.isEmpty) continue;
-        await db
-            .into(db.packageRedemptions)
-            .insertOnConflictUpdate(
-              PackageRedemptionsCompanion(
-                id: drift.Value(r.id),
-                customerPackageId: drift.Value(r.customerPackageId),
-                sessionsUsed: drift.Value(r.sessionsUsed),
-                note: drift.Value(r.note),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      // Sync shifts (pulled from server)
-      _safeAddStatus('Syncing shifts...');
-      for (final s in pull.shifts) {
-        if (s.id.isEmpty) continue;
-
-        await db
-            .into(db.shifts)
-            .insertOnConflictUpdate(
-              ShiftsCompanion(
-                id: drift.Value(s.id),
-                outletId: drift.Value(s.outletId?.toString()),
-                staffId: drift.Value(s.staffId?.toString()),
-                openedAt: drift.Value(s.openedAt),
-                closedAt: drift.Value(s.closedAt),
-                openingFloat: drift.Value(s.openingFloat),
-                closingFloat: drift.Value(s.closingFloat ?? 0),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      // Sync cash movements (pulled from server)
-      _safeAddStatus('Syncing cash movements...');
-      for (final m in pull.cashMovements) {
-        if (m.id <= 0) continue;
-        final key = m.idempotencyKey.trim();
-        final existingByRemote = await db.getCashMovementByRemoteId(m.id);
-        if (existingByRemote != null) {
-          await db.updateCashMovement(
-            existingByRemote.id,
-            CashMovementsCompanion(
-              idempotencyKey: key.isEmpty
-                  ? const drift.Value.absent()
-                  : drift.Value(key),
-              type: drift.Value(
-                m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
-              ),
-              amount: drift.Value(m.amount),
-              note: drift.Value(m.note),
-              createdAt: drift.Value(
-                m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
-              ),
-            ),
-          );
-          continue;
-        }
-
-        if (key.isNotEmpty) {
-          final existingByKey = await db.getCashMovementByIdempotencyKey(key);
-          if (existingByKey != null) {
-            await db.updateCashMovement(
-              existingByKey.id,
-              CashMovementsCompanion(
-                remoteId: drift.Value(m.id),
-                idempotencyKey: drift.Value(key),
-                type: drift.Value(
-                  m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
-                ),
-                amount: drift.Value(m.amount),
-                note: drift.Value(m.note),
-                createdAt: drift.Value(
-                  m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
-                ),
-              ),
-            );
-            continue;
-          }
-        }
-
-        await db
-            .into(db.cashMovements)
-            .insert(
-              CashMovementsCompanion.insert(
-                remoteId: drift.Value(m.id),
-                idempotencyKey: key.isEmpty
-                    ? const drift.Value.absent()
-                    : drift.Value(key),
-                outletId: pull.outletId.trim().isNotEmpty
-                    ? drift.Value(pull.outletId)
-                    : const drift.Value.absent(),
-                staffId: m.staffId != null
-                    ? drift.Value(m.staffId.toString())
-                    : const drift.Value.absent(),
-                type: m.type.trim().isEmpty ? 'withdrawal' : m.type.trim(),
-                amount: m.amount,
-                note: drift.Value(m.note),
-                createdAt: drift.Value(
-                  m.createdAt ?? m.updatedAt ?? DateTime.now().toUtc(),
-                ),
-              ),
-            );
-      }
-
-      _safeAddStatus('Syncing settings...');
-      for (final setting in pull.settings) {
-        if (setting.key.isEmpty) continue;
-        await db.upsertAppSetting(
-          AppSettingsCompanion.insert(
-            key: setting.key,
-            valueJson: drift.Value(jsonEncode(setting.value)),
-            updatedAt: drift.Value(setting.updatedAt ?? DateTime.now().toUtc()),
-          ),
-        );
-      }
-
-      final outlet = pull.outlet;
-      if (outlet != null && outlet.id.isNotEmpty) {
-        await db.upsertOutlet(
-          OutletsCompanion.insert(
-            id: drift.Value(outlet.id),
-            name: outlet.name.isEmpty ? 'Default outlet' : outlet.name,
-            address: drift.Value(outlet.address),
-            phone: drift.Value(outlet.phone),
-            updatedAt: drift.Value(outlet.updatedAt ?? DateTime.now().toUtc()),
-          ),
-        );
-      }
-
-      final businessProfile = pull.businessProfile;
-      if (businessProfile != null && businessProfile.shopName.isNotEmpty) {
-        _safeAddStatus('Syncing business profile...');
-        // Preserve locally-configured tax settings; backend does not own them.
-        final existingProfile = await db.getBusinessProfile();
-        await db.upsertBusinessProfile(
-          BusinessProfilesCompanion.insert(
-            id: kPrimaryBusinessProfileId,
-            sellerId: drift.Value(
-              businessProfile.sellerId.trim().isEmpty
-                  ? null
-                  : businessProfile.sellerId,
-            ),
-            sellerName: drift.Value(businessProfile.sellerName),
-            sellerEmail: drift.Value(businessProfile.sellerEmail),
-            sellerPhone: drift.Value(businessProfile.sellerPhone),
-            shopId: drift.Value(businessProfile.shopId),
-            shopName: businessProfile.shopName,
-            shopAddress: drift.Value(businessProfile.shopAddress),
-            shopPhone: drift.Value(businessProfile.shopPhone),
-            logoUploadId: businessProfile.logoUploadId != null
-                ? drift.Value(businessProfile.logoUploadId)
-                : const drift.Value.absent(),
-            logoUrl: drift.Value(businessProfile.logoUrl),
-            metaTitle: drift.Value(businessProfile.metaTitle),
-            metaDescription: drift.Value(businessProfile.metaDescription),
-            thermalPrinterWidth: businessProfile.thermalPrinterWidth != null
-                ? drift.Value(businessProfile.thermalPrinterWidth)
-                : const drift.Value.absent(),
-            shippingCost: businessProfile.shippingCost != null
-                ? drift.Value(businessProfile.shippingCost)
-                : const drift.Value.absent(),
-            selfDeliveryActive: drift.Value(businessProfile.selfDeliveryActive),
-            deliveryRadiusKm: businessProfile.deliveryRadiusKm != null
-                ? drift.Value(businessProfile.deliveryRadiusKm)
-                : const drift.Value.absent(),
-            deliveryPickupLatitude:
-                businessProfile.deliveryPickupLatitude != null
-                ? drift.Value(businessProfile.deliveryPickupLatitude)
-                : const drift.Value.absent(),
-            deliveryPickupLongitude:
-                businessProfile.deliveryPickupLongitude != null
-                ? drift.Value(businessProfile.deliveryPickupLongitude)
-                : const drift.Value.absent(),
-            cashOnDeliveryEnabled: drift.Value(
-              businessProfile.cashOnDeliveryEnabled,
-            ),
-            bankPaymentEnabled: drift.Value(businessProfile.bankPaymentEnabled),
-            mobileMoneyEnabled: drift.Value(businessProfile.mobileMoneyEnabled),
-            bankName: drift.Value(businessProfile.bankName),
-            bankAccName: drift.Value(businessProfile.bankAccName),
-            bankAccNo: drift.Value(businessProfile.bankAccNo),
-            bankRoutingNo: drift.Value(businessProfile.bankRoutingNo),
-            mtnMerchantCode: drift.Value(businessProfile.mtnMerchantCode),
-            airtelMerchantCode: drift.Value(businessProfile.airtelMerchantCode),
-            paybillNumber: drift.Value(businessProfile.paybillNumber),
-            receiptPaymentMethodsJson: drift.Value(
-              jsonEncode(businessProfile.receiptPaymentMethods),
-            ),
-            deliveryProfileJson: drift.Value(
-              jsonEncode(businessProfile.deliveryProfile),
-            ),
-            verificationStatus: drift.Value(
-              businessProfile.verificationStatus ?? 0,
-            ),
-            taxEnabled: drift.Value(existingProfile?.taxEnabled ?? false),
-            taxRate: drift.Value(existingProfile?.taxRate ?? 0),
-            taxLabel: drift.Value(existingProfile?.taxLabel ?? 'VAT'),
-            taxInclusionMode: drift.Value(
-              existingProfile?.taxInclusionMode ?? 'exclusive',
-            ),
-            updatedAt: drift.Value(
-              businessProfile.updatedAt ?? DateTime.now().toUtc(),
-            ),
-            synced: const drift.Value(true),
-          ),
-        );
-        // Cache verification status separately for easy UI access
-        if (businessProfile.verificationStatus != null) {
-          await db.upsertAppSetting(
-            AppSettingsCompanion(
-              key: const drift.Value('shop_verification_status'),
-              valueJson: drift.Value(
-                businessProfile.verificationStatus.toString(),
-              ),
-            ),
-          );
-        }
-      }
-
-      for (final t in pull.receiptTemplates) {
-        await db
-            .into(db.receiptTemplates)
-            .insertOnConflictUpdate(
-              ReceiptTemplatesCompanion.insert(
-                id: drift.Value(t.id),
-                name: drift.Value(t.name),
-                style: drift.Value(t.style),
-                headerText: drift.Value(t.headerMessage),
-                colorHex: drift.Value(t.headerColor),
-                footerText: drift.Value(t.footerMessage),
-                showLogo: drift.Value(t.showLogo),
-                showQr: drift.Value(t.showQr),
-                isActive: drift.Value(t.isActive),
-                updatedAt: drift.Value(t.updatedAt),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      for (final t in pull.quotationTemplates) {
-        await db
-            .into(db.quotationTemplates)
-            .insertOnConflictUpdate(
-              QuotationTemplatesCompanion.insert(
-                id: drift.Value(t.id),
-                name: drift.Value(t.name),
-                style: drift.Value(t.style),
-                headerText: drift.Value(t.headerMessage), // Matches DTO
-                colorHex: drift.Value(t.headerColor),
-                footerText: drift.Value(t.footerMessage),
-                showLogo: drift.Value(t.showLogo),
-                showQr: drift.Value(t.showQr),
-                isActive: drift.Value(t.isActive),
-                updatedAt: drift.Value(t.updatedAt),
-                synced: const drift.Value(true),
-              ),
-            );
-      }
-
-      _safeAddStatus('Syncing transactions...');
-      for (final e in pull.ledgerEntries) {
-        if (e.clientEntryId.isEmpty) continue;
-
-        final List<LedgerLinesCompanion> lines = e.lines
-            .map(
-              (l) => LedgerLinesCompanion.insert(
-                entryId: e.clientEntryId,
-                title: l.title,
-                quantity: l.quantity,
-                unitPrice: l.price,
-                lineTotal: l.total,
-                itemId: drift.Value(l.itemId),
-                serviceId: drift.Value(l.serviceId),
-                variant: drift.Value(l.variation),
-              ),
-            )
-            .toList();
-
-        final List<PaymentsCompanion> payments = e.payments
-            .map(
-              (p) => PaymentsCompanion.insert(
-                entryId: e.clientEntryId,
-                method: p.method,
-                amount: p.amount,
-              ),
-            )
-            .toList();
-
-        await db.upsertLedgerEntryFromSync(
-          entry: LedgerEntriesCompanion.insert(
-            id: drift.Value(e.clientEntryId),
-            idempotencyKey:
-                e.clientEntryId, // Use client ID as idempotency key for now
-            type: e.type,
-            subtotal: drift.Value(e.subtotal),
-            discount: drift.Value(e.discount),
-            tax: drift.Value(e.tax),
-            total: drift.Value(e.total),
-            note: drift.Value(e.note),
-            synced: const drift.Value(true),
-            remoteAck: drift.Value(
-              jsonEncode({
-                'server_entry_id': e.id,
-                'received_at': e.updatedAt?.toIso8601String(),
-              }),
-            ),
-            remoteId: drift.Value(e.id),
-            customerId: drift.Value(e.customerId),
-            createdAt: drift.Value(e.occurredAt ?? DateTime.now().toUtc()),
-          ),
-          lines: lines,
-          payments: payments,
-        );
-      }
-
-      if (pull.sellerProfile != null) {
-        _safeAddStatus('Syncing profile...');
-        await secureStorage.write(
-          key: 'seller_profile',
-          value: jsonEncode({
-            'id': pull.sellerProfile!.id,
-            'name': pull.sellerProfile!.name,
-            'email': pull.sellerProfile!.email,
-            'phone': pull.sellerProfile!.phone,
-            'business_name': pull.sellerProfile!.businessName,
-          }),
-        );
-      }
-
-      // Update cursors BEFORE pruning so that a crash during pruning
-      // leaves cursors intact. On next restart the sync will resume
-      // from a known cursor rather than doing a delta on stale cursors
-      // and permanently losing items that were pruned.
-      await Future.wait(
-        _pullCursorKeys.map((key) => db.setLastPulledAt(key, pull.receivedAt)),
-      );
-
-      if (pull.isFullSnapshot) {
-        await _applyFullSnapshotPruning(pull);
-      }
-
       // Debug: Log total items in DB after sync
       final allItems = await db.getAllItems();
       final allServices = await db.getAllServices();
@@ -3842,25 +3903,26 @@ class SyncService {
         return;
       }
 
-      try {
-        _safeAddStatus('Caching media for offline use...');
-        final allVariantStocks = await (db.select(db.itemStocks)).get();
-        await _primeOfflineMediaCache(
-          allItems,
-          allServices,
-          variantStocks: allVariantStocks,
-          businessLogoUrl: businessProfile?.logoUrl,
-        );
-      } catch (e, st) {
-        final telemetry = Telemetry.instance;
-        if (telemetry != null) {
-          unawaited(
-            telemetry.recordError(e, st, hint: 'primeOfflineMediaCache'),
-          );
-        }
-        if (kDebugMode) {
-          debugPrint('[SyncService] Failed to cache media offline: $e');
-        }
+      // Images are a separate background task. A slow image host must never
+      // hold up the sales outbox or the next incremental data sync.
+      if (_mediaCacheInFlight == null && !_isDisposed) {
+        final allVariantStocks = await db.select(db.itemStocks).get();
+        final logoUrl = (await db.getBusinessProfile())?.logoUrl;
+        _mediaCacheInFlight =
+            _primeOfflineMediaCache(
+                  allItems,
+                  allServices,
+                  variantStocks: allVariantStocks,
+                  businessLogoUrl: logoUrl,
+                )
+                .catchError((Object error, StackTrace stack) {
+                  if (kDebugMode) {
+                    debugPrint(
+                      '[SyncService] Media cache retry deferred: $error',
+                    );
+                  }
+                })
+                .whenComplete(() => _mediaCacheInFlight = null);
       }
     } on DioException catch (e) {
       final status = e.response?.statusCode;
@@ -4490,6 +4552,11 @@ class SyncService {
     _retryTimer = null;
     _foregroundTimer?.cancel();
     _foregroundTimer = null;
+    // Let in-flight writes finish before the account database is cleared.
+    // Errors still reach their original callers; draining must always finish.
+    await Future.wait(
+      _activeWork.toList().map((work) => work.catchError((Object _) {})),
+    );
     await _syncStatusController.close();
   }
 

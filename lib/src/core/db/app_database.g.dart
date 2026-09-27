@@ -8,6 +8,17 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _wholesaleRangesJsonMeta =
+      const VerificationMeta('wholesaleRangesJson');
+  @override
+  late final GeneratedColumn<String> wholesaleRangesJson =
+      GeneratedColumn<String>(
+        'wholesale_ranges_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -390,6 +401,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    wholesaleRangesJson,
     id,
     remoteId,
     name,
@@ -437,6 +449,15 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('wholesale_ranges_json')) {
+      context.handle(
+        _wholesaleRangesJsonMeta,
+        wholesaleRangesJson.isAcceptableOrUnknown(
+          data['wholesale_ranges_json']!,
+          _wholesaleRangesJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
@@ -693,6 +714,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   Item map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Item(
+      wholesaleRangesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}wholesale_ranges_json'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -839,6 +864,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
 }
 
 class Item extends DataClass implements Insertable<Item> {
+  final String? wholesaleRangesJson;
   final String id;
   final int? remoteId;
   final String name;
@@ -874,6 +900,7 @@ class Item extends DataClass implements Insertable<Item> {
   final DateTime updatedAt;
   final bool synced;
   const Item({
+    this.wholesaleRangesJson,
     required this.id,
     this.remoteId,
     required this.name,
@@ -912,6 +939,9 @@ class Item extends DataClass implements Insertable<Item> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (!nullToAbsent || wholesaleRangesJson != null) {
+      map['wholesale_ranges_json'] = Variable<String>(wholesaleRangesJson);
+    }
     map['id'] = Variable<String>(id);
     if (!nullToAbsent || remoteId != null) {
       map['remote_id'] = Variable<int>(remoteId);
@@ -997,6 +1027,9 @@ class Item extends DataClass implements Insertable<Item> {
 
   ItemsCompanion toCompanion(bool nullToAbsent) {
     return ItemsCompanion(
+      wholesaleRangesJson: wholesaleRangesJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(wholesaleRangesJson),
       id: Value(id),
       remoteId: remoteId == null && nullToAbsent
           ? const Value.absent()
@@ -1078,6 +1111,9 @@ class Item extends DataClass implements Insertable<Item> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Item(
+      wholesaleRangesJson: serializer.fromJson<String?>(
+        json['wholesaleRangesJson'],
+      ),
       id: serializer.fromJson<String>(json['id']),
       remoteId: serializer.fromJson<int?>(json['remoteId']),
       name: serializer.fromJson<String>(json['name']),
@@ -1118,6 +1154,7 @@ class Item extends DataClass implements Insertable<Item> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'wholesaleRangesJson': serializer.toJson<String?>(wholesaleRangesJson),
       'id': serializer.toJson<String>(id),
       'remoteId': serializer.toJson<int?>(remoteId),
       'name': serializer.toJson<String>(name),
@@ -1156,6 +1193,7 @@ class Item extends DataClass implements Insertable<Item> {
   }
 
   Item copyWith({
+    Value<String?> wholesaleRangesJson = const Value.absent(),
     String? id,
     Value<int?> remoteId = const Value.absent(),
     String? name,
@@ -1191,6 +1229,9 @@ class Item extends DataClass implements Insertable<Item> {
     DateTime? updatedAt,
     bool? synced,
   }) => Item(
+    wholesaleRangesJson: wholesaleRangesJson.present
+        ? wholesaleRangesJson.value
+        : this.wholesaleRangesJson,
     id: id ?? this.id,
     remoteId: remoteId.present ? remoteId.value : this.remoteId,
     name: name ?? this.name,
@@ -1234,6 +1275,9 @@ class Item extends DataClass implements Insertable<Item> {
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
+      wholesaleRangesJson: data.wholesaleRangesJson.present
+          ? data.wholesaleRangesJson.value
+          : this.wholesaleRangesJson,
       id: data.id.present ? data.id.value : this.id,
       remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
       name: data.name.present ? data.name.value : this.name,
@@ -1306,6 +1350,7 @@ class Item extends DataClass implements Insertable<Item> {
   @override
   String toString() {
     return (StringBuffer('Item(')
+          ..write('wholesaleRangesJson: $wholesaleRangesJson, ')
           ..write('id: $id, ')
           ..write('remoteId: $remoteId, ')
           ..write('name: $name, ')
@@ -1346,6 +1391,7 @@ class Item extends DataClass implements Insertable<Item> {
 
   @override
   int get hashCode => Object.hashAll([
+    wholesaleRangesJson,
     id,
     remoteId,
     name,
@@ -1385,6 +1431,7 @@ class Item extends DataClass implements Insertable<Item> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Item &&
+          other.wholesaleRangesJson == this.wholesaleRangesJson &&
           other.id == this.id &&
           other.remoteId == this.remoteId &&
           other.name == this.name &&
@@ -1422,6 +1469,7 @@ class Item extends DataClass implements Insertable<Item> {
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
+  final Value<String?> wholesaleRangesJson;
   final Value<String> id;
   final Value<int?> remoteId;
   final Value<String> name;
@@ -1458,6 +1506,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> synced;
   final Value<int> rowid;
   const ItemsCompanion({
+    this.wholesaleRangesJson = const Value.absent(),
     this.id = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.name = const Value.absent(),
@@ -1495,6 +1544,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
+    this.wholesaleRangesJson = const Value.absent(),
     this.id = const Value.absent(),
     this.remoteId = const Value.absent(),
     required String name,
@@ -1533,6 +1583,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   }) : name = Value(name),
        price = Value(price);
   static Insertable<Item> custom({
+    Expression<String>? wholesaleRangesJson,
     Expression<String>? id,
     Expression<int>? remoteId,
     Expression<String>? name,
@@ -1570,6 +1621,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (wholesaleRangesJson != null)
+        'wholesale_ranges_json': wholesaleRangesJson,
       if (id != null) 'id': id,
       if (remoteId != null) 'remote_id': remoteId,
       if (name != null) 'name': name,
@@ -1609,6 +1662,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   }
 
   ItemsCompanion copyWith({
+    Value<String?>? wholesaleRangesJson,
     Value<String>? id,
     Value<int?>? remoteId,
     Value<String>? name,
@@ -1646,6 +1700,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
+      wholesaleRangesJson: wholesaleRangesJson ?? this.wholesaleRangesJson,
       id: id ?? this.id,
       remoteId: remoteId ?? this.remoteId,
       name: name ?? this.name,
@@ -1687,6 +1742,11 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (wholesaleRangesJson.present) {
+      map['wholesale_ranges_json'] = Variable<String>(
+        wholesaleRangesJson.value,
+      );
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -1798,6 +1858,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   @override
   String toString() {
     return (StringBuffer('ItemsCompanion(')
+          ..write('wholesaleRangesJson: $wholesaleRangesJson, ')
           ..write('id: $id, ')
           ..write('remoteId: $remoteId, ')
           ..write('name: $name, ')
@@ -27715,6 +27776,905 @@ class ParkedSalesCompanion extends UpdateCompanion<ParkedSale> {
   }
 }
 
+class $RenderJobsTable extends RenderJobs
+    with TableInfo<$RenderJobsTable, RenderJob> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RenderJobsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => _uuid.v4(),
+  );
+  static const VerificationMeta _specJsonMeta = const VerificationMeta(
+    'specJson',
+  );
+  @override
+  late final GeneratedColumn<String> specJson = GeneratedColumn<String>(
+    'spec_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('queued'),
+  );
+  static const VerificationMeta _outputPathMeta = const VerificationMeta(
+    'outputPath',
+  );
+  @override
+  late final GeneratedColumn<String> outputPath = GeneratedColumn<String>(
+    'output_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _errorMeta = const VerificationMeta('error');
+  @override
+  late final GeneratedColumn<String> error = GeneratedColumn<String>(
+    'error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    specJson,
+    status,
+    outputPath,
+    error,
+    attempts,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'render_jobs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RenderJob> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('spec_json')) {
+      context.handle(
+        _specJsonMeta,
+        specJson.isAcceptableOrUnknown(data['spec_json']!, _specJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_specJsonMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('output_path')) {
+      context.handle(
+        _outputPathMeta,
+        outputPath.isAcceptableOrUnknown(data['output_path']!, _outputPathMeta),
+      );
+    }
+    if (data.containsKey('error')) {
+      context.handle(
+        _errorMeta,
+        error.isAcceptableOrUnknown(data['error']!, _errorMeta),
+      );
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RenderJob map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RenderJob(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      specJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}spec_json'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      outputPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}output_path'],
+      ),
+      error: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error'],
+      ),
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RenderJobsTable createAlias(String alias) {
+    return $RenderJobsTable(attachedDatabase, alias);
+  }
+}
+
+class RenderJob extends DataClass implements Insertable<RenderJob> {
+  final String id;
+  final String specJson;
+  final String status;
+  final String? outputPath;
+  final String? error;
+  final int attempts;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const RenderJob({
+    required this.id,
+    required this.specJson,
+    required this.status,
+    this.outputPath,
+    this.error,
+    required this.attempts,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['spec_json'] = Variable<String>(specJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || outputPath != null) {
+      map['output_path'] = Variable<String>(outputPath);
+    }
+    if (!nullToAbsent || error != null) {
+      map['error'] = Variable<String>(error);
+    }
+    map['attempts'] = Variable<int>(attempts);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  RenderJobsCompanion toCompanion(bool nullToAbsent) {
+    return RenderJobsCompanion(
+      id: Value(id),
+      specJson: Value(specJson),
+      status: Value(status),
+      outputPath: outputPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(outputPath),
+      error: error == null && nullToAbsent
+          ? const Value.absent()
+          : Value(error),
+      attempts: Value(attempts),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RenderJob.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RenderJob(
+      id: serializer.fromJson<String>(json['id']),
+      specJson: serializer.fromJson<String>(json['specJson']),
+      status: serializer.fromJson<String>(json['status']),
+      outputPath: serializer.fromJson<String?>(json['outputPath']),
+      error: serializer.fromJson<String?>(json['error']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'specJson': serializer.toJson<String>(specJson),
+      'status': serializer.toJson<String>(status),
+      'outputPath': serializer.toJson<String?>(outputPath),
+      'error': serializer.toJson<String?>(error),
+      'attempts': serializer.toJson<int>(attempts),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  RenderJob copyWith({
+    String? id,
+    String? specJson,
+    String? status,
+    Value<String?> outputPath = const Value.absent(),
+    Value<String?> error = const Value.absent(),
+    int? attempts,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => RenderJob(
+    id: id ?? this.id,
+    specJson: specJson ?? this.specJson,
+    status: status ?? this.status,
+    outputPath: outputPath.present ? outputPath.value : this.outputPath,
+    error: error.present ? error.value : this.error,
+    attempts: attempts ?? this.attempts,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  RenderJob copyWithCompanion(RenderJobsCompanion data) {
+    return RenderJob(
+      id: data.id.present ? data.id.value : this.id,
+      specJson: data.specJson.present ? data.specJson.value : this.specJson,
+      status: data.status.present ? data.status.value : this.status,
+      outputPath: data.outputPath.present
+          ? data.outputPath.value
+          : this.outputPath,
+      error: data.error.present ? data.error.value : this.error,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RenderJob(')
+          ..write('id: $id, ')
+          ..write('specJson: $specJson, ')
+          ..write('status: $status, ')
+          ..write('outputPath: $outputPath, ')
+          ..write('error: $error, ')
+          ..write('attempts: $attempts, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    specJson,
+    status,
+    outputPath,
+    error,
+    attempts,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RenderJob &&
+          other.id == this.id &&
+          other.specJson == this.specJson &&
+          other.status == this.status &&
+          other.outputPath == this.outputPath &&
+          other.error == this.error &&
+          other.attempts == this.attempts &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RenderJobsCompanion extends UpdateCompanion<RenderJob> {
+  final Value<String> id;
+  final Value<String> specJson;
+  final Value<String> status;
+  final Value<String?> outputPath;
+  final Value<String?> error;
+  final Value<int> attempts;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const RenderJobsCompanion({
+    this.id = const Value.absent(),
+    this.specJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.outputPath = const Value.absent(),
+    this.error = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RenderJobsCompanion.insert({
+    this.id = const Value.absent(),
+    required String specJson,
+    this.status = const Value.absent(),
+    this.outputPath = const Value.absent(),
+    this.error = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : specJson = Value(specJson);
+  static Insertable<RenderJob> custom({
+    Expression<String>? id,
+    Expression<String>? specJson,
+    Expression<String>? status,
+    Expression<String>? outputPath,
+    Expression<String>? error,
+    Expression<int>? attempts,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (specJson != null) 'spec_json': specJson,
+      if (status != null) 'status': status,
+      if (outputPath != null) 'output_path': outputPath,
+      if (error != null) 'error': error,
+      if (attempts != null) 'attempts': attempts,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RenderJobsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? specJson,
+    Value<String>? status,
+    Value<String?>? outputPath,
+    Value<String?>? error,
+    Value<int>? attempts,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return RenderJobsCompanion(
+      id: id ?? this.id,
+      specJson: specJson ?? this.specJson,
+      status: status ?? this.status,
+      outputPath: outputPath ?? this.outputPath,
+      error: error ?? this.error,
+      attempts: attempts ?? this.attempts,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (specJson.present) {
+      map['spec_json'] = Variable<String>(specJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (outputPath.present) {
+      map['output_path'] = Variable<String>(outputPath.value);
+    }
+    if (error.present) {
+      map['error'] = Variable<String>(error.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RenderJobsCompanion(')
+          ..write('id: $id, ')
+          ..write('specJson: $specJson, ')
+          ..write('status: $status, ')
+          ..write('outputPath: $outputPath, ')
+          ..write('error: $error, ')
+          ..write('attempts: $attempts, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SellerEventsTable extends SellerEvents
+    with TableInfo<$SellerEventsTable, SellerEvent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SellerEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: () => DateTime.now().toUtc(),
+  );
+  static const VerificationMeta _syncedMeta = const VerificationMeta('synced');
+  @override
+  late final GeneratedColumn<bool> synced = GeneratedColumn<bool>(
+    'synced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("synced" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    entityId,
+    payload,
+    createdAt,
+    synced,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'seller_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SellerEvent> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('synced')) {
+      context.handle(
+        _syncedMeta,
+        synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SellerEvent map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SellerEvent(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      ),
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      synced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}synced'],
+      )!,
+    );
+  }
+
+  @override
+  $SellerEventsTable createAlias(String alias) {
+    return $SellerEventsTable(attachedDatabase, alias);
+  }
+}
+
+class SellerEvent extends DataClass implements Insertable<SellerEvent> {
+  final int id;
+  final String type;
+  final String? entityId;
+  final String? payload;
+  final DateTime createdAt;
+  final bool synced;
+  const SellerEvent({
+    required this.id,
+    required this.type,
+    this.entityId,
+    this.payload,
+    required this.createdAt,
+    required this.synced,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || entityId != null) {
+      map['entity_id'] = Variable<String>(entityId);
+    }
+    if (!nullToAbsent || payload != null) {
+      map['payload'] = Variable<String>(payload);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['synced'] = Variable<bool>(synced);
+    return map;
+  }
+
+  SellerEventsCompanion toCompanion(bool nullToAbsent) {
+    return SellerEventsCompanion(
+      id: Value(id),
+      type: Value(type),
+      entityId: entityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(entityId),
+      payload: payload == null && nullToAbsent
+          ? const Value.absent()
+          : Value(payload),
+      createdAt: Value(createdAt),
+      synced: Value(synced),
+    );
+  }
+
+  factory SellerEvent.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SellerEvent(
+      id: serializer.fromJson<int>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      entityId: serializer.fromJson<String?>(json['entityId']),
+      payload: serializer.fromJson<String?>(json['payload']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      synced: serializer.fromJson<bool>(json['synced']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'type': serializer.toJson<String>(type),
+      'entityId': serializer.toJson<String?>(entityId),
+      'payload': serializer.toJson<String?>(payload),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'synced': serializer.toJson<bool>(synced),
+    };
+  }
+
+  SellerEvent copyWith({
+    int? id,
+    String? type,
+    Value<String?> entityId = const Value.absent(),
+    Value<String?> payload = const Value.absent(),
+    DateTime? createdAt,
+    bool? synced,
+  }) => SellerEvent(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    entityId: entityId.present ? entityId.value : this.entityId,
+    payload: payload.present ? payload.value : this.payload,
+    createdAt: createdAt ?? this.createdAt,
+    synced: synced ?? this.synced,
+  );
+  SellerEvent copyWithCompanion(SellerEventsCompanion data) {
+    return SellerEvent(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      synced: data.synced.present ? data.synced.value : this.synced,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SellerEvent(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('entityId: $entityId, ')
+          ..write('payload: $payload, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('synced: $synced')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, type, entityId, payload, createdAt, synced);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SellerEvent &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.entityId == this.entityId &&
+          other.payload == this.payload &&
+          other.createdAt == this.createdAt &&
+          other.synced == this.synced);
+}
+
+class SellerEventsCompanion extends UpdateCompanion<SellerEvent> {
+  final Value<int> id;
+  final Value<String> type;
+  final Value<String?> entityId;
+  final Value<String?> payload;
+  final Value<DateTime> createdAt;
+  final Value<bool> synced;
+  const SellerEventsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.synced = const Value.absent(),
+  });
+  SellerEventsCompanion.insert({
+    this.id = const Value.absent(),
+    required String type,
+    this.entityId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.synced = const Value.absent(),
+  }) : type = Value(type);
+  static Insertable<SellerEvent> custom({
+    Expression<int>? id,
+    Expression<String>? type,
+    Expression<String>? entityId,
+    Expression<String>? payload,
+    Expression<DateTime>? createdAt,
+    Expression<bool>? synced,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (entityId != null) 'entity_id': entityId,
+      if (payload != null) 'payload': payload,
+      if (createdAt != null) 'created_at': createdAt,
+      if (synced != null) 'synced': synced,
+    });
+  }
+
+  SellerEventsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? type,
+    Value<String?>? entityId,
+    Value<String?>? payload,
+    Value<DateTime>? createdAt,
+    Value<bool>? synced,
+  }) {
+    return SellerEventsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      entityId: entityId ?? this.entityId,
+      payload: payload ?? this.payload,
+      createdAt: createdAt ?? this.createdAt,
+      synced: synced ?? this.synced,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (synced.present) {
+      map['synced'] = Variable<bool>(synced.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SellerEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('entityId: $entityId, ')
+          ..write('payload: $payload, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('synced: $synced')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -27784,6 +28744,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AvailabilityExceptionsTable availabilityExceptions =
       $AvailabilityExceptionsTable(this);
   late final $ParkedSalesTable parkedSales = $ParkedSalesTable(this);
+  late final $RenderJobsTable renderJobs = $RenderJobsTable(this);
+  late final $SellerEventsTable sellerEvents = $SellerEventsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -27835,6 +28797,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     availabilitySchedules,
     availabilityExceptions,
     parkedSales,
+    renderJobs,
+    sellerEvents,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -27906,6 +28870,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$ItemsTableCreateCompanionBuilder =
     ItemsCompanion Function({
+      Value<String?> wholesaleRangesJson,
       Value<String> id,
       Value<int?> remoteId,
       required String name,
@@ -27944,6 +28909,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
     ItemsCompanion Function({
+      Value<String?> wholesaleRangesJson,
       Value<String> id,
       Value<int?> remoteId,
       Value<String> name,
@@ -28086,6 +29052,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get wholesaleRangesJson => $composableBuilder(
+    column: $table.wholesaleRangesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -28391,6 +29362,11 @@ class $$ItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get wholesaleRangesJson => $composableBuilder(
+    column: $table.wholesaleRangesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -28571,6 +29547,11 @@ class $$ItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get wholesaleRangesJson => $composableBuilder(
+    column: $table.wholesaleRangesJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -28865,6 +29846,7 @@ class $$ItemsTableTableManager
               $$ItemsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<String?> wholesaleRangesJson = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<int?> remoteId = const Value.absent(),
                 Value<String> name = const Value.absent(),
@@ -28901,6 +29883,7 @@ class $$ItemsTableTableManager
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
+                wholesaleRangesJson: wholesaleRangesJson,
                 id: id,
                 remoteId: remoteId,
                 name: name,
@@ -28939,6 +29922,7 @@ class $$ItemsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<String?> wholesaleRangesJson = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<int?> remoteId = const Value.absent(),
                 required String name,
@@ -28975,6 +29959,7 @@ class $$ItemsTableTableManager
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
+                wholesaleRangesJson: wholesaleRangesJson,
                 id: id,
                 remoteId: remoteId,
                 name: name,
@@ -49333,6 +50318,475 @@ typedef $$ParkedSalesTableProcessedTableManager =
       ParkedSale,
       PrefetchHooks Function()
     >;
+typedef $$RenderJobsTableCreateCompanionBuilder =
+    RenderJobsCompanion Function({
+      Value<String> id,
+      required String specJson,
+      Value<String> status,
+      Value<String?> outputPath,
+      Value<String?> error,
+      Value<int> attempts,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$RenderJobsTableUpdateCompanionBuilder =
+    RenderJobsCompanion Function({
+      Value<String> id,
+      Value<String> specJson,
+      Value<String> status,
+      Value<String?> outputPath,
+      Value<String?> error,
+      Value<int> attempts,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$RenderJobsTableFilterComposer
+    extends Composer<_$AppDatabase, $RenderJobsTable> {
+  $$RenderJobsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get specJson => $composableBuilder(
+    column: $table.specJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outputPath => $composableBuilder(
+    column: $table.outputPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get error => $composableBuilder(
+    column: $table.error,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RenderJobsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RenderJobsTable> {
+  $$RenderJobsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get specJson => $composableBuilder(
+    column: $table.specJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outputPath => $composableBuilder(
+    column: $table.outputPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get error => $composableBuilder(
+    column: $table.error,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RenderJobsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RenderJobsTable> {
+  $$RenderJobsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get specJson =>
+      $composableBuilder(column: $table.specJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get outputPath => $composableBuilder(
+    column: $table.outputPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get error =>
+      $composableBuilder(column: $table.error, builder: (column) => column);
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RenderJobsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RenderJobsTable,
+          RenderJob,
+          $$RenderJobsTableFilterComposer,
+          $$RenderJobsTableOrderingComposer,
+          $$RenderJobsTableAnnotationComposer,
+          $$RenderJobsTableCreateCompanionBuilder,
+          $$RenderJobsTableUpdateCompanionBuilder,
+          (
+            RenderJob,
+            BaseReferences<_$AppDatabase, $RenderJobsTable, RenderJob>,
+          ),
+          RenderJob,
+          PrefetchHooks Function()
+        > {
+  $$RenderJobsTableTableManager(_$AppDatabase db, $RenderJobsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RenderJobsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RenderJobsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RenderJobsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> specJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> outputPath = const Value.absent(),
+                Value<String?> error = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RenderJobsCompanion(
+                id: id,
+                specJson: specJson,
+                status: status,
+                outputPath: outputPath,
+                error: error,
+                attempts: attempts,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String specJson,
+                Value<String> status = const Value.absent(),
+                Value<String?> outputPath = const Value.absent(),
+                Value<String?> error = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RenderJobsCompanion.insert(
+                id: id,
+                specJson: specJson,
+                status: status,
+                outputPath: outputPath,
+                error: error,
+                attempts: attempts,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RenderJobsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RenderJobsTable,
+      RenderJob,
+      $$RenderJobsTableFilterComposer,
+      $$RenderJobsTableOrderingComposer,
+      $$RenderJobsTableAnnotationComposer,
+      $$RenderJobsTableCreateCompanionBuilder,
+      $$RenderJobsTableUpdateCompanionBuilder,
+      (RenderJob, BaseReferences<_$AppDatabase, $RenderJobsTable, RenderJob>),
+      RenderJob,
+      PrefetchHooks Function()
+    >;
+typedef $$SellerEventsTableCreateCompanionBuilder =
+    SellerEventsCompanion Function({
+      Value<int> id,
+      required String type,
+      Value<String?> entityId,
+      Value<String?> payload,
+      Value<DateTime> createdAt,
+      Value<bool> synced,
+    });
+typedef $$SellerEventsTableUpdateCompanionBuilder =
+    SellerEventsCompanion Function({
+      Value<int> id,
+      Value<String> type,
+      Value<String?> entityId,
+      Value<String?> payload,
+      Value<DateTime> createdAt,
+      Value<bool> synced,
+    });
+
+class $$SellerEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $SellerEventsTable> {
+  $$SellerEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SellerEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SellerEventsTable> {
+  $$SellerEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get synced => $composableBuilder(
+    column: $table.synced,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SellerEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SellerEventsTable> {
+  $$SellerEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get synced =>
+      $composableBuilder(column: $table.synced, builder: (column) => column);
+}
+
+class $$SellerEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SellerEventsTable,
+          SellerEvent,
+          $$SellerEventsTableFilterComposer,
+          $$SellerEventsTableOrderingComposer,
+          $$SellerEventsTableAnnotationComposer,
+          $$SellerEventsTableCreateCompanionBuilder,
+          $$SellerEventsTableUpdateCompanionBuilder,
+          (
+            SellerEvent,
+            BaseReferences<_$AppDatabase, $SellerEventsTable, SellerEvent>,
+          ),
+          SellerEvent,
+          PrefetchHooks Function()
+        > {
+  $$SellerEventsTableTableManager(_$AppDatabase db, $SellerEventsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SellerEventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SellerEventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SellerEventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String?> entityId = const Value.absent(),
+                Value<String?> payload = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+              }) => SellerEventsCompanion(
+                id: id,
+                type: type,
+                entityId: entityId,
+                payload: payload,
+                createdAt: createdAt,
+                synced: synced,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String type,
+                Value<String?> entityId = const Value.absent(),
+                Value<String?> payload = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<bool> synced = const Value.absent(),
+              }) => SellerEventsCompanion.insert(
+                id: id,
+                type: type,
+                entityId: entityId,
+                payload: payload,
+                createdAt: createdAt,
+                synced: synced,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SellerEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SellerEventsTable,
+      SellerEvent,
+      $$SellerEventsTableFilterComposer,
+      $$SellerEventsTableOrderingComposer,
+      $$SellerEventsTableAnnotationComposer,
+      $$SellerEventsTableCreateCompanionBuilder,
+      $$SellerEventsTableUpdateCompanionBuilder,
+      (
+        SellerEvent,
+        BaseReferences<_$AppDatabase, $SellerEventsTable, SellerEvent>,
+      ),
+      SellerEvent,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -49432,4 +50886,8 @@ class $AppDatabaseManager {
       );
   $$ParkedSalesTableTableManager get parkedSales =>
       $$ParkedSalesTableTableManager(_db, _db.parkedSales);
+  $$RenderJobsTableTableManager get renderJobs =>
+      $$RenderJobsTableTableManager(_db, _db.renderJobs);
+  $$SellerEventsTableTableManager get sellerEvents =>
+      $$SellerEventsTableTableManager(_db, _db.sellerEvents);
 }

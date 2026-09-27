@@ -37,11 +37,10 @@ const _aida = CopyFramework(
   id: 'aida',
   name: 'AIDA Classic',
   headlines: [
-    'Stop Scrolling — This is For You',
-    'You Won\'t Believe This Deal',
-    'Attention: Limited Time Only',
-    'The Secret Everyone\'s Talking About',
-    'This Changes Everything',
+    'Great Finds at Great Prices',
+    'Quality You Can Trust',
+    'Something Special for You',
+    'The Smart Choice',
   ],
   subheadlines: [
     'Discover why thousands in Uganda are switching.',
@@ -106,49 +105,56 @@ const _fab = CopyFramework(
 );
 
 // ---------------------------------------------------------------------------
-// Social Proof
+// Social Proof — only used when the seller has verified review data.
+///
+/// NOTE: These frameworks are NOT used by default. They are only applied
+/// when the seller has actual review data (ratings, review count) from
+/// the backend. Using them without verified data would be fabrication.
 // ---------------------------------------------------------------------------
 const socialProofFramework = CopyFramework(
   id: 'social',
   name: 'Social Proof',
   headlines: [
-    'Loved by 1,000+ Customers',
-    'Uganda\'s Favourite Shop',
-    '5-Star Rated Across the Board',
-    'Join Our Happy Customers',
+    'Trusted by Ugandan Buyers',
+    'Quality You Can Count On',
+    'Your Neighbour\'s Favourite Shop',
+    'Join Our Customers',
   ],
   subheadlines: [
-    'Real people. Real reviews. Real quality.',
-    'Don\'t just take our word for it — see what they say.',
+    'Real people. Real quality.',
+    'See what makes us different.',
   ],
   bodies: [
-    '"Best purchase I\'ve made this year!" — Sarah, Kampala\n\n"Fast delivery and amazing quality." — John, Entebbe',
-    'Trusted by families, businesses, and students across Uganda.',
+    'We stand behind every product we sell. Quality checked, carefully packed.',
+    'Trusted by families and businesses across Uganda.',
   ],
-  ctas: ['Join Them', 'Shop Like They Do', 'See Why They Love Us'],
+  ctas: ['Shop With Us', 'See Our Catalog', 'Visit Us'],
 );
 
 // ---------------------------------------------------------------------------
-// Scarcity / Urgency
+// Scarcity / Urgency — only used when stock is ACTUALLY low.
+///
+/// NOTE: These frameworks are NOT used by default. They are only applied
+/// when the catalog item has verified low stock (stockEnabled && stockQty <= 5).
 // ---------------------------------------------------------------------------
 const _scarcity = CopyFramework(
   id: 'scarcity',
   name: 'Scarcity & Urgency',
   headlines: [
-    'Only a Few Left!',
-    'Sale Ends Tonight',
-    'Last Chance — Don\'t Miss Out',
-    'Hurry! Stock Running Low',
+    'Limited Availability',
+    'While Stocks Last',
+    'Quality Finds — Act Today',
+    'Don\'t Miss Out',
   ],
   subheadlines: [
-    'Once they\'re gone, they\'re gone.',
-    'This deal won\'t last forever. Act fast.',
+    'Genuine stock, limited quantity.',
+    'Quality items move fast.',
   ],
   bodies: [
-    'Limited stock available. Secure yours before someone else does.',
-    'High demand, limited supply. Order now to avoid disappointment.',
+    'Stock is limited. Order now to avoid disappointment.',
+    'Popular item — secure yours today.',
   ],
-  ctas: ['Claim Yours', 'Buy Before It\'s Gone', 'Secure Now', 'Hurry — Order'],
+  ctas: ['Order Now', 'Check Availability', 'Shop Today'],
 );
 
 // ---------------------------------------------------------------------------
@@ -192,8 +198,8 @@ const welcomeFramework = CopyFramework(
     'Discover what makes us different.',
   ],
   bodies: [
-    'At {{BUSINESS}}, we believe in quality, trust, and fast service. Every order is handled with care.',
-    'From Kampala to every corner of Uganda — we deliver happiness to your doorstep.',
+    'At {{BUSINESS}}, we believe in quality, trust, and prompt service.',
+    'We\'re here to serve you — quality products, fair prices.',
   ],
   ctas: ['Explore Our Shop', 'See What We Offer', 'Visit Us'],
 );
@@ -219,38 +225,38 @@ const trustFramework = CopyFramework(
   id: 'trust',
   name: 'Trust & Guarantee',
   headlines: [
-    'Your Satisfaction, Guaranteed',
     'Quality You Can Trust',
     'Why Customers Choose Us',
-    'The {{BUSINESS}} Promise',
+    'The {{BUSINESS}} Difference',
+    'Built on Trust',
   ],
   subheadlines: [
-    '100% quality check · Fast delivery · Easy returns',
     'We stand behind every product we sell.',
+    'Carefully packed, promptly delivered.',
   ],
   bodies: [
-    '✓ Every item inspected before shipping\n✓ Fast delivery across Uganda\n✓ Friendly customer support\n✓ Money-back guarantee',
+    '✓ Every item checked before packing\n✓ Careful packing · Prompt delivery\n✓ Friendly customer support',
   ],
-  ctas: ['Shop with Confidence', 'Trust Us Today', 'Our Guarantee'],
+  ctas: ['Shop With Us', 'See Our Shop', 'Visit Us'],
 );
 
 const referralFramework = CopyFramework(
   id: 'referral',
   name: 'Referral',
   headlines: [
-    'Love Us? Tell a Friend!',
-    'Share the Love, Earn Rewards',
-    'Refer & Get Rewarded',
+    'Love Our Products? Tell a Friend',
+    'Share with Friends',
     'Spread the Word',
+    'Recommend {{BUSINESS}}',
   ],
   subheadlines: [
-    'Good things are meant to be shared.',
-    'Invite friends and both of you win.',
+    'Good things are worth sharing.',
+    'Tell friends about us.',
   ],
   bodies: [
-    'Tell your friends about {{BUSINESS}} and enjoy exclusive perks. The more you share, the more you earn.',
+    'If you enjoy our products, tell your friends about {{BUSINESS}}.',
   ],
-  ctas: ['Share Now', 'Refer Friends', 'Get My Link'],
+  ctas: ['Share Our Shop', 'Tell a Friend'],
 );
 
 // ---------------------------------------------------------------------------

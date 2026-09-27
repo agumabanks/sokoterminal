@@ -12,10 +12,13 @@ import '../../core/sync/sync_service.dart';
 import '../../core/telemetry/telemetry.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../widgets/bottom_sheet_modal.dart';
+import '../../core/util/formatters.dart';
+import '../orders/order_details_screen.dart';
 import '../orders/orders_controller.dart';
 import '../notifications/notifications_controller.dart';
 import '../refunds/refunds_screen.dart';
 import '../services/service_bookings_controller.dart';
+import '../services/service_bookings_screen.dart';
 
 enum InboxBucket { needsAction, inProgress, completed }
 
@@ -125,7 +128,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text('Inbox', style: DesignTokens.textTitle),
+        title: Text('Alerts', style: DesignTokens.textTitle),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -160,7 +163,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               child: filtered.isEmpty
                   ? _EmptyState(bucket: bucket, type: type)
                   : ListView.separated(
-                      padding: DesignTokens.paddingScreen,
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        100 + MediaQuery.paddingOf(context).bottom,
+                      ),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) =>
                           const SizedBox(height: DesignTokens.spaceSm),
@@ -476,9 +484,73 @@ void _openInboxItem(BuildContext context, WidgetRef ref, _InboxItem item) {
     case InboxType.orders:
     case InboxType.bookings:
     case InboxType.stock:
+      _showInboxSummary(context, ref, item);
     case InboxType.all:
       break;
   }
+}
+
+void _showInboxSummary(BuildContext context, WidgetRef ref, _InboxItem item) {
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(item.title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Text(stripHtml(item.subtitle)),
+            const SizedBox(height: 12),
+            Text('Status: ${item.status.replaceAll('_', ' ')}'),
+            if (item.pendingSync)
+              const Text('Saved on this terminal. Waiting to sync.'),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                if (item.type == InboxType.orders) {
+                  final id = int.tryParse(item.id);
+                  if (id != null) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailsScreen(orderId: id),
+                      ),
+                    );
+                  }
+                } else if (item.type == InboxType.stock) {
+                  ref.read(routerProvider).go('/home/more/low-stock');
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ServiceBookingsScreen(),
+                    ),
+                  );
+                }
+              },
+              child: Text(
+                item.type == InboxType.orders
+                    ? 'View order'
+                    : item.type == InboxType.stock
+                    ? 'Manage stock'
+                    : 'View bookings',
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 void _showNotificationDetail(
@@ -499,22 +571,8 @@ void _showNotificationDetail(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(notification.body, style: DesignTokens.textBody),
+        Text(stripHtml(notification.body), style: DesignTokens.textBody),
         const SizedBox(height: DesignTokens.spaceLg),
-        if (notification.data.isNotEmpty) ...[
-          Text('Details', style: DesignTokens.textBodyBold),
-          const SizedBox(height: DesignTokens.spaceSm),
-          ...notification.data.entries.map((e) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: DesignTokens.spaceXs),
-              child: Text(
-                '${e.key}: ${e.value}',
-                style: DesignTokens.textSmall,
-              ),
-            );
-          }),
-          const SizedBox(height: DesignTokens.spaceLg),
-        ],
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(

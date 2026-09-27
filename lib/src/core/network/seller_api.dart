@@ -344,11 +344,60 @@ class SellerApi {
     );
   }
 
-  Future<Response<dynamic>> pullPosSync({required DateTime since}) {
-    return client.get(
-      '/v2/seller/pos/sync/pull',
-      query: {'since': since.toUtc().toIso8601String()},
-    );
+  /// Assemble every page before callers apply data or advance durable cursors.
+  Future<Response<dynamic>> pullPosSync({required DateTime since}) async {
+    const collections = ['products', 'services', 'ledger_entries'];
+    final query = <String, dynamic>{
+      'since': since.toUtc().toIso8601String(),
+      'pagination_mode': 'cursor',
+      'include_catalog_manifest': 1,
+      'page': 1,
+    };
+    Response<dynamic>? first;
+    Map<String, dynamic>? merged;
+    for (var page = 1; page <= 10000; page++) {
+      query['page'] = page;
+      query['include_catalog_manifest'] = page == 1 ? 1 : 0;
+      final response = await client.get(
+        '/v2/seller/pos/sync/pull',
+        query: Map.of(query),
+      );
+      final raw = response.data;
+      if (raw is! Map) throw FormatException('Invalid sync response');
+      final body = Map<String, dynamic>.from(
+        raw['data'] is Map ? raw['data'] as Map : raw,
+      );
+      if (merged == null) {
+        first = response;
+        merged = Map.of(body);
+        for (final key in collections) {
+          merged[key] = List<dynamic>.from(body[key] as List? ?? const []);
+        }
+        query['until'] = body['received_at'];
+      } else {
+        for (final key in collections) {
+          (merged[key] as List).addAll(body[key] as List? ?? const []);
+        }
+      }
+      final pagination = body['pagination'];
+      if (pagination is! Map ||
+          !collections.any((key) => pagination['has_more_$key'] == true)) {
+        first!.data = merged;
+        return first;
+      }
+      if (pagination['mode'] == 'cursor') {
+        for (final key in collections) {
+          final next = pagination['next_$key'];
+          if (pagination['has_more_$key'] == true &&
+              (next == null ||
+                  next.toString() == query['after_$key']?.toString())) {
+            throw FormatException('Sync pagination did not advance: $key');
+          }
+          if (next != null) query['after_$key'] = next;
+        }
+      }
+    }
+    throw StateError('Sync exceeded page limit; cursor was not advanced');
   }
 
   // POS Catalog Products (offline-first upsert)
@@ -1192,7 +1241,7 @@ class SellerApi {
   }) {
     return client.post(
       '/v2/seller/pos/staff/login',
-      data: {'phone': phone, 'pin': pin},
+      data: {'phone': phone, 'pin': pin, 'login_mode': 'shop'},
     );
   }
 
@@ -1539,6 +1588,8 @@ class SellerApi {
     required int remoteId,
     double? amount,
     String? expiresAt,
+    int quantity = 1,
+    double serviceFeePercent = 0,
   }) async {
     final path = type == 'service'
         ? '/v2/seller/payment-links/service/$remoteId'
@@ -1546,6 +1597,8 @@ class SellerApi {
     final res = await client.post(
       path,
       data: {
+        'quantity': quantity,
+        'service_fee_percent': serviceFeePercent,
         if (amount != null) 'amount': amount,
         if (expiresAt != null) 'expires_at': expiresAt,
       },
@@ -1555,6 +1608,27 @@ class SellerApi {
       return Map<String, dynamic>.from(data['link'] as Map);
     }
     return null;
+  }
+
+  Future<Map<String, dynamic>?> generateCheckoutPaymentLink({
+    required List<Map<String, dynamic>> lines,
+    required double taxAmount,
+    required double serviceFeePercent,
+    required String idempotencyKey,
+  }) async {
+    final res = await client.post(
+      '/v2/seller/pos/payment-links/checkout',
+      data: {
+        'lines': lines,
+        'tax_amount': taxAmount,
+        'service_fee_percent': serviceFeePercent,
+      },
+      options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
+    final data = _extractData(res.data);
+    return data['success'] == true
+        ? Map<String, dynamic>.from(data['link'] as Map)
+        : null;
   }
 
   Future<List<Map<String, dynamic>>> fetchPaymentLinks() async {
@@ -1583,15 +1657,30 @@ class SellerApi {
   }
 
   Future<bool> deactivatePaymentLink(int linkId) async {
-    final res = await client.post('/v2/seller/payment-links/$linkId/deactivate');
+    final res = await client.post(
+      '/v2/seller/payment-links/$linkId/deactivate',
+    );
     final data = _extractData(res.data);
     return data['success'] == true;
   }
 
+  Future<void> reportAiContent({int? adId, String? reportToken, required String reason}) async {
+    await client.post('/v2/seller/ai/content-reports', data: {
+      if (adId != null) 'ad_id': adId,
+      if (reportToken != null) 'report_token': reportToken,
+      'reason': reason,
+    });
+  }
+
   // ─── Marketing ─────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> generateMarketingContent(Map<String, dynamic> itemData) async {
-    final res = await client.post('/v2/seller/ai/marketing-content', data: itemData);
+  Future<Map<String, dynamic>?> generateMarketingContent(
+    Map<String, dynamic> itemData,
+  ) async {
+    final res = await client.post(
+      '/v2/seller/ai/marketing-content',
+      data: itemData,
+    );
     final data = _extractData(res.data);
     if (data['success'] == true) {
       return data['content'] as Map<String, dynamic>?;

@@ -1,17 +1,14 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:soko_seller_terminal/src/core/app_providers.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_session_controller.dart';
 import 'package:soko_seller_terminal/src/core/auth/pos_staff_prefs.dart';
 import 'package:soko_seller_terminal/src/core/settings/business_setup_prefs.dart';
 import 'package:soko_seller_terminal/src/core/sync/sync_service.dart';
-import 'package:soko_seller_terminal/src/core/network/dio_auth_utils.dart';
 import 'package:soko_seller_terminal/src/core/theme/design_tokens.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -49,7 +46,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     super.initState();
     _introController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 450),
     );
     _ambientController = AnimationController(
       vsync: this,
@@ -71,7 +68,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
 
     _introController.forward();
-    Future.delayed(const Duration(milliseconds: 350), _bootstrap);
+    unawaited(_bootstrap());
   }
 
   @override
@@ -82,49 +79,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _bootstrap() async {
-    await _requestPermissions();
-    if (!mounted) return;
-    await _checkAuthAndSync();
-  }
-
-  Future<void> _requestPermissions() async {
     try {
-      if (mounted) setState(() => _status = 'Checking permissions…');
-
-      // ── Step 1: silent permissions (never prompt the user) ────────────
-      // These are considered pre-granted on a POS terminal and should be
-      // silently granted via ADB for enrolled devices:
-      //   adb shell pm grant com.soko24.soko_seller_terminal \
-      //       android.permission.READ_CONTACTS
-      //   adb shell pm grant com.soko24.soko_seller_terminal \
-      //       android.permission.ACCESS_FINE_LOCATION
-      //
-      // We still request them here so a fresh install works without ADB.
-      final corePermissions = <Permission>[
-        Permission.contacts,
-        Permission.locationWhenInUse,
-        Permission.notification,
-      ];
-      for (final p in corePermissions) {
-        final s = await p.status;
-        if (s.isDenied || s.isRestricted) {
-          await p.request();
-        }
+      await _checkAuthAndSync();
+    } catch (error, stack) {
+      debugPrint('[Splash] boot failed: $error\n$stack');
+      if (mounted) {
+        setState(() => _status = 'Could not restore your workspace');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Saved data is safe. Please try again.'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => unawaited(_bootstrap()),
+            ),
+          ),
+        );
       }
-
-      // ── Step 2: Bluetooth (Android 12+ runtime, needed for receipt printers)
-      final btPermissions = <Permission>[
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-      ];
-      for (final p in btPermissions) {
-        final s = await p.status;
-        if (s.isDenied || s.isRestricted) {
-          await p.request();
-        }
-      }
-    } catch (e) {
-      debugPrint('[Splash] Permission request failed: $e');
     }
   }
 
@@ -144,44 +114,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       return;
     }
 
-    // If the token carries an expiry (e.g. "Remember this device for 90 days"),
-    // treat it as invalid once it has expired. This lets the device operate
-    // offline for up to 90 days and only forces re-auth after the deadline.
-    if (expiresAt != null && DateTime.now().toUtc().isAfter(expiresAt)) {
-      debugPrint('[Splash] Token expired locally, redirecting to login');
-      DioAuthUtils.notifyAuthExpired(
-        detail: 'Session expired — please sign in again',
-      );
-      await secureStorage.deleteAccessToken();
-      await secureStorage.deleteAccessTokenExpiresAt();
-      if (mounted) context.go('/login');
-      return;
-    }
-
-    // Validate token when online before proceeding
-    final connectivity = await Connectivity().checkConnectivity();
-    final online = connectivity.any((r) => r != ConnectivityResult.none);
-    debugPrint('[Splash] online=$online');
-    if (online) {
-      try {
-        final api = ref.read(apiClientProvider);
-        await api.get('/v2/auth/user');
-        debugPrint('[Splash] token validation OK');
-      } on DioException catch (e) {
-        final status = e.response?.statusCode;
-        if (DioAuthUtils.isAuthStatus(status)) {
-          debugPrint('[Splash] Token invalid, redirecting to login');
-          DioAuthUtils.notifyAuthExpired();
-          await secureStorage.deleteAccessToken();
-          if (mounted) context.go('/login');
-          return;
-        }
-        // Other errors: allow offline-style fallback
-      } catch (e) {
-        debugPrint('[Splash] Token validation error: $e');
-      }
-    }
-
+    // Cloud token expiry does not expire this device's local account.
+    // Requests will report when cloud reauthentication is needed; startup must
+    // never delete credentials or wait for an internet validation round trip.
     if (!mounted) {
       debugPrint('[Splash] not mounted after token check');
       return;
@@ -204,27 +139,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         if (mounted) context.go('/staff-login');
         return;
       }
-      // Validate staff token online before proceeding, same as owner login.
-      if (online) {
-        try {
-          final api = ref.read(apiClientProvider);
-          await api.get('/v2/auth/user');
-          debugPrint('[Splash] Staff token validation OK');
-        } on DioException catch (e) {
-          final status = e.response?.statusCode;
-          if (DioAuthUtils.isAuthStatus(status)) {
-            debugPrint(
-              '[Splash] Staff token invalid, redirecting to staff login',
-            );
-            DioAuthUtils.notifyAuthExpired();
-            await secureStorage.deleteAccessToken();
-            if (mounted) context.go('/staff-login');
-            return;
-          }
-        } catch (e) {
-          debugPrint('[Splash] Staff token validation error: $e');
-        }
-      }
     } else {
       if (!mounted) {
         debugPrint('[Splash] not mounted before staff check');
@@ -234,7 +148,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       debugPrint('[Splash] POS session already loading via provider...');
       // PosSessionController already auto-loads in its provider constructor;
       // we just wait briefly for it to settle rather than firing a second load().
-      await Future.delayed(const Duration(milliseconds: 300));
+      // The provider restores local POS state immediately and validates online
+      // in the background. Do not add a fixed delay to every returning launch.
       if (!mounted) {
         debugPrint('[Splash] not mounted after pos session load');
         return;
@@ -276,23 +191,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
     }
 
-    final sub = syncService.syncStatusStream.listen((status) {
-      if (mounted) setState(() => _status = status);
-    });
-
-    debugPrint('[Splash] calling syncService.syncNow()...');
-    try {
-      await syncService.syncNow();
-      debugPrint('[Splash] syncNow() COMPLETED');
-    } catch (e) {
-      debugPrint('[Splash] syncNow() FAILED: $e');
-    }
-
-    await sub.cancel();
-    if (!mounted) {
-      debugPrint('[Splash] not mounted after sync');
-      return;
-    }
+    // start() already schedules background sync. Open the saved local data
+    // without waiting for catalogue downloads or offline media caching.
+    if (!mounted) return;
 
     debugPrint('[Splash] checking business setup...');
     bool setupCompleted = false;

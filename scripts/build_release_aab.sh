@@ -71,7 +71,7 @@ if [[ -n "${appVersion}" ]]; then
 fi
 
 echo "[build] Building Android App Bundle (AAB)…"
-flutter build appbundle --release "${buildArgs[@]}"
+flutter build appbundle --release --no-tree-shake-icons "${buildArgs[@]}"
 
 echo "[build] Output:"
 echo "[build]   build/app/outputs/bundle/release/app-release.aab"

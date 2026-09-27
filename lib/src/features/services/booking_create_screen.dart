@@ -229,7 +229,10 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
         : null;
 
     try {
+      final selectedService = service;
+      final pendingCacheId = -DateTime.now().microsecondsSinceEpoch;
       await sync.enqueue('booking_create', {
+        'local_cache_id': pendingCacheId,
         'offering_id': service?.remoteId,
         'client_name': name,
         'client_phone': _phoneCtrl.text.trim(),
@@ -241,6 +244,20 @@ class _BookingCreateScreenState extends ConsumerState<BookingCreateScreen> {
         'meeting_type': _meetingType,
         if (locationJson != null) 'location': locationJson,
       });
+      if (selectedService != null) {
+        ref
+            .read(serviceBookingsControllerProvider.notifier)
+            .addPendingBooking(
+              serviceId: selectedService.id,
+              serviceTitle: selectedService.title,
+              customerName: name,
+              customerPhone: _phoneCtrl.text.trim(),
+              start: start,
+              end: end,
+              price: price,
+              cacheId: pendingCacheId,
+            );
+      }
       unawaited(sync.syncNow());
     } catch (e) {
       debugPrint('[BookingCreate] Sync enqueue failed: $e');

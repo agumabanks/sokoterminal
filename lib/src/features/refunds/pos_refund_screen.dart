@@ -133,7 +133,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
   }
 
   Future<void> _processRefund() async {
-    if (_selectedSale == null || _refundTotal <= 0) return;
+    if (_loading || _selectedSale == null || _refundTotal <= 0) return;
 
     setState(() => _loading = true);
     try {
@@ -199,7 +199,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
           ? 'Refund for ${formatPosReceiptNumber(_selectedSale!.receiptNumber)}'
           : _noteCtrl.text.trim();
 
-      await db.saveLedgerEntry(
+      await db.refundSale(
         entry: LedgerEntriesCompanion.insert(
           id: drift.Value(refundId),
           receiptNumber: drift.Value(receiptNumber),
@@ -226,43 +226,7 @@ class _PosRefundScreenState extends ConsumerState<PosRefundScreen> {
         ],
       );
 
-      // Restore stock for refunded items (best-effort).
-      for (final line in _saleLines) {
-        final qty = _refundQuantities[line.id] ?? 0;
-        if (qty <= 0) continue;
-        final itemId = line.itemId;
-        if (itemId == null || itemId.isEmpty) continue;
-        await db.recordInventoryMovement(
-          itemId: itemId,
-          delta: qty,
-          note: 'refund',
-          variant: line.variant ?? '',
-        );
-      }
-
-      // Queue sync (best-effort; local audit log is the source of truth)
-      try {
-        await sync.enqueue('ledger_push', {
-          'entry_id': refundId,
-          'idempotency_key': idempotencyKey,
-          'type': 'refund',
-          'original_entry_id': _selectedSale!.id,
-          'subtotal': _refundTotal,
-          'discount': 0,
-          'tax': 0,
-          'total': _refundTotal,
-          'note': refundNote,
-          'occurred_at': occurredAt.toIso8601String(),
-          'customer_id': _selectedSale!.customerId,
-          'payments': [
-            {'method': 'cash', 'amount': _refundTotal},
-          ],
-          'lines': apiLines,
-        });
-        unawaited(sync.syncNow());
-      } catch (e) {
-        debugPrint('[Refund] Ledger sync enqueue failed: $e');
-      }
+      unawaited(sync.syncNow());
 
       await db.recordAuditLog(
         actorStaffId: actorStaffId,

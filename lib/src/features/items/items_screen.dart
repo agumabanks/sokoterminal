@@ -4,7 +4,6 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../core/app_providers.dart';
@@ -41,6 +40,8 @@ class ItemsScreen extends ConsumerStatefulWidget {
 }
 
 class _ItemsScreenState extends ConsumerState<ItemsScreen> {
+  late final _itemsStream = ref.read(appDatabaseProvider).watchItems();
+
   String _searchQuery = '';
 
   @override
@@ -134,6 +135,43 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
             },
           ),
 
+          StreamBuilder<List<Item>>(
+            stream: _itemsStream,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox.shrink();
+              final products = snapshot.data!;
+              final available = products
+                  .where((i) => !i.stockEnabled || i.stockQty > 0)
+                  .length;
+              final low = products
+                  .where(
+                    (i) =>
+                        i.stockEnabled &&
+                        i.stockQty > 0 &&
+                        i.stockQty <= (i.lowStockWarning ?? 5),
+                  )
+                  .length;
+              final out = products
+                  .where((i) => i.stockEnabled && i.stockQty <= 0)
+                  .length;
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DesignTokens.spaceMd,
+                ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Chip(label: Text('${products.length} products')),
+                    Chip(label: Text('$available available')),
+                    Chip(label: Text('$low low stock')),
+                    Chip(label: Text('$out out of stock')),
+                  ],
+                ),
+              );
+            },
+          ),
+
           // Search bar
           Padding(
             padding: DesignTokens.paddingScreen,
@@ -178,7 +216,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
           // Items list
           Expanded(
             child: StreamBuilder<List<Item>>(
-              stream: db.watchItems(),
+              stream: _itemsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -218,7 +256,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
                       onCreateAd: () => _createAdForItem(item),
                       onDesignInStudio: () => unawaited(_designInStudio(item)),
                       onPaymentLink: () => _generatePaymentLink(item),
-                      onVideoAd: () => _createVideoAd(item),
                       onLongPress: () {
                         showModalBottomSheet(
                           context: context,
@@ -261,11 +298,6 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen> {
       title: item.name,
       defaultAmount: item.price,
     );
-  }
-
-  Future<void> _createVideoAd(Item item) async {
-    if (!mounted) return;
-    context.go('/home/more/video-ad');
   }
 
   Future<void> _showItemEditor(
@@ -695,7 +727,6 @@ class _ItemCard extends StatelessWidget {
     this.onCreateAd,
     this.onDesignInStudio,
     this.onPaymentLink,
-    this.onVideoAd,
   });
 
   final Item item;
@@ -708,7 +739,6 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback? onCreateAd;
   final VoidCallback? onDesignInStudio;
   final VoidCallback? onPaymentLink;
-  final VoidCallback? onVideoAd;
 
   @override
   Widget build(BuildContext context) {
@@ -957,7 +987,6 @@ class _ItemCard extends StatelessWidget {
                       if (value == 'preview') onPreview();
                       if (value == 'stock') onStockTap();
                       if (value == 'payment-link') onPaymentLink?.call();
-                      if (value == 'video-ad') onVideoAd?.call();
                     },
                     itemBuilder: (_) => [
                       const PopupMenuItem(
@@ -974,16 +1003,9 @@ class _ItemCard extends StatelessWidget {
                           label: 'Adjust stock',
                         ),
                       ),
-                      PopupMenuItem(
-                        value: 'video-ad',
-                        child: const _ProductMenuItem(
-                          icon: Icons.videocam_outlined,
-                          label: 'Video ad',
-                        ),
-                      ),
                       const PopupMenuItem(
                         value: 'payment-link',
-                        child: const _ProductMenuItem(
+                        child: _ProductMenuItem(
                           icon: Icons.link,
                           label: 'Payment link',
                         ),

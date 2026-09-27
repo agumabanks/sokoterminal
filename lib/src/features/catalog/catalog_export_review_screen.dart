@@ -56,6 +56,14 @@ class _CatalogExportReviewScreenState extends State<CatalogExportReviewScreen> {
           XFile(widget.file.path),
         ], text: widget.shareText);
       }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open sharing. Please try again.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sharing = false);
     }
@@ -124,6 +132,8 @@ class _CatalogExportReviewScreenState extends State<CatalogExportReviewScreen> {
           Expanded(
             child: isPdf
                 ? PdfPreview(
+                    // Avoid native full-page buffers scaling with screen density.
+                    dpi: 100,
                     build: (_) async => widget.pdfBytes!,
                     allowPrinting: false,
                     allowSharing: false,

@@ -209,100 +209,6 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
     }
   }
 
-  Future<void> _buySubscription(_WalletProduct product) async {
-    if (product.planId == null || product.planId! <= 0) return;
-    final wallet = _wallet;
-    if (wallet == null) return;
-    final amount = product.unitPrice;
-    if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This plan is free or trial-backed. Choose it during signup or through the seller setup flow.',
-          ),
-        ),
-      );
-      return;
-    }
-    if (wallet.balance < amount) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sanaa Wallet balance is too low. Need ${_formatMoney(amount)} /=, have ${_formatMoney(wallet.balance)} /=.',
-          ),
-          action: SnackBarAction(label: 'Top up', onPressed: _startTopup),
-        ),
-      );
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Activate ${product.label}?'),
-        content: Text(
-          'This will charge ${_formatMoney(amount)} /= from Sanaa Wallet for one month of ${product.label}.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Activate'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      final response = await ref
-          .read(sellerApiProvider)
-          .createSellerWalletPurchase(
-            type: 'seller_subscription',
-            extra: {'plan_id': product.planId},
-            idempotencyKey: 'wallet-subscription-${_uuid.v4()}',
-          );
-      final body = response.data is Map<String, dynamic>
-          ? Map<String, dynamic>.from(response.data as Map<String, dynamic>)
-          : const <String, dynamic>{};
-      final data = body['data'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(body['data'] as Map<String, dynamic>)
-          : const <String, dynamic>{};
-      final walletBalance = _asDouble(data['wallet_balance']);
-      final subscription = data['subscription'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(
-              data['subscription'] as Map<String, dynamic>,
-            )
-          : const <String, dynamic>{};
-      final plan = subscription['plan'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(
-              subscription['plan'] as Map<String, dynamic>,
-            )
-          : const <String, dynamic>{};
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${plan['name'] ?? product.label} is active. Sanaa Wallet balance: ${_formatMoney(walletBalance)} /=.',
-          ),
-        ),
-      );
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Subscription purchase failed: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
-  }
 
   Future<int?> _promptForInteger({
     required String title,
@@ -419,27 +325,7 @@ class _SellerWalletScreenState extends ConsumerState<SellerWalletScreen> {
                       trailingLabel: 'Buy now',
                       onPressed: _busy ? null : _buySmsCredits,
                     ),
-                    if (wallet.subscriptionPlans.isNotEmpty) ...[
-                      const SizedBox(height: DesignTokens.spaceSm),
-                      ...wallet.subscriptionPlans.map(
-                        (plan) => Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: DesignTokens.spaceSm,
-                          ),
-                          child: _PurchaseTile(
-                            title: plan.label,
-                            subtitle:
-                                '${plan.description ?? 'Seller subscription plan'} ${plan.trialDays > 0 ? '• ${plan.trialDays}-day trial for new sellers' : ''}',
-                            trailingLabel: plan.unitPrice <= 0
-                                ? 'Included'
-                                : 'Activate',
-                            onPressed: _busy || plan.unitPrice <= 0
-                                ? null
-                                : () => _buySubscription(plan),
-                          ),
-                        ),
-                      ),
-                    ],
+
                   ],
                 ),
               ),
@@ -562,7 +448,7 @@ class _WalletHero extends StatelessWidget {
           ),
           const SizedBox(height: DesignTokens.spaceSm),
           Text(
-            'One balance for SMS credits, seller plans, and business tools.',
+            'Your business balance and SMS credits.',
             style: DesignTokens.textSmall.copyWith(color: Colors.white),
           ),
           const SizedBox(height: DesignTokens.spaceMd),

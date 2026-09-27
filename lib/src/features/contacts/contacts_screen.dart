@@ -56,7 +56,13 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           _ContactsStatusArea(state: state, controller: controller),
 
           // Recent contacts section with header
-          if (state.filteredContacts.isNotEmpty) _buildRecentSection(state),
+          if (state.searchQuery.isEmpty &&
+              state.filteredContacts.isNotEmpty &&
+              MediaQuery.viewInsetsOf(context).bottom == 0)
+            ExpansionTile(
+              title: const Text('Recent contacts'),
+              children: [_buildRecentSection(state)],
+            ),
 
           // Tabs
           Container(
@@ -128,7 +134,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
           style: TextStyle(color: DesignTokens.grayDark, fontSize: 18),
           cursorColor: DesignTokens.brandAccent,
           decoration: InputDecoration(
-            hintText: 'Search...',
+            hintText: 'Search name, phone or email',
             hintStyle: TextStyle(color: DesignTokens.grayMedium),
             border: InputBorder.none,
           ),
@@ -150,11 +156,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen>
     return AppBar(
       backgroundColor: DesignTokens.surface,
       elevation: 0,
-      leadingWidth: 48,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Icon(Icons.more_horiz, color: DesignTokens.grayMedium),
-      ),
+      automaticallyImplyLeading: true,
       title: Text('Contacts', style: DesignTokens.textTitle),
       actions: [
         IconButton(
@@ -999,7 +1001,8 @@ class _ContactsStatusArea extends StatelessWidget {
           icon: Icons.cloud_off_outlined,
           iconColor: DesignTokens.grayMedium,
           title: 'Contact sync is off',
-          subtitle: 'Turn on to see your phone contacts in Soko.',
+          subtitle:
+              'Upload contact names, phone numbers and emails to Soko24 for your shop’s customer list across terminals. Optional; turn off in Settings to stop future sync.',
           ctaText: 'Turn On',
           previewCount: state.deviceContactCount,
           onCta: () async => controller.setDeviceContactsOptIn(true),
@@ -1014,9 +1017,8 @@ class _ContactsStatusArea extends StatelessWidget {
         icon: Icons.contacts_rounded,
         iconColor: DesignTokens.brandAccent,
         title: 'Never lose a customer',
-        subtitle: state.deviceContactCount > 0
-            ? 'You have ${state.deviceContactCount} contacts on this phone. Sync them to Soko and they\'ll appear on all your Soko terminals instantly.'
-            : 'Sync your phone contacts so they\'re available on every Soko terminal — even after you switch devices.',
+        subtitle:
+            'With your permission, Soko24 uploads contact names, phone numbers and emails to your shop’s customer list across terminals. Optional; turn off sync in Settings anytime.',
         ctaText: 'Allow Contacts Access',
         previewCount: state.deviceContactCount > 0
             ? state.deviceContactCount
@@ -1286,7 +1288,7 @@ class _ContactListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatarColor = _getAvatarColor(contact.name);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: DesignTokens.surfaceCard,
         borderRadius: DesignTokens.borderRadiusMd,
@@ -1355,7 +1357,7 @@ class _ContactListTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: DesignTokens.grayLight),
+                Icon(Icons.chevron_right, color: DesignTokens.grayMedium),
               ],
             ),
           ),

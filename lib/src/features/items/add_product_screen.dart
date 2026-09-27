@@ -23,6 +23,7 @@ import '../bnpl/providers/product_bnpl_provider.dart';
 import '../../widgets/html_editor.dart';
 import '../../widgets/offline_cached_image.dart';
 import 'product_form_controller.dart';
+import 'wholesale_pricing.dart';
 import 'product_variants_screen.dart';
 
 /// Smooth single-scroll product creation & editing screen.
@@ -48,6 +49,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   final _scrollController = ScrollController();
   final _nameCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
+  bool _wholesaleEnabled = false;
+  List<Map<String, dynamic>> _wholesaleRanges = [];
   final _priceCtrl = TextEditingController();
   final _costCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
@@ -122,6 +125,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final item = widget.existingItem;
     if (item == null) return;
     final ctrl = ref.read(productFormProvider.notifier);
+    _wholesaleRanges = wholesaleRanges(item.wholesaleRangesJson);
+    _wholesaleEnabled = _wholesaleRanges.isNotEmpty;
     ctrl.setName(item.name);
     _nameCtrl.text = item.name;
     if (item.categoryId != null) {
@@ -428,6 +433,15 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   Future<void> _saveProduct() async {
     if (_isSaving) return;
+    final wholesaleError = _wholesaleEnabled
+        ? validateWholesaleRanges(_wholesaleRanges)
+        : null;
+    if (wholesaleError != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(wholesaleError)));
+      return;
+    }
     _isSaving = true;
 
     final state = ref.read(productFormProvider);
@@ -515,6 +529,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       final companion = ItemsCompanion(
         id: Value(id),
         name: Value(state.name.trim()),
+        wholesaleRangesJson: Value(
+          jsonEncode(_wholesaleEnabled ? _wholesaleRanges : []),
+        ),
         price: Value(
           double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0,
         ),
@@ -736,23 +753,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       appBar: _buildAppBar(state),
       body: CustomScrollView(
         controller: _scrollController,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Hero photo
-                _buildPhotoSection(state, ctrl),
-                const SizedBox(height: 8),
-
-                // 2. Marketplace toggle
-                _buildMarketplaceCard(state, ctrl),
-                const SizedBox(height: 8),
-
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  child: Text(
+                    'Start with a name, price and stock. Add photos and online details when you are ready.',
+                  ),
+                ),
                 // 3. Product info
                 _buildFormSection(
                   icon: Icons.inventory_2_outlined,
-                  title: 'Product Info',
+                  title: '1. Product name',
                   child: _buildProductInfoFields(state, ctrl),
                 ),
                 const SizedBox(height: 8),
@@ -760,11 +776,33 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 // 4. Pricing & stock
                 _buildFormSection(
                   icon: Icons.payments_outlined,
-                  title: 'Pricing & Stock',
+                  title: '2. Price & stock',
                   child: _buildPricingFields(state, ctrl),
                 ),
                 const SizedBox(height: 8),
 
+                WholesaleEditor(
+                  enabled: _wholesaleEnabled,
+                  ranges: _wholesaleRanges,
+                  onToggle: (v) => setState(() {
+                    _wholesaleEnabled = v;
+                    if (v && _wholesaleRanges.isEmpty) _wholesaleRanges.add({});
+                  }),
+                  onChanged: () => setState(() {}),
+                ),
+                ExpansionTile(
+                  backgroundColor: Colors.white,
+                  collapsedBackgroundColor: Colors.white,
+                  childrenPadding: const EdgeInsets.all(16),
+                  title: const Text('Photos & online shop'),
+                  subtitle: const Text(
+                    'Optional — add photos or publish online',
+                  ),
+                  children: [
+                    _buildPhotoSection(state, ctrl),
+                    _buildMarketplaceCard(state, ctrl),
+                  ],
+                ),
                 // 5. Marketplace details (only when publishing online)
                 if (state.publishOnline) ...[
                   _buildFormSection(
@@ -861,7 +899,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           // Background image or placeholder
           AnimatedContainer(
             duration: const Duration(milliseconds: 250),
-            height: 240,
+            height: 180,
             width: double.infinity,
             decoration: BoxDecoration(
               color: hasThumb
@@ -1081,58 +1119,64 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   void _showPhotoOptions(ProductFormController ctrl) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight,
-                borderRadius: BorderRadius.circular(2),
-              ),
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            Text(
-              'Add Photo',
-              style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: DesignTokens.grayLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Add Photo',
+                  style: DesignTokens.textHeadline.copyWith(fontSize: 17),
+                ),
+                const SizedBox(height: 16),
+                _photoOptionTile(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Take a photo',
+                  onTap: () {
+                    Navigator.pop(context);
+                    ctrl.takeThumbnailPhoto();
+                  },
+                ),
+                const Divider(height: 1),
+                _photoOptionTile(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Choose from gallery',
+                  onTap: () {
+                    Navigator.pop(context);
+                    ctrl.pickThumbnail();
+                  },
+                ),
+                const Divider(height: 1),
+                _photoOptionTile(
+                  icon: Icons.collections_outlined,
+                  label: 'Add gallery photos',
+                  subtitle: 'Select multiple photos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    ctrl.pickGalleryImages();
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _photoOptionTile(
-              icon: Icons.camera_alt_outlined,
-              label: 'Take a photo',
-              onTap: () {
-                Navigator.pop(context);
-                ctrl.takeThumbnailPhoto();
-              },
-            ),
-            const Divider(height: 1),
-            _photoOptionTile(
-              icon: Icons.photo_library_outlined,
-              label: 'Choose from gallery',
-              onTap: () {
-                Navigator.pop(context);
-                ctrl.pickThumbnail();
-              },
-            ),
-            const Divider(height: 1),
-            _photoOptionTile(
-              icon: Icons.collections_outlined,
-              label: 'Add gallery photos',
-              subtitle: 'Select multiple photos',
-              onTap: () {
-                Navigator.pop(context);
-                ctrl.pickGalleryImages();
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1371,6 +1415,21 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     String? subtitle,
     required Widget child,
   }) {
+    if (title == 'Sanaa Finance BNPL') {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          title: const Text('Pay later options'),
+          subtitle: const Text('Optional'),
+          childrenPadding: const EdgeInsets.all(16),
+          children: [child],
+        ),
+      );
+    }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -1726,32 +1785,22 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           onChanged: ctrl.setPrice,
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: AppInput(
-                controller: _costCtrl,
-                label: 'Buying Price (/=)',
-                hint: '30,000',
-                prefixIcon: Icons.shopping_bag_outlined,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [CommaNumberFormatter()],
-                onChanged: ctrl.setCost,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppInput(
-                controller: _stockCtrl,
-                label: 'Stock Qty *',
-                hint: '10',
-                prefixIcon: Icons.inventory,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [CommaNumberFormatter()],
-                onChanged: ctrl.setStock,
-              ),
-            ),
-          ],
+        AppInput(
+          controller: _stockCtrl,
+          label: 'Quantity in stock',
+          hint: '0',
+          keyboardType: TextInputType.number,
+          inputFormatters: const [CommaNumberFormatter()],
+          onChanged: ctrl.setStock,
+        ),
+        const SizedBox(height: 12),
+        AppInput(
+          controller: _costCtrl,
+          label: 'Cost per item (optional)',
+          hint: '0',
+          keyboardType: TextInputType.number,
+          inputFormatters: const [CommaNumberFormatter()],
+          onChanged: ctrl.setCost,
         ),
 
         if (state.publishOnline) ...[
@@ -1794,114 +1843,123 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           ),
         ],
 
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: AppInput(
-                controller: _skuCtrl,
-                label: 'SKU',
-                hint: 'AUTO',
-                prefixIcon: Icons.qr_code,
-                onChanged: ctrl.setSku,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppInput(
-                controller: _minQtyCtrl,
-                label: 'Min Order Qty',
-                hint: '1',
-                prefixIcon: Icons.add_shopping_cart_outlined,
-                keyboardType: TextInputType.number,
-                inputFormatters: const [CommaNumberFormatter()],
-                onChanged: ctrl.setMinQty,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        AppInput(
-          controller: _lowStockCtrl,
-          label: 'Low stock alert when below',
-          hint: 'e.g. 5',
-          prefixIcon: Icons.warning_amber_outlined,
-          keyboardType: TextInputType.number,
-          inputFormatters: const [CommaNumberFormatter()],
-          onChanged: ctrl.setLowStockWarning,
-        ),
-
-        if (state.taxEnabled) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: DesignTokens.surfaceGrouped,
-              borderRadius: DesignTokens.borderRadiusMd,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.account_balance_outlined,
-                      color: DesignTokens.brandPrimary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${state.taxLabel} Tax',
-                      style: DesignTokens.textBodyBold,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                AppInput(
-                  controller: _taxRateCtrl,
-                  label: '${state.taxLabel} rate (%)',
-                  hint: '18',
-                  prefixIcon: Icons.percent,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: const [CommaNumberFormatter()],
-                  onChanged: ctrl.setTaxRate,
-                ),
-                const SizedBox(height: 8),
-                _buildTaxInclusionHint(state),
-              ],
-            ),
+        ExpansionTile(
+          title: const Text('More stock settings'),
+          subtitle: const Text(
+            'Item code, minimum order, low-stock alerts and tax',
           ),
-        ],
-
-        if (remoteConfig.ffProductVariantsEditor &&
-            widget.existingItem == null) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: DesignTokens.surfaceGrouped,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
+          tilePadding: EdgeInsets.zero,
+          children: [
+            const SizedBox(height: 12),
+            Row(
               children: [
-                const Icon(
-                  Icons.layers_outlined,
-                  color: DesignTokens.grayMedium,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'Variants can be added after saving the product',
-                    style: DesignTokens.textSmall.copyWith(
-                      color: DesignTokens.grayMedium,
-                    ),
+                  child: AppInput(
+                    controller: _skuCtrl,
+                    label: 'Item code (automatic)',
+                    hint: 'AUTO',
+                    prefixIcon: Icons.qr_code,
+                    onChanged: ctrl.setSku,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppInput(
+                    controller: _minQtyCtrl,
+                    label: 'Min Order Qty',
+                    hint: '1',
+                    prefixIcon: Icons.add_shopping_cart_outlined,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: const [CommaNumberFormatter()],
+                    onChanged: ctrl.setMinQty,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            AppInput(
+              controller: _lowStockCtrl,
+              label: 'Low stock alert when below',
+              hint: 'e.g. 5',
+              prefixIcon: Icons.warning_amber_outlined,
+              keyboardType: TextInputType.number,
+              inputFormatters: const [CommaNumberFormatter()],
+              onChanged: ctrl.setLowStockWarning,
+            ),
+
+            if (state.taxEnabled) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: DesignTokens.surfaceGrouped,
+                  borderRadius: DesignTokens.borderRadiusMd,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.account_balance_outlined,
+                          color: DesignTokens.brandPrimary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${state.taxLabel} Tax',
+                          style: DesignTokens.textBodyBold,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    AppInput(
+                      controller: _taxRateCtrl,
+                      label: '${state.taxLabel} rate (%)',
+                      hint: '18',
+                      prefixIcon: Icons.percent,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [CommaNumberFormatter()],
+                      onChanged: ctrl.setTaxRate,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildTaxInclusionHint(state),
+                  ],
+                ),
+              ),
+            ],
+
+            if (remoteConfig.ffProductVariantsEditor &&
+                widget.existingItem == null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: DesignTokens.surfaceGrouped,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.layers_outlined,
+                      color: DesignTokens.grayMedium,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Variants can be added after saving the product',
+                        style: DesignTokens.textSmall.copyWith(
+                          color: DesignTokens.grayMedium,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }

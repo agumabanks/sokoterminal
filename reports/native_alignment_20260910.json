@@ -1,0 +1,174 @@
+{
+  "count": 34,
+  "load_failures": [],
+  "relro_end_nonzero": [
+    {
+      "library": "lib/arm64-v8a/libavcodec.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libavdevice.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libavfilter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libavformat.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libc++_shared.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libdatastore_shared_counter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libffmpegkit_abidetect.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libflutter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libsurface_util_jni.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libswscale.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libavcodec.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libavdevice.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libavfilter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/x86_64/libavformat.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libbarhopper_v3.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libc++_shared.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libdatastore_shared_counter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libffmpegkit.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/x86_64/libffmpegkit_abidetect.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libflutter.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libsqlite3.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/x86_64/libsurface_util_jni.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/x86_64/libswresample.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libswscale.so",
+      "load_aligned": true,
+      "relro_end_remainders": [
+        12288
+      ]
+    }
+  ]
+}

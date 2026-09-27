@@ -648,6 +648,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
             const SizedBox(height: 16),
             _buildPhoneField(),
+            TextButton(
+              onPressed: () => context.go('/staff-login'),
+              child: const Text(
+                'I am staff — use shop number & staff PIN',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
             const SizedBox(height: 28),
             _MainButton(
               text: 'Continue',

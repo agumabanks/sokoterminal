@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,6 +49,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             value: enabled,
             onChanged: (v) async {
+              if (v && !await _ensurePrinterPermission()) return;
+              if (!mounted) return;
               await ref.read(printQueueServiceProvider).setPrinterEnabled(v);
               if (!mounted) return;
               setState(() {});
@@ -61,6 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               style: DesignTokens.textSmall,
             ),
             onTap: () async {
+              if (!await _ensurePrinterPermission() || !context.mounted) return;
               final devices = await BlueThermalPrinter.instance
                   .getBondedDevices();
               if (!context.mounted) return;
@@ -188,7 +192,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 secondary: const Icon(Icons.contacts_outlined),
                 title: const Text('Sync device contacts'),
                 subtitle: const Text(
-                  'Back up phone contacts to your Soko account',
+                  'Upload contact names, phone numbers and emails to Soko24 for your shop’s customer list across terminals. Optional; turn off to stop future sync.',
                 ),
                 value: optedIn,
                 onChanged: (v) async {
@@ -288,7 +292,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
-            onTap: () => ref.read(authControllerProvider.notifier).logout(),
+            onTap: () async {
+              try {
+                await ref.read(authControllerProvider.notifier).logout();
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
@@ -315,14 +329,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
           ),
-          const ListTile(
-            leading: Icon(Icons.support_agent),
-            title: Text('Support'),
-            subtitle: Text('WhatsApp: +256-700-000000'),
+          ListTile(
+            leading: const Icon(Icons.person_remove_outlined),
+            title: const Text('Request account deletion'),
+            subtitle: const Text(
+              'Ask Soko24 to delete your account and associated data',
+            ),
+            onTap: () async {
+              final uri = Uri.parse(
+                privacyPolicyUrl,
+              ).replace(path: '/account/delete-request');
+              try {
+                if (await launchUrl(
+                  uri,
+                  mode: LaunchMode.externalApplication,
+                )) {
+                  return;
+                }
+              } catch (_) {}
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Could not open the deletion request page. Please try again.',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.support_agent),
+            title: const Text('Support'),
+            subtitle: const Text('Soko24 help and contact information'),
+            onTap: () => launchUrl(
+              Uri.parse(privacyPolicyUrl).replace(path: '/contact-us'),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<bool> _ensurePrinterPermission() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.bluetoothConnect.request();
+    if (status.isGranted) return true;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Allow nearby devices in app permissions to connect a receipt printer.',
+          ),
+        ),
+      );
+    }
+    return false;
   }
 
   String _privacyPolicyUrl(String apiBaseUrl) {

@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class CustomersScreen extends ConsumerStatefulWidget {
 
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   bool _refreshing = false;
+  String _query = '';
 
   @override
   void initState() {
@@ -84,7 +86,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           onRefresh: _refreshSilently,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: DesignTokens.paddingScreen,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              110 + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               Text(
                 '${list.length} customer${list.length == 1 ? '' : 's'}',
@@ -98,25 +106,81 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 style: DesignTokens.textCaption,
               ),
               const SizedBox(height: DesignTokens.spaceLg),
-              const SectionHeader(title: 'Contacts'),
-              ...list.map(
-                (c) => Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: DesignTokens.brandPrimary.withValues(
-                        alpha: 0.08,
-                      ),
-                      child: Text(
-                        c.name.trim().isEmpty
-                            ? '?'
-                            : c.name.trim()[0].toUpperCase(),
+              TextField(
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Search name or phone',
+                ),
+                onChanged: (value) =>
+                    setState(() => _query = value.trim().toLowerCase()),
+              ),
+              const SizedBox(height: 12),
+              const SectionHeader(title: 'Customers'),
+              if (list.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Add your first customer using + above.'),
+                ),
+              ...list
+                  .where(
+                    (c) => '${c.name} ${c.phone ?? ''}'.toLowerCase().contains(
+                      _query,
+                    ),
+                  )
+                  .map(
+                    (c) => Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: DesignTokens.brandPrimary.withValues(
+                            alpha: 0.08,
+                          ),
+                          child: Text(
+                            c.name.trim().isEmpty
+                                ? '?'
+                                : c.name.trim()[0].toUpperCase(),
+                          ),
+                        ),
+                        title: Text(c.name),
+                        subtitle: Text(c.phone ?? 'No phone number'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => showModalBottomSheet<void>(
+                          context: context,
+                          showDragHandle: true,
+                          builder: (sheet) => SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    c.name,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SelectableText(
+                                    c.phone ?? 'No phone number saved',
+                                  ),
+                                  if ((c.phone ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: 16),
+                                    OutlinedButton.icon(
+                                      onPressed: () => launchUrl(
+                                        Uri(scheme: 'tel', path: c.phone),
+                                      ),
+                                      icon: const Icon(Icons.call_outlined),
+                                      label: const Text('Call customer'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    title: Text(c.name),
-                    subtitle: Text(c.phone ?? 'No phone number'),
                   ),
-                ),
-              ),
             ],
           ),
         ),

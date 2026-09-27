@@ -343,6 +343,7 @@ class ElementWidget extends StatelessWidget {
 
   Widget _buildIcon(double s) {
     if (el.iconCodePoint == null) return _buildFigure(s);
+    // ignore: const_non_constant_declarations
     return Icon(
       IconData(
         el.iconCodePoint!,

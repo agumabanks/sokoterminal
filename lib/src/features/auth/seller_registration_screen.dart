@@ -244,7 +244,7 @@ class _SellerRegistrationScreenState
               .map(
                 (e) => _RegistrationPlan.fromJson(Map<String, dynamic>.from(e)),
               )
-              .where((plan) => plan.isActive)
+              .where((plan) => plan.isActive && plan.priceMonthly <= 0)
               .toList()
             ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
       if (!mounted) return;

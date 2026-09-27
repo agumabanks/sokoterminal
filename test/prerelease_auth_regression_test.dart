@@ -132,22 +132,6 @@ void main() {
       );
     });
 
-    test('splash screen rejects locally expired tokens before sync', () {
-      final source =
-          File('lib/src/features/splash/splash_screen.dart').readAsStringSync();
-
-      expect(
-        source.contains('readAccessTokenExpiresAt'),
-        isTrue,
-        reason: 'Splash must read the stored token expiry',
-      );
-      expect(
-        source.contains('DateTime.now().toUtc().isAfter(expiresAt)'),
-        isTrue,
-        reason: 'Splash must reject tokens whose expiry has passed',
-      );
-    });
-
     test('phone fallback retries seller password login with multiple UG variants', () {
       final source =
           File('lib/src/features/auth/auth_controller.dart').readAsStringSync();

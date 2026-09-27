@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -22,6 +24,7 @@ import 'src/core/firebase/firebase_analytics_service.dart';
 import 'src/core/firebase/firebase_runtime.dart';
 import 'src/core/firebase/remote_config_service.dart';
 import 'src/core/theme/design_tokens.dart';
+import 'src/core/startup/startup_gate.dart';
 
 /// Top-level background message handler for FCM.
 /// Runs in a separate isolate; keep it lightweight.
@@ -63,77 +66,79 @@ Future<void> main() async {
     ),
   );
 
-  // Initialize Firebase Core first
+  runApp(StartupGate(initialize: _initializeLocalApp));
+}
+
+Future<Widget> _initializeLocalApp() async {
+  // Load environment configuration with sensible fallbacks.
+  try {
+    await dotenv.load(fileName: 'assets/config/.env');
+  } catch (_) {
+    try {
+      await dotenv.load(fileName: 'assets/config/.env.example');
+    } catch (_) {
+      // AppConfig also supports compile-time and production defaults.
+    }
+  }
+  final config = AppConfig.fromEnv(
+    dotenv.isInitialized ? dotenv.env : const {},
+  );
+
+  final prefs = await SharedPreferences.getInstance().timeout(
+    const Duration(seconds: 10),
+  );
+  // Firebase Core is required before AuthController can safely initialize FCM.
+  // Keep Remote Config, Analytics and notification setup deferred until after
+  // the first frame.
   final firebaseEnabled = await FirebaseRuntime.instance.prepare();
   if (firebaseEnabled) {
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      debugPrint('[Main] Firebase Core initialized');
-
-      // Register background message handler before any other FCM setup
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
       );
-      debugPrint('[Main] FCM background handler registered');
-
-      await FirebaseAnalyticsService.instance.init();
-      debugPrint('[Main] Firebase Analytics initialized');
-
-      // Initialize Crashlytics (error reporting)
-      await CrashlyticsService.instance.init();
-      debugPrint('[Main] Crashlytics initialized');
-
-      // Initialize Remote Config
-      await RemoteConfigService.instance.init();
-      debugPrint('[Main] Remote Config initialized');
-    } catch (e, stack) {
-      FirebaseRuntime.instance.disable('Firebase init failed: $e');
-      debugPrint('[Main] Firebase initialization failed: $e');
-      // Log to crashlytics if possible
-      try {
-        await CrashlyticsService.instance.recordError(
-          e,
-          stack,
-          reason: 'Firebase init failed',
-        );
-      } catch (_) {}
+    } catch (error) {
+      FirebaseRuntime.instance.disable('Firebase init failed: $error');
     }
-  } else {
-    debugPrint(
-      '[Main] Skipping Firebase initialization: '
-      '${FirebaseRuntime.instance.disableReason ?? 'unsupported runtime'}',
-    );
   }
-
-  // Initialize legacy telemetry
-  try {
-    await Telemetry.init();
-    await BugLogger.init();
-  } catch (_) {}
-
-  // Load environment configuration with sensible fallbacks.
-  try {
-    await dotenv.load(fileName: 'assets/config/.env');
-  } catch (_) {
-    await dotenv.load(fileName: 'assets/config/.env.example');
-  }
-  final config = AppConfig.fromEnv(dotenv.env);
-
-  final prefs = await SharedPreferences.getInstance();
   final secureStorage = SecureStorage();
   final database = await AppDatabase.make();
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        appConfigProvider.overrideWithValue(config),
-        sharedPreferencesProvider.overrideWithValue(prefs),
-        secureStorageProvider.overrideWithValue(secureStorage),
-        appDatabaseProvider.overrideWithValue(database),
-      ],
-      child: const SokoSellerApp(),
-    ),
+  try {
+    // Finish migrations before providers read local data; never launch a second
+    // migration writer by timing out this operation and offering Retry.
+    await database.customSelect('SELECT 1').get();
+  } catch (_) {
+    await database.close();
+    rethrow;
+  }
+
+  return ProviderScope(
+    overrides: [
+      appConfigProvider.overrideWithValue(config),
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      secureStorageProvider.overrideWithValue(secureStorage),
+      appDatabaseProvider.overrideWithValue(database),
+    ],
+    child: SokoSellerApp(initializeServices: _initializeOptionalServices),
   );
+}
+
+Future<void> _initializeOptionalServices() async {
+  // Initialize error handlers before the legacy logger chains them.
+  await _bestEffort(() => CrashlyticsService.instance.init());
+  await _bestEffort(() => Telemetry.init());
+  await _bestEffort(() => BugLogger.init());
+  unawaited(_bestEffort(() => FirebaseAnalyticsService.instance.init()));
+  unawaited(_bestEffort(() => RemoteConfigService.instance.init()));
+}
+
+Future<void> _bestEffort(Future<dynamic> Function() action) async {
+  try {
+    await action();
+  } catch (error) {
+    debugPrint('[Startup] Optional service unavailable: $error');
+  }
 }

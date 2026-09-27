@@ -35,14 +35,11 @@ class RateLimitInterceptor extends Interceptor {
   // Track in-flight requests: key → completer that receives the response
   final _inflight = <String, Completer<Response<dynamic>>>{};
 
-  // Track last successful call time per key (for debounce on reads)
-  final _lastCall = <String, int>{};
-
   // 429 counters and circuit-open timestamps per endpoint
   final _count429 = <String, int>{};
   final _circuitOpenUntil = <String, int>{};
 
-  String _key(RequestOptions opts) => '${opts.method}:${opts.path}';
+  String _key(RequestOptions opts) => '${opts.method}:${opts.uri}';
 
   bool _isMutation(String method) {
     final m = method.toUpperCase();
@@ -75,25 +72,23 @@ class RateLimitInterceptor extends Interceptor {
       return handler.next(options);
     }
 
-    // ── GET / READ debounce ───────────────────────────────────────────────
-    final last = _lastCall[key];
-    if (last != null && (now - last) < minIntervalMs) {
-      // If a request for this key is already in-flight, wait for it.
-      final completer = _inflight[key];
-      if (completer != null) {
-        debugPrint('[RateLimit] Fan-out: waiting for in-flight $key');
-        completer.future.then(
-          (r) => handler.resolve(r),
-          onError: (e) => handler.reject(e as DioException),
-        );
-        return;
-      }
+    // Only identical reads share a response. Keep the original tracker until
+    // completion, even on slow networks; replacing it strands earlier callers.
+    final existing = _inflight[key];
+    if (existing != null) {
+      existing.future.then(
+        (response) => handler.resolve(response),
+        onError: (Object error) => handler.reject(error as DioException),
+      );
+      return;
     }
 
     // Record timestamp and register in-flight tracker for GETs
-    _lastCall[key] = now;
     final completer = Completer<Response<dynamic>>();
     _inflight[key] = completer;
+    // The first caller receives errors through Dio; the tracker may have no
+    // duplicate listeners, so consume its error without changing their result.
+    unawaited(completer.future.then<void>((_) {}, onError: (Object _) {}));
 
     // Attach a tag so onResponse/onError can complete the completer
     options.extra['_rate_limit_key'] = key;
@@ -156,13 +151,28 @@ class ApiClient {
         baseUrl: _normalizeBaseUrl(config.apiBaseUrl),
         connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
         receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
-        headers: {'Accept': 'application/json'},
+        headers: {'Accept': 'application/json', 'X-Soko-Client': 'terminal'},
       ),
     );
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          final syncAuthRequired =
+              await _secureStorage.read(key: 'sync_auth_required') == '1';
+          if (syncAuthRequired &&
+              !options.path.contains('/auth/') &&
+              !options.path.endsWith('pos/pin/verify') &&
+              !options.path.endsWith('pos/staff/login')) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.cancel,
+                message:
+                    'Sign in to resume cloud sync. Offline work is available.',
+              ),
+            );
+          }
           final token = await _secureStorage.readAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -181,7 +191,8 @@ class ApiClient {
         onError: (error, handler) async {
           _logError(error);
           final statusCode = error.response?.statusCode;
-          if (statusCode == 401) {
+          if (statusCode == 401 &&
+              error.requestOptions.extra['authRetried'] != true) {
             final path = error.requestOptions.path;
 
             // Strict path matching for auth endpoints that should NEVER
@@ -240,7 +251,7 @@ class ApiClient {
                     ),
                     contentType: error.requestOptions.contentType,
                     responseType: error.requestOptions.responseType,
-                    extra: error.requestOptions.extra,
+                    extra: {...error.requestOptions.extra, 'authRetried': true},
                   );
                   newOptions.headers?['Authorization'] = 'Bearer $newToken';
                   // Remove the old Authorization header if present
@@ -271,8 +282,11 @@ class ApiClient {
                   return handler.next(error);
                 }
               } else {
-                // Refresh failed or returned no token → force logout.
-                await _performLogout(path);
+                // Refresh failed or returned no token: retain the local session.
+                // Only a server rejection of refresh marks cloud authentication stale.
+                debugPrint(
+                  '[HTTP] Cloud request deferred; local session preserved',
+                );
               }
             }
           }
@@ -370,6 +384,8 @@ class ApiClient {
   /// Attempts to refresh the token by hitting the backend refresh endpoint.
   /// Returns true if a new token was obtained and persisted.
   /// Coordinates concurrent refresh attempts so only one request is fired.
+  Future<bool> refreshAccessToken() => _attemptTokenRefresh();
+
   Future<bool> _attemptTokenRefresh() async {
     // If another request is already refreshing, wait for it.
     if (_isRefreshing && _refreshCompleter != null) {
@@ -377,6 +393,12 @@ class ApiClient {
       return _refreshCompleter!.future;
     }
 
+    final attemptedToken = await _secureStorage.readAccessToken();
+    if (attemptedToken == null || attemptedToken.isEmpty) return false;
+    // Recheck after the asynchronous storage read.
+    if (_isRefreshing && _refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
     _isRefreshing = true;
     _refreshCompleter = Completer<bool>();
 
@@ -402,7 +424,19 @@ class ApiClient {
       );
       final newToken = response.data?['access_token'];
       if (newToken != null && newToken is String && newToken.isNotEmpty) {
+        if (await _secureStorage.readAccessToken() != attemptedToken) {
+          return finish(false);
+        }
         await _secureStorage.writeAccessToken(newToken);
+        final expiresAt = DateTime.tryParse(
+          response.data?['expires_at']?.toString() ?? '',
+        );
+        if (expiresAt == null) {
+          await _secureStorage.deleteAccessTokenExpiresAt();
+        } else {
+          await _secureStorage.writeAccessTokenExpiresAt(expiresAt);
+        }
+        await _secureStorage.delete(key: 'sync_auth_required');
         debugPrint(
           '[HTTP] Token refreshed successfully (${newToken.length} chars)',
         );
@@ -412,6 +446,10 @@ class ApiClient {
       return finish(false);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
+      if (status == 401 &&
+          await _secureStorage.readAccessToken() == attemptedToken) {
+        await _markCloudAuthRequired();
+      }
       debugPrint('[HTTP] Token refresh failed: HTTP $status');
       return finish(false);
     } catch (e) {
@@ -420,27 +458,10 @@ class ApiClient {
     }
   }
 
-  Future<void> _performLogout(String path) async {
-    if (_isLoggingOut) {
-      debugPrint('[HTTP] Auth expired for $path; logout already in progress');
-      return;
-    }
-    _isLoggingOut = true;
-    debugPrint(
-      '[HTTP] Access token expired or missing for $path; '
-      'clearing persisted session',
-    );
+  Future<void> _markCloudAuthRequired() async {
+    await _secureStorage.write(key: 'sync_auth_required', value: '1');
     DioAuthUtils.notifyAuthExpired();
-    await _secureStorage.deleteAccessToken();
-    await _secureStorage.deletePosSessionToken();
     _onAuthExpired?.call();
-
-    // If the logout callback did not reset the guard (e.g. it was null or
-    // failed synchronously), reset it ourselves so future 401s are not
-    // permanently suppressed.
-    if (_isLoggingOut) {
-      _isLoggingOut = false;
-    }
   }
 
   static bool _pathEndsWithOneOf(String path, Set<String> suffixes) {

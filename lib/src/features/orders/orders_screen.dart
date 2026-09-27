@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,11 +27,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     return Scaffold(
       backgroundColor: DesignTokens.surface,
       appBar: AppBar(
-        title: Text('Marketplace Orders', style: DesignTokens.textTitle),
+        title: Text('Orders', style: DesignTokens.textTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(ordersControllerProvider.notifier).load(),
+            onPressed: state.loading
+                ? null
+                : () => ref.read(ordersControllerProvider.notifier).load(),
           ),
         ],
       ),
@@ -52,13 +55,24 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
               ? orders.where((order) => order.needsAction).toList()
               : orders;
 
-          final totalRevenue = orders.fold<double>(
-            0,
-            (sum, order) => sum + order.displayTotal,
-          );
+          final totalRevenue = orders
+              .where(
+                (order) => !const [
+                  'cancelled',
+                  'canceled',
+                ].contains(order.normalizedDeliveryStatus),
+              )
+              .fold<double>(0, (sum, order) => sum + order.displayTotal);
 
           return Column(
             children: [
+              if (state.error != null)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Showing saved orders. Pull down to retry the latest updates.',
+                  ),
+                ),
               Container(
                 width: double.infinity,
                 margin: DesignTokens.paddingScreen,
@@ -102,8 +116,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                         ),
                         Expanded(
                           child: _SummaryItem(
-                            label: 'Revenue',
-                            value: totalRevenue.toUgx(),
+                            label: 'Order value',
+                            value:
+                                'UGX ${NumberFormat.compact().format(totalRevenue)}',
                           ),
                         ),
                       ],
@@ -118,7 +133,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   DesignTokens.spaceMd,
                   0,
                 ),
-                child: Row(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _OrdersFilterChip(
                       label: 'All',
@@ -126,7 +143,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       onTap: () =>
                           setState(() => _filter = OrdersListFilter.all),
                     ),
-                    const SizedBox(width: DesignTokens.spaceSm),
                     _OrdersFilterChip(
                       label: 'Needs action',
                       count: needsActionCount,
@@ -155,7 +171,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                           ],
                         )
                       : ListView.builder(
-                          padding: DesignTokens.paddingScreen,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            16,
+                            16,
+                            100 + MediaQuery.paddingOf(context).bottom,
+                          ),
                           itemCount: visibleOrders.length,
                           itemBuilder: (context, index) {
                             final order = visibleOrders[index];
@@ -310,7 +332,13 @@ class _OrderTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(total.toUgx(), style: DesignTokens.textBodyBold),
+                  Flexible(
+                    child: Text(
+                      total.toUgx(),
+                      style: DesignTokens.textBodyBold,
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: DesignTokens.spaceXs),

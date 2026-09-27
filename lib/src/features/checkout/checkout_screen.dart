@@ -1,3 +1,6 @@
+import 'product_sale_sheet.dart';
+import '../items/wholesale_pricing.dart';
+import '../payment_links/payment_links_screen.dart';
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -159,14 +162,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         }
       }
 
-      final items = await ref.read(appDatabaseProvider).getAllItems();
-      final syncService = ref.read(syncServiceProvider);
-
-      if (items.isEmpty) {
-        await syncService.forceFullResync();
-      } else {
-        await syncService.syncNow();
-      }
+      // A service-only or empty shop must keep its saved delta cursor too.
+      // Missing cursors already cause the sync service to bootstrap.
+      await ref.read(syncServiceProvider).syncNow();
 
       ref.invalidate(productsLastPulledAtProvider);
     } catch (_) {
@@ -199,109 +197,48 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return null;
     }
 
-    if (stocks.isEmpty) {
-      Haptics.selection();
-      final msg = cartController.addItem(item: item);
-      if (msg != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-        if (msg.startsWith('Out of stock')) return null;
-      }
-      PosSoundService().playAddToCart();
-      return item.name;
-    }
-
-    final hasChoices =
-        stocks.length > 1 ||
-        (stocks.length == 1 && stocks.first.variant.trim().isNotEmpty);
-    if (!hasChoices) {
-      Haptics.selection();
-      final s = stocks.first;
-      final msg = cartController.addItem(
-        item: item,
-        availableStock: s.stockQty,
+    final hasOptions =
+        stocks.length > 1 || stocks.any((s) => s.variant.trim().isNotEmpty);
+    final bulk = wholesaleRanges(item.wholesaleRangesJson).isNotEmpty;
+    ProductSaleSelection? selection;
+    if (hasOptions || bulk) {
+      selection = await showModalBottomSheet<ProductSaleSelection>(
+        backgroundColor: Colors.white,
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => ProductSaleSheet(item: item, stocks: stocks),
       );
-      if (msg != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-        if (msg.startsWith('Out of stock')) return null;
-      }
-      PosSoundService().playAddToCart();
-      return item.name;
+      if (!context.mounted || selection == null) return null;
     }
-
-    final pickedVariant = await BottomSheetModal.show<String>(
-      context: context,
-      title: item.name,
-      subtitle: 'Choose a variant',
-      child: ListView.separated(
-        shrinkWrap: true,
-        itemCount: stocks.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (_, i) {
-          final s = stocks[i];
-          final label = s.variant.trim().isEmpty
-              ? 'Default'
-              : s.variant.replaceAll('-', ' • ');
-          final outOfStock = item.stockEnabled && s.stockQty <= 0;
-          return ListTile(
-            title: Text(label, style: DesignTokens.textBodyBold),
-            subtitle: Text(
-              'Stock: ${s.stockQty}',
-              style: DesignTokens.textSmall,
-            ),
-            trailing: Text(s.price.toUgx(), style: DesignTokens.textBodyBold),
-            onTap: () async {
-              if (outOfStock) {
-                await _showOutOfStockAlert(
-                  context,
-                  '${item.name} • ${label == 'Default' ? 'default variant' : label}',
-                );
-                return;
-              }
-              Haptics.selection();
-              Navigator.of(context).pop(s.variant);
-            },
+    final stock = selection?.stock ?? (stocks.isEmpty ? null : stocks.first);
+    final quantity = selection?.quantity ?? 1;
+    final message = stock != null && stock.variant.isNotEmpty
+        ? cartController.addItemVariant(
+            item: item,
+            variant: stock.variant,
+            price: stock.price,
+            quantity: quantity,
+            availableStock: stock.stockQty,
+          )
+        : cartController.addItem(
+            item: item,
+            quantity: quantity,
+            availableStock: stock?.stockQty,
           );
-        },
-      ),
-    );
-
-    if (!context.mounted) return null;
-    if (pickedVariant == null) return null;
-    final normalized = pickedVariant.trim();
-    final pickedStock = stocks.firstWhere(
-      (e) => e.variant.trim() == normalized,
-      orElse: () => stocks.first,
-    );
-    if (normalized.isEmpty) {
-      final msg = cartController.addItem(
-        item: item,
-        availableStock: pickedStock.stockQty,
-      );
-      if (msg != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-        if (msg.startsWith('Out of stock')) return null;
-      }
-      PosSoundService().playAddToCart();
-      return item.name;
+    if (message != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
-    final msg = cartController.addItemVariant(
-      item: item,
-      variant: normalized,
-      price: pickedStock.price,
-      availableStock: pickedStock.stockQty,
-    );
-    if (msg != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      if (msg.startsWith('Out of stock')) return null;
-    }
+    if (message?.startsWith('Out of stock') == true) return null;
     PosSoundService().playAddToCart();
-    return '${item.name} • $normalized';
+    return item.name;
   }
 
   @override
@@ -395,6 +332,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         final outOfStock =
                             item.stockEnabled && item.stockQty <= 0;
                         return _ProductTile(
+                          wholesale: wholesaleRanges(
+                            item.wholesaleRangesJson,
+                          ).isNotEmpty,
                           name: item.name,
                           price: item.price,
                           stock: item.stockQty,
@@ -1374,6 +1314,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           shrinkWrap: true,
           physics: const ClampingScrollPhysics(),
           children: [
+            _PaymentMethodTile(
+              icon: Icons.link,
+              title: 'Payment Link',
+              subtitle: 'Create one link for this cart · internet required',
+              onTap: () => Navigator.of(sheetContext).pop('payment_link'),
+            ),
+            const SizedBox(height: DesignTokens.spaceSm),
             if (paymentSettings.cashEnabled) ...[
               _PaymentMethodTile(
                 icon: Icons.money,
@@ -1445,6 +1392,70 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     String? note;
 
     switch (paymentOption) {
+      case 'payment_link':
+        if (!online) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Connect to the internet to create a payment link.',
+              ),
+            ),
+          );
+          return;
+        }
+        try {
+          final db = ref.read(appDatabaseProvider);
+          final lines = <Map<String, dynamic>>[];
+          for (final line in cart.lines) {
+            final remoteId = line.itemId != null
+                ? (await db.getItemById(line.itemId!))?.remoteId
+                : line.serviceId != null
+                ? (await db.getServiceById(line.serviceId!))?.remoteId
+                : null;
+            if (remoteId == null) {
+              throw StateError(
+                'Sync ${line.title} before creating a payment link.',
+              );
+            }
+            lines.add({
+              'type': line.itemId != null ? 'product' : 'service',
+              'remote_id': remoteId,
+              'quantity': line.quantity,
+              'unit_amount': line.price,
+              'variant': line.variant,
+            });
+          }
+          if (!context.mounted) return;
+          final link = await showGeneratePaymentLinkSheet(
+            context,
+            ref,
+            type: 'checkout',
+            remoteId: 0,
+            title: 'POS checkout',
+            defaultAmount: cart.subtotal,
+            checkoutLines: lines,
+            taxAmount: taxInclusionMode == 'inclusive' ? 0 : taxAmount,
+          );
+          if (link != null) {
+            ref.read(cartControllerProvider.notifier).clear();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Payment link saved. The order will be created after payment is confirmed.',
+                  ),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('$e')));
+          }
+        }
+        return;
       case 'cash':
         final received = await _cashReceivedFlow(context, total: total);
         if (received == null || !context.mounted) return;
@@ -1543,9 +1554,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         final bnplCart = ref.read(cartControllerProvider);
         if (bnplCart.customer == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Select a customer for BNPL sale'),
-            ),
+            const SnackBar(content: Text('Select a customer for BNPL sale')),
           );
           return;
         }
@@ -2487,7 +2496,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ],
     );
   }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2597,6 +2605,7 @@ class _ProductTile extends StatelessWidget {
   const _ProductTile({
     required this.name,
     required this.price,
+    this.wholesale = false,
     this.stock,
     this.stockEnabled = true,
     this.lowStockThreshold = 5,
@@ -2604,6 +2613,7 @@ class _ProductTile extends StatelessWidget {
     this.onTap,
   });
 
+  final bool wholesale;
   final String name;
   final double price;
   final int? stock;
@@ -2647,6 +2657,30 @@ class _ProductTile extends StatelessWidget {
                       fit: StackFit.expand,
                       children: [
                         _buildImage(),
+                        if (wholesale)
+                          const Positioned(
+                            left: 6,
+                            top: 6,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Color(0xFF146C43),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(6),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: EdgeInsets.all(5),
+                                child: Text(
+                                  'WHOLESALE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         if (outOfStock)
                           Container(
                             color: Colors.black.withValues(alpha: 0.4),
@@ -2703,16 +2737,18 @@ class _ProductTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: DesignTokens.textBody.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: DesignTokens.textPrimary,
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: DesignTokens.textBody.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: DesignTokens.textPrimary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const Spacer(),
+                        const SizedBox(height: DesignTokens.spaceXxs),
                         if (effectiveStock != null)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -3052,6 +3088,66 @@ class _CartPane extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final line = cart.lines[index];
                       return _CartItem(
+                        wholesaleNote:
+                            wholesaleRanges(line.wholesaleRangesJson).isEmpty
+                            ? null
+                            : (line.price < (line.retailPrice ?? line.price)
+                                  ? 'Wholesale price applied'
+                                  : 'Wholesale available · tap quantity'),
+                        onSetQuantity: () async {
+                          final controller = TextEditingController(
+                            text: '${line.quantity}',
+                          );
+                          final qty = await showDialog<int>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Order quantity'),
+                              content: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    for (final range in wholesaleRanges(
+                                      line.wholesaleRangesJson,
+                                    ))
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
+                                        child: Text(
+                                          '${range["min_qty"]}–${range["max_qty"]} items: ${(double.tryParse('${range["price"]}') ?? 0).toUgx()} each',
+                                        ),
+                                      ),
+                                    TextField(
+                                      controller: controller,
+                                      autofocus: true,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Number of items',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(dialogContext),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    final value = int.tryParse(controller.text);
+                                    if (value != null && value > 0) {
+                                      Navigator.pop(dialogContext, value);
+                                    }
+                                  },
+                                  child: const Text('Apply'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (qty != null) await onUpdateQuantity(line.id, qty);
+                        },
                         title: line.title,
                         price: line.price,
                         quantity: line.quantity,
@@ -3148,6 +3244,8 @@ class _CartItem extends StatelessWidget {
     required this.title,
     required this.price,
     required this.quantity,
+    this.wholesaleNote,
+    this.onSetQuantity,
     this.variant,
     this.availableStock,
     required this.onIncrement,
@@ -3156,6 +3254,8 @@ class _CartItem extends StatelessWidget {
     required this.onRemove,
   });
 
+  final String? wholesaleNote;
+  final VoidCallback? onSetQuantity;
   final String title;
   final double price;
   final int quantity;
@@ -3214,6 +3314,14 @@ class _CartItem extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (variant != null && variant!.isNotEmpty) ...[
+                  if (wholesaleNote != null)
+                    Text(
+                      wholesaleNote!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF146C43),
+                      ),
+                    ),
                   const SizedBox(height: 2),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -3255,7 +3363,13 @@ class _CartItem extends StatelessWidget {
               Container(
                 width: 32,
                 alignment: Alignment.center,
-                child: Text('$quantity', style: DesignTokens.textBodyBold),
+                child: InkWell(
+                  onTap: onSetQuantity,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text('$quantity', style: DesignTokens.textBodyBold),
+                  ),
+                ),
               ),
               _StepperButton(
                 icon: Icons.add,

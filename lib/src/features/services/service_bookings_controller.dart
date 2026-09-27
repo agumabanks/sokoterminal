@@ -41,6 +41,36 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
   final SyncService sync;
   static const _uuid = Uuid();
 
+  /// Adds a locally-created booking immediately so the list behaves like the
+  /// rest of the offline-first terminal while the server operation is queued.
+  Future<void> addPendingBooking({
+    required String serviceId,
+    required String serviceTitle,
+    required String customerName,
+    required String customerPhone,
+    required DateTime start,
+    required DateTime end,
+    required double price,
+    required int cacheId,
+  }) async {
+    final pending = <String, dynamic>{
+      'id': cacheId,
+      'offering_id': serviceId,
+      'offering': {'id': serviceId, 'title': serviceTitle},
+      'user': {'name': customerName, 'phone': customerPhone},
+      'scheduled_start': start.toUtc().toIso8601String(),
+      'scheduled_end': end.toUtc().toIso8601String(),
+      'price': price,
+      'status': 'pending',
+      'pending_sync': true,
+    };
+    state = ServiceBookingsState(
+      bookings: [pending, ...state.bookings],
+      error: state.error,
+    );
+    await db.upsertCachedServiceBooking(cacheId, jsonEncode(pending));
+  }
+
   Future<void> load() async {
     state = ServiceBookingsState(loading: true, bookings: state.bookings);
     try {
@@ -57,6 +87,10 @@ class ServiceBookingsController extends StateNotifier<ServiceBookingsState> {
         final id = int.tryParse(booking['id']?.toString() ?? '');
         if (id == null) continue;
         await db.upsertCachedServiceBooking(id, jsonEncode(booking));
+      }
+      final cached = await db.getCachedServiceBookings();
+      for (final row in cached.where((row) => row.bookingId < 0)) {
+        await db.deleteCachedServiceBooking(row.bookingId);
       }
 
       state = ServiceBookingsState(bookings: list);

@@ -108,7 +108,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
   final List<File> _galleryFiles = [];
   final List<String> _galleryUrls = [];
   final List<int> _galleryUploadIds = [];
-  bool _publishOnline = true;
+  bool _publishOnline = false;
   bool _isSaving = false;
 
   // BNPL
@@ -298,9 +298,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
   }
 
   Future<void> _pickGalleryImages() async {
-    final picked = await ImagePicker().pickMultiImage(
-      imageQuality: 95,
-    );
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 95);
     if (picked.isEmpty || !mounted) return;
 
     final files = <File>[];
@@ -507,12 +505,8 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
 
     final pendingGalleryPaths = _galleryFiles.map((f) => f.path).toList();
     final combinedGalleryUrls = [..._galleryUrls, ...pendingGalleryPaths];
-    final galleryJson = combinedGalleryUrls.isNotEmpty
-        ? jsonEncode(combinedGalleryUrls)
-        : null;
-    final galleryIdsJson = _galleryUploadIds.isNotEmpty
-        ? jsonEncode(_galleryUploadIds)
-        : null;
+    final galleryJson = jsonEncode(combinedGalleryUrls);
+    final galleryIdsJson = jsonEncode(_galleryUploadIds);
     final pricingPackagesJson = encodePricingPackages(_pricingTiers);
     final packagesForApi = pricingPackagesForApi(_pricingTiers);
 
@@ -523,7 +517,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     final syncPayload = <String, dynamic>{
       'local_id': id,
       'title': title,
-      if (summary.isNotEmpty) 'summary': summary,
+      'summary': summary,
       'description': description,
       'base_price': price,
       if (cost != null) 'purchase_price': cost,
@@ -565,12 +559,8 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
               coverUploadId: _coverUploadId != null
                   ? Value(_coverUploadId)
                   : const Value.absent(),
-              galleryUrls: galleryJson != null
-                  ? Value(galleryJson)
-                  : const Value.absent(),
-              galleryUploadIds: galleryIdsJson != null
-                  ? Value(galleryIdsJson)
-                  : const Value.absent(),
+              galleryUrls: Value(galleryJson),
+              galleryUploadIds: Value(galleryIdsJson),
             )
           : service
                 .toCompanion(true)
@@ -692,18 +682,12 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildPhotoSection(),
-                if (_galleryUrls.isNotEmpty || _galleryFiles.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _buildGalleryStrip(),
-                ],
-                const SizedBox(height: 8),
-                _buildPublishCard(),
-                if (_moderationStatus == 'pending') ...[
-                  const SizedBox(height: 8),
-                  _buildModerationBanner(),
-                ],
-                const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  child: Text(
+                    'Give your service a name and price. Add photos and turn on online booking when you are ready.',
+                  ),
+                ),
                 _buildSection(
                   icon: Icons.room_service_outlined,
                   title: 'Service Details',
@@ -717,22 +701,6 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                         textCapitalization: TextCapitalization.words,
                         onChanged: (_) => setState(() {}),
                       ),
-                      const SizedBox(height: 16),
-                      AppInput(
-                        controller: _summaryCtrl,
-                        label: 'Short summary',
-                        hint: 'One-line pitch for your shop listing',
-                        prefixIcon: Icons.short_text_outlined,
-                        maxLines: 2,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildCategoryPicker(),
-                      const SizedBox(height: 16),
-                      _buildServiceTypePicker(),
-                      const SizedBox(height: 16),
-                      _buildDeliveryTimeframePicker(),
-                      const SizedBox(height: 16),
                       if (narrow)
                         Column(
                           children: [
@@ -748,7 +716,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                             const SizedBox(height: 16),
                             AppInput(
                               controller: _durationCtrl,
-                              label: 'Duration (min)',
+                              label: 'Minutes (optional)',
                               hint: '60',
                               prefixIcon: Icons.schedule_outlined,
                               keyboardType: TextInputType.number,
@@ -774,7 +742,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                             Expanded(
                               child: AppInput(
                                 controller: _durationCtrl,
-                                label: 'Duration (min)',
+                                label: 'Minutes (optional)',
                                 hint: '60',
                                 prefixIcon: Icons.schedule_outlined,
                                 keyboardType: TextInputType.number,
@@ -792,6 +760,38 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                         keyboardType: TextInputType.number,
                         inputFormatters: const [CommaNumberFormatter()],
                       ),
+                      ExpansionTile(
+                        key: ValueKey(_publishOnline),
+                        initiallyExpanded: _publishOnline,
+                        title: Text(
+                          _publishOnline
+                              ? 'Online booking details'
+                              : 'More service details',
+                        ),
+                        subtitle: Text(
+                          _publishOnline
+                              ? 'Complete these to publish'
+                              : 'Summary, category and turnaround',
+                        ),
+                        children: [
+                          const SizedBox(height: 16),
+                          AppInput(
+                            controller: _summaryCtrl,
+                            label: 'Short summary',
+                            hint: 'One-line pitch for your shop listing',
+                            prefixIcon: Icons.short_text_outlined,
+                            maxLines: 2,
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildCategoryPicker(),
+                          const SizedBox(height: 16),
+                          _buildServiceTypePicker(),
+                          const SizedBox(height: 16),
+                          _buildDeliveryTimeframePicker(),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                       if (_galleryUrls.isEmpty && _galleryFiles.isEmpty) ...[
                         const SizedBox(height: 16),
                         _buildAddGalleryPrompt(),
@@ -800,6 +800,27 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                ExpansionTile(
+                  title: const Text('Photos & online booking'),
+                  subtitle: const Text(
+                    'Optional — add photos or publish online',
+                  ),
+                  children: [
+                    _buildPhotoSection(),
+                    if (_galleryUrls.isNotEmpty ||
+                        _galleryFiles.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _buildGalleryStrip(),
+                    ],
+                    const SizedBox(height: 8),
+                    _buildPublishCard(),
+                    if (_moderationStatus == 'pending') ...[
+                      const SizedBox(height: 8),
+                      _buildModerationBanner(),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                ),
                 _buildSection(
                   icon: Icons.payments_outlined,
                   title: 'Sanaa Finance BNPL',
@@ -1531,7 +1552,7 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
                       ? (_publishChecklistComplete
                             ? 'Customers can find and book this service'
                             : 'Complete the checklist below to go live')
-                      : 'Saved on this device only',
+                      : 'Keep in your catalog; publish online later',
                   style: DesignTokens.textSmall,
                 ),
                 if (_publishOnline) ...[
@@ -1699,6 +1720,25 @@ class _ServiceEditScreenState extends ConsumerState<ServiceEditScreen> {
     String? subtitle,
     required Widget child,
   }) {
+    if (title == 'Sanaa Finance BNPL' ||
+        title == 'Marketplace packages' ||
+        (title == 'Description' && !_publishOnline)) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: DesignTokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          title: Text(
+            title == 'Sanaa Finance BNPL' ? 'Pay later options' : title,
+          ),
+          subtitle: const Text('Optional — you can add this later'),
+          childrenPadding: const EdgeInsets.all(16),
+          children: [child],
+        ),
+      );
+    }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(

@@ -436,7 +436,10 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
           borderRadius: DesignTokens.borderRadiusLg,
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: _galleryImage(gallery.first, service.title),
+            child: GestureDetector(
+              onTap: () => _openGallery(gallery, 0, service.title),
+              child: _galleryImage(gallery.first, service.title),
+            ),
           ),
         ),
         if (gallery.length > 1) ...[
@@ -452,7 +455,10 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
                   width: 72,
-                  child: _galleryImage(gallery[i], service.title),
+                  child: GestureDetector(
+                    onTap: () => _openGallery(gallery, i, service.title),
+                    child: _galleryImage(gallery[i], service.title),
+                  ),
                 ),
               ),
             ),
@@ -462,13 +468,52 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     );
   }
 
-  Widget _galleryImage(String url, String title) {
+  Future<void> _openGallery(
+    List<String> images,
+    int initial,
+    String title,
+  ) async {
+    final controller = PageController(initialPage: initial);
+    int index = initial;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => StatefulBuilder(
+          builder: (context, update) => Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              title: Text('${index + 1} / ${images.length}'),
+            ),
+            body: PageView.builder(
+              controller: controller,
+              itemCount: images.length,
+              onPageChanged: (value) => update(() => index = value),
+              itemBuilder: (_, i) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: _galleryImage(images[i], title, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Future.delayed(const Duration(seconds: 1), controller.dispose);
+  }
+
+  Widget _galleryImage(String url, String title, {BoxFit fit = BoxFit.cover}) {
     if (url.startsWith('http')) {
       return OfflineCachedImage(
         imageUrl: url,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: fit,
         errorWidget: ServiceArtwork(
           title: title,
           imageUrl: null,
@@ -482,7 +527,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     if (file.existsSync()) {
       return Image.file(
         file,
-        fit: BoxFit.cover,
+        fit: fit,
         width: double.infinity,
         height: double.infinity,
       );

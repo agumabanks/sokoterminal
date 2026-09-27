@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
@@ -30,6 +32,9 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
 
   String? _email;
   dynamic _logoUploadId;
+  File? _logoPreview;
+  String? _logoUrl;
+  bool _uploadingLogo = false;
 
   @override
   void initState() {
@@ -45,6 +50,43 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     _metaTitleCtrl.dispose();
     _metaDescCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickLogo() async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1000,
+      imageQuality: 85,
+    );
+    if (image == null || !mounted) return;
+    setState(() => _uploadingLogo = true);
+    try {
+      final response = await ref
+          .read(sellerApiProvider)
+          .uploadSellerFile(File(image.path));
+      final raw = response.data;
+      final data = raw is Map && raw['data'] is Map
+          ? raw['data'] as Map
+          : raw as Map;
+      final id = int.tryParse('${data['id'] ?? data['upload_id']}');
+      if (id == null) throw StateError('Logo upload was not accepted');
+      if (!mounted) return;
+      setState(() {
+        _logoUploadId = id;
+        _logoUrl = data['url']?.toString();
+        _logoPreview = File(image.path);
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not upload logo. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingLogo = false);
+    }
   }
 
   Future<void> _load() async {
@@ -84,6 +126,7 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     final metaTitle = _metaTitleCtrl.text.trim();
     final metaDescription = _metaDescCtrl.text.trim();
 
+    if (_uploadingLogo) return;
     if (name.isEmpty || address.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Shop name and address are required')),
@@ -126,9 +169,7 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
           logoUploadId: _logoUploadId is int
               ? Value(_logoUploadId as int)
               : const Value.absent(),
-          logoUrl: existing?.logoUrl == null
-              ? const Value.absent()
-              : Value(existing!.logoUrl),
+          logoUrl: Value(_logoUrl ?? existing?.logoUrl),
           metaTitle: Value(metaTitle),
           metaDescription: Value(metaDescription),
           thermalPrinterWidth: existing?.thermalPrinterWidth == null
@@ -206,6 +247,7 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
     _addressCtrl.text = profile.shopAddress ?? '';
     _email = profile.sellerEmail;
     _logoUploadId = profile.logoUploadId;
+    _logoUrl = profile.logoUrl;
     _metaTitleCtrl.text = profile.metaTitle ?? '';
     _metaDescCtrl.text = profile.metaDescription ?? '';
   }
@@ -230,6 +272,32 @@ class _ShopInfoScreenState extends ConsumerState<ShopInfoScreen> {
                   title: 'Basic info',
                   child: Column(
                     children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundImage: _logoPreview != null
+                              ? FileImage(_logoPreview!)
+                              : (_logoUrl == null
+                                        ? null
+                                        : NetworkImage(_logoUrl!))
+                                    as ImageProvider?,
+                          child: _logoPreview == null && _logoUrl == null
+                              ? const Icon(Icons.store)
+                              : null,
+                        ),
+                        title: const Text('Shop logo'),
+                        subtitle: Text(
+                          _logoUploadId == null
+                              ? 'Add your business logo'
+                              : 'Logo selected — save your changes',
+                        ),
+                        trailing: _uploadingLogo
+                            ? const CircularProgressIndicator()
+                            : IconButton(
+                                onPressed: _pickLogo,
+                                icon: const Icon(Icons.add_a_photo_outlined),
+                              ),
+                      ),
                       TextField(
                         controller: _nameCtrl,
                         textCapitalization: TextCapitalization.words,

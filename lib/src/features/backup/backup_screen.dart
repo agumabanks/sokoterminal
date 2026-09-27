@@ -93,7 +93,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Backup created successfully!'),
+            content: Text('Cloud backup created. Unsynced device data is not included.'),
             backgroundColor: DesignTokens.success,
           ),
         );
@@ -113,60 +113,21 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   }
 
   Future<void> _restoreBackup(int backupId) async {
-    final confirmed = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Restore Backup?'),
+        title: const Text('Restore unavailable'),
         content: const Text(
-          'This will replace your current local data with the backup data. '
-          'Make sure your current data is synced before proceeding.',
+          'This version can create cloud backups, but cannot restore them to this device yet. Your current data has not been changed.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: DesignTokens.warning,
-            ),
-            child: const Text('Restore'),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
           ),
         ],
       ),
     );
-
-    if (confirmed != true) return;
-
-    try {
-      final client = ref.read(apiClientProvider);
-      final response = await client.get<Map<String, dynamic>>(
-        '/v2/seller/backups/$backupId',
-      );
-
-      if (response.data?['success'] == true) {
-        // Here you would typically clear local DB and import the backup data
-        // For now, we just show success
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backup restored successfully! Syncing...'),
-              backgroundColor: DesignTokens.success,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to restore: $e'),
-            backgroundColor: DesignTokens.error,
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _deleteBackup(int backupId) async {

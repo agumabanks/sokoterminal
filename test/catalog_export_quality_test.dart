@@ -9,6 +9,34 @@ import 'package:soko_seller_terminal/src/features/catalog/catalog_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('full catalog page accommodates long business details', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final items = List.generate(
+      6,
+      (index) => Item(
+        id: '$index',
+        name: 'Product $index',
+        price: 1000,
+        stockEnabled: false,
+        stockQty: 0,
+        publishedOnline: false,
+        minPurchaseQty: 1,
+        refundable: false,
+        cashOnDelivery: true,
+        updatedAt: DateTime(2026),
+        synced: false,
+      ),
+    );
+    final bytes = await CatalogService(db).buildCatalogPdf(
+      items: items,
+      shopName: List.filled(12, 'Long business name').join(' '),
+      shopAddress: List.filled(15, 'Kampala Uganda').join(' '),
+      shopPhone: '+256700000000',
+    );
+    expect(String.fromCharCodes(bytes), startsWith('%PDF'));
+  });
+
   test('catalog PDF embeds the selected product image', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final temp = await Directory.systemTemp.createTemp('soko-catalog-proof-');

@@ -18,14 +18,15 @@ class MigrationState {
   MigrationState copyWith({
     bool? checking,
     Map<String, dynamic>? pendingBackup,
+    bool clearPendingBackup = false,
     bool? restoring,
     String? error,
   }) {
     return MigrationState(
       checking: checking ?? this.checking,
-      pendingBackup: pendingBackup ?? this.pendingBackup,
+      pendingBackup: clearPendingBackup ? null : pendingBackup ?? this.pendingBackup,
       restoring: restoring ?? this.restoring,
-      error: error ?? this.error,
+      error: error,
     );
   }
 }
@@ -46,7 +47,7 @@ class MigrationController extends StateNotifier<MigrationState> {
       final storage = ref.read(secureStorageProvider);
       final posToken = await storage.readPosSessionToken();
       if (posToken == null || posToken.trim().isEmpty) {
-        state = state.copyWith(checking: false, pendingBackup: null);
+        state = state.copyWith(checking: false, clearPendingBackup: true);
         return;
       }
 
@@ -71,21 +72,9 @@ class MigrationController extends StateNotifier<MigrationState> {
   Future<bool> restoreBackup(int backupId) async {
     state = state.copyWith(restoring: true, error: null);
     try {
-      final client = ref.read(apiClientProvider);
-      final response = await client.get<Map<String, dynamic>>(
-        '/v2/seller/backups/$backupId',
+      throw UnsupportedError(
+        'Backup restore is unavailable in this version. Your local data has not been changed.',
       );
-
-      if (response.data?['success'] == true) {
-        final backupData = response.data?['data'] as Map<String, dynamic>?;
-        if (backupData != null) {
-          final db = ref.read(appDatabaseProvider);
-          await db.importBackupData(backupData);
-          state = state.copyWith(restoring: false, pendingBackup: null);
-          return true;
-        }
-      }
-      throw Exception('Invalid backup data received');
     } catch (e) {
       state = state.copyWith(restoring: false, error: e.toString());
       return false;
@@ -93,6 +82,6 @@ class MigrationController extends StateNotifier<MigrationState> {
   }
 
   void dismiss() {
-    state = state.copyWith(pendingBackup: null);
+    state = state.copyWith(clearPendingBackup: true);
   }
 }

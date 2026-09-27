@@ -287,17 +287,11 @@ String _replaceVars(
 ) {
   return text
       .replaceAll('{{BUSINESS}}', businessName)
-      .replaceAll(
-        '{{TAGLINE}}',
-        tagline.isNotEmpty ? tagline : 'Quality you can trust',
-      )
-      .replaceAll('{{PHONE}}', phone.isNotEmpty ? phone : 'Call us')
-      .replaceAll('{{WHATSAPP}}', whatsapp.isNotEmpty ? whatsapp : 'Message us')
-      .replaceAll(
-        '{{LOCATION}}',
-        location.isNotEmpty ? location : 'Kampala, Uganda',
-      )
-      .replaceAll('{{CTA_LINK}}', website.isNotEmpty ? website : 'soko24.co');
+      .replaceAll('{{TAGLINE}}', tagline)
+      .replaceAll('{{PHONE}}', phone)
+      .replaceAll('{{WHATSAPP}}', whatsapp)
+      .replaceAll('{{LOCATION}}', location)
+      .replaceAll('{{CTA_LINK}}', website);
 }
 
 // ---------------------------------------------------------------------------

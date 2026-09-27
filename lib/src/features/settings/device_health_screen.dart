@@ -329,7 +329,15 @@ class _DeviceHealthScreenState extends ConsumerState<DeviceHealthScreen> {
     );
     if (confirmed == true && context.mounted) {
       final auth = ref.read(authControllerProvider.notifier);
-      await auth.logout();
+      try {
+        await auth.logout();
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+      }
     }
   }
 

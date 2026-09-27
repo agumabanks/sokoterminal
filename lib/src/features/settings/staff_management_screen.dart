@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 import 'package:drift/drift.dart' as drift;
@@ -27,8 +29,12 @@ class StaffMember {
     required this.role,
     required this.active,
     this.createdAt,
+    this.photoUploadId,
+    this.photoUrl,
   });
 
+  final int? photoUploadId;
+  final String? photoUrl;
   final int id;
   final String name;
   final String role;
@@ -36,6 +42,8 @@ class StaffMember {
   final DateTime? createdAt;
 
   factory StaffMember.fromJson(Map<String, dynamic> json) => StaffMember(
+    photoUploadId: int.tryParse('${json['photo_upload_id']}'),
+    photoUrl: json['photo_url']?.toString(),
     id: (json['id'] as num?)?.toInt() ?? 0,
     name: json['name']?.toString() ?? '',
     role: json['role']?.toString() ?? 'cashier',
@@ -151,10 +159,12 @@ class StaffController extends StateNotifier<StaffState> {
     required String name,
     required String role,
     required String pin,
+    int? photoUploadId,
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
       final res = await _api.createStaff({
+        if (photoUploadId != null) 'photo_upload_id': photoUploadId,
         'name': name,
         'role': role,
         'pin': pin,
@@ -189,6 +199,7 @@ class StaffController extends StateNotifier<StaffState> {
     String? role,
     bool? active,
     String? pin,
+    int? photoUploadId,
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
@@ -197,6 +208,7 @@ class StaffController extends StateNotifier<StaffState> {
         if (role != null) 'role': role,
         if (active != null) 'active': active,
         if (pin != null) 'pin': pin,
+        if (photoUploadId != null) 'photo_upload_id': photoUploadId,
       });
       await _db.upsertStaff(
         StaffCompanion.insert(
@@ -371,6 +383,7 @@ class StaffManagementScreen extends ConsumerWidget {
           name: result['name']?.toString() ?? '',
           role: result['role']?.toString() ?? 'cashier',
           pin: result['pin']?.toString() ?? '',
+          photoUploadId: result['photo_upload_id'] as int?,
         );
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -413,6 +426,7 @@ class StaffManagementScreen extends ConsumerWidget {
             role: result['role'] as String?,
             active: result['active'] as bool?,
             pin: result['pin'] as String?,
+            photoUploadId: result['photo_upload_id'] as int?,
           );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -611,16 +625,21 @@ class _StaffCard extends StatelessWidget {
     return Card(
       child: ListTile(
         leading: CircleAvatar(
+          backgroundImage: member.photoUrl == null
+              ? null
+              : NetworkImage(member.photoUrl!),
           backgroundColor: member.role == 'manager'
               ? DesignTokens.brandPrimary
               : DesignTokens.brandAccent,
-          child: Text(
-            member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: member.photoUrl != null
+              ? null
+              : Text(
+                  member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
         title: Text(member.name),
         subtitle: Row(
@@ -668,16 +687,19 @@ class _StaffCard extends StatelessWidget {
   }
 }
 
-class _StaffForm extends StatefulWidget {
+class _StaffForm extends ConsumerStatefulWidget {
   const _StaffForm({this.initial});
 
   final StaffMember? initial;
 
   @override
-  State<_StaffForm> createState() => _StaffFormState();
+  ConsumerState<_StaffForm> createState() => _StaffFormState();
 }
 
-class _StaffFormState extends State<_StaffForm> {
+class _StaffFormState extends ConsumerState<_StaffForm> {
+  int? _photoUploadId;
+  bool _uploadingPhoto = false;
+  File? _photo;
   late final TextEditingController _nameCtrl;
   String _role = 'cashier';
   bool _active = true;
@@ -687,6 +709,7 @@ class _StaffFormState extends State<_StaffForm> {
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initial?.name ?? '');
+    _photoUploadId = widget.initial?.photoUploadId;
     _role = widget.initial?.role ?? 'cashier';
     _active = widget.initial?.active ?? true;
   }
@@ -695,6 +718,43 @@ class _StaffFormState extends State<_StaffForm> {
   void dispose() {
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 80,
+    );
+    if (image == null || !mounted) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final res = await ref
+          .read(sellerApiProvider)
+          .uploadSellerFile(File(image.path));
+      final raw = res.data;
+      final data = raw is Map && raw['data'] is Map
+          ? raw['data'] as Map
+          : raw as Map;
+      final id = int.tryParse('${data['id'] ?? data['upload_id']}');
+      if (id == null) throw StateError('Upload failed');
+      if (mounted) {
+        setState(() {
+          _photoUploadId = id;
+          _photo = File(image.path);
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo upload failed. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   @override
@@ -706,7 +766,20 @@ class _StaffFormState extends State<_StaffForm> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppInput(controller: _nameCtrl, label: 'Name'),
+          ListTile(
+            leading: CircleAvatar(
+              backgroundImage: _photo == null ? null : FileImage(_photo!),
+              child: _photo == null ? const Icon(Icons.person_outline) : null,
+            ),
+            title: const Text('Profile photo'),
+            trailing: _uploadingPhoto
+                ? const CircularProgressIndicator()
+                : IconButton(
+                    onPressed: _pickPhoto,
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                  ),
+          ),
+          AppInput(controller: _nameCtrl, label: 'Full name'),
           const SizedBox(height: DesignTokens.spaceMd),
           DropdownButtonFormField<String>(
             initialValue: _role,
@@ -718,6 +791,14 @@ class _StaffFormState extends State<_StaffForm> {
             onChanged: (v) {
               if (v != null) setState(() => _role = v);
             },
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              _role == 'manager'
+                  ? 'Manager: manages stock, staff and approvals. Sign in using the shop login number and this staff member’s PIN.'
+                  : 'Cashier: makes sales with the permissions you allow. Sign in using the shop login number and this staff member’s PIN.',
+            ),
           ),
           if (isEdit) ...[
             const SizedBox(height: DesignTokens.spaceMd),
@@ -775,9 +856,12 @@ class _StaffFormState extends State<_StaffForm> {
                       );
                       return;
                     }
+                    if (_uploadingPhoto) return;
                     Navigator.pop(context, {
                       'name': _nameCtrl.text.trim(),
                       'role': _role,
+                      if (_photoUploadId != null)
+                        'photo_upload_id': _photoUploadId,
                       'active': _active,
                       if (_pin != null) 'pin': _pin,
                     });

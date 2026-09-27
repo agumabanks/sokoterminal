@@ -265,15 +265,15 @@ List<AdTemplate> generateSeasonalCampaign({
     ),
   );
 
-  // Ad 2: Discount announcement
+  // Ad 2: Seasonal offer (no invented discount)
   out.add(
     _seasonalTemplate(
-      id: 'season_${season.id}_discount_$seed',
-      name: '${season.name} · Discount',
-      headline: 'Up to 30% Off',
-      sub: season.name,
-      body: 'Don\'t miss our biggest ${season.name} sale of the year.',
-      cta: 'Save Now',
+      id: 'season_${season.id}_offer_$seed',
+      name: '${season.name} · Offer',
+      headline: '${season.name} Special',
+      sub: 'Quality products for ${season.name}',
+      body: 'Find something special at $businessName this ${season.name}.',
+      cta: 'Shop Now',
       bg: bg,
       ac: ac,
       textColor: textColor,

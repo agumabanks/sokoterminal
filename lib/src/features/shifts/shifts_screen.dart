@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/util/formatters.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
@@ -60,9 +62,10 @@ class ShiftsScreen extends ConsumerWidget {
             error: (e, _) => _CardError(title: 'Shift status failed', error: e),
           ),
           const SizedBox(height: DesignTokens.spaceMd),
-          _ActionsCard(openShift: openShift.asData?.value),
+          if (openShift.hasValue)
+            _ActionsCard(openShift: openShift.asData?.value),
           const SizedBox(height: DesignTokens.spaceLg),
-          Text('Cash movements', style: DesignTokens.textBodyBold),
+          Text('Recent cash activity', style: DesignTokens.textBodyBold),
           const SizedBox(height: DesignTokens.spaceSm),
           movements.when(
             data: (rows) => rows.isEmpty
@@ -81,148 +84,139 @@ class ShiftsScreen extends ConsumerWidget {
   }
 }
 
+final _shiftTransactionsProvider = StreamProvider(
+  (ref) => ref.watch(appDatabaseProvider).watchTransactions(),
+);
+final _shiftSummaryProvider = FutureProvider.autoDispose
+    .family<_ShiftCashSummary, Shift>((ref, shift) async {
+      ref.watch(cashMovementsProvider);
+      ref.watch(_shiftTransactionsProvider);
+      final db = ref.watch(appDatabaseProvider);
+      return _ShiftCashSummary(
+        opening: shift.openingFloat,
+        cashSales: await db.computeCashSalesSince(shift.openedAt),
+        netMovements: await db.computeCashMovementsNetSince(shift.openedAt),
+      );
+    });
+
 class _ShiftStatusCard extends ConsumerWidget {
   const _ShiftStatusCard({required this.shift});
-
   final Shift? shift;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (shift == null) {
+    final active = shift;
+    if (active == null) {
       return Container(
-        padding: DesignTokens.paddingLg,
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite,
-          borderRadius: DesignTokens.borderRadiusLg,
-          boxShadow: DesignTokens.shadowSm,
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Row(
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: DesignTokens.paddingSm,
-              decoration: BoxDecoration(
-                color: DesignTokens.grayLight.withValues(alpha: 0.4),
-                borderRadius: DesignTokens.borderRadiusSm,
-              ),
-              child: const Icon(
-                Icons.lock_clock,
-                color: DesignTokens.grayMedium,
-              ),
+            Icon(Icons.storefront_outlined, size: 32),
+            SizedBox(height: 12),
+            Text(
+              'Ready to start your day?',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: DesignTokens.spaceMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('No shift open', style: DesignTokens.textBodyBold),
-                  const SizedBox(height: DesignTokens.spaceXxs),
-                  Text(
-                    'Open a shift to track cash in/out and close with counted cash.',
-                    style: DesignTokens.textSmall,
-                  ),
-                ],
-              ),
+            SizedBox(height: 8),
+            Text(
+              'Count the cash already in your till and start a shift. During the day, record money added or taken out. End by counting the till again.',
             ),
           ],
         ),
       );
     }
-
-    final openedAt = shift!.openedAt.toLocal();
-    final openedText =
-        '${openedAt.year}-${openedAt.month.toString().padLeft(2, '0')}-${openedAt.day.toString().padLeft(2, '0')} '
-        '${openedAt.hour.toString().padLeft(2, '0')}:${openedAt.minute.toString().padLeft(2, '0')}';
-
+    final summary = ref.watch(_shiftSummaryProvider(active));
+    final time = active.openedAt.toLocal();
     return Container(
-      padding: DesignTokens.paddingLg,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: DesignTokens.brandGradient,
-        borderRadius: DesignTokens.borderRadiusLg,
-        boxShadow: DesignTokens.shadowMd,
+        color: DesignTokens.brandPrimary,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              const Icon(Icons.lock_clock, color: DesignTokens.surfaceWhite),
-              const SizedBox(width: DesignTokens.spaceSm),
-              Text('Shift open', style: DesignTokens.textTitleLight),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DesignTokens.spaceSm,
-                  vertical: DesignTokens.spaceXxs,
+              const Text(
+                'Shift in progress',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
-                decoration: BoxDecoration(
-                  color: DesignTokens.surfaceWhite.withValues(alpha: 0.18),
-                  borderRadius: DesignTokens.borderRadiusSm,
-                ),
-                child: Text(openedText, style: DesignTokens.textSmallLight),
+              ),
+              Text(
+                'Started ${time.day}/${time.month} at ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                style: const TextStyle(color: Colors.white70),
               ),
             ],
           ),
-          const SizedBox(height: DesignTokens.spaceMd),
-          FutureBuilder<_ShiftCashSummary>(
-            future: _computeSummary(ref, shift!),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Text('Calculating…', style: DesignTokens.textSmallLight);
-              }
-              final summary = snapshot.data;
-              if (summary == null) {
-                return Text(
-                  'Cash summary unavailable',
-                  style: DesignTokens.textSmallLight,
-                );
-              }
-
-              return Row(
-                children: [
-                  _MetricPill(
-                    label: 'Opening',
-                    value: '${summary.opening.toStringAsFixed(0)} /=',
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  _MetricPill(
-                    label: 'Cash sales',
-                    value: '${summary.cashSales.toStringAsFixed(0)} /=',
-                  ),
-                  const SizedBox(width: DesignTokens.spaceSm),
-                  _MetricPill(
-                    label: 'Net in/out',
-                    value: '${summary.netMovements.toStringAsFixed(0)} /=',
-                  ),
-                ],
-              );
-            },
+          const SizedBox(height: 20),
+          const Text(
+            'Expected cash in the till',
+            style: TextStyle(color: Colors.white70),
           ),
-          const SizedBox(height: DesignTokens.spaceMd),
-          FutureBuilder<_ShiftCashSummary>(
-            future: _computeSummary(ref, shift!),
-            builder: (context, snapshot) {
-              final expected = snapshot.data?.expected ?? shift!.openingFloat;
-              return Text(
-                'Expected cash now: ${expected.toStringAsFixed(0)} /=',
-                style: DesignTokens.textBodyLight.copyWith(
-                  fontWeight: FontWeight.w700,
+          const SizedBox(height: 4),
+          summary.when(
+            data: (value) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value.expected.toUgx(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                for (final row in [
+                  ('Opening cash', value.opening),
+                  ('Cash sales', value.cashSales),
+                  ('Added / taken out', value.netMovements),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            row.$1,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                        Text(
+                          row.$2.toUgx(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => const Text(
+              'Could not calculate cash. Tap sync to retry.',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Mobile money and card payments are not cash in your till.',
+            style: TextStyle(color: Colors.white70),
           ),
         ],
       ),
-    );
-  }
-
-  Future<_ShiftCashSummary> _computeSummary(WidgetRef ref, Shift shift) async {
-    final db = ref.read(appDatabaseProvider);
-    final cashSales = await db.computeCashSalesSince(shift.openedAt);
-    final netMovements = await db.computeCashMovementsNetSince(shift.openedAt);
-    return _ShiftCashSummary(
-      opening: shift.openingFloat,
-      cashSales: cashSales,
-      netMovements: netMovements,
     );
   }
 }
@@ -239,44 +233,6 @@ class _ShiftCashSummary {
   final double netMovements;
 
   double get expected => opening + cashSales + netMovements;
-}
-
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DesignTokens.spaceSm,
-          vertical: DesignTokens.spaceSm,
-        ),
-        decoration: BoxDecoration(
-          color: DesignTokens.surfaceWhite.withValues(alpha: 0.16),
-          borderRadius: DesignTokens.borderRadiusMd,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: DesignTokens.textSmallLight),
-            const SizedBox(height: DesignTokens.spaceXxs),
-            Text(
-              value,
-              style: DesignTokens.textBodyLight.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ActionsCard extends ConsumerWidget {
@@ -296,13 +252,16 @@ class _ActionsCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Actions', style: DesignTokens.textBodyBold),
+          Text(
+            openShift == null ? 'Start here' : 'Manage your till',
+            style: DesignTokens.textBodyBold,
+          ),
           const SizedBox(height: DesignTokens.spaceMd),
           if (openShift == null)
             ElevatedButton.icon(
               onPressed: () => _openShiftSheet(context, ref),
               icon: const Icon(Icons.play_circle_outline),
-              label: const Text('Open shift'),
+              label: const Text('Start shift'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: DesignTokens.brandAccent,
               ),
@@ -347,7 +306,7 @@ class _ActionsCard extends ConsumerWidget {
             ElevatedButton.icon(
               onPressed: () => _closeShiftSheet(context, ref, openShift!),
               icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text('Close shift'),
+              label: const Text('End shift & count cash'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: DesignTokens.error,
               ),
@@ -359,65 +318,44 @@ class _ActionsCard extends ConsumerWidget {
   }
 
   void _openShiftSheet(BuildContext context, WidgetRef ref) {
-    final floatCtrl = TextEditingController(text: '0');
-    BottomSheetModal.show(
-      context: context,
-      title: 'Open shift',
-      subtitle: 'Enter opening float',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: floatCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Opening cash (/=)',
-              prefixIcon: Icon(Icons.money),
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceLg),
-          ElevatedButton(
-            onPressed: () async {
-              final opening = double.tryParse(floatCtrl.text.trim()) ?? 0;
-              final db = ref.read(appDatabaseProvider);
-              final outletId = (await db.getPrimaryOutlet())?.id;
-              final staffId = ref.read(posSessionProvider).staffId?.toString();
-              final shiftId = await db.openShift(
-                openingFloat: opening,
-                outletId: outletId,
-                staffId: staffId,
-              );
-              final sync = ref.read(syncServiceProvider);
-              await sync.enqueue('shift_open', {
-                'idempotency_key': shiftId,
-                'shift_id': shiftId,
-                'opened_at': DateTime.now().toUtc().toIso8601String(),
-                'opening_float': opening,
-                if (staffId != null) 'staff_id': staffId,
-                if (outletId != null) 'outlet_id': outletId,
-              });
-              await db.recordCashMovement(
-                type: 'open',
-                amount: opening,
-                note: 'Open shift ($shiftId)',
-                outletId: outletId,
-                staffId: staffId,
-              );
-              unawaited(sync.syncNow());
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Shift opened'),
-                  backgroundColor: DesignTokens.brandAccent,
-                ),
-              );
-            },
-            child: const Text('Open shift'),
-          ),
-        ],
-      ),
+    _showCashForm(
+      context,
+      title: 'Start shift',
+      label: 'Cash already in the till (UGX)',
+      help: 'Count your opening cash. Enter 0 if the till is empty.',
+      allowZero: true,
+      submit: (amount, note, category) async {
+        final db = ref.read(appDatabaseProvider);
+        final sync = ref.read(syncServiceProvider);
+        await db.transaction(() async {
+          if (await db.getOpenShift() != null) {
+            throw StateError('A shift is already open.');
+          }
+          final outletId = (await db.getPrimaryOutlet())?.id;
+          final staffId = ref.read(posSessionProvider).staffId?.toString();
+          final shiftId = await db.openShift(
+            openingFloat: amount,
+            outletId: outletId,
+            staffId: staffId,
+          );
+          await sync.enqueue('shift_open', {
+            'idempotency_key': shiftId,
+            'shift_id': shiftId,
+            'opened_at': DateTime.now().toUtc().toIso8601String(),
+            'opening_float': amount,
+            if (staffId != null) 'staff_id': staffId,
+            if (outletId != null) 'outlet_id': outletId,
+          });
+          await db.recordCashMovement(
+            type: 'open',
+            amount: amount,
+            note: 'Open shift ($shiftId)',
+            outletId: outletId,
+            staffId: staffId,
+          );
+        });
+        unawaited(sync.syncNow());
+      },
     );
   }
 
@@ -426,197 +364,113 @@ class _ActionsCard extends ConsumerWidget {
     WidgetRef ref, {
     required String type,
   }) {
-    final amountCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    final title = type == 'withdrawal' ? 'Cash out' : 'Cash in';
-    String category = type == 'withdrawal' ? 'expense' : 'topup';
-    BottomSheetModal.show(
-      context: context,
-      title: title,
-      subtitle: 'Record a ${type == 'withdrawal' ? 'withdrawal' : 'float'}',
-      child: StatefulBuilder(
-        builder: (context, setState) {
-          final categories = type == 'withdrawal'
-              ? const [
-                  ('expense', 'Expense'),
-                  ('supplier', 'Supplier payment'),
-                  ('owner', 'Owner withdrawal'),
-                  ('other', 'Other'),
-                ]
-              : const [
-                  ('topup', 'Top-up'),
-                  ('change', 'Change / float'),
-                  ('other', 'Other'),
-                ];
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Reason', style: DesignTokens.textBodyBold),
-              const SizedBox(height: DesignTokens.spaceSm),
-              Wrap(
-                spacing: DesignTokens.spaceSm,
-                runSpacing: DesignTokens.spaceSm,
-                children: [
-                  for (final item in categories)
-                    ChoiceChip(
-                      label: Text(item.$2),
-                      selected: category == item.$1,
-                      onSelected: (_) => setState(() => category = item.$1),
-                    ),
-                ],
-              ),
-              const SizedBox(height: DesignTokens.spaceMd),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount (/=)',
-                  prefixIcon: Icon(Icons.money),
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spaceMd),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Note (optional)',
-                  prefixIcon: Icon(Icons.notes_outlined),
-                ),
-              ),
-              const SizedBox(height: DesignTokens.spaceLg),
-              ElevatedButton(
-                onPressed: () async {
-                  final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
-                  if (amount <= 0) return;
-
-                  final note = noteCtrl.text.trim();
-                  final storedNote = note.isEmpty
-                      ? '[$category]'
-                      : '[$category] $note';
-
-                  final db = ref.read(appDatabaseProvider);
-                  final outletId = (await db.getPrimaryOutlet())?.id;
-                  final staffId = ref
-                      .read(posSessionProvider)
-                      .staffId
-                      ?.toString();
-
-                  final occurredAt = DateTime.now().toUtc();
-                  String? linkedExpenseId;
-                  int movementId = 0;
-
-                  await db.transaction(() async {
-                    if (type == 'withdrawal' && category != 'owner') {
-                      linkedExpenseId = await db.recordExpense(
-                        amount: amount,
-                        method: 'cash',
-                        category: category,
-                        note: note.isEmpty ? null : note,
-                        outletId: outletId,
-                        staffId: staffId,
-                        occurredAt: occurredAt,
-                      );
-                    }
-
-                    movementId = await db.recordCashMovement(
-                      type: type,
-                      amount: amount,
-                      note: storedNote,
-                      linkedExpenseId: linkedExpenseId,
-                      outletId: outletId,
-                      staffId: staffId,
-                      occurredAt: occurredAt,
-                    );
-
-                    if (type == 'withdrawal' || type == 'float') {
-                      await db.recordAuditLog(
-                        actorStaffId: staffId,
-                        action: 'cash_movement_$type',
-                        payload: {
-                          'movement_id': movementId,
-                          if (linkedExpenseId != null)
-                            'linked_expense_id': linkedExpenseId,
-                          'amount': amount,
-                          'tag': category,
-                          'note': note,
-                        },
-                      );
-                    }
-                  });
-
-                  unawaited(ref.read(syncServiceProvider).syncNow());
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '${type == 'withdrawal' ? 'Cash out' : 'Cash in'} recorded',
-                      ),
-                      backgroundColor: DesignTokens.brandAccent,
-                    ),
-                  );
-                },
-                child: const Text('Save'),
-              ),
+    final withdrawal = type == 'withdrawal';
+    _showCashForm(
+      context,
+      title: withdrawal ? 'Take cash out' : 'Add cash',
+      label: 'Amount (UGX)',
+      help: withdrawal
+          ? 'Record money leaving the till, such as an expense or owner withdrawal.'
+          : 'Record extra cash added to the till. Sales are counted automatically.',
+      allowZero: false,
+      categories: withdrawal
+          ? const [
+              ('expense', 'Expense'),
+              ('supplier', 'Supplier'),
+              ('owner', 'Owner'),
+              ('other', 'Other'),
+            ]
+          : const [
+              ('topup', 'Top-up'),
+              ('change', 'Change'),
+              ('other', 'Other'),
             ],
+      submit: (amount, note, category) async {
+        final db = ref.read(appDatabaseProvider);
+        await db.transaction(() async {
+          final shift = await db.getOpenShift();
+          if (shift == null) {
+            throw StateError('Start a shift before recording cash.');
+          }
+          final staffId = ref.read(posSessionProvider).staffId?.toString();
+          String? expenseId;
+          if (withdrawal && category != 'owner') {
+            expenseId = await db.recordExpense(
+              amount: amount,
+              method: 'cash',
+              category: category,
+              note: note.isEmpty ? null : note,
+              outletId: shift.outletId,
+              staffId: staffId,
+              occurredAt: DateTime.now().toUtc(),
+            );
+          }
+          final id = await db.recordCashMovement(
+            type: type,
+            amount: amount,
+            note: '[$category] $note',
+            linkedExpenseId: expenseId,
+            outletId: shift.outletId,
+            staffId: staffId,
           );
-        },
-      ),
+          await db.recordAuditLog(
+            actorStaffId: staffId,
+            action: 'cash_movement_$type',
+            payload: {
+              'movement_id': id,
+              if (expenseId != null) 'linked_expense_id': expenseId,
+              'amount': amount,
+              'tag': category,
+              'note': note,
+            },
+          );
+        });
+        unawaited(ref.read(syncServiceProvider).syncNow());
+      },
     );
   }
 
-  void _closeShiftSheet(BuildContext context, WidgetRef ref, Shift shift) {
-    final countedCtrl = TextEditingController();
-    BottomSheetModal.show(
-      context: context,
-      title: 'Close shift',
-      subtitle: 'Enter counted cash',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: countedCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Counted cash (/=)',
-              prefixIcon: Icon(Icons.money),
-            ),
-          ),
-          const SizedBox(height: DesignTokens.spaceLg),
-          ElevatedButton(
-            onPressed: () async {
-              final counted = double.tryParse(countedCtrl.text.trim()) ?? 0;
-              final db = ref.read(appDatabaseProvider);
-              await db.closeShift(shiftId: shift.id, closingFloat: counted);
-              final sync = ref.read(syncServiceProvider);
-              await sync.enqueue('shift_close', {
-                'idempotency_key': shift.id,
-                'shift_id': shift.id,
-                'closed_at': DateTime.now().toUtc().toIso8601String(),
-                'closing_float': counted,
-              });
-              await db.recordCashMovement(
-                type: 'close',
-                amount: counted,
-                note: 'Close shift (${shift.id})',
-                outletId: shift.outletId,
-                staffId: shift.staffId,
-              );
-              unawaited(sync.syncNow());
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Shift closed'),
-                  backgroundColor: DesignTokens.brandAccent,
-                ),
-              );
-            },
-            child: const Text('Close shift'),
-          ),
-        ],
-      ),
+  Future<void> _closeShiftSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Shift shift,
+  ) async {
+    final db = ref.read(appDatabaseProvider);
+    final expected =
+        shift.openingFloat +
+        await db.computeCashSalesSince(shift.openedAt) +
+        await db.computeCashMovementsNetSince(shift.openedAt);
+    if (!context.mounted) return;
+    _showCashForm(
+      context,
+      title: 'End shift',
+      label: 'Cash you counted (UGX)',
+      help: 'Count the cash in your till before ending the shift.',
+      allowZero: true,
+      expected: expected,
+      submit: (amount, note, category) async {
+        final sync = ref.read(syncServiceProvider);
+        await db.transaction(() async {
+          if ((await db.getOpenShift())?.id != shift.id) {
+            throw StateError('This shift is no longer open.');
+          }
+          await db.closeShift(shiftId: shift.id, closingFloat: amount);
+          await sync.enqueue('shift_close', {
+            'idempotency_key': shift.id,
+            'shift_id': shift.id,
+            'closed_at': DateTime.now().toUtc().toIso8601String(),
+            'closing_float': amount,
+          });
+          await db.recordCashMovement(
+            type: 'close',
+            amount: amount,
+            note: 'Close shift (${shift.id})',
+            outletId: shift.outletId,
+            staffId: shift.staffId,
+          );
+        });
+        unawaited(sync.syncNow());
+      },
     );
   }
 }
@@ -795,4 +649,134 @@ class _CardError extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showCashForm(
+  BuildContext context, {
+  required String title,
+  required String label,
+  required String help,
+  required bool allowZero,
+  double? expected,
+  List<(String, String)> categories = const [],
+  required Future<void> Function(double, String, String) submit,
+}) async {
+  final amountCtrl = TextEditingController();
+  final noteCtrl = TextEditingController();
+  String category = categories.isEmpty ? '' : categories.first.$1;
+  bool saving = false;
+  String? error;
+  await BottomSheetModal.show(
+    context: context,
+    title: title,
+    showCloseButton: false,
+    isDismissible: false,
+    enableDrag: false,
+    child: StatefulBuilder(
+      builder: (ctx, update) => PopScope(
+        canPop: !saving,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(help),
+              const SizedBox(height: 16),
+              if (expected != null)
+                Text(
+                  'Expected: ${expected.toUgx()}',
+                  style: DesignTokens.textBodyBold,
+                ),
+              TextField(
+                controller: amountCtrl,
+                enabled: !saving,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (_) => update(() {}),
+                decoration: InputDecoration(
+                  labelText: label,
+                  errorText: error,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              if (expected != null && double.tryParse(amountCtrl.text) != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Difference: ${(double.parse(amountCtrl.text) - expected).toUgx()}',
+                    style: DesignTokens.textBodyBold,
+                  ),
+                ),
+              if (categories.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final entry in categories)
+                      ChoiceChip(
+                        label: Text(entry.$2),
+                        selected: category == entry.$1,
+                        onSelected: saving
+                            ? null
+                            : (_) => update(() => category = entry.$1),
+                      ),
+                  ],
+                ),
+                TextField(
+                  controller: noteCtrl,
+                  enabled: !saving,
+                  decoration: const InputDecoration(
+                    labelText: 'Note (optional)',
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final amount = double.tryParse(amountCtrl.text);
+                        if (amount == null ||
+                            !amount.isFinite ||
+                            amount < 0 ||
+                            (!allowZero && amount == 0)) {
+                          update(
+                            () => error = allowZero
+                                ? 'Enter the amount you counted, including 0.'
+                                : 'Enter an amount above 0.',
+                          );
+                          return;
+                        }
+                        update(() {
+                          saving = true;
+                          error = null;
+                        });
+                        try {
+                          await submit(amount, noteCtrl.text.trim(), category);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            update(() {
+                              saving = false;
+                              error = '$e';
+                            });
+                          }
+                        }
+                      },
+                child: Text(saving ? 'Saving…' : title),
+              ),
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  Future.delayed(const Duration(seconds: 1), () {
+    amountCtrl.dispose();
+    noteCtrl.dispose();
+  });
 }

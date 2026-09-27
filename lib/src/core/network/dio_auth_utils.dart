@@ -9,16 +9,17 @@ class DioAuthUtils {
 
   static bool isAuthError(DioException error) {
     final status = error.response?.statusCode;
-    return status == 401 || status == 403;
+    return status == 401;
   }
 
-  static bool isAuthStatus(int? status) => status == 401 || status == 403;
+  static bool isAuthStatus(int? status) => status == 401;
 
   static String userMessage(DioException error) {
     if (isAuthError(error)) {
       return 'Session expired — please sign in again';
     }
     final status = error.response?.statusCode;
+    if (status == 403) return 'You do not have permission for this action';
     if (status == 429) return 'Too many requests — try again shortly';
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
@@ -37,7 +38,10 @@ class DioAuthUtils {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        content: Text(detail ?? 'Session expired — signing you out'),
+        content: Text(
+          detail ??
+              'Cloud sync paused — sign in again. Offline work is available.',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
       ),

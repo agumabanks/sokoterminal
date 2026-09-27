@@ -339,6 +339,7 @@ class _IconWidget extends StatelessWidget {
     if (el.iconCodePoint == null) {
       return _FigureWidget(el: el, sx: sx, sy: sy);
     }
+    // ignore: const_non_constant_declarations
     return Icon(
       IconData(
         el.iconCodePoint!,

@@ -28,7 +28,6 @@ import 'features/items/items_screen.dart';
 import 'features/services/services_screen.dart';
 import 'features/orders/orders_screen.dart';
 import 'features/ads/ads_screen.dart';
-import 'features/ads/video_ad_screen.dart';
 import 'features/ads/item_deep_link_screen.dart';
 import 'features/ads/studio_deep_link_launcher.dart';
 import 'features/ads/studio_notification_scheduler.dart';
@@ -133,12 +132,17 @@ Page<dynamic> _buildPage({required Widget child, GoRouterState? state}) {
 }
 
 class SokoSellerApp extends ConsumerWidget {
-  const SokoSellerApp({super.key});
+  const SokoSellerApp({super.key, this.initializeServices});
+
+  final Future<void> Function()? initializeServices;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    return _LifecycleAwareApp(router: router);
+    return _LifecycleAwareApp(
+      router: router,
+      initializeServices: initializeServices,
+    );
   }
 }
 
@@ -146,8 +150,9 @@ class SokoSellerApp extends ConsumerWidget {
 /// SplashScreen's listener is disposed after login; this one persists
 /// for the entire app session so token refresh on resume always works.
 class _LifecycleAwareApp extends ConsumerStatefulWidget {
-  const _LifecycleAwareApp({required this.router});
+  const _LifecycleAwareApp({required this.router, this.initializeServices});
   final GoRouter router;
+  final Future<void> Function()? initializeServices;
 
   @override
   ConsumerState<_LifecycleAwareApp> createState() => _LifecycleAwareAppState();
@@ -155,25 +160,41 @@ class _LifecycleAwareApp extends ConsumerStatefulWidget {
 
 class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
   AppLifecycleListener? _lifecycleListener;
+  StreamSubscription<Uri>? _deepLinkSubscription;
 
   @override
   void initState() {
     super.initState();
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
-        final auth = ref.read(authControllerProvider.notifier);
-        unawaited(auth.refreshToken());
+        // Ordinary resume must not rotate/revoke a valid token. Refresh is
+        // coordinated by ApiClient only when a cloud request requires it.
         // Resume contact background sync when app comes to foreground.
         unawaited(_backgroundContactSync());
       },
     );
     // Kick off contact sync shortly after the widget tree settles.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initializeServices != null) {
+        unawaited(widget.initializeServices!());
+      }
       unawaited(_backgroundContactSync());
       _configurePushNavigation();
-      _configureLocalNotifications();
-      _initDeepLinks();
+      unawaited(_deferredOptionalSetup());
     });
+  }
+
+  Future<void> _deferredOptionalSetup() async {
+    // Let the first workspace frame settle before initializing native
+    // notification channels and permission prompts.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    try {
+      await _configureLocalNotifications();
+    } catch (error) {
+      debugPrint('[App] Local notifications unavailable: $error');
+    }
+    await _initDeepLinks();
   }
 
   Future<void> _initDeepLinks() async {
@@ -183,7 +204,8 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
       if (initial != null && mounted) _handleDeepLink(initial);
     } catch (_) {}
 
-    appLinks.uriLinkStream.listen((uri) {
+    await _deepLinkSubscription?.cancel();
+    _deepLinkSubscription = appLinks.uriLinkStream.listen((uri) {
       if (mounted) _handleDeepLink(uri);
     }, onError: (_) {});
   }
@@ -290,6 +312,7 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
   @override
   void dispose() {
     _lifecycleListener?.dispose();
+    unawaited(_deepLinkSubscription?.cancel());
     super.dispose();
   }
 
@@ -302,6 +325,32 @@ class _LifecycleAwareAppState extends ConsumerState<_LifecycleAwareApp> {
         theme: AppTheme.light(),
         scaffoldMessengerKey: rootScaffoldMessengerKey,
         routerConfig: widget.router,
+        builder: (context, child) => Column(
+          children: [
+            if (ref
+                    .watch(authControllerProvider)
+                    .message
+                    ?.contains('resume cloud sync') ==
+                true)
+              Material(
+                color: Colors.amber.shade100,
+                child: SafeArea(
+                  bottom: false,
+                  child: ListTile(
+                    dense: true,
+                    title: const Text(
+                      'Cloud sync paused. You can keep working offline.',
+                    ),
+                    trailing: TextButton(
+                      onPressed: () => widget.router.go('/login?reauth=1'),
+                      child: const Text('Sign in'),
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(child: child ?? const SizedBox.shrink()),
+          ],
+        ),
       ),
     );
   }
@@ -363,6 +412,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (loggedIn && setupRequired && !setupCompleted && !onBusinessSetup) {
         if (onRegister && postRegistrationPending) return null;
         return '/home/more/business-setup';
+      }
+      if (loggedIn && onLogin && state.uri.queryParameters['reauth'] == '1') {
+        return null;
       }
       if (loggedIn && (onLogin || onRegister)) {
         if (onRegister && postRegistrationPending) return null;
@@ -733,10 +785,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'video-ad',
                     name: 'video-ad',
-                    pageBuilder: (context, state) => _buildPage(
-                      state: state,
-                      child: const VideoAdScreen(),
-                    ),
+                    redirect: (context, state) => '/home/more/ads',
                   ),
                   GoRoute(
                     path: 'evening-close',
@@ -757,10 +806,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'madeni',
                     name: 'madeni',
-                    pageBuilder: (context, state) => _buildPage(
-                      state: state,
-                      child: const MadeniScreen(),
-                    ),
+                    pageBuilder: (context, state) =>
+                        _buildPage(state: state, child: const MadeniScreen()),
                   ),
                   GoRoute(
                     path: 'marketing',
@@ -776,14 +823,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                     pageBuilder: (context, state) => _buildPage(
                       state: state,
                       child: const MarketingGeneratorScreen(),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'video-ad',
-                    name: 'video-ad',
-                    pageBuilder: (context, state) => _buildPage(
-                      state: state,
-                      child: const VideoAdScreen(),
                     ),
                   ),
                   GoRoute(

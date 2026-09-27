@@ -8,11 +8,14 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../util/ledger_sync_utils.dart';
+
 part 'app_database.g.dart';
 
 const _uuid = Uuid();
 
 class Items extends Table {
+  TextColumn get wholesaleRangesJson => text().nullable()();
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
   IntColumn get remoteId => integer().nullable()();
   TextColumn get name => text()();
@@ -261,8 +264,10 @@ class MadeniEntries extends Table {
   RealColumn get amountPaid => real().withDefault(const Constant(0))();
   TextColumn get status => text().withDefault(const Constant('pending'))();
   DateTimeColumn get dueDate => dateTime().nullable()();
-  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
-  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   TextColumn get remoteId => text().nullable()();
   @override
@@ -271,11 +276,13 @@ class MadeniEntries extends Table {
 
 class MadeniPayments extends Table {
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
-  TextColumn get entryId => text().references(MadeniEntries, #id, onDelete: KeyAction.cascade)();
+  TextColumn get entryId =>
+      text().references(MadeniEntries, #id, onDelete: KeyAction.cascade)();
   RealColumn get amount => real()();
   TextColumn get method => text()();
   TextColumn get externalRef => text().nullable()();
-  DateTimeColumn get paidAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get paidAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
   Set<Column<Object>>? get primaryKey => {id};
 }
@@ -289,8 +296,10 @@ class SupplierDebts extends Table {
   RealColumn get amountPaid => real().withDefault(const Constant(0))();
   TextColumn get status => text().withDefault(const Constant('pending'))();
   DateTimeColumn get dueDate => dateTime().nullable()();
-  DateTimeColumn get createdAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
-  DateTimeColumn get updatedAt => dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   @override
   Set<Column<Object>>? get primaryKey => {id};
@@ -783,6 +792,8 @@ class AvailabilityExceptions extends Table {
     AvailabilitySchedules,
     AvailabilityExceptions,
     ParkedSales,
+    RenderJobs,
+    SellerEvents,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -799,7 +810,7 @@ class AppDatabase extends _$AppDatabase {
       AppDatabase._internal;
 
   @override
-  int get schemaVersion => 39;
+  int get schemaVersion => 41;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -817,6 +828,7 @@ class AppDatabase extends _$AppDatabase {
   );
 
   Future<void> _runSchemaUpgrade(Migrator migrator, int from, int to) async {
+    if (from < 41) await migrator.addColumn(items, items.wholesaleRangesJson);
     if (from < 2) {
       await migrator.createTable(roles);
       await migrator.createTable(staff);
@@ -1000,6 +1012,10 @@ class AppDatabase extends _$AppDatabase {
       await migrator.createTable(madeniPayments);
       await migrator.createTable(supplierDebts);
     }
+    if (from < 40) {
+      await migrator.createTable(renderJobs);
+      await migrator.createTable(sellerEvents);
+    }
   }
 
   // Expense Categories
@@ -1073,8 +1089,9 @@ class AppDatabase extends _$AppDatabase {
 
   // ─── Madeni Ledger (Customer Debts) ──────────────────────────────────────
 
-  Stream<List<MadeniEntry>> watchMadeniEntries() =>
-      (select(madeniEntries)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+  Stream<List<MadeniEntry>> watchMadeniEntries() => (select(
+    madeniEntries,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
   Stream<List<MadeniEntry>> watchMadeniEntriesForCustomer(String customerId) =>
       (select(madeniEntries)
@@ -1092,9 +1109,13 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     await into(madeniEntries).insert(
       MadeniEntriesCompanion.insert(
-        customerId: customerId != null ? Value(customerId) : const Value.absent(),
+        customerId: customerId != null
+            ? Value(customerId)
+            : const Value.absent(),
         customerName: customerName,
-        customerPhone: customerPhone != null ? Value(customerPhone) : const Value.absent(),
+        customerPhone: customerPhone != null
+            ? Value(customerPhone)
+            : const Value.absent(),
         description: description,
         amount: amount,
         dueDate: dueDate != null ? Value(dueDate) : const Value.absent(),
@@ -1106,7 +1127,9 @@ class AppDatabase extends _$AppDatabase {
     String id,
     MadeniEntriesCompanion companion,
   ) async {
-    await (update(madeniEntries)..where((t) => t.id.equals(id))).write(companion);
+    await (update(
+      madeniEntries,
+    )..where((t) => t.id.equals(id))).write(companion);
   }
 
   Future<void> deleteMadeniEntry(String id) async {
@@ -1128,24 +1151,27 @@ class AppDatabase extends _$AppDatabase {
           entryId: entryId,
           amount: amount,
           method: method,
-          externalRef: externalRef != null ? Value(externalRef) : const Value.absent(),
+          externalRef: externalRef != null
+              ? Value(externalRef)
+              : const Value.absent(),
         ),
       );
-      final entry = await (select(madeniEntries)
-            ..where((t) => t.id.equals(entryId)))
-          .getSingle();
+      final entry = await (select(
+        madeniEntries,
+      )..where((t) => t.id.equals(entryId))).getSingle();
       final newPaid = entry.amountPaid + amount;
       final newStatus = newPaid >= entry.amount
           ? 'paid'
           : newPaid > 0
-              ? 'partial'
-              : entry.status;
-      await (update(madeniEntries)..where((t) => t.id.equals(entryId)))
-          .write(MadeniEntriesCompanion(
-        amountPaid: Value(newPaid),
-        status: Value(newStatus),
-        updatedAt: Value(DateTime.now().toUtc()),
-      ));
+          ? 'partial'
+          : entry.status;
+      await (update(madeniEntries)..where((t) => t.id.equals(entryId))).write(
+        MadeniEntriesCompanion(
+          amountPaid: Value(newPaid),
+          status: Value(newStatus),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
     });
   }
 
@@ -1160,8 +1186,9 @@ class AppDatabase extends _$AppDatabase {
 
   // ─── Supplier Debts ────────────────────────────────────────────────────────
 
-  Stream<List<SupplierDebt>> watchSupplierDebts() =>
-      (select(supplierDebts)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+  Stream<List<SupplierDebt>> watchSupplierDebts() => (select(
+    supplierDebts,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
   Future<void> addSupplierDebt({
     String? supplierId,
@@ -1172,7 +1199,9 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     await into(supplierDebts).insert(
       SupplierDebtsCompanion.insert(
-        supplierId: supplierId != null ? Value(supplierId) : const Value.absent(),
+        supplierId: supplierId != null
+            ? Value(supplierId)
+            : const Value.absent(),
         supplierName: supplierName,
         description: description,
         amount: amount,
@@ -1185,7 +1214,9 @@ class AppDatabase extends _$AppDatabase {
     String id,
     SupplierDebtsCompanion companion,
   ) async {
-    await (update(supplierDebts)..where((t) => t.id.equals(id))).write(companion);
+    await (update(
+      supplierDebts,
+    )..where((t) => t.id.equals(id))).write(companion);
   }
 
   Future<void> deleteSupplierDebt(String id) async {
@@ -1288,7 +1319,13 @@ class AppDatabase extends _$AppDatabase {
     )..where((t) => t.remoteId.isNotNull() & t.synced.equals(true))).get();
 
     for (final service in candidates) {
-      if (keep.contains(service.id)) continue;
+      if (keep.contains(service.remoteId.toString())) continue;
+      final pending = await customSelect(
+        'SELECT 1 FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id '
+        'WHERE l.service_id = ? AND e.synced = 0 LIMIT 1',
+        variables: [Variable.withString(service.id)],
+      ).getSingleOrNull();
+      if (pending != null) continue;
       final bookings = await (select(
         localBookings,
       )..where((t) => t.serviceId.equals(service.id))).get();
@@ -1920,15 +1957,26 @@ class AppDatabase extends _$AppDatabase {
     required List<({String itemId, int quantity, String? variant})> stockDeltas,
   }) async {
     return await transaction(() async {
+      final quantities = <(String, String), int>{};
+      for (final delta in stockDeltas) {
+        if (delta.quantity <= 0) {
+          throw ArgumentError('Sale quantity must be positive');
+        }
+        final key = (delta.itemId, (delta.variant ?? '').trim());
+        quantities[key] = (quantities[key] ?? 0) + delta.quantity;
+      }
+      final consolidatedDeltas = quantities.entries
+          .map((e) => (itemId: e.key.$1, variant: e.key.$2, quantity: e.value))
+          .toList();
       // 1. Re-read and validate stock inside the transaction
       final shortages = <String>[];
-      for (final delta in stockDeltas) {
+      for (final delta in consolidatedDeltas) {
         final item = await (select(
           items,
         )..where((tbl) => tbl.id.equals(delta.itemId))).getSingleOrNull();
         if (item == null || !item.stockEnabled) continue;
 
-        final variant = (delta.variant ?? '').trim();
+        final variant = delta.variant;
         var available = variant.isEmpty ? item.stockQty : 0;
         final stockRow =
             await (select(itemStocks)..where(
@@ -1951,6 +1999,7 @@ class AppDatabase extends _$AppDatabase {
       }
 
       // 2. Save ledger entry
+      if (!entry.id.present) entry = entry.copyWith(id: Value(_uuid.v4()));
       await into(ledgerEntries).insert(entry);
       for (final line in lines) {
         await into(ledgerLines).insert(line);
@@ -1961,7 +2010,7 @@ class AppDatabase extends _$AppDatabase {
 
       // 3. Decrement stock inside the same transaction
       final now = DateTime.now().toUtc();
-      for (final delta in stockDeltas) {
+      for (final delta in consolidatedDeltas) {
         final item = await (select(
           items,
         )..where((tbl) => tbl.id.equals(delta.itemId))).getSingleOrNull();
@@ -1982,8 +2031,8 @@ class AppDatabase extends _$AppDatabase {
           ItemsCompanion(stockQty: Value(updatedQty), updatedAt: Value(now)),
         );
 
-        final variant = (delta.variant ?? '').trim();
-        if (variant.isNotEmpty) {
+        final variant = delta.variant;
+        {
           final row =
               await (select(itemStocks)..where(
                     (t) =>
@@ -2007,7 +2056,111 @@ class AppDatabase extends _$AppDatabase {
         }
       }
 
+      // Persist the outbox with the sale, so a crash cannot strand a receipt.
+      final bundle = await fetchLedgerEntryBundle(entry.id.value);
+      if (bundle == null) throw StateError('Saved sale is missing');
+      await enqueueSync(
+        'ledger_push',
+        jsonEncode(buildLedgerPushPayload(bundle)),
+      );
       return entry.receiptNumber.value ?? 0;
+    });
+  }
+
+  /// Refund, returned stock and outbox either all commit or all roll back.
+  Future<void> refundSale({
+    required LedgerEntriesCompanion entry,
+    required List<LedgerLinesCompanion> lines,
+    required List<PaymentsCompanion> payments,
+  }) async {
+    await transaction(() async {
+      final saleId = entry.originalEntryId.value;
+      if (saleId == null || entry.type.value != 'refund') {
+        throw ArgumentError('Refund requires an original sale');
+      }
+      final sale = await fetchLedgerEntryBundle(saleId);
+      if (sale == null ||
+          sale.entry.type != 'sale' ||
+          await isSaleVoided(saleId)) {
+        throw StateError('Original sale is missing or voided');
+      }
+      final refunds =
+          await (select(ledgerEntries)..where(
+                (t) =>
+                    t.originalEntryId.equals(saleId) & t.type.equals('refund'),
+              ))
+              .get();
+      final alreadyRefunded = refunds.fold<double>(
+        0,
+        (sum, r) => sum + r.total,
+      );
+      final amount = entry.total.value;
+      if (!amount.isFinite ||
+          amount <= 0 ||
+          alreadyRefunded + amount > sale.entry.total + 0.02) {
+        throw StateError('Refund exceeds the remaining sale amount');
+      }
+      String lineKey(
+        String? item,
+        String? service,
+        String? variant,
+        String title,
+      ) => jsonEncode([item, service, (variant ?? '').trim(), title]);
+      final remaining = <String, int>{};
+      for (final line in sale.lines) {
+        final key = lineKey(
+          line.itemId,
+          line.serviceId,
+          line.variant,
+          line.title,
+        );
+        remaining[key] = (remaining[key] ?? 0) + line.quantity;
+      }
+      for (final refund in refunds) {
+        final bundle = await fetchLedgerEntryBundle(refund.id);
+        for (final line in bundle!.lines) {
+          final key = lineKey(
+            line.itemId,
+            line.serviceId,
+            line.variant,
+            line.title,
+          );
+          remaining[key] = (remaining[key] ?? 0) - line.quantity;
+        }
+      }
+      for (final line in lines) {
+        final key = lineKey(
+          line.itemId.value,
+          line.serviceId.value,
+          line.variant.value,
+          line.title.value,
+        );
+        final qty = line.quantity.value;
+        if (qty <= 0 || qty > (remaining[key] ?? 0)) {
+          throw StateError(
+            'Refund quantity exceeds remaining quantity for ${line.title.value}',
+          );
+        }
+        remaining[key] = remaining[key]! - qty;
+      }
+      await saveLedgerEntry(entry: entry, lines: lines, payments: payments);
+      for (final line in lines) {
+        final itemId = line.itemId.value;
+        if (itemId == null) continue;
+        final item = await getItemById(itemId);
+        if (item == null || !item.stockEnabled) continue;
+        await recordInventoryMovement(
+          itemId: itemId,
+          delta: line.quantity.value,
+          note: 'refund',
+          variant: line.variant.value ?? '',
+        );
+      }
+      final bundle = await fetchLedgerEntryBundle(entry.id.value);
+      await enqueueSync(
+        'ledger_push',
+        jsonEncode(buildLedgerPushPayload(bundle!)),
+      );
     });
   }
 
@@ -2529,7 +2682,13 @@ class AppDatabase extends _$AppDatabase {
       items,
     )..where((t) => t.remoteId.isNotNull() & t.synced.equals(true))).get();
     for (final item in candidates) {
-      if (keep.contains(item.id)) continue;
+      if (keep.contains(item.remoteId.toString())) continue;
+      final pending = await customSelect(
+        'SELECT 1 FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id '
+        'WHERE l.item_id = ? AND e.synced = 0 LIMIT 1',
+        variables: [Variable.withString(item.id)],
+      ).getSingleOrNull();
+      if (pending != null) continue;
       await deleteItemAndDetach(item.id);
     }
   }
@@ -2873,6 +3032,12 @@ class AppDatabase extends _$AppDatabase {
     cachedServiceBookings,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).get();
 
+  Future<void> deleteCachedServiceBooking(int bookingId) async {
+    await (delete(
+      cachedServiceBookings,
+    )..where((t) => t.bookingId.equals(bookingId))).go();
+  }
+
   Stream<List<CachedServiceBooking>> watchCachedServiceBookings() => (select(
     cachedServiceBookings,
   )..orderBy([(t) => OrderingTerm.desc(t.updatedAt)])).watch();
@@ -3121,12 +3286,34 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Includes blocked work and sales that have not yet reached the outbox.
+  Future<bool> hasUnsyncedWork() async {
+    final result = await customSelect(
+      "SELECT EXISTS(SELECT 1 FROM sync_ops WHERE status != 'synced') "
+      'OR EXISTS(SELECT 1 FROM ledger_entries WHERE synced = 0) '
+      'OR EXISTS(SELECT 1 FROM transactions WHERE synced = 0) '
+      'OR EXISTS(SELECT 1 FROM items WHERE synced = 0) '
+      'OR EXISTS(SELECT 1 FROM services WHERE synced = 0) '
+      'OR EXISTS(SELECT 1 FROM madeni_entries WHERE synced = 0) '
+      'OR EXISTS(SELECT 1 FROM supplier_debts WHERE synced = 0) AS pending',
+    ).getSingle();
+    return result.read<int>('pending') != 0;
+  }
+
   /// Clears ALL data from the database.
   /// This is called on logout to ensure complete data isolation between
   /// different sellers using the same device.
   Future<void> clearAllData() async {
     await transaction(() async {
       // Clear all tables in reverse dependency order to avoid foreign key violations
+      await delete(madeniPayments).go();
+      await delete(madeniEntries).go();
+      await delete(supplierDebts).go();
+      await delete(serviceJobSessions).go();
+      await delete(availabilitySchedules).go();
+      await delete(availabilityExceptions).go();
+      await delete(renderJobs).go();
+      await delete(sellerEvents).go();
       await delete(packageRedemptions).go();
       await delete(customerPackages).go();
       await delete(servicePackages).go();
@@ -3361,6 +3548,87 @@ class AppDatabase extends _$AppDatabase {
       }
     });
   }
+
+  // ─── Render Jobs ───────────────────────────────────────────────────────────
+
+  Stream<List<RenderJob>> watchRenderJobs() => (select(
+    renderJobs,
+  )..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).watch();
+
+  Stream<List<RenderJob>> watchPendingRenderJobs() =>
+      (select(renderJobs)
+            ..where((t) => t.status.isIn(['queued', 'failed']))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .watch();
+
+  Future<List<RenderJob>> getPendingRenderJobs() =>
+      (select(renderJobs)
+            ..where((t) => t.status.isIn(['queued', 'failed']))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .get();
+
+  Future<RenderJob?> getRenderJobById(String id) =>
+      (select(renderJobs)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<void> upsertRenderJob(RenderJobsCompanion companion) async {
+    await into(renderJobs).insertOnConflictUpdate(companion);
+  }
+
+  Future<void> updateRenderJobStatus(
+    String id,
+    String status, {
+    String? outputPath,
+    String? error,
+  }) async {
+    await (update(renderJobs)..where((t) => t.id.equals(id))).write(
+      RenderJobsCompanion(
+        status: Value(status),
+        outputPath: outputPath != null
+            ? Value(outputPath)
+            : const Value.absent(),
+        error: error != null ? Value(error) : const Value.absent(),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+  }
+
+  Future<void> deleteRenderJob(String id) async {
+    await (delete(renderJobs)..where((t) => t.id.equals(id))).go();
+  }
+
+  // ─── Seller Events (offline analytics) ─────────────────────────────────────
+
+  Future<void> logEvent({
+    required String type,
+    String? entityId,
+    Map<String, dynamic>? payload,
+  }) async {
+    await into(sellerEvents).insert(
+      SellerEventsCompanion.insert(
+        type: type,
+        entityId: entityId != null ? Value(entityId) : const Value.absent(),
+        payload: payload != null
+            ? Value(jsonEncode(payload))
+            : const Value.absent(),
+      ),
+    );
+  }
+
+  Stream<List<SellerEvent>> watchEventsByType(String type) =>
+      (select(sellerEvents)
+            ..where((t) => t.type.equals(type))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .watch();
+
+  Future<List<SellerEvent>> getUnsyncedEvents() =>
+      (select(sellerEvents)..where((t) => t.synced.equals(false))).get();
+
+  Future<void> markEventsSynced(List<int> ids) async {
+    if (ids.isEmpty) return;
+    await (update(sellerEvents)..where((t) => t.id.isIn(ids))).write(
+      const SellerEventsCompanion(synced: Value(true)),
+    );
+  }
 }
 
 class TransactionWithLines {
@@ -3409,6 +3677,37 @@ class ParkedSales extends Table {
       dateTime().clientDefault(() => DateTime.now().toUtc())();
   @override
   Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Video render job queue — survives app kills, sequential execution on low-end devices.
+class RenderJobs extends Table {
+  TextColumn get id => text().clientDefault(() => _uuid.v4())();
+  TextColumn get specJson => text()(); // Serialized VideoAdSpec
+  TextColumn get status => text().withDefault(
+    const Constant('queued'),
+  )(); // queued | rendering | done | failed
+  TextColumn get outputPath => text().nullable()();
+  TextColumn get error => text().nullable()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  DateTimeColumn get updatedAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  @override
+  Set<Column<Object>>? get primaryKey => {id};
+}
+
+/// Offline event log for analytics — ad_generated, ad_shared_whatsapp, catalog_exported, etc.
+class SellerEvents extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get type =>
+      text()(); // 'ad_generated', 'ad_shared_whatsapp', 'catalog_exported'
+  TextColumn get entityId => text().nullable()(); // adSpecId / catalogId
+  TextColumn get payload =>
+      text().nullable()(); // JSON: template, style, productIds
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now().toUtc())();
+  BoolColumn get synced => boolean().withDefault(const Constant(false))();
 }
 
 // ─── Built-in expense category seeds ──────────────────────────────────────────

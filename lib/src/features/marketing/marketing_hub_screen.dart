@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 
 import '../../core/app_providers.dart';
+import '../ads/ai_content_report_button.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/util/formatters.dart';
 import '../../core/util/haptics.dart';
 import '../../widgets/empty_state.dart';
-import '../ads/video_ad_generator.dart';
+import '../ads/video_ad_spec.dart';
+import '../ads/ffmpeg_plan_builder.dart';
+import '../ads/music_library.dart';
 import '../catalog/catalog_template.dart';
 import '../checkout/checkout_screen.dart';
 import 'package:path_provider/path_provider.dart';
@@ -784,7 +789,8 @@ class _VideoTabState extends ConsumerState<_VideoTab> {
       }
 
       final tempDir = await getTemporaryDirectory();
-      final fontPath = await VideoAdGenerator.extractFont();
+      final fontPath = await MusicLibrary.instance.extractFont();
+      final musicPath = await MusicLibrary.instance.resolveTrack(AdMusicGenre.afrobeats);
       final outputPath = '${tempDir.path}/video_ad_${_selectedId}_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
       final imageFile = File('${tempDir.path}/product_$_selectedId.jpg');
@@ -792,17 +798,32 @@ class _VideoTabState extends ConsumerState<_VideoTab> {
         await imageFile.writeAsBytes([]);
       }
 
-      final success = await VideoAdGenerator.generate(
-        imagePaths: [imageFile.path],
-        musicPath: '',
-        fontPath: fontPath,
+      final spec = VideoAdSpec.quickAd(
+        imagePath: imageFile.path,
         productName: productName,
         price: price.toUgx(),
+        format: AdFormat.status9x16,
+        quality: RenderQuality.standard720,
+        music: musicPath != null ? AdMusicTrack(assetName: musicPath) : null,
+      );
+
+      final assets = RenderAssets(fontPath: fontPath, musicPath: musicPath);
+      final plan = FfmpegPlanBuilder().buildSimple(
+        spec: spec,
+        assets: assets,
         outputPath: outputPath,
-        onProgress: (p) {
+      );
+
+      final session = await FFmpegKit.executeAsync(
+        plan.command,
+        null,
+        null,
+        (stats) {
+          final p = (stats.getTime() / plan.targetDurationMs).clamp(0.0, 1.0);
           if (mounted) setState(() => _progress = p);
         },
       );
+      final success = ReturnCode.isSuccess(await session.getReturnCode());
 
       if (mounted) {
         if (success) {

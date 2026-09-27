@@ -53,7 +53,7 @@ class LogoutDialog extends ConsumerWidget {
                   const SizedBox(width: DesignTokens.spaceSm),
                   Expanded(
                     child: Text(
-                      '$pendingCount unsynced transaction${pendingCount == 1 ? '' : 's'} will be lost if you sign out completely.',
+                      '$pendingCount unsynced transaction${pendingCount == 1 ? '' : 's'} must sync before you sign out completely.',
                       style: DesignTokens.textSmall.copyWith(
                         color: DesignTokens.warning,
                       ),
@@ -113,35 +113,17 @@ class LogoutDialog extends ConsumerWidget {
     WidgetRef ref,
     int pendingCount,
   ) async {
-    if (pendingCount > 0) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Are you sure?'),
-          content: Text(
-            'You have $pendingCount unsynced transaction${pendingCount == 1 ? '' : 's'}. '
-            'Signing out will permanently delete them from this device.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: TextButton.styleFrom(foregroundColor: DesignTokens.error),
-              child: const Text('Sign out anyway'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(authControllerProvider.notifier).logout();
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      context.go('/login');
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
-
-    Navigator.of(context).pop();
-    await ref.read(authControllerProvider.notifier).logout();
-    if (!context.mounted) return;
-    context.go('/login');
   }
 }
 
