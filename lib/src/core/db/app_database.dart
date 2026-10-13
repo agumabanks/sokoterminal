@@ -15,6 +15,7 @@ part 'app_database.g.dart';
 const _uuid = Uuid();
 
 class Items extends Table {
+  TextColumn get sellingCoverageJson => text().nullable()();
   TextColumn get wholesaleRangesJson => text().nullable()();
   TextColumn get id => text().clientDefault(() => _uuid.v4())();
   IntColumn get remoteId => integer().nullable()();
@@ -810,7 +811,7 @@ class AppDatabase extends _$AppDatabase {
       AppDatabase._internal;
 
   @override
-  int get schemaVersion => 41;
+  int get schemaVersion => 42;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1015,6 +1016,9 @@ class AppDatabase extends _$AppDatabase {
     if (from < 40) {
       await migrator.createTable(renderJobs);
       await migrator.createTable(sellerEvents);
+    }
+    if (from < 42) {
+      await migrator.addColumn(items, items.sellingCoverageJson);
     }
   }
 

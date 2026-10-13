@@ -8,6 +8,17 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sellingCoverageJsonMeta =
+      const VerificationMeta('sellingCoverageJson');
+  @override
+  late final GeneratedColumn<String> sellingCoverageJson =
+      GeneratedColumn<String>(
+        'selling_coverage_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _wholesaleRangesJsonMeta =
       const VerificationMeta('wholesaleRangesJson');
   @override
@@ -401,6 +412,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    sellingCoverageJson,
     wholesaleRangesJson,
     id,
     remoteId,
@@ -449,6 +461,15 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('selling_coverage_json')) {
+      context.handle(
+        _sellingCoverageJsonMeta,
+        sellingCoverageJson.isAcceptableOrUnknown(
+          data['selling_coverage_json']!,
+          _sellingCoverageJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('wholesale_ranges_json')) {
       context.handle(
         _wholesaleRangesJsonMeta,
@@ -714,6 +735,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
   Item map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Item(
+      sellingCoverageJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}selling_coverage_json'],
+      ),
       wholesaleRangesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}wholesale_ranges_json'],
@@ -864,6 +889,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
 }
 
 class Item extends DataClass implements Insertable<Item> {
+  final String? sellingCoverageJson;
   final String? wholesaleRangesJson;
   final String id;
   final int? remoteId;
@@ -900,6 +926,7 @@ class Item extends DataClass implements Insertable<Item> {
   final DateTime updatedAt;
   final bool synced;
   const Item({
+    this.sellingCoverageJson,
     this.wholesaleRangesJson,
     required this.id,
     this.remoteId,
@@ -939,6 +966,9 @@ class Item extends DataClass implements Insertable<Item> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (!nullToAbsent || sellingCoverageJson != null) {
+      map['selling_coverage_json'] = Variable<String>(sellingCoverageJson);
+    }
     if (!nullToAbsent || wholesaleRangesJson != null) {
       map['wholesale_ranges_json'] = Variable<String>(wholesaleRangesJson);
     }
@@ -1027,6 +1057,9 @@ class Item extends DataClass implements Insertable<Item> {
 
   ItemsCompanion toCompanion(bool nullToAbsent) {
     return ItemsCompanion(
+      sellingCoverageJson: sellingCoverageJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellingCoverageJson),
       wholesaleRangesJson: wholesaleRangesJson == null && nullToAbsent
           ? const Value.absent()
           : Value(wholesaleRangesJson),
@@ -1111,6 +1144,9 @@ class Item extends DataClass implements Insertable<Item> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Item(
+      sellingCoverageJson: serializer.fromJson<String?>(
+        json['sellingCoverageJson'],
+      ),
       wholesaleRangesJson: serializer.fromJson<String?>(
         json['wholesaleRangesJson'],
       ),
@@ -1154,6 +1190,7 @@ class Item extends DataClass implements Insertable<Item> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'sellingCoverageJson': serializer.toJson<String?>(sellingCoverageJson),
       'wholesaleRangesJson': serializer.toJson<String?>(wholesaleRangesJson),
       'id': serializer.toJson<String>(id),
       'remoteId': serializer.toJson<int?>(remoteId),
@@ -1193,6 +1230,7 @@ class Item extends DataClass implements Insertable<Item> {
   }
 
   Item copyWith({
+    Value<String?> sellingCoverageJson = const Value.absent(),
     Value<String?> wholesaleRangesJson = const Value.absent(),
     String? id,
     Value<int?> remoteId = const Value.absent(),
@@ -1229,6 +1267,9 @@ class Item extends DataClass implements Insertable<Item> {
     DateTime? updatedAt,
     bool? synced,
   }) => Item(
+    sellingCoverageJson: sellingCoverageJson.present
+        ? sellingCoverageJson.value
+        : this.sellingCoverageJson,
     wholesaleRangesJson: wholesaleRangesJson.present
         ? wholesaleRangesJson.value
         : this.wholesaleRangesJson,
@@ -1275,6 +1316,9 @@ class Item extends DataClass implements Insertable<Item> {
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
+      sellingCoverageJson: data.sellingCoverageJson.present
+          ? data.sellingCoverageJson.value
+          : this.sellingCoverageJson,
       wholesaleRangesJson: data.wholesaleRangesJson.present
           ? data.wholesaleRangesJson.value
           : this.wholesaleRangesJson,
@@ -1350,6 +1394,7 @@ class Item extends DataClass implements Insertable<Item> {
   @override
   String toString() {
     return (StringBuffer('Item(')
+          ..write('sellingCoverageJson: $sellingCoverageJson, ')
           ..write('wholesaleRangesJson: $wholesaleRangesJson, ')
           ..write('id: $id, ')
           ..write('remoteId: $remoteId, ')
@@ -1391,6 +1436,7 @@ class Item extends DataClass implements Insertable<Item> {
 
   @override
   int get hashCode => Object.hashAll([
+    sellingCoverageJson,
     wholesaleRangesJson,
     id,
     remoteId,
@@ -1431,6 +1477,7 @@ class Item extends DataClass implements Insertable<Item> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Item &&
+          other.sellingCoverageJson == this.sellingCoverageJson &&
           other.wholesaleRangesJson == this.wholesaleRangesJson &&
           other.id == this.id &&
           other.remoteId == this.remoteId &&
@@ -1469,6 +1516,7 @@ class Item extends DataClass implements Insertable<Item> {
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
+  final Value<String?> sellingCoverageJson;
   final Value<String?> wholesaleRangesJson;
   final Value<String> id;
   final Value<int?> remoteId;
@@ -1506,6 +1554,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> synced;
   final Value<int> rowid;
   const ItemsCompanion({
+    this.sellingCoverageJson = const Value.absent(),
     this.wholesaleRangesJson = const Value.absent(),
     this.id = const Value.absent(),
     this.remoteId = const Value.absent(),
@@ -1544,6 +1593,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.rowid = const Value.absent(),
   });
   ItemsCompanion.insert({
+    this.sellingCoverageJson = const Value.absent(),
     this.wholesaleRangesJson = const Value.absent(),
     this.id = const Value.absent(),
     this.remoteId = const Value.absent(),
@@ -1583,6 +1633,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   }) : name = Value(name),
        price = Value(price);
   static Insertable<Item> custom({
+    Expression<String>? sellingCoverageJson,
     Expression<String>? wholesaleRangesJson,
     Expression<String>? id,
     Expression<int>? remoteId,
@@ -1621,6 +1672,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (sellingCoverageJson != null)
+        'selling_coverage_json': sellingCoverageJson,
       if (wholesaleRangesJson != null)
         'wholesale_ranges_json': wholesaleRangesJson,
       if (id != null) 'id': id,
@@ -1662,6 +1715,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   }
 
   ItemsCompanion copyWith({
+    Value<String?>? sellingCoverageJson,
     Value<String?>? wholesaleRangesJson,
     Value<String>? id,
     Value<int?>? remoteId,
@@ -1700,6 +1754,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<int>? rowid,
   }) {
     return ItemsCompanion(
+      sellingCoverageJson: sellingCoverageJson ?? this.sellingCoverageJson,
       wholesaleRangesJson: wholesaleRangesJson ?? this.wholesaleRangesJson,
       id: id ?? this.id,
       remoteId: remoteId ?? this.remoteId,
@@ -1742,6 +1797,11 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (sellingCoverageJson.present) {
+      map['selling_coverage_json'] = Variable<String>(
+        sellingCoverageJson.value,
+      );
+    }
     if (wholesaleRangesJson.present) {
       map['wholesale_ranges_json'] = Variable<String>(
         wholesaleRangesJson.value,
@@ -1858,6 +1918,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   @override
   String toString() {
     return (StringBuffer('ItemsCompanion(')
+          ..write('sellingCoverageJson: $sellingCoverageJson, ')
           ..write('wholesaleRangesJson: $wholesaleRangesJson, ')
           ..write('id: $id, ')
           ..write('remoteId: $remoteId, ')
@@ -28870,6 +28931,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$ItemsTableCreateCompanionBuilder =
     ItemsCompanion Function({
+      Value<String?> sellingCoverageJson,
       Value<String?> wholesaleRangesJson,
       Value<String> id,
       Value<int?> remoteId,
@@ -28909,6 +28971,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
     ItemsCompanion Function({
+      Value<String?> sellingCoverageJson,
       Value<String?> wholesaleRangesJson,
       Value<String> id,
       Value<int?> remoteId,
@@ -29052,6 +29115,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get sellingCoverageJson => $composableBuilder(
+    column: $table.sellingCoverageJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get wholesaleRangesJson => $composableBuilder(
     column: $table.wholesaleRangesJson,
     builder: (column) => ColumnFilters(column),
@@ -29362,6 +29430,11 @@ class $$ItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get sellingCoverageJson => $composableBuilder(
+    column: $table.sellingCoverageJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get wholesaleRangesJson => $composableBuilder(
     column: $table.wholesaleRangesJson,
     builder: (column) => ColumnOrderings(column),
@@ -29547,6 +29620,11 @@ class $$ItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get sellingCoverageJson => $composableBuilder(
+    column: $table.sellingCoverageJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get wholesaleRangesJson => $composableBuilder(
     column: $table.wholesaleRangesJson,
     builder: (column) => column,
@@ -29846,6 +29924,7 @@ class $$ItemsTableTableManager
               $$ItemsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<String?> sellingCoverageJson = const Value.absent(),
                 Value<String?> wholesaleRangesJson = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<int?> remoteId = const Value.absent(),
@@ -29883,6 +29962,7 @@ class $$ItemsTableTableManager
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
+                sellingCoverageJson: sellingCoverageJson,
                 wholesaleRangesJson: wholesaleRangesJson,
                 id: id,
                 remoteId: remoteId,
@@ -29922,6 +30002,7 @@ class $$ItemsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<String?> sellingCoverageJson = const Value.absent(),
                 Value<String?> wholesaleRangesJson = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<int?> remoteId = const Value.absent(),
@@ -29959,6 +30040,7 @@ class $$ItemsTableTableManager
                 Value<bool> synced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
+                sellingCoverageJson: sellingCoverageJson,
                 wholesaleRangesJson: wholesaleRangesJson,
                 id: id,
                 remoteId: remoteId,

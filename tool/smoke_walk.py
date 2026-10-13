@@ -14,9 +14,11 @@ import time
 
 PKG = "com.soko24.soko_seller_terminal"
 ACTIVITY = f"{PKG}/.MainActivity"
-PKGSET = "soko24u.buyer"  # noise filter
+# Pin the target device: the LAN also exposes a CPH1933 and an unqualified adb
+# call fails with "more than one device/emulator".
+SERIAL = os.environ.get("SOKO_DEVICE", "192.168.1.66:5555")
 OUT = "/var/www/soko/app/soko_seller_terminal/build/smoke"
-ADB = ["adb"]
+ADB = ["adb", "-s", SERIAL]
 
 
 def sh(*args, timeout=120):
@@ -95,11 +97,22 @@ def nav_bar_y(xml):
 def go_tab(xml, label):
     """Tap a bottom-nav tab by geometry so page text can never shadow it."""
     y = nav_bar_y(xml)
-    pt = find_node(xml, label, min_y=y - 5)
-    if not pt:
-        return None
-    tap(pt[0], y)
-    return pt
+    for m in re.finditer(r'<node[^>]*>', xml):
+        tag = m.group(0)
+        vals = [html.unescape(v).strip()
+                for v in re.findall(r'(?:text|content-desc)="([^"]*)"', tag)]
+        # Nav items may carry a badge ("Alerts\n99+"), so match the first line.
+        if not any(v.split("\n")[0].strip().lower() == label.lower() for v in vals):
+            continue
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        # The nav row spans the tap target; require it to sit in the bar.
+        if y1 <= y <= y2 or (y1 >= 1000 and y1 < y):
+            tap((x1 + x2) // 2, y)
+            return (x1 + x2) // 2, y
+    return None
 
 
 def tap(x, y):
@@ -175,6 +188,39 @@ def dismiss_sheets(xml):
     return False
 
 
+def scroll_down(xml, dy=300):
+    """Advance by one tool row without skipping a short section."""
+    shell("input swipe 400 900 400 600 350")
+    time.sleep(1.5)
+
+
+def reset_scroll_to_top():
+    """Return a long seller-tools page to its first row before searching.
+
+    Android keeps the previous scroll offset when a tool route is popped. A
+    downward-only search can therefore miss tiles that sit above that offset.
+    A few long downward swipes are harmless at the top and deterministic on
+    both the phone and tablet layouts.
+    """
+    for _ in range(8):
+        shell("input swipe 400 600 400 1150 350")
+    time.sleep(1.5)
+
+
+def tile_visible(xml, label):
+    """Return a UI tree containing `label`, scrolling down to look for it.
+
+    Returns the (possibly re-dumped) XML so the caller taps on the same
+    snapshot it searched.
+    """
+    for _ in range(12):
+        if find_node(xml, label):
+            return xml
+        scroll_down(xml)
+        xml = dump_ui()
+    return xml
+
+
 def main():
     shell("input keyevent KEYCODE_WAKEUP")
     shell("wm dismiss-keyguard || true")
@@ -209,12 +255,14 @@ def main():
     dismiss_sheets(xml)
     go_tab(xml, "Me")
     time.sleep(2.5)
-    for label, expect in [("Products", "Product"), ("Customers", "Customer"),
+    for label, expect in [("Products", "Product"), ("Customers", "Contact"),
                           ("Orders", "Order"), ("Payment Links", "Payment"),
-                          ("Studio", "Studio"), ("Analytics", "Analytic")]:
+                          ("Studio", "Studio"), ("Analytics", "Insight")]:
+        reset_scroll_to_top()
         xml = dump_ui()
         if dismiss_sheets(xml):
             xml = dump_ui()
+        xml = tile_visible(xml, label)
         pt = find_node(xml, label)
         if pt is None:
             step(f"Me > {label}", False, "tile not found in Me tab")

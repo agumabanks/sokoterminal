@@ -205,12 +205,16 @@ class _AccountingScreenState extends ConsumerState<AccountingScreen> {
           ),
         ],
       ),
-      child: ListTile(
-        leading: Icon(icon, color: DesignTokens.brandPrimary),
-        title: Text(title, style: DesignTokens.textBodyBold),
-        subtitle: Text(subtitle, style: DesignTokens.textSmall),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: DesignTokens.borderRadiusMd,
+        child: ListTile(
+          leading: Icon(icon, color: DesignTokens.brandPrimary),
+          title: Text(title, style: DesignTokens.textBodyBold),
+          subtitle: Text(subtitle, style: DesignTokens.textSmall),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
+        ),
       ),
     );
   }

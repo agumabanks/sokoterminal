@@ -1,6 +1,5 @@
 import '../../core/util/haptics.dart';
 import 'dart:async';
-import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/util/country_codes.dart';
 import 'auth_controller.dart';
-import '../../core/theme/design_tokens.dart';
 
 /// "Steve Jobs" Style Phone-First Login
 /// Flow: Phone -> Check -> PIN (if set) OR Password (if not set) OR Register (if new)
@@ -48,11 +46,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // Soko brand palette — aligned with DesignTokens
-  static const Color _bg = DesignTokens.brandPrimary;
-  static const Color _accent = DesignTokens.brandAccent;
-  static const Color _surface = DesignTokens.brandPrimary;
-  static const Color _stroke = Color(0x22FFFFFF);
+  bool _authPage = false;
 
   @override
   void initState() {
@@ -62,9 +56,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.black,
-        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
 
@@ -322,6 +316,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   void _nextPage() {
+    setState(() => _authPage = true);
     _pageController.nextPage(
       duration: const Duration(milliseconds: 520),
       curve: Curves.easeOutQuint,
@@ -329,6 +324,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   void _prevPage() {
+    setState(() => _authPage = false);
     _pageController.previousPage(
       duration: const Duration(milliseconds: 520),
       curve: Curves.easeOutQuint,
@@ -473,553 +469,333 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final busy = _isLoading || (_authPage && _cooldownSeconds > 0);
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       child: Scaffold(
-        backgroundColor: _bg,
-        body: Stack(
-          children: [
-            // Base gradient (subtle)
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [_bg, DesignTokens.brandPrimary, _bg],
-                ),
-              ),
-            ),
-
-            // Accent glow (soft, minimal)
-            Positioned(
-              top: -140,
-              right: -120,
-              child: _GlowBlob(
-                color: _accent.withValues(alpha: 0.16),
-                size: 420,
-              ),
-            ),
-            Positioned(
-              bottom: -160,
-              left: -130,
-              child: _GlowBlob(
-                color: Colors.white.withValues(alpha: 0.06),
-                size: 520,
-              ),
-            ),
-
-            SafeArea(
+        backgroundColor: const Color(0xfff7f8fa),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Column(
                 children: [
-                  _buildHeader(),
-                  Expanded(
-                    child: Center(
-                      // Keeps the layout “designed” on tablets/web without changing behavior
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 520),
-                        child: PageView(
-                          controller: _pageController,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: [_buildPhoneStep(), _buildAuthStep()],
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xff111820),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.storefront_outlined,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Soko Seller',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [_buildPhoneStep(), _buildAuthStep()],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xffa12222),
+                                ),
+                              ),
+                            ),
+                          ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xff111820),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(54),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: busy
+                                ? null
+                                : (_authPage
+                                      ? _handleAuthSubmit
+                                      : _handlePhoneSubmit),
+                            child: busy
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        _cooldownSeconds > 0
+                                            ? 'Try again in $_cooldownSeconds seconds'
+                                            : 'Please wait…',
+                                      ),
+                                    ],
+                                  )
+                                : Text(_authPage ? 'Sign in' : 'Continue'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-
-            // Error pill
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 12,
-              left: 16,
-              right: 16,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                child: _errorMessage == null
-                    ? const SizedBox.shrink()
-                    : _buildErrorSnack(key: ValueKey(_errorMessage)),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-      child: Row(
+  Widget _buildPhoneStep() => SingleChildScrollView(
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+    child: FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _surface.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _stroke),
-                  ),
-                  child: const Icon(
-                    Icons.storefront_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
+          const Text(
+            'Welcome to your shop',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Text(
-                'Sign in',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
-                ),
-              ),
+          const SizedBox(height: 12),
+          const Text(
+            'Sell, track your stock and grow your business.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xff51565f),
+              height: 1.4,
             ),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            'Phone number',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          _buildPhoneField(),
+          const SizedBox(height: 12),
+          const Text(
+            'Use the number you registered with. New here? We’ll help you create an account.',
+            style: TextStyle(color: Color(0xff51565f), height: 1.4),
+          ),
+          const SizedBox(height: 24),
+          TextButton.icon(
+            onPressed: _isLoading ? null : () => context.go('/staff-login'),
+            icon: const Icon(Icons.badge_outlined),
+            label: const Text('I work in someone else’s shop'),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPhoneStep() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Soko24',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.95),
-                fontSize: 42,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1.2,
-                height: 1.05,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Seller Terminal',
-              style: TextStyle(
-                color: _accent.withValues(alpha: 0.95),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.6,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Sell in-store, online, and offline — one terminal for your whole business.',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
-                fontSize: 15,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 22),
-            const _LoginFeatureRow(),
-            const SizedBox(height: 36),
-            Text(
-              'Enter your phone number',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildPhoneField(),
-            TextButton(
-              onPressed: () => context.go('/staff-login'),
-              child: const Text(
-                'I am staff — use shop number & staff PIN',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 28),
-            _MainButton(
-              text: 'Continue',
-              isLoading: _isLoading,
-              onTap: _handlePhoneSubmit,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'We’ll check if you already have an account.',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.35),
-                fontSize: 13,
-              ),
-            ),
-          ],
+    ),
+  );
+  Widget _buildAuthStep() => SingleChildScrollView(
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: _isLoading ? null : _prevPage,
+          icon: const Icon(Icons.arrow_back),
+          label: Text(_phoneController.text),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAuthStep() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InkWell(
-              onTap: _prevPage,
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.arrow_back,
-                      color: Colors.white.withValues(alpha: 0.55),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _phoneController.text,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        fontSize: 14,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              _userName != null
-                  ? 'Hello, $_userName'
-                  : ((_hasPin && !_usePassword) ? 'Enter PIN' : 'Password'),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.95),
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.9,
-                height: 1.08,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              (_hasPin && !_usePassword)
-                  ? 'Enter your 6-digit access PIN.'
-                  : 'Enter your password to login.',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
-                fontSize: 16,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 44),
-            _buildAuthField(),
-            const SizedBox(height: 16),
-            _buildRememberDeviceRow(),
-            const SizedBox(height: 28),
-            _MainButton(
-              text: (_hasPin && !_usePassword)
-                  ? 'Unlock'
-                  : _cooldownSeconds > 0
-                  ? 'Wait $_cooldownSeconds s'
-                  : 'Login',
-              isLoading: _isLoading || _cooldownSeconds > 0,
-              onTap: () {
-                _handleAuthSubmit();
-              },
-            ),
-            if (_hasPin) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: (_isLoading || _cooldownSeconds > 0)
-                    ? null
-                    : () {
-                        setState(() {
-                          _usePassword = !_usePassword;
-                          _pinController.clear();
-                        });
-                      },
-                child: Text(
-                  _usePassword ? 'Use PIN instead' : 'Use password instead',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
-                ),
-              ),
-            ],
-            if (_usePassword) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: (_isLoading || _cooldownSeconds > 0)
-                    ? null
-                    : () => context.push('/forgot-password'),
-                child: Text(
-                  'Forgot password?',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-                ),
-              ),
-            ],
-          ],
+        const SizedBox(height: 20),
+        Text(
+          _userName == null ? 'Welcome back' : 'Hello, $_userName',
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPhoneField() {
-    final bool focused = _phoneFocus.hasFocus;
-
-    return _GlassField(
-      focused: focused,
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () => _showCountryPicker(),
-            borderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(22),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              child: Row(
-                children: [
-                  Text(
-                    _selectedCountry.flag,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: Colors.white.withValues(alpha: 0.55),
-                  ),
-                ],
+        const SizedBox(height: 12),
+        Text(
+          _hasPin && !_usePassword
+              ? 'Enter your 6-digit PIN to open your shop.'
+              : 'Enter your password to open your shop.',
+          style: const TextStyle(color: Color(0xff51565f), fontSize: 16),
+        ),
+        const SizedBox(height: 24),
+        _buildAuthField(),
+        const SizedBox(height: 12),
+        _buildRememberDeviceRow(),
+        if (_hasPin)
+          TextButton(
+            onPressed: _isLoading || _cooldownSeconds > 0
+                ? null
+                : () => setState(() {
+                    _usePassword = !_usePassword;
+                    _pinController.clear();
+                  }),
+            child: Text(_usePassword ? 'Use my PIN' : 'Use my password'),
+          ),
+        if (_usePassword)
+          TextButton(
+            onPressed: _isLoading || _cooldownSeconds > 0
+                ? null
+                : () => context.push('/forgot-password'),
+            child: const Text('Forgot password?'),
+          ),
+      ],
+    ),
+  );
+  InputDecoration _fieldDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xffb8bec7)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xffb8bec7)),
+    ),
+  );
+  Widget _buildPhoneField() => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Semantics(
+        label: 'Country: ${_selectedCountry.name}, ${_selectedCountry.code}',
+        button: true,
+        child: SizedBox(
+          height: 60,
+          child: OutlinedButton(
+            onPressed: _isLoading ? null : _showCountryPicker,
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
-          ),
-          Container(
-            width: 1,
-            height: 26,
-            color: Colors.white.withValues(alpha: 0.10),
-          ),
-          Expanded(
-            child: TextFormField(
-              focusNode: _phoneFocus,
-              controller: _phoneController,
-              cursorColor: Colors.white,
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.2,
-              ),
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.telephoneNumber],
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(15),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_selectedCountry.code),
+                const Icon(Icons.keyboard_arrow_down, size: 18),
               ],
-              onFieldSubmitted: (_) => _handlePhoneSubmit(),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 18,
-                ),
-                filled: false,
-                fillColor: Colors.transparent,
-                hintText: 'Phone number',
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.28),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRememberDeviceRow() {
-    return InkWell(
-      onTap: () {
-        Haptics.selection();
-        setState(() => _rememberDevice = !_rememberDevice);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: _rememberDevice,
-                onChanged: (value) {
-                  Haptics.selection();
-                  setState(() => _rememberDevice = value ?? false);
-                },
-                activeColor: _accent,
-                checkColor: Colors.black,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Remember this device for 90 days',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.72),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAuthField() {
-    final bool focused = _authFocus.hasFocus;
-
-    final TextStyle pinStyle = TextStyle(
-      fontSize: 24,
-      color: Colors.white,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 10,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-
-    final TextStyle passwordStyle = TextStyle(
-      fontSize: 18,
-      color: Colors.white,
-      fontWeight: FontWeight.w500,
-      letterSpacing: -0.2,
-    );
-
-    return _GlassField(
-      focused: focused,
-      child: TextFormField(
-        focusNode: _authFocus,
-        controller: _pinController,
-        style: (_hasPin && !_usePassword) ? pinStyle : passwordStyle,
-        keyboardType: (_hasPin && !_usePassword)
-            ? TextInputType.number
-            : TextInputType.visiblePassword,
-        cursorColor: Colors.white,
-        obscureText: _obscureText,
-        textAlign: (_hasPin && !_usePassword)
-            ? TextAlign.center
-            : TextAlign.start,
-        textInputAction: TextInputAction.done,
-        autofillHints: (_hasPin && !_usePassword)
-            ? const []
-            : const [AutofillHints.password],
-        inputFormatters: (_hasPin && !_usePassword)
-            ? [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ]
-            : null,
-        onFieldSubmitted: (_) => _handleAuthSubmit(),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 18,
-          ),
-          filled: false,
-          fillColor: Colors.transparent,
-          hintText: (_hasPin && !_usePassword) ? '••••••' : 'Password',
-          hintStyle: TextStyle(
-            color: Colors.white.withValues(alpha: 0.18),
-            letterSpacing: (_hasPin && !_usePassword) ? 10 : -0.2,
-            fontWeight: FontWeight.w600,
-          ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: TextFormField(
+          controller: _phoneController,
+          focusNode: _phoneFocus,
+          enabled: !_isLoading,
+          style: const TextStyle(fontSize: 18, color: Color(0xff111820)),
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumber],
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(15),
+          ],
+          onFieldSubmitted: (_) => _handlePhoneSubmit(),
+          decoration: _fieldDecoration('0700 123 456'),
+        ),
+      ),
+    ],
+  );
+  Widget _buildAuthField() => TextFormField(
+    controller: _pinController,
+    focusNode: _authFocus,
+    enabled: !_isLoading,
+    style: TextStyle(
+      fontSize: _hasPin && !_usePassword ? 24 : 18,
+      color: const Color(0xff111820),
+      letterSpacing: _hasPin && !_usePassword ? 5 : 0,
+    ),
+    keyboardType: _hasPin && !_usePassword
+        ? TextInputType.number
+        : TextInputType.visiblePassword,
+    obscureText: _obscureText,
+    textInputAction: TextInputAction.done,
+    autofillHints: _hasPin && !_usePassword
+        ? const []
+        : const [AutofillHints.password],
+    inputFormatters: _hasPin && !_usePassword
+        ? [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ]
+        : null,
+    onFieldSubmitted: (_) => _handleAuthSubmit(),
+    decoration:
+        _fieldDecoration(
+          _hasPin && !_usePassword ? '6-digit PIN' : 'Password',
+        ).copyWith(
           suffixIcon: IconButton(
-            splashRadius: 18,
+            tooltip: _obscureText
+                ? 'Show PIN or password'
+                : 'Hide PIN or password',
             icon: Icon(
-              _obscureText ? Icons.visibility_off : Icons.visibility,
-              color: Colors.white.withValues(alpha: 0.35),
-              size: 20,
+              _obscureText
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
             ),
             onPressed: () => setState(() => _obscureText = !_obscureText),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorSnack({Key? key}) {
-    return ClipRRect(
-      key: key,
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF453A).withValues(alpha: 0.86),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 1),
-                child: Icon(Icons.error_outline, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                  softWrap: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => setState(() => _errorMessage = null),
-                child: const Padding(
-                  padding: EdgeInsets.only(top: 1),
-                  child: Icon(Icons.close, color: Colors.white, size: 18),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  );
+  Widget _buildRememberDeviceRow() => CheckboxListTile(
+    contentPadding: EdgeInsets.zero,
+    controlAffinity: ListTileControlAffinity.leading,
+    title: const Text('Remember this device for 90 days'),
+    value: _rememberDevice,
+    onChanged: _isLoading
+        ? null
+        : (v) {
+            Haptics.selection();
+            setState(() => _rememberDevice = v == true);
+          },
+  );
 
   Future<void> _showCountryPicker() async {
     final selected = await showCountryPickerBottomSheet(
@@ -1029,198 +805,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (selected != null) {
       setState(() => _selectedCountry = selected);
     }
-  }
-}
-
-/// Frosted field container (Apple-like restraint)
-class _GlassField extends StatelessWidget {
-  const _GlassField({required this.child, required this.focused});
-
-  final Widget child;
-  final bool focused;
-
-  // Solid dark background - NO blur to avoid glow bleed-through
-  static const Color _solidBg = DesignTokens.brandPrimary;
-  static const Color _stroke = Color(0x33FFFFFF);
-  static const Color _strokeFocused = DesignTokens.info;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        color: _solidBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: focused ? _strokeFocused : _stroke,
-          width: focused ? 1.5 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _LoginFeatureRow extends StatelessWidget {
-  const _LoginFeatureRow();
-
-  static const _accent = DesignTokens.brandAccent;
-  static const _stroke = Color(0x22FFFFFF);
-
-  static const _items = [
-    (Icons.point_of_sale_rounded, 'POS checkout'),
-    (Icons.sync_rounded, 'Instant sync'),
-    (Icons.brush_rounded, 'Soko Studio'),
-    (Icons.wifi_off_rounded, 'Works offline'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _items
-          .map(
-            (item) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _stroke),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(item.$1, size: 14, color: _accent),
-                  const SizedBox(width: 6),
-                  Text(
-                    item.$2,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-/// Soft background glow blob
-class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({required this.color, required this.size});
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.55),
-            blurRadius: 120,
-            spreadRadius: 30,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MainButton extends StatefulWidget {
-  const _MainButton({
-    required this.text,
-    this.isLoading = false,
-    required this.onTap,
-  });
-
-  final String text;
-  final bool isLoading;
-  final VoidCallback onTap;
-
-  @override
-  State<_MainButton> createState() => _MainButtonState();
-}
-
-class _MainButtonState extends State<_MainButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool disabled = widget.isLoading;
-
-    return GestureDetector(
-      onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
-      onTapCancel: disabled ? null : () => setState(() => _pressed = false),
-      onTap: disabled
-          ? null
-          : () {
-              setState(() => _pressed = false);
-              widget.onTap();
-            },
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 120),
-        scale: _pressed ? 0.985 : 1.0,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
-          opacity: disabled ? 0.9 : 1.0,
-          child: Container(
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: DesignTokens.brandAccent,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  blurRadius: 30,
-                  offset: const Offset(0, 14),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 24,
-                  offset: const Offset(0, 16),
-                ),
-              ],
-            ),
-            child: widget.isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    widget.text,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-          ),
-        ),
-      ),
-    );
   }
 }

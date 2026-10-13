@@ -24,6 +24,7 @@ void main() {
         'ALTER TABLE items DROP COLUMN wholesale_ranges_json',
       );
       await db.customStatement('PRAGMA user_version = 40');
+      await db.customStatement('ALTER TABLE items DROP COLUMN selling_coverage_json');
       await db.close();
       db = AppDatabase.forTesting(NativeDatabase(file));
       final item = await db.getItemById('existing');

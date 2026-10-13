@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:crypto/crypto.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,6 +9,9 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/app_providers.dart';
 import '../../core/util/comma_number_formatter.dart';
 import '../../core/util/image_crop_helper.dart';
+import '../delivery/coverage_rules.dart';
+
+const _notProvided = Object();
 
 /// Reactive state for product creation form
 class ProductFormState {
@@ -17,6 +23,9 @@ class ProductFormState {
   final String unit;
   final String price;
   final String cost;
+  final bool costUnknown;
+  final Map<String, dynamic>? sellingCoverage;
+  final List<String> galleryOrder;
   final String stock;
   final String discount;
   final String discountType;
@@ -72,6 +81,9 @@ class ProductFormState {
     this.unit = 'pc',
     this.price = '',
     this.cost = '',
+    this.costUnknown = false,
+    this.sellingCoverage,
+    this.galleryOrder = const [],
     this.stock = '0',
     this.discount = '',
     this.discountType = 'flat',
@@ -111,13 +123,16 @@ class ProductFormState {
 
   ProductFormState copyWith({
     String? name,
-    String? categoryId,
-    String? categoryName,
-    String? brandId,
-    String? brandName,
+    Object? categoryId = _notProvided,
+    Object? categoryName = _notProvided,
+    Object? brandId = _notProvided,
+    Object? brandName = _notProvided,
     String? unit,
     String? price,
     String? cost,
+    bool? costUnknown,
+    Object? sellingCoverage = _notProvided,
+    List<String>? galleryOrder,
     String? stock,
     String? discount,
     String? discountType,
@@ -140,9 +155,9 @@ class ProductFormState {
     String? taxRate,
     String? taxLabel,
     String? taxInclusionMode,
-    File? thumbnailFile,
-    String? thumbnailUrl,
-    int? thumbnailUploadId,
+    Object? thumbnailFile = _notProvided,
+    Object? thumbnailUrl = _notProvided,
+    Object? thumbnailUploadId = _notProvided,
     List<File>? galleryFiles,
     List<String>? galleryUrls,
     List<int>? galleryUploadIds,
@@ -156,13 +171,26 @@ class ProductFormState {
   }) {
     return ProductFormState(
       name: name ?? this.name,
-      categoryId: categoryId ?? this.categoryId,
-      categoryName: categoryName ?? this.categoryName,
-      brandId: brandId ?? this.brandId,
-      brandName: brandName ?? this.brandName,
+      categoryId: identical(categoryId, _notProvided)
+          ? this.categoryId
+          : categoryId as String?,
+      categoryName: identical(categoryName, _notProvided)
+          ? this.categoryName
+          : categoryName as String?,
+      brandId: identical(brandId, _notProvided)
+          ? this.brandId
+          : brandId as String?,
+      brandName: identical(brandName, _notProvided)
+          ? this.brandName
+          : brandName as String?,
       unit: unit ?? this.unit,
       price: price ?? this.price,
       cost: cost ?? this.cost,
+      costUnknown: costUnknown ?? this.costUnknown,
+      sellingCoverage: identical(sellingCoverage, _notProvided)
+          ? this.sellingCoverage
+          : sellingCoverage as Map<String, dynamic>?,
+      galleryOrder: galleryOrder ?? this.galleryOrder,
       stock: stock ?? this.stock,
       discount: discount ?? this.discount,
       discountType: discountType ?? this.discountType,
@@ -185,9 +213,15 @@ class ProductFormState {
       taxRate: taxRate ?? this.taxRate,
       taxLabel: taxLabel ?? this.taxLabel,
       taxInclusionMode: taxInclusionMode ?? this.taxInclusionMode,
-      thumbnailFile: thumbnailFile ?? this.thumbnailFile,
-      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
-      thumbnailUploadId: thumbnailUploadId ?? this.thumbnailUploadId,
+      thumbnailFile: identical(thumbnailFile, _notProvided)
+          ? this.thumbnailFile
+          : thumbnailFile as File?,
+      thumbnailUrl: identical(thumbnailUrl, _notProvided)
+          ? this.thumbnailUrl
+          : thumbnailUrl as String?,
+      thumbnailUploadId: identical(thumbnailUploadId, _notProvided)
+          ? this.thumbnailUploadId
+          : thumbnailUploadId as int?,
       galleryFiles: galleryFiles ?? this.galleryFiles,
       galleryUrls: galleryUrls ?? this.galleryUrls,
       galleryUploadIds: galleryUploadIds ?? this.galleryUploadIds,
@@ -200,6 +234,101 @@ class ProductFormState {
       error: error,
     );
   }
+
+  Map<String, dynamic> toDraft() => {
+    'name': name,
+    'categoryId': categoryId,
+    'categoryName': categoryName,
+    'brandId': brandId,
+    'brandName': brandName,
+    'unit': unit,
+    'price': price,
+    'cost': cost,
+    'stock': stock,
+    'discount': discount,
+    'discountType': discountType,
+    'sku': sku,
+    'minQty': minQty,
+    'lowStockWarning': lowStockWarning,
+    'description': description,
+    'tags': tags,
+    'shippingDays': shippingDays,
+    'shippingFee': shippingFee,
+    'weight': weight,
+    'bnplMinOrderAmount': bnplMinOrderAmount,
+    'bnplMaxOrderAmount': bnplMaxOrderAmount,
+    'bnplInstallmentCount': bnplInstallmentCount,
+    'taxRate': taxRate,
+    'taxLabel': taxLabel,
+    'taxInclusionMode': taxInclusionMode,
+    'costUnknown': costUnknown,
+    'refundable': refundable,
+    'cashOnDelivery': cashOnDelivery,
+    'publishOnline': publishOnline,
+    'bnplEnabled': bnplEnabled,
+    'taxEnabled': taxEnabled,
+    'thumbnailFile': thumbnailFile?.path,
+    'thumbnailUrl': thumbnailUrl,
+    'thumbnailUploadId': thumbnailUploadId,
+    'galleryFiles': galleryFiles.map((f) => f.path).toList(),
+    'galleryUrls': galleryUrls,
+    'galleryUploadIds': galleryUploadIds,
+    'galleryOrder': orderedGallery,
+    'sellingCoverage': sellingCoverage,
+  };
+  factory ProductFormState.fromDraft(Map<String, dynamic> data) =>
+      ProductFormState(
+        name: data['name'] as String? ?? '',
+        categoryId: data['categoryId'] as String?,
+        categoryName: data['categoryName'] as String?,
+        brandId: data['brandId'] as String?,
+        brandName: data['brandName'] as String?,
+        unit: data['unit'] as String? ?? 'pc',
+        price: data['price'] as String? ?? '',
+        cost: data['cost'] as String? ?? '',
+        stock: data['stock'] as String? ?? '0',
+        discount: data['discount'] as String? ?? '',
+        discountType: data['discountType'] as String? ?? 'flat',
+        sku: data['sku'] as String? ?? '',
+        minQty: data['minQty'] as String? ?? '1',
+        lowStockWarning: data['lowStockWarning'] as String? ?? '',
+        description: data['description'] as String? ?? '',
+        tags: data['tags'] as String? ?? '',
+        shippingDays: data['shippingDays'] as String? ?? '',
+        shippingFee: data['shippingFee'] as String? ?? '',
+        weight: data['weight'] as String? ?? '',
+        bnplMinOrderAmount: data['bnplMinOrderAmount'] as String? ?? '',
+        bnplMaxOrderAmount: data['bnplMaxOrderAmount'] as String? ?? '',
+        bnplInstallmentCount: data['bnplInstallmentCount'] as String? ?? '',
+        taxRate: data['taxRate'] as String? ?? '',
+        taxLabel: data['taxLabel'] as String? ?? 'VAT',
+        taxInclusionMode: data['taxInclusionMode'] as String? ?? 'exclusive',
+        costUnknown: data['costUnknown'] == true,
+        refundable: data['refundable'] == true,
+        cashOnDelivery:
+            data['cashOnDelivery'] == true || data['cashOnDelivery'] == null,
+        publishOnline: data['publishOnline'] == true,
+        bnplEnabled: data['bnplEnabled'] == true,
+        taxEnabled: data['taxEnabled'] == true,
+        thumbnailFile:
+            data['thumbnailFile'] is String &&
+                File(data['thumbnailFile']).existsSync()
+            ? File(data['thumbnailFile'])
+            : null,
+        thumbnailUrl: data['thumbnailUrl'] as String?,
+        thumbnailUploadId: data['thumbnailUploadId'] as int?,
+        galleryFiles: (data['galleryFiles'] as List? ?? [])
+            .cast<String>()
+            .map(File.new)
+            .where((f) => f.existsSync())
+            .toList(),
+        galleryUrls: (data['galleryUrls'] as List? ?? []).cast<String>(),
+        galleryUploadIds: (data['galleryUploadIds'] as List? ?? []).cast<int>(),
+        galleryOrder: (data['galleryOrder'] as List? ?? []).cast<String>(),
+        sellingCoverage: data['sellingCoverage'] == null
+            ? null
+            : Map<String, dynamic>.from(data['sellingCoverage'] as Map),
+      );
 
   double? get priceValue =>
       double.tryParse(CommaNumberFormatter.unformat(price.trim()));
@@ -238,6 +367,8 @@ class ProductFormState {
     final s = stockValue;
     if (p == null || p <= 0) return false;
     if (s == null || s < 0) return false;
+    if (!costUnknown && costValue == null) return false;
+    if (costValue != null && costValue! < 0) return false;
     return true;
   }
 
@@ -254,6 +385,7 @@ class ProductFormState {
   }
 
   bool get isExtrasValid {
+    if (coverageError(sellingCoverage) != null) return false;
     final min = minQtyValue;
     if (min == null || min < 1) return false;
     if (lowStockWarning.trim().isNotEmpty && lowStockWarningValue == null) {
@@ -275,21 +407,43 @@ class ProductFormState {
     return true;
   }
 
+  bool get hasCover =>
+      thumbnailFile != null || (thumbnailUrl?.trim().isNotEmpty ?? false);
+  int get galleryCount => galleryUrls.length + galleryFiles.length;
   bool get isImagesValid =>
-      !publishOnline ||
-      thumbnailFile != null ||
-      (thumbnailUrl != null && thumbnailUrl!.trim().isNotEmpty);
+      !publishOnline || (hasCover && galleryCount >= 3 && galleryCount <= 6);
+  double? get estimatedProfit {
+    if (costValue == null || priceValue == null) return null;
+    final discountAmount = discountType == 'percent'
+        ? priceValue! * (discountValue ?? 0) / 100
+        : (discountValue ?? 0);
+    var sale = priceValue! - discountAmount;
+    final rate = double.tryParse(CommaNumberFormatter.unformat(taxRate)) ?? 0;
+    if (taxEnabled && taxInclusionMode == 'inclusive' && rate > 0) {
+      sale /= 1 + rate / 100;
+    }
+    return sale - costValue!;
+  }
+
+  List<String> get orderedGallery {
+    final paths = [...galleryUrls, ...galleryFiles.map((f) => f.path)];
+    return [
+      ...galleryOrder.where(paths.contains),
+      ...paths.where((p) => !galleryOrder.contains(p)),
+    ];
+  }
 
   /// Check if ready to submit
   bool get isOnlineDetailsValid {
     if (!publishOnline) return true;
+    if (coverageError(sellingCoverage) != null) return false;
     final desc = description.trim();
     if (desc.isEmpty) return false;
     if (desc.length < 10) return false;
 
     // Marketplace requires explicit shipping signals. Use `0` for free shipping.
     final days = shippingDaysValue;
-    if (days == null) return false;
+    if (days == null || days < 1) return false;
     final fee = shippingFeeValue;
     if (fee == null) return false;
     return true;
@@ -308,9 +462,141 @@ class ProductFormState {
 /// Controller for product form
 class ProductFormController extends StateNotifier<ProductFormState> {
   final Ref ref;
+  bool _draftEnabled = false;
+  late final _draftPreferences = ref.read(sharedPreferencesProvider);
+  String? _draftKey;
+  Timer? _draftTimer;
   final ImagePicker _imagePicker = ImagePicker();
 
-  ProductFormController(this.ref) : super(const ProductFormState());
+  ProductFormController(this.ref) : super(const ProductFormState()) {
+    addListener((_) {
+      if (!_draftEnabled || state.isSubmitting) return;
+      _draftTimer?.cancel();
+      _draftTimer = Timer(
+        const Duration(milliseconds: 400),
+        () => unawaited(saveDraft()),
+      );
+    }, fireImmediately: false);
+  }
+
+  @override
+  void dispose() {
+    _draftTimer?.cancel();
+    if (_draftEnabled) unawaited(saveDraft());
+    super.dispose();
+  }
+
+  Future<bool> restoreDraft() async {
+    final profile = await ref.read(appDatabaseProvider).getBusinessProfile();
+    _draftKey = 'product_draft_v2_${profile?.sellerId ?? "local"}';
+    final raw = _draftPreferences.getString(_draftKey!);
+    var restored = false;
+    if (raw != null) {
+      try {
+        final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        state = ProductFormState.fromDraft(data);
+        restored = state.name.isNotEmpty || state.hasCover;
+      } catch (_) {
+        /* An old or incomplete draft must not block creation. */
+      }
+    }
+    _draftEnabled = true;
+    return restored;
+  }
+
+  Future<void> saveDraft() async {
+    if (!_draftEnabled || _draftKey == null) return;
+    await _draftPreferences.setString(_draftKey!, jsonEncode(state.toDraft()));
+  }
+
+  Future<void> discardDraft() async {
+    _draftEnabled = false;
+    _draftTimer?.cancel();
+    if (_draftKey != null) {
+      await ref.read(sharedPreferencesProvider).remove(_draftKey!);
+    }
+  }
+
+  void setCostUnknown(bool value) =>
+      state = state.copyWith(costUnknown: value, cost: value ? '' : state.cost);
+  void setSellingCoverage(Map<String, dynamic>? value) =>
+      state = state.copyWith(sellingCoverage: value);
+  void reorderGallery(int oldIndex, int newIndex) {
+    final order = state.orderedGallery;
+    if (newIndex > oldIndex) newIndex--;
+    order.insert(newIndex, order.removeAt(oldIndex));
+    state = state.copyWith(galleryOrder: order);
+  }
+
+  void replaceGalleryPhoto(String path, File replacement) {
+    final order = state.orderedGallery
+        .map((p) => p == path ? replacement.path : p)
+        .toList();
+    final remote = state.galleryUrls.indexOf(path);
+    if (remote >= 0) {
+      final urls = [...state.galleryUrls]..removeAt(remote);
+      final ids = [...state.galleryUploadIds];
+      if (remote < ids.length) ids.removeAt(remote);
+      state = state.copyWith(
+        galleryUrls: urls,
+        galleryUploadIds: ids,
+        galleryFiles: [...state.galleryFiles, replacement],
+        galleryOrder: order,
+      );
+    } else {
+      replaceGalleryFile(path, replacement);
+    }
+  }
+
+  Future<void> replaceGalleryFromPicker(String path) async {
+    if (!await _requestMediaPermission(camera: false)) return;
+    final image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 95,
+    );
+    if (image == null) return;
+    final original = await keepOriginal(File(image.path));
+    final cropped = await cropProductImage(original);
+    if (cropped != null) replaceGalleryPhoto(path, await _keepEdited(cropped));
+  }
+
+  void replaceGalleryFile(String path, File replacement) {
+    final files = [...state.galleryFiles];
+    final index = files.indexWhere((f) => f.path == path);
+    if (index < 0) return;
+    files[index] = replacement;
+    state = state.copyWith(
+      galleryFiles: files,
+      galleryOrder: state.orderedGallery
+          .map((p) => p == path ? replacement.path : p)
+          .toList(),
+    );
+  }
+
+  void setEditedCover(File file) => state = state.copyWith(
+    thumbnailFile: file,
+    thumbnailUrl: null,
+    thumbnailUploadId: null,
+  );
+  Future<File> keepOriginal(File file) async {
+    final root = await getApplicationDocumentsDirectory();
+    final dir = Directory('${root.path}/product_photos/originals');
+    await dir.create(recursive: true);
+    final digest = sha256.convert(await file.readAsBytes()).toString();
+    final copy = File('${dir.path}/$digest.jpg');
+    if (!await copy.exists()) await file.copy(copy.path);
+    return copy;
+  }
+
+  Future<File> _keepEdited(File file) async {
+    final root = await getApplicationDocumentsDirectory();
+    final dir = Directory('${root.path}/product_photos/edits');
+    await dir.create(recursive: true);
+    final digest = sha256.convert(await file.readAsBytes()).toString();
+    final copy = File('${dir.path}/$digest.jpg');
+    if (!await copy.exists()) await file.copy(copy.path);
+    return copy;
+  }
 
   /// Load business tax settings into the form defaults.
   Future<void> loadBusinessTaxSettings() async {
@@ -474,7 +760,8 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     if (status.isPermanentlyDenied) {
       // User must go to settings; surface this via error state.
       state = state.copyWith(
-        error: 'Camera access denied. Enable it in Settings → App → Permissions.',
+        error:
+            'Camera access denied. Enable it in Settings → App → Permissions.',
       );
     }
     return false;
@@ -488,9 +775,16 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       imageQuality: 95,
     );
     if (image != null) {
-      final cropped = await cropProductImage(File(image.path));
+      final cropped = await cropProductImage(
+        await keepOriginal(File(image.path)),
+      );
       if (cropped != null) {
-        state = state.copyWith(thumbnailFile: cropped, error: null);
+        state = state.copyWith(
+          thumbnailFile: await _keepEdited(cropped),
+          thumbnailUrl: null,
+          thumbnailUploadId: null,
+          error: null,
+        );
       }
     }
   }
@@ -503,9 +797,16 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       imageQuality: 95,
     );
     if (image != null) {
-      final cropped = await cropProductImage(File(image.path));
+      final cropped = await cropProductImage(
+        await keepOriginal(File(image.path)),
+      );
       if (cropped != null) {
-        state = state.copyWith(thumbnailFile: cropped, error: null);
+        state = state.copyWith(
+          thumbnailFile: await _keepEdited(cropped),
+          thumbnailUrl: null,
+          thumbnailUploadId: null,
+          error: null,
+        );
       }
     }
   }
@@ -516,19 +817,33 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     final List<XFile> images = await _imagePicker.pickMultiImage(
       imageQuality: 95,
     );
-    if (images.isNotEmpty) {
-      final files = <File>[];
-      for (final x in images) {
-        final cropped = await cropProductImage(File(x.path));
-        if (cropped != null) files.add(cropped);
-      }
-      if (files.isNotEmpty) {
-        state = state.copyWith(
-          galleryFiles: [...state.galleryFiles, ...files],
-          error: null,
-        );
+    if (images.isEmpty) return;
+    final files = <File>[];
+    final signatures = <String>{};
+    for (final existing in [
+      ...state.galleryFiles,
+      if (state.thumbnailFile != null) state.thumbnailFile!,
+    ]) {
+      if (await existing.exists()) {
+        signatures.add(sha256.convert(await existing.readAsBytes()).toString());
       }
     }
+    for (final x in images) {
+      if (state.galleryCount + files.length >= 6) break;
+      final original = await keepOriginal(File(x.path));
+      final cropped = await cropProductImage(original);
+      if (cropped == null) continue;
+      final file = await _keepEdited(cropped);
+      final hash = sha256.convert(await file.readAsBytes()).toString();
+      if (!signatures.add(hash)) continue;
+      files.add(file);
+    }
+    state = state.copyWith(
+      galleryFiles: [...state.galleryFiles, ...files],
+      error: images.length > files.length
+          ? 'Up to 6 different gallery photos. Repeated or cancelled photos were skipped.'
+          : null,
+    );
   }
 
   /// Add pre-cropped gallery files directly (from custom picker)
@@ -597,6 +912,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
     }
 
     state = state.copyWith(
+      thumbnailFile: null,
       thumbnailUrl: selectedUrl,
       thumbnailUploadId: selectedId,
       galleryUrls: urls,
@@ -614,11 +930,12 @@ class ProductFormController extends StateNotifier<ProductFormState> {
   }
 
   void setExistingImages({
-    String? thumbnailUrl,
-    int? thumbnailUploadId,
+    Object? thumbnailUrl = _notProvided,
+    Object? thumbnailUploadId = _notProvided,
     List<String> galleryUrls = const [],
     List<int> galleryUploadIds = const [],
     List<File> pendingGalleryFiles = const [],
+    List<String> orderedPaths = const [],
     File? pendingThumbnailFile,
   }) {
     state = state.copyWith(
@@ -627,6 +944,7 @@ class ProductFormController extends StateNotifier<ProductFormState> {
       galleryUrls: galleryUrls,
       galleryUploadIds: galleryUploadIds,
       galleryFiles: pendingGalleryFiles,
+      galleryOrder: orderedPaths,
       thumbnailFile: pendingThumbnailFile,
     );
   }

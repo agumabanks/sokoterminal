@@ -22,6 +22,11 @@ import '../bnpl/providers/bnpl_seller_status_provider.dart';
 import '../bnpl/providers/product_bnpl_provider.dart';
 import '../../widgets/html_editor.dart';
 import '../../widgets/offline_cached_image.dart';
+import 'product_photo_editor.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import '../delivery/selling_coverage_card.dart';
+import '../delivery/coverage_rules.dart';
 import 'product_form_controller.dart';
 import 'wholesale_pricing.dart';
 import 'product_variants_screen.dart';
@@ -43,10 +48,11 @@ class AddProductScreen extends ConsumerStatefulWidget {
 class _AddProductScreenState extends ConsumerState<AddProductScreen>
     with SingleTickerProviderStateMixin {
   static const _uuid = Uuid();
+  int _onboardingStep = 0;
   bool _hydratingRemote = false;
   bool _hydratedRemote = false;
 
-  final _scrollController = ScrollController();
+  var _scrollController = ScrollController();
   final _nameCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   bool _wholesaleEnabled = false;
@@ -70,12 +76,30 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.existingItem == null) _stockCtrl.text = '0';
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
+        final controller = ref.read(productFormProvider.notifier);
+        if (widget.existingItem == null && await controller.restoreDraft()) {
+          if (!mounted) return;
+          final draft = ref.read(productFormProvider);
+          _applyDraftControllers(draft);
+          if (draft.publishOnline) unawaited(controller.setPublishOnline(true));
+        }
         _populateFromExisting();
         unawaited(_hydrateFromServerIfNeeded());
         unawaited(_loadBnplSettingsIfNeeded());
         await ref.read(productFormProvider.notifier).loadBusinessTaxSettings();
+        final profile = await ref
+            .read(appDatabaseProvider)
+            .getBusinessProfile();
+        if (profile?.deliveryProfileJson != null) {
+          final settings = jsonDecode(profile!.deliveryProfileJson!) as Map;
+          _shopCoverage = settings['selling_coverage'] == null
+              ? null
+              : Map<String, dynamic>.from(settings['selling_coverage'] as Map);
+        }
+        if (!mounted) return;
         final state = ref.read(productFormProvider);
         if (state.taxRate.isNotEmpty) {
           _taxRateCtrl.text = state.taxRate;
@@ -144,6 +168,14 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ? CommaNumberFormatter.format(item.cost!.toStringAsFixed(0))
         : '';
     ctrl.setCost(_costCtrl.text);
+    ctrl.setCostUnknown(item.cost == null);
+    ctrl.setSellingCoverage(
+      item.sellingCoverageJson == null
+          ? null
+          : Map<String, dynamic>.from(
+              jsonDecode(item.sellingCoverageJson!) as Map,
+            ),
+    );
     _stockCtrl.text = CommaNumberFormatter.format(item.stockQty.toString());
     ctrl.setStock(_stockCtrl.text);
     _discountCtrl.text = item.discount != null
@@ -187,15 +219,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final thumbRaw = (item.thumbnailUrl ?? item.imageUrl)?.trim();
     final galleryUrlsAll = _decodeStringList(item.galleryUrls);
     final galleryIdsAll = _decodeIntList(item.galleryUploadIds);
-    final remoteCount = galleryIdsAll.length < galleryUrlsAll.length
-        ? galleryIdsAll.length
-        : galleryUrlsAll.length;
-    final remoteGalleryUrls = galleryUrlsAll.take(remoteCount).toList();
-    final pendingGalleryFiles = galleryUrlsAll
-        .skip(remoteCount)
-        .map((p) => File(p))
-        .where((f) => f.existsSync())
-        .toList();
+    final remoteGalleryUrls = <String>[];
+    final validGalleryIds = <int>[];
+    final pendingGalleryFiles = <File>[];
+    for (var i = 0; i < galleryUrlsAll.length; i++) {
+      final id = i < galleryIdsAll.length ? galleryIdsAll[i] : 0;
+      if (id > 0) {
+        remoteGalleryUrls.add(galleryUrlsAll[i]);
+        validGalleryIds.add(id);
+      } else if (!galleryUrlsAll[i].startsWith('http')) {
+        pendingGalleryFiles.add(File(galleryUrlsAll[i]));
+      }
+    }
 
     File? pendingThumbnailFile;
     String? remoteThumbnailUrl = thumbRaw;
@@ -215,7 +250,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       thumbnailUrl: remoteThumbnailUrl,
       thumbnailUploadId: remoteThumbnailId,
       galleryUrls: remoteGalleryUrls,
-      galleryUploadIds: galleryIdsAll.take(remoteCount).toList(),
+      galleryUploadIds: validGalleryIds,
+      orderedPaths: galleryUrlsAll,
       pendingGalleryFiles: pendingGalleryFiles,
       pendingThumbnailFile: pendingThumbnailFile,
     );
@@ -431,7 +467,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
 
   bool _isSaving = false;
 
-  Future<void> _saveProduct() async {
+  Future<void> _saveProduct({bool asDraft = false}) async {
     if (_isSaving) return;
     final wholesaleError = _wholesaleEnabled
         ? validateWholesaleRanges(_wholesaleRanges)
@@ -444,7 +480,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     }
     _isSaving = true;
 
-    final state = ref.read(productFormProvider);
+    final state = asDraft
+        ? ref.read(productFormProvider).copyWith(publishOnline: false)
+        : ref.read(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
     debugPrint(
       '[AddProductScreen] save pressed. canSubmit=${state.canSubmit}, '
@@ -506,13 +544,13 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           ? null
           : state.thumbnailUploadId;
 
-      final pendingGalleryPaths = state.galleryFiles
-          .map((f) => f.path)
-          .toList();
-      final combinedGalleryUrls = [
-        ...state.galleryUrls,
-        ...pendingGalleryPaths,
-      ];
+      final combinedGalleryUrls = state.orderedGallery;
+      final alignedGalleryIds = combinedGalleryUrls.map((path) {
+        final index = state.galleryUrls.indexOf(path);
+        return index >= 0 && index < state.galleryUploadIds.length
+            ? state.galleryUploadIds[index]
+            : 0;
+      }).toList();
 
       final existingGalleryUrls = _decodeStringList(existing?.galleryUrls);
       final existingGalleryIds = _decodeIntList(existing?.galleryUploadIds);
@@ -534,6 +572,11 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         ),
         price: Value(
           double.tryParse(CommaNumberFormatter.unformat(state.price)) ?? 0,
+        ),
+        sellingCoverageJson: Value(
+          state.sellingCoverage == null
+              ? null
+              : jsonEncode(state.sellingCoverage),
         ),
         cost: Value(double.tryParse(CommaNumberFormatter.unformat(state.cost))),
         stockQty: Value(
@@ -567,7 +610,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         galleryUploadIds: currentHasGallery || shouldClearGallery
             ? Value(
                 jsonEncode(
-                  currentHasGallery ? state.galleryUploadIds : const <int>[],
+                  currentHasGallery ? alignedGalleryIds : const <int>[],
                 ),
               )
             : const Value.absent(),
@@ -605,6 +648,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           opType: opType,
           syncPayload: {
             'local_id': id,
+            'selling_coverage': state.sellingCoverage,
+            'media_contract_version': 2,
             if (widget.existingItem?.remoteId != null)
               'remote_id': widget.existingItem!.remoteId,
             'name': state.name.trim(),
@@ -658,10 +703,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 CommaNumberFormatter.unformat(state.taxRate),
               ),
             if (finalSku.isNotEmpty) 'sku': finalSku,
-            if (state.cost.isNotEmpty)
-              'purchase_price': double.tryParse(
-                CommaNumberFormatter.unformat(state.cost),
-              ),
+            'purchase_price': double.tryParse(
+              CommaNumberFormatter.unformat(state.cost),
+            ),
           },
         );
         unawaited(sync.syncCatalogImmediately());
@@ -713,6 +757,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
         '[AddProductScreen] product saved: id=$id, name=${state.name.trim()}',
       );
       if (mounted) {
+        await ctrl.discardDraft();
+        if (!mounted) return;
         ctrl.reset();
         Navigator.pop(context, true);
         final message = state.publishOnline
@@ -747,6 +793,10 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     final state = ref.watch(productFormProvider);
     final ctrl = ref.read(productFormProvider.notifier);
     final bnplStatusAsync = ref.watch(bnplSellerStatusProvider);
+
+    if (widget.existingItem == null) {
+      return _buildOnboarding(state, ctrl);
+    }
 
     return Scaffold(
       backgroundColor: DesignTokens.surfaceGrouped,
@@ -790,13 +840,17 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   }),
                   onChanged: () => setState(() {}),
                 ),
+                const SizedBox(height: 12),
                 ExpansionTile(
                   backgroundColor: Colors.white,
                   collapsedBackgroundColor: Colors.white,
+                  initiallyExpanded: widget.existingItem != null,
                   childrenPadding: const EdgeInsets.all(16),
                   title: const Text('Photos & online shop'),
-                  subtitle: const Text(
-                    'Optional — add photos or publish online',
+                  subtitle: Text(
+                    state.galleryCount > 0
+                        ? 'Cover + ${state.galleryCount} gallery photos'
+                        : 'Add a cover photo or more product photos',
                   ),
                   children: [
                     _buildPhotoSection(state, ctrl),
@@ -854,6 +908,442 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
+  Map<String, dynamic>? _shopCoverage;
+  void _applyDraftControllers(ProductFormState state) {
+    _nameCtrl.text = state.name;
+    _priceCtrl.text = state.price;
+    _costCtrl.text = state.cost;
+    _stockCtrl.text = state.stock;
+    _weightCtrl.text = state.weight;
+    _discountCtrl.text = state.discount;
+    _skuCtrl.text = state.sku;
+    _minQtyCtrl.text = state.minQty;
+    _lowStockCtrl.text = state.lowStockWarning;
+    _descriptionCtrl.text = state.description;
+    _tagsCtrl.text = state.tags;
+    _shippingDaysCtrl.text = state.shippingDays;
+    _shippingFeeCtrl.text = state.shippingFee;
+    _taxRateCtrl.text = state.taxRate;
+    _bnplMinCtrl.text = state.bnplMinOrderAmount;
+    _bnplMaxCtrl.text = state.bnplMaxOrderAmount;
+    _bnplInstallmentCtrl.text = state.bnplInstallmentCount;
+  }
+
+  Future<void> _startFreshProduct() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start a fresh product?'),
+        content: const Text(
+          'This removes the unfinished details on this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Start fresh'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ctrl = ref.read(productFormProvider.notifier);
+    await ctrl.discardDraft();
+    ctrl.reset();
+    await ctrl.restoreDraft();
+    if (!mounted) return;
+    _applyDraftControllers(ref.read(productFormProvider));
+    _goToOnboardingStep(0);
+  }
+
+  Future<File> _photoFile(String path, ProductFormController ctrl) async {
+    if (!path.startsWith('http')) return File(path);
+    final response = await Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    ).get<List<int>>(path, options: Options(responseType: ResponseType.bytes));
+    final temporary = File(
+      '${(await getTemporaryDirectory()).path}/product-edit-${DateTime.now().microsecondsSinceEpoch}.jpg',
+    );
+    await temporary.writeAsBytes(response.data!);
+    return ctrl.keepOriginal(temporary);
+  }
+
+  Future<void> _editCoverPhoto(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) async {
+    try {
+      final file = await _photoFile(
+        state.thumbnailFile?.path ?? state.thumbnailUrl!,
+        ctrl,
+      );
+      if (!mounted) return;
+      final edited = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(builder: (_) => ProductPhotoEditor(source: file)),
+      );
+      if (edited != null && mounted) ctrl.setEditedCover(edited);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open the photo. Connect to the internet and try again.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editGalleryPhoto(
+    String path,
+    ProductFormController ctrl,
+  ) async {
+    try {
+      final file = await _photoFile(path, ctrl);
+      if (!mounted) return;
+      final edited = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(builder: (_) => ProductPhotoEditor(source: file)),
+      );
+      if (edited != null && mounted) ctrl.replaceGalleryPhoto(path, edited);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open this photo. Try again when connected.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _replaceGalleryPhoto(
+    String path,
+    ProductFormController ctrl,
+  ) async => ctrl.replaceGalleryFromPicker(path);
+
+  void _goToOnboardingStep(int step) {
+    FocusScope.of(context).unfocus();
+    final previous = _scrollController;
+    setState(() {
+      _onboardingStep = step;
+      _scrollController = ScrollController();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+  }
+
+  Widget _buildOnboarding(ProductFormState state, ProductFormController ctrl) {
+    final online = state.publishOnline;
+    final titles = [
+      'Where will you sell?',
+      'Add your product',
+      online ? 'Get ready for online buyers' : 'Ready to add',
+    ];
+    final basicReady = state.isBasicInfoValid && state.isPricingValid;
+    final hint = _onboardingStep == 1
+        ? (!state.isBasicInfoValid
+              ? 'Enter a product name'
+              : !state.isPricingValid
+              ? (!state.costUnknown && state.costValue == null
+                    ? 'Enter a buying price, or choose “I don’t know”'
+                    : 'Enter a selling price and a quantity of 0 or more')
+              : null)
+        : _onboardingStep == 2
+        ? _getValidationHint(state)
+        : null;
+    return PopScope(
+      canPop: _onboardingStep == 0 || state.isSubmitting,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && !state.isSubmitting) {
+          _goToOnboardingStep(_onboardingStep - 1);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xfff7f8fa),
+        appBar: AppBar(
+          title: const Text('Add product'),
+          actions: [
+            IconButton(
+              tooltip: 'Start a fresh product',
+              icon: const Icon(Icons.restart_alt),
+              onPressed: state.isSubmitting ? null : _startFreshProduct,
+            ),
+          ],
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: state.isSubmitting
+                ? null
+                : () {
+                    if (_onboardingStep > 0) {
+                      _goToOnboardingStep(_onboardingStep - 1);
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
+          ),
+        ),
+        body: ListView(
+          key: ValueKey(_onboardingStep),
+          controller: _scrollController,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            Text(
+              'Step ${_onboardingStep + 1} of 3',
+              style: DesignTokens.textSmall,
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: (_onboardingStep + 1) / 3),
+            const SizedBox(height: 20),
+            Text(
+              titles[_onboardingStep],
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _onboardingStep == 0
+                  ? 'Choose one. You can change this later.'
+                  : _onboardingStep == 1
+                  ? 'Add the details you know. You can finish later.'
+                  : online
+                  ? 'Show buyers the product and how it reaches them.'
+                  : 'Check your product, then add it to your till.',
+            ),
+            const SizedBox(height: 20),
+            if (_onboardingStep == 0) ...[
+              _sellingChoice(
+                state,
+                ctrl,
+                false,
+                Icons.storefront_outlined,
+                'In my shop',
+                'Add stock and sell at the till. No online listing.',
+              ),
+              const SizedBox(height: 12),
+              _sellingChoice(
+                state,
+                ctrl,
+                true,
+                Icons.public,
+                'In my shop + online',
+                'Sell at the till and list on Soko for online buyers.',
+              ),
+            ],
+            if (_onboardingStep == 1) ...[
+              _buildFormSection(
+                icon: Icons.inventory_2_outlined,
+                title: 'What are you selling?',
+                child: _buildProductInfoFields(state, ctrl),
+              ),
+              const SizedBox(height: 16),
+              _buildPhotoSection(state, ctrl),
+              const SizedBox(height: 16),
+              _buildFormSection(
+                icon: Icons.payments_outlined,
+                title: 'Price & stock',
+                child: _buildPricingFields(state, ctrl),
+              ),
+              ExpansionTile(
+                title: const Text('Wholesale pricing (optional)'),
+                children: [
+                  WholesaleEditor(
+                    enabled: _wholesaleEnabled,
+                    ranges: _wholesaleRanges,
+                    onToggle: (v) => setState(() {
+                      _wholesaleEnabled = v;
+                      if (v && _wholesaleRanges.isEmpty) {
+                        _wholesaleRanges.add({});
+                      }
+                    }),
+                    onChanged: () => setState(() {}),
+                  ),
+                ],
+              ),
+            ],
+            if (_onboardingStep == 2) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(state.name, style: DesignTokens.textBodyBold),
+                      const SizedBox(height: 8),
+                      Text(
+                        'UGX ${_priceCtrl.text} · ${_stockCtrl.text} in stock',
+                      ),
+                      Text(online ? 'In my shop + online' : 'In my shop'),
+                      TextButton(
+                        onPressed: state.isSubmitting
+                            ? null
+                            : () => _goToOnboardingStep(1),
+                        child: const Text('Edit product details'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (online) ...[
+                _buildPhotoSection(state, ctrl),
+                const SizedBox(height: 16),
+                _buildFormSection(
+                  icon: Icons.category_outlined,
+                  title: 'Help buyers find it',
+                  child: Column(
+                    children: [
+                      _buildCategorySelector(state, ctrl),
+                      ExpansionTile(
+                        title: const Text('Brand & weight (optional)'),
+                        children: [
+                          _buildBrandSelector(state, ctrl),
+                          AppInput(
+                            controller: _weightCtrl,
+                            label: 'Weight (kg)',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            onChanged: ctrl.setWeight,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                _buildFormSection(
+                  icon: Icons.local_shipping_outlined,
+                  title: 'Description & delivery',
+                  child: _buildMarketplaceFields(state, ctrl),
+                ),
+                SellingCoverageCard(
+                  value: state.sellingCoverage,
+                  product: true,
+                  shopValue: _shopCoverage,
+                  onChanged: ctrl.setSellingCoverage,
+                ),
+              ] else
+                _buildPhotoSection(state, ctrl),
+              ExpansionTile(
+                title: const Text('Let buyers pay later (optional)'),
+                children: [
+                  _buildBnplSection(
+                    state,
+                    ctrl,
+                    ref.watch(bnplSellerStatusProvider).valueOrNull,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                online
+                    ? 'Saved to your till first. Your online listing is sent when connected.'
+                    : 'Saved on this device and ready to use at the till.',
+              ),
+            ],
+            if (state.error != null) _buildErrorBanner(state.error!),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          color: DesignTokens.surfaceRaised,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            12 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hint != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(hint),
+                  ),
+                if (_onboardingStep == 2 && online && !state.canSubmit)
+                  TextButton(
+                    onPressed: state.isSubmitting || !basicReady
+                        ? null
+                        : () => _saveProduct(asDraft: true),
+                    child: const Text('Save in my shop · finish online later'),
+                  ),
+                AppButton(
+                  label: _onboardingStep == 0
+                      ? 'Continue'
+                      : _onboardingStep == 1
+                      ? (online ? 'Next: online' : 'Review product')
+                      : (online ? 'Add & send online' : 'Add to my shop'),
+                  isLoading: state.isSubmitting,
+                  expand: true,
+                  onPressed:
+                      state.isSubmitting ||
+                          (_onboardingStep == 1 && !basicReady) ||
+                          (_onboardingStep == 2 && !state.canSubmit)
+                      ? null
+                      : () {
+                          if (_onboardingStep < 2) {
+                            _goToOnboardingStep(_onboardingStep + 1);
+                          } else {
+                            _saveProduct();
+                          }
+                        },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sellingChoice(
+    ProductFormState state,
+    ProductFormController ctrl,
+    bool online,
+    IconData icon,
+    String title,
+    String subtitle,
+  ) {
+    final selected = state.publishOnline == online;
+    return Card(
+      color: selected
+          ? DesignTokens.brandPrimary.withValues(alpha: 0.08)
+          : DesignTokens.surfaceRaised,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? DesignTokens.brandPrimary : DesignTokens.grayLight,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Icon(icon),
+        title: Text(title, style: DesignTokens.textBodyBold),
+        subtitle: Text(subtitle),
+        trailing: Icon(
+          selected ? Icons.check_circle : Icons.radio_button_unchecked,
+        ),
+        onTap: () => ctrl.setPublishOnline(online),
+      ),
+    );
+  }
+
   AppBar _buildAppBar(ProductFormState state) {
     return AppBar(
       backgroundColor: DesignTokens.surfaceRaised,
@@ -885,166 +1375,120 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ProductFormState state,
     ProductFormController ctrl,
   ) {
-    final hasThumb =
-        state.thumbnailFile != null ||
-        (state.thumbnailUrl != null && state.thumbnailUrl!.isNotEmpty);
-    final isSynced =
-        state.thumbnailUploadId != null ||
-        (state.thumbnailUrl?.startsWith('http') == true);
-
-    return GestureDetector(
-      onTap: () => _showPhotoOptions(ctrl),
-      child: Stack(
-        children: [
-          // Background image or placeholder
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            height: 180,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: hasThumb
-                  ? Colors.black
-                  : DesignTokens.brandPrimary.withValues(alpha: 0.05),
-            ),
-            child: hasThumb
-                ? _buildThumbImage(state)
-                : _buildPhotoPlaceholder(),
-          ),
-
-          // Gradient overlay at bottom for the "change photo" hint
-          if (hasThumb)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 80,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black54],
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.photo_camera_outlined),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Cover photo${state.publishOnline ? "" : " · optional"}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
-              ),
+              ],
             ),
-
-          // "Tap to change" label when image exists
-          if (hasThumb)
-            Positioned(
-              bottom: 12,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.edit_outlined,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isSynced ? 'Change photo' : 'Tap to change photo',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
+            const SizedBox(height: 12),
+            Text(
+              state.publishOnline
+                  ? 'The first photo buyers see.'
+                  : 'A photo helps you find the product at the till.',
+            ),
+            const SizedBox(height: 16),
+            if (state.hasCover)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  height: 150,
+                  width: double.infinity,
+                  child: _buildThumbImage(state),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: state.isSubmitting
+                      ? null
+                      : () => _showPhotoOptions(ctrl),
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: Text(state.hasCover ? 'Change photo' : 'Add photo'),
+                ),
+                if (state.hasCover)
+                  OutlinedButton.icon(
+                    onPressed: state.isSubmitting
+                        ? null
+                        : () => _editCoverPhoto(state, ctrl),
+                    icon: const Icon(Icons.tune),
+                    label: const Text('Edit photo'),
                   ),
-                ],
-              ),
-            ),
-
-          // Synced badge
-          if (isSynced && hasThumb)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: DesignTokens.brandAccent.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, size: 12, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text(
-                      'Synced',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (hasThumb && state.thumbnailFile != null)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.cloud_upload_outlined,
-                      size: 12,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Uploading on sync',
-                      style: TextStyle(color: Colors.white, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // Remove button
-          if (hasThumb)
-            Positioned(
-              top: 12,
-              left: 12,
-              child: GestureDetector(
-                onTap: ctrl.removeThumbnail,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
+                if (state.hasCover)
+                  TextButton(
+                    onPressed: state.isSubmitting ? null : ctrl.removeThumbnail,
+                    child: const Text('Remove'),
                   ),
-                  child: const Icon(Icons.close, size: 16, color: Colors.white),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.collections_outlined),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'More product photos',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
+                Text(
+                  '${state.galleryCount}/6',
+                  style: DesignTokens.textSmall.copyWith(
+                    color: DesignTokens.grayMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              state.publishOnline
+                  ? 'Show different sides of your product. Add 3–6 clear photos.'
+                  : 'Add extra views so you can recognise the product easily.',
+            ),
+            if (state.galleryCount > 0) ...[
+              const SizedBox(height: 12),
+              _buildGalleryStrip(state, ctrl),
+            ],
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: state.isSubmitting || state.galleryCount >= 6
+                  ? null
+                  : ctrl.pickGalleryImages,
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: Text(
+                state.galleryCount == 0
+                    ? 'Add gallery photos'
+                    : 'Add more photos',
               ),
             ),
-        ],
+            if (state.galleryCount >= 6)
+              Text(
+                'You have added the maximum of 6 photos.',
+                style: DesignTokens.textSmall.copyWith(
+                  color: DesignTokens.grayMedium,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1210,116 +1654,91 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     );
   }
 
-  // Gallery strip (shown below the hero if gallery photos exist)
   Widget _buildGalleryStrip(
     ProductFormState state,
     ProductFormController ctrl,
   ) {
-    final total = state.galleryUrls.length + state.galleryFiles.length;
-    if (total == 0) return const SizedBox.shrink();
-
-    return SizedBox(
-      height: 80,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: total + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          if (i == total) {
-            return GestureDetector(
-              onTap: ctrl.pickGalleryImages,
-              child: Container(
-                width: 70,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: DesignTokens.brandPrimary.withValues(alpha: 0.4),
-                    style: BorderStyle.solid,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  color: DesignTokens.brandPrimary.withValues(alpha: 0.04),
-                ),
-                child: const Icon(Icons.add, color: DesignTokens.brandPrimary),
-              ),
-            );
-          }
-          final isRemote = i < state.galleryUrls.length;
-          final fileIndex = i - state.galleryUrls.length;
-          return GestureDetector(
-            onLongPress: () {
-              if (isRemote) {
-                ctrl.setGalleryUrlAsThumbnail(i);
-              } else {
-                ctrl.setGalleryFileAsThumbnail(fileIndex);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Set as main photo'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-            child: Stack(
-              children: [
-                Container(
-                  width: 70,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isRemote
-                          ? DesignTokens.brandAccent.withValues(alpha: 0.6)
-                          : DesignTokens.grayLight,
-                      width: 2,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: isRemote
-                        ? OfflineCachedImage(
-                            imageUrl: state.galleryUrls[i],
-                            width: 70,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            errorWidget: const SizedBox(),
-                          )
-                        : Image.file(
-                            state.galleryFiles[fileIndex],
-                            width: 70,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                ),
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: GestureDetector(
-                    onTap: () => isRemote
-                        ? ctrl.removeExistingGalleryImage(i)
-                        : ctrl.removeGalleryImage(fileIndex),
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+    final photos = state.orderedGallery;
+    if (photos.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text('No gallery photos yet'),
+      );
+    }
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      itemCount: photos.length,
+      onReorderItem: (oldIndex, newIndex) => ctrl.reorderGallery(
+        oldIndex,
+        newIndex > oldIndex ? newIndex + 1 : newIndex,
       ),
+      itemBuilder: (context, index) {
+        final path = photos[index];
+        final remoteIndex = state.galleryUrls.indexOf(path);
+        final localIndex = state.galleryFiles.indexWhere((f) => f.path == path);
+        return ListTile(
+          key: ValueKey(path),
+          contentPadding: EdgeInsets.zero,
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: remoteIndex >= 0
+                  ? OfflineCachedImage(imageUrl: path, fit: BoxFit.cover)
+                  : Image.file(File(path), fit: BoxFit.cover),
+            ),
+          ),
+          title: Text('Photo ${index + 1}'),
+          subtitle: const Text('Hold the handle to reorder'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PopupMenuButton<String>(
+                tooltip: 'Photo options',
+                onSelected: (action) {
+                  if (action == 'cover') {
+                    if (remoteIndex >= 0) {
+                      ctrl.setGalleryUrlAsThumbnail(remoteIndex);
+                    } else {
+                      ctrl.setGalleryFileAsThumbnail(localIndex);
+                    }
+                  }
+                  if (action == 'remove') {
+                    if (remoteIndex >= 0) {
+                      ctrl.removeExistingGalleryImage(remoteIndex);
+                    } else {
+                      ctrl.removeGalleryImage(localIndex);
+                    }
+                  }
+                  if (action == 'edit') _editGalleryPhoto(path, ctrl);
+                  if (action == 'replace') _replaceGalleryPhoto(path, ctrl);
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Crop, rotate & filters'),
+                  ),
+                  PopupMenuItem(value: 'replace', child: Text('Replace photo')),
+                  PopupMenuItem(value: 'cover', child: Text('Use as cover')),
+                  PopupMenuItem(value: 'remove', child: Text('Remove')),
+                ],
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.drag_handle),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
-
-  // ─── Marketplace Toggle Card ────────────────────────────────────────────────
 
   Widget _buildMarketplaceCard(
     ProductFormState state,
@@ -1378,8 +1797,8 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                 ),
                 Text(
                   state.publishOnline
-                      ? 'Visible on soko24.co to all buyers'
-                      : 'Only available at point of sale',
+                      ? 'Added to your online shop after saving and syncing'
+                      : 'Use this product at your till',
                   style: DesignTokens.textSmall.copyWith(
                     color: DesignTokens.grayMedium,
                   ),
@@ -1417,7 +1836,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   }) {
     if (title == 'Sanaa Finance BNPL') {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: DesignTokens.surfaceRaised,
           borderRadius: BorderRadius.circular(12),
@@ -1431,7 +1850,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
       );
     }
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: DesignTokens.surfaceRaised,
         borderRadius: BorderRadius.circular(16),
@@ -1456,24 +1875,29 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
                   child: Icon(icon, size: 17, color: DesignTokens.brandPrimary),
                 ),
                 const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: DesignTokens.textBodyBold),
-                    if (subtitle != null)
-                      Text(
-                        subtitle,
-                        style: DesignTokens.textSmall.copyWith(
-                          color: DesignTokens.grayMedium,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: DesignTokens.textBodyBold),
+                      if (subtitle != null)
+                        Text(
+                          subtitle,
+                          style: DesignTokens.textSmall.copyWith(
+                            color: DesignTokens.grayMedium,
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: DesignTokens.hairline),
-          Padding(padding: const EdgeInsets.all(16), child: child),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Material(color: Colors.transparent, child: child),
+          ),
         ],
       ),
     );
@@ -1485,74 +1909,63 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ProductFormState state,
     ProductFormController ctrl,
   ) {
-    const units = [
-      'pc',
-      'kg',
-      'g',
-      'set',
-      'pair',
-      'pack',
-      'box',
-      'dozen',
-      'liter',
-      'meter',
-    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppInput(
           controller: _nameCtrl,
-          label: 'Product Name *',
-          hint: 'E.g., iPhone 15 Pro Max 256GB',
+          label: 'What is the product called?',
+          hint: 'e.g. Sugar 1 kg',
           prefixIcon: Icons.inventory_2_outlined,
           textCapitalization: TextCapitalization.words,
           onChanged: ctrl.setName,
         ),
         const SizedBox(height: 16),
 
-        if (state.publishOnline) ...[
+        if (state.publishOnline && widget.existingItem != null) ...[
           _buildCategorySelector(state, ctrl),
           const SizedBox(height: 16),
           _buildBrandSelector(state, ctrl),
           const SizedBox(height: 16),
         ],
 
-        // Unit chips
-        Text('Unit *', style: DesignTokens.textSmallBold),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: units
-              .map(
-                (unit) => ChoiceChip(
-                  label: Text(unit),
-                  selected: state.unit == unit,
-                  onSelected: (v) {
-                    if (v) ctrl.setUnit(unit);
-                  },
-                  selectedColor: DesignTokens.brandPrimary.withValues(
-                    alpha: 0.15,
-                  ),
-                  labelStyle: TextStyle(
-                    color: state.unit == unit
-                        ? DesignTokens.brandPrimary
-                        : DesignTokens.grayDark,
-                    fontWeight: state.unit == unit
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                  ),
-                  side: BorderSide(
-                    color: state.unit == unit
-                        ? DesignTokens.brandPrimary.withValues(alpha: 0.5)
-                        : DesignTokens.grayLight,
-                  ),
-                ),
-              )
-              .toList(),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue:
+              const [
+                'pc',
+                'kg',
+                'g',
+                'set',
+                'pair',
+                'pack',
+                'box',
+                'dozen',
+                'liter',
+                'meter',
+              ].contains(state.unit)
+              ? state.unit
+              : null,
+          hint: Text(state.unit.isEmpty ? 'Choose a unit' : state.unit),
+          decoration: const InputDecoration(labelText: 'How do you sell it?'),
+          items: const [
+            DropdownMenuItem(value: 'pc', child: Text('Each (one item)')),
+            DropdownMenuItem(value: 'kg', child: Text('Kilogram')),
+            DropdownMenuItem(value: 'g', child: Text('Gram')),
+            DropdownMenuItem(value: 'set', child: Text('Set')),
+            DropdownMenuItem(value: 'pair', child: Text('Pair')),
+            DropdownMenuItem(value: 'pack', child: Text('Pack')),
+            DropdownMenuItem(value: 'box', child: Text('Box')),
+            DropdownMenuItem(value: 'dozen', child: Text('Dozen (12 items)')),
+            DropdownMenuItem(value: 'liter', child: Text('Litre')),
+            DropdownMenuItem(value: 'meter', child: Text('Metre')),
+          ],
+          onChanged: (value) {
+            if (value != null) ctrl.setUnit(value);
+          },
         ),
 
-        if (state.publishOnline) ...[
+        if (state.publishOnline && widget.existingItem != null) ...[
           const SizedBox(height: 16),
           AppInput(
             controller: _weightCtrl,
@@ -1561,64 +1974,6 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             prefixIcon: Icons.scale_outlined,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: ctrl.setWeight,
-          ),
-        ],
-
-        // Gallery strip (if any gallery photos)
-        if (state.galleryUrls.isNotEmpty || state.galleryFiles.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text('Gallery Photos', style: DesignTokens.textSmallBold),
-          const SizedBox(height: 8),
-          _buildGalleryStrip(state, ctrl),
-        ] else if (state.publishOnline) ...[
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: ctrl.pickGalleryImages,
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: DesignTokens.brandPrimary.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: DesignTokens.brandPrimary.withValues(alpha: 0.2),
-                  style: BorderStyle.solid,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.add_photo_alternate_outlined,
-                    color: DesignTokens.brandPrimary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add gallery photos',
-                          style: DesignTokens.textBody.copyWith(
-                            color: DesignTokens.brandPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          'Show more angles to attract buyers',
-                          style: DesignTokens.textSmall.copyWith(
-                            color: DesignTokens.grayMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: DesignTokens.grayMedium,
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ],
@@ -1770,198 +2125,238 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
     ProductFormState state,
     ProductFormController ctrl,
   ) {
-    final remoteConfig = ref.read(remoteConfigProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Price — hero field
+        AppInput(
+          controller: _costCtrl,
+          label: 'Buying price (UGX)',
+          hint: 'What you paid for one item',
+          keyboardType: TextInputType.number,
+          inputFormatters: const [CommaNumberFormatter()],
+          onChanged: (value) {
+            ctrl.setCostUnknown(false);
+            ctrl.setCost(value);
+          },
+        ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          controlAffinity: ListTileControlAffinity.leading,
+          title: const Text('I don’t know the buying price yet'),
+          value: state.costUnknown,
+          onChanged: (value) {
+            if (value == true) _costCtrl.clear();
+            ctrl.setCostUnknown(value == true);
+          },
+        ),
+        const SizedBox(height: 16),
         AppInput(
           controller: _priceCtrl,
-          label: 'Selling Price (/=) *',
-          hint: '50,000',
+          label: 'Selling price (UGX)',
+          hint: 'What the customer pays for one item',
           prefixIcon: Icons.attach_money,
           keyboardType: TextInputType.number,
           inputFormatters: const [CommaNumberFormatter()],
           onChanged: ctrl.setPrice,
         ),
-        const SizedBox(height: 12),
+        if (state.estimatedProfit != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              '${state.estimatedProfit! < 0 ? "Estimated loss" : "Estimated profit"} per item: UGX ${CommaNumberFormatter.format(state.estimatedProfit!.abs().toStringAsFixed(0))}',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: state.estimatedProfit! < 0
+                    ? const Color(0xffa12222)
+                    : const Color(0xff14623c),
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
         AppInput(
           controller: _stockCtrl,
-          label: 'Quantity in stock',
+          label: 'How many do you have?',
           hint: '0',
           keyboardType: TextInputType.number,
           inputFormatters: const [CommaNumberFormatter()],
           onChanged: ctrl.setStock,
         ),
         const SizedBox(height: 12),
-        AppInput(
-          controller: _costCtrl,
-          label: 'Cost per item (optional)',
-          hint: '0',
-          keyboardType: TextInputType.number,
-          inputFormatters: const [CommaNumberFormatter()],
-          onChanged: ctrl.setCost,
-        ),
+        if (widget.existingItem == null)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('More options (optional)'),
+            subtitle: const Text('Discounts, stock alerts and tax'),
+            children: _buildExtraPricingFields(state, ctrl),
+          )
+        else
+          ..._buildExtraPricingFields(state, ctrl),
+      ],
+    );
+  }
 
-        if (state.publishOnline) ...[
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: AppInput(
-                  controller: _discountCtrl,
-                  label: 'Discount',
-                  hint: '0',
-                  prefixIcon: Icons.discount_outlined,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: const [CommaNumberFormatter()],
-                  onChanged: ctrl.setDiscount,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Type', style: DesignTokens.textSmallBold),
-                  const SizedBox(height: 8),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'flat', label: Text('/=')),
-                      ButtonSegment(value: 'percent', label: Text('%')),
-                    ],
-                    selected: {state.discountType},
-                    onSelectionChanged: (v) => ctrl.setDiscountType(v.first),
-                    style: SegmentedButton.styleFrom(
-                      selectedBackgroundColor: DesignTokens.brandPrimary,
-                      selectedForegroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-
-        ExpansionTile(
-          title: const Text('More stock settings'),
-          subtitle: const Text(
-            'Item code, minimum order, low-stock alerts and tax',
-          ),
-          tilePadding: EdgeInsets.zero,
+  List<Widget> _buildExtraPricingFields(
+    ProductFormState state,
+    ProductFormController ctrl,
+  ) {
+    final remoteConfig = ref.read(remoteConfigProvider);
+    return [
+      if (state.publishOnline) ...[
+        const SizedBox(height: 12),
+        Row(
           children: [
-            const SizedBox(height: 12),
-            Row(
+            Expanded(
+              flex: 3,
+              child: AppInput(
+                controller: _discountCtrl,
+                label: 'Discount',
+                hint: '0',
+                prefixIcon: Icons.discount_outlined,
+                keyboardType: TextInputType.number,
+                inputFormatters: const [CommaNumberFormatter()],
+                onChanged: ctrl.setDiscount,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: AppInput(
-                    controller: _skuCtrl,
-                    label: 'Item code (automatic)',
-                    hint: 'AUTO',
-                    prefixIcon: Icons.qr_code,
-                    onChanged: ctrl.setSku,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppInput(
-                    controller: _minQtyCtrl,
-                    label: 'Min Order Qty',
-                    hint: '1',
-                    prefixIcon: Icons.add_shopping_cart_outlined,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: const [CommaNumberFormatter()],
-                    onChanged: ctrl.setMinQty,
+                Text('Type', style: DesignTokens.textSmallBold),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'flat', label: Text('/=')),
+                    ButtonSegment(value: 'percent', label: Text('%')),
+                  ],
+                  selected: {state.discountType},
+                  onSelectionChanged: (v) => ctrl.setDiscountType(v.first),
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: DesignTokens.brandPrimary,
+                    selectedForegroundColor: Colors.white,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            AppInput(
-              controller: _lowStockCtrl,
-              label: 'Low stock alert when below',
-              hint: 'e.g. 5',
-              prefixIcon: Icons.warning_amber_outlined,
-              keyboardType: TextInputType.number,
-              inputFormatters: const [CommaNumberFormatter()],
-              onChanged: ctrl.setLowStockWarning,
-            ),
-
-            if (state.taxEnabled) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: DesignTokens.surfaceGrouped,
-                  borderRadius: DesignTokens.borderRadiusMd,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.account_balance_outlined,
-                          color: DesignTokens.brandPrimary,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${state.taxLabel} Tax',
-                          style: DesignTokens.textBodyBold,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    AppInput(
-                      controller: _taxRateCtrl,
-                      label: '${state.taxLabel} rate (%)',
-                      hint: '18',
-                      prefixIcon: Icons.percent,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: const [CommaNumberFormatter()],
-                      onChanged: ctrl.setTaxRate,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildTaxInclusionHint(state),
-                  ],
-                ),
-              ),
-            ],
-
-            if (remoteConfig.ffProductVariantsEditor &&
-                widget.existingItem == null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: DesignTokens.surfaceGrouped,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.layers_outlined,
-                      color: DesignTokens.grayMedium,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Variants can be added after saving the product',
-                        style: DesignTokens.textSmall.copyWith(
-                          color: DesignTokens.grayMedium,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ],
-    );
+      ExpansionTile(
+        title: const Text('More stock settings'),
+        subtitle: const Text(
+          'Item code, minimum order, low-stock alerts and tax',
+        ),
+        tilePadding: EdgeInsets.zero,
+        children: [
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: AppInput(
+                  controller: _skuCtrl,
+                  label: 'Item code (automatic)',
+                  hint: 'AUTO',
+                  prefixIcon: Icons.qr_code,
+                  onChanged: ctrl.setSku,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppInput(
+                  controller: _minQtyCtrl,
+                  label: 'Min Order Qty',
+                  hint: '1',
+                  prefixIcon: Icons.add_shopping_cart_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: const [CommaNumberFormatter()],
+                  onChanged: ctrl.setMinQty,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          AppInput(
+            controller: _lowStockCtrl,
+            label: 'Low stock alert when below',
+            hint: 'e.g. 5',
+            prefixIcon: Icons.warning_amber_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: const [CommaNumberFormatter()],
+            onChanged: ctrl.setLowStockWarning,
+          ),
+          if (state.taxEnabled) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: DesignTokens.surfaceGrouped,
+                borderRadius: DesignTokens.borderRadiusMd,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_outlined,
+                        color: DesignTokens.brandPrimary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${state.taxLabel} Tax',
+                        style: DesignTokens.textBodyBold,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  AppInput(
+                    controller: _taxRateCtrl,
+                    label: '${state.taxLabel} rate (%)',
+                    hint: '18',
+                    prefixIcon: Icons.percent,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: const [CommaNumberFormatter()],
+                    onChanged: ctrl.setTaxRate,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildTaxInclusionHint(state),
+                ],
+              ),
+            ),
+          ],
+          if (remoteConfig.ffProductVariantsEditor &&
+              widget.existingItem == null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: DesignTokens.surfaceGrouped,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.layers_outlined,
+                    color: DesignTokens.grayMedium,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Variants can be added after saving the product',
+                      style: DesignTokens.textSmall.copyWith(
+                        color: DesignTokens.grayMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    ];
   }
 
   // ─── Marketplace Fields ────────────────────────────────────────────────────
@@ -1982,11 +2377,20 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           ),
         ),
         const SizedBox(height: 6),
-        HtmlEditor(
-          initialHtml: _descriptionCtrl.text,
-          placeholder: 'Tell buyers what makes this product great…',
-          onChanged: ctrl.setDescription,
-        ),
+        if (widget.existingItem == null)
+          AppInput(
+            controller: _descriptionCtrl,
+            label: 'What should buyers know?',
+            hint: 'e.g. A sealed 1 kg bag of white sugar.',
+            maxLines: 4,
+            onChanged: ctrl.setDescription,
+          )
+        else
+          HtmlEditor(
+            initialHtml: _descriptionCtrl.text,
+            placeholder: 'Tell buyers what makes this product great…',
+            onChanged: ctrl.setDescription,
+          ),
         const SizedBox(height: 4),
         if (plainDesc.isNotEmpty && plainDesc.length < 10)
           Text(
@@ -2021,7 +2425,7 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
             Expanded(
               child: AppInput(
                 controller: _shippingFeeCtrl,
-                label: 'Fee (/=) *',
+                label: 'Delivery fee (UGX)',
                 hint: '0 = free',
                 prefixIcon: Icons.payments_outlined,
                 keyboardType: TextInputType.number,
@@ -2321,7 +2725,9 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
   }
 
   String? _getValidationHint(ProductFormState state) {
-    if (state.name.trim().isEmpty) return 'Enter a product name to continue';
+    if (state.name.trim().isEmpty) {
+      return 'Enter a product name to continue';
+    }
     if (state.unit.trim().isEmpty) {
       return 'Enter a unit of measure (e.g. pc, kg)';
     }
@@ -2336,18 +2742,30 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen>
           ? 'Discount must be less than 100%'
           : 'Discount must be less than the selling price';
     }
-    if (!state.isExtrasValid) return 'Check min qty / shipping fields';
+    if (!state.isExtrasValid) {
+      if (coverageError(state.sellingCoverage) != null) {
+        return coverageError(state.sellingCoverage);
+      }
+      return 'Check minimum order quantity, weight and delivery details';
+    }
     if (state.publishOnline && !state.isOnlineDetailsValid) {
+      if (coverageError(state.sellingCoverage) != null) {
+        return coverageError(state.sellingCoverage);
+      }
       if (state.description.trim().length < 10) {
         return 'Write a description (at least 10 characters)';
       }
-      if (state.shippingDaysValue == null) return 'Set delivery days (e.g. 3)';
+      if (state.shippingDaysValue == null || state.shippingDaysValue! < 1) {
+        return 'Set delivery days (e.g. 3)';
+      }
       if (state.shippingFeeValue == null) {
         return 'Set delivery fee (0 for free)';
       }
     }
     if (!state.isImagesValid) {
-      return 'Add a product photo for marketplace listing';
+      return !state.hasCover
+          ? 'Add a cover photo'
+          : 'Add 3–6 different gallery photos (${state.galleryCount} added)';
     }
     return null;
   }

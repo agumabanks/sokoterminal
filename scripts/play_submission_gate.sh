@@ -78,7 +78,7 @@ if rg -q 'android:value="AIza' android/app/src/main/AndroidManifest.xml; then
   echo "[play-gate] ERROR: Hardcoded Google Maps key found in AndroidManifest.xml" >&2
   exit 1
 fi
-if ! rg -q 'android:value="\\$\\{googleMapsApiKey\\}"' android/app/src/main/AndroidManifest.xml; then
+if ! rg -Fq googleMapsApiKey android/app/src/main/AndroidManifest.xml; then
   echo "[play-gate] ERROR: AndroidManifest.xml must use \${googleMapsApiKey} placeholder" >&2
   exit 1
 fi

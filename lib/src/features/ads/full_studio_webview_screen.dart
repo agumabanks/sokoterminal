@@ -281,7 +281,7 @@ class _StudioWebError {
   const _StudioWebError({
     required this.title,
     required this.message,
-    this.detail,
+    required this.detail,
     required this.icon,
     required this.tint,
   });
@@ -290,6 +290,7 @@ class _StudioWebError {
     : this(
         title: 'You\'re offline',
         message: 'Connect to the internet to use Soko Studio.',
+        detail: null,
         icon: Icons.wifi_off_rounded,
         tint: Colors.orangeAccent,
       );
@@ -298,6 +299,7 @@ class _StudioWebError {
     : this(
         title: 'Session expired',
         message: 'Your seller session has expired. Please log in again.',
+        detail: null,
         icon: Icons.lock_outline_rounded,
         tint: Colors.redAccent,
       );

@@ -1448,10 +1448,17 @@ class SyncService {
           if (remoteId != null) 'product_id': remoteId,
           'name': (payload['name'] ?? item?.name ?? '').toString(),
           'unit_price': _asDouble(payload['unit_price'] ?? item?.price ?? 0),
-          if (payload['purchase_price'] != null || item?.cost != null)
-            'purchase_price': _asDouble(
-              payload['purchase_price'] ?? item?.cost ?? 0,
-            ),
+          if (payload.containsKey('purchase_price') || item?.cost != null)
+            'purchase_price': payload.containsKey('purchase_price')
+                ? payload['purchase_price']
+                : item?.cost,
+          if (payload.containsKey('media_contract_version'))
+            'media_contract_version': payload['media_contract_version'],
+          if (payload.containsKey('selling_coverage') ||
+              item?.sellingCoverageJson != null)
+            'selling_coverage': payload.containsKey('selling_coverage')
+                ? payload['selling_coverage']
+                : jsonDecode(item!.sellingCoverageJson!),
           'current_stock': _asInt(
             payload['current_stock'] ?? item?.stockQty ?? 0,
           ),
@@ -1576,89 +1583,43 @@ class SyncService {
               );
             }
           }
-          if (thumbUploadId != null) {
+          if (thumbUploadId != null || item.thumbnailUrl == null) {
             upsertPayload['thumbnail_upload_id'] = thumbUploadId;
           }
 
-          // Gallery (remote urls first, then pending local paths).
-          final urlsAll = _decodeStringList(item.galleryUrls);
-          final idsAll = _decodeIntList(item.galleryUploadIds);
-          final remoteCount = idsAll.length < urlsAll.length
-              ? idsAll.length
-              : urlsAll.length;
-          final remoteUrls = urlsAll.take(remoteCount).toList();
-          final remoteIds = idsAll.take(remoteCount).toList();
-          final pending = urlsAll
-              .skip(remoteCount)
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList();
-
-          if (pending.isNotEmpty) {
-            final pendingQueue = List<String>.from(pending);
-            var mutated = false;
-            for (final path in List<String>.from(pendingQueue)) {
-              if (path.startsWith('http://') || path.startsWith('https://')) {
-                continue;
-              }
-              final file = File(path);
-              if (!file.existsSync()) {
-                pendingQueue.remove(path);
-                mutated = true;
-                continue;
-              }
-              try {
-                final uploaded = await _uploadImageFile(path);
-                remoteIds.add(uploaded['id'] as int);
-                remoteUrls.add(uploaded['url'] as String);
-                pendingQueue.remove(path);
-                mutated = true;
-                await db.updateItemFields(
-                  localId,
-                  ItemsCompanion(
-                    galleryUrls: drift.Value(
-                      jsonEncode([...remoteUrls, ...pendingQueue]),
-                    ),
-                    galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
-                  ),
-                );
-              } on DioException catch (e) {
-                if (_isRetryableUploadError(e)) {
-                  rethrow; // Let outer retry handle it
-                }
-                // Non-retryable: keep path in queue so the next sync can
-                // retry (e.g. after a backend fix or reconnect).
-                debugPrint(
-                  '[SyncService] Gallery upload failed for $localId path=$path '
-                  '(status ${e.response?.statusCode}): ${e.error}. Keeping for retry.',
-                );
-                rethrow;
-              }
-            }
-            if (mutated) {
-              await db.updateItemFields(
-                localId,
-                ItemsCompanion(
-                  galleryUrls: drift.Value(
-                    jsonEncode([...remoteUrls, ...pendingQueue]),
-                  ),
-                  galleryUploadIds: drift.Value(jsonEncode(remoteIds)),
-                ),
+          // IDs and URLs are aligned; 0 denotes a pending local file. Older rows
+          // have fewer IDs than URLs, which are interpreted the same way.
+          final urls = _decodeStringList(item.galleryUrls);
+          final storedIds = _decodeIntList(item.galleryUploadIds);
+          final ids = List<int>.generate(
+            urls.length,
+            (i) => i < storedIds.length ? storedIds[i] : 0,
+          );
+          for (var i = 0; i < urls.length; i++) {
+            if (ids[i] > 0) continue;
+            if (urls[i].startsWith('http')) continue;
+            if (!File(urls[i]).existsSync()) {
+              throw DioException(
+                requestOptions: RequestOptions(path: op.opType),
+                error:
+                    'A gallery photo is missing. Open the product to replace it.',
               );
             }
+            final uploaded = await _uploadImageFile(urls[i]);
+            ids[i] = uploaded['id'] as int;
+            urls[i] = uploaded['url'] as String;
+            // Persist each successful upload so retries do not upload it twice.
+            await db.updateItemFields(
+              localId,
+              ItemsCompanion(
+                galleryUrls: drift.Value(jsonEncode(urls)),
+                galleryUploadIds: drift.Value(jsonEncode(ids)),
+              ),
+            );
           }
-
-          final hasGalleryColumns =
-              item.galleryUrls != null || item.galleryUploadIds != null;
-          final hasUnknownRemoteWithoutIds =
-              idsAll.isEmpty &&
-              pending.any(
-                (p) => p.startsWith('http://') || p.startsWith('https://'),
-              );
-          final canReplaceGallery =
-              hasGalleryColumns && !hasUnknownRemoteWithoutIds;
-          if (canReplaceGallery) {
-            upsertPayload['photo_upload_ids'] = remoteIds;
+          if ((item.galleryUrls != null || item.galleryUploadIds != null) &&
+              !ids.contains(0)) {
+            upsertPayload['photo_upload_ids'] = ids;
             upsertPayload['replace_photo_upload_ids'] = true;
           }
         }
@@ -3146,9 +3107,12 @@ class SyncService {
                   : const drift.Value.absent(),
               name: p.name.isEmpty ? 'Product' : p.name,
               price: displayPrice,
-              cost: p.purchasePrice != null
-                  ? drift.Value(p.purchasePrice)
-                  : const drift.Value.absent(),
+              cost: drift.Value(p.purchasePrice),
+              sellingCoverageJson: drift.Value(
+                p.sellingCoverage == null
+                    ? null
+                    : jsonEncode(p.sellingCoverage),
+              ),
               stockQty: drift.Value(displayStock),
               imageUrl: drift.Value(p.imageUrl),
               thumbnailUrl: drift.Value(p.thumbnailUrl ?? p.imageUrl),

@@ -282,6 +282,7 @@ class PosSyncProduct {
     this.imageUrl,
     this.thumbnailUploadId,
     this.thumbnailUrl,
+    this.sellingCoverage,
     this.photoUploadIds = const [],
     this.galleryUrls = const [],
     this.stocks = const [],
@@ -313,6 +314,7 @@ class PosSyncProduct {
   final String? imageUrl;
   final int? thumbnailUploadId;
   final String? thumbnailUrl;
+  final Map<String, dynamic>? sellingCoverage;
   final List<int> photoUploadIds;
   final List<String> galleryUrls;
   final List<PosSyncProductStock> stocks;
@@ -348,6 +350,9 @@ class PosSyncProduct {
       imageUrl: json['image_url']?.toString() ?? json['image']?.toString(),
       thumbnailUploadId: _asNullableInt(json['thumbnail_upload_id']),
       thumbnailUrl: json['thumbnail_url']?.toString(),
+      sellingCoverage: json['selling_coverage'] is Map
+          ? Map<String, dynamic>.from(json['selling_coverage'] as Map)
+          : null,
       taxRate: _asNullableDouble(json['tax_rate']),
       photoUploadIds: (json['photo_upload_ids'] is List)
           ? (json['photo_upload_ids'] as List)

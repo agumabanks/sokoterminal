@@ -5,10 +5,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/app_providers.dart';
-import '../checkout/cart_controller.dart';
 import '../../core/db/app_database.dart';
 import '../../core/security/manager_approval.dart';
 import '../../core/theme/design_tokens.dart';
@@ -34,15 +32,6 @@ final _previewStocksProvider = StreamProvider.family<List<ItemStock>, String>((
   return db.watchItemStocksForItem(itemId);
 });
 
-final _previewNetUnits7dProvider = StreamProvider.family<int, String>((
-  ref,
-  itemId,
-) {
-  final db = ref.watch(appDatabaseProvider);
-  final since = DateTime.now().toUtc().subtract(const Duration(days: 7));
-  return db.watchNetUnitsMovedForItemSince(itemId, since);
-});
-
 class ProductPreviewScreen extends ConsumerStatefulWidget {
   const ProductPreviewScreen({super.key, required this.itemId});
   final String itemId;
@@ -57,7 +46,6 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
 
   int _pageIndex = 0;
   String _selectedVariant = '';
-  int _qty = 1;
 
   @override
   void initState() {
@@ -88,10 +76,6 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
   Widget build(BuildContext context) {
     final itemAsync = ref.watch(_previewItemProvider(widget.itemId));
     final stocksAsync = ref.watch(_previewStocksProvider(widget.itemId));
-    final netUnits7dAsync = ref.watch(
-      _previewNetUnits7dProvider(widget.itemId),
-    );
-
     return itemAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -120,295 +104,259 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
         final isLowStock =
             stockEnabled && stockNow > 0 && stockNow <= lowStockThreshold;
         final isOutOfStock = stockEnabled && stockNow <= 0;
-        final netUnits7d = netUnits7dAsync.valueOrNull;
-        final isFastMoving = netUnits7d != null && netUnits7d >= 20;
-
         final imageUris = _buildImageUris(item: item, stock: selectedStock);
-
-        final total = unitPrice * _qty;
-
-        return DefaultTabController(
-          length: 4,
-          child: Scaffold(
-            backgroundColor: DesignTokens.surface,
-            body: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverAppBar(
-                  backgroundColor: DesignTokens.surface,
-                  title: Text('Preview', style: DesignTokens.textTitle),
-                  pinned: true,
-                  expandedHeight: 280,
-                  actions: [
-                    IconButton(
-                      tooltip: 'Edit',
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () async {
-                        final ok = await requireManagerPin(
-                          context,
-                          ref,
-                          reason: 'edit products',
-                        );
-                        if (!ok || !context.mounted) return;
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AddProductScreen(existingItem: item),
-                          ),
-                        );
-                      },
+        final productDetails = <(String, String?)>[
+          ('SKU', item.sku),
+          ('Barcode', item.barcode),
+          ('Category', item.categoryName ?? item.categoryId),
+          ('Brand', item.brandName ?? item.brandId),
+          ('Unit', item.unit),
+        ].where((row) => row.$2?.trim().isNotEmpty == true).toList();
+        final deliveryDetails = <(String, String?)>[
+          if (item.minPurchaseQty > 1)
+            ('Minimum order', '${item.minPurchaseQty} items'),
+          if (item.shippingDays != null)
+            ('Delivery time', '${item.shippingDays} days'),
+          if (item.shippingFee != null)
+            ('Delivery fee', item.shippingFee!.toUgx()),
+          if (item.cashOnDelivery) ('Cash on delivery', 'Available'),
+          if (item.refundable) ('Returns', 'Accepted'),
+        ];
+        return Scaffold(
+          backgroundColor: DesignTokens.surface,
+          appBar: AppBar(
+            title: Text('Product preview', style: DesignTokens.textTitle),
+            actions: [
+              IconButton(
+                tooltip: 'Edit product',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () async {
+                  final ok = await requireManagerPin(
+                    context,
+                    ref,
+                    reason: 'edit products',
+                  );
+                  if (!ok || !context.mounted) return;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddProductScreen(existingItem: item),
                     ),
-                    if (item.remoteId != null)
-                      IconButton(
-                        tooltip: 'Create payment link',
-                        icon: const Icon(Icons.link),
-                        onPressed: () => showGeneratePaymentLinkSheet(
-                          context,
-                          ref,
-                          type: 'product',
-                          remoteId: item.remoteId!,
-                          title: item.name,
-                          defaultAmount: item.price,
-                        ),
+                  );
+                },
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'More product actions',
+                onSelected: (action) async {
+                  if (action == 'payment') {
+                    await showGeneratePaymentLinkSheet(
+                      context,
+                      ref,
+                      type: 'product',
+                      remoteId: item.remoteId!,
+                      title: item.name,
+                      defaultAmount: item.price,
+                    );
+                  } else {
+                    await launchFullStudioWebForProduct(
+                      context,
+                      ref,
+                      item,
+                      openPanel: 'smart-ads',
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  if (item.remoteId != null)
+                    const PopupMenuItem(
+                      value: 'payment',
+                      child: ListTile(
+                        leading: Icon(Icons.link),
+                        title: Text('Create payment link'),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                    IconButton(
-                      tooltip: 'Design in Studio',
-                      icon: const Icon(Icons.design_services_rounded),
-                      onPressed: () async {
-                        await launchFullStudioWebForProduct(
-                          context,
-                          ref,
-                          item,
-                          openPanel: 'smart-ads',
-                        );
-                      },
                     ),
-                  ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: _ImageCarousel(
-                      controller: _pageController,
-                      pageIndex: _pageIndex,
-                      images: imageUris,
-                      onPageChanged: (i) => setState(() => _pageIndex = i),
-                      onTap: imageUris.isEmpty
-                          ? null
-                          : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => _ImageGalleryScreen(
-                                    images: imageUris,
-                                    initialIndex: _pageIndex,
-                                  ),
-                                ),
-                              );
-                            },
+                  const PopupMenuItem(
+                    value: 'studio',
+                    child: ListTile(
+                      leading: Icon(Icons.design_services_outlined),
+                      title: Text('Open Studio'),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                  bottom: TabBar(
-                    labelColor: DesignTokens.brandPrimary,
-                    unselectedLabelColor: DesignTokens.grayMedium,
-                    indicatorColor: DesignTokens.brandPrimary,
-                    tabs: const [
-                      Tab(text: 'Overview'),
-                      Tab(text: 'Specs'),
-                      Tab(text: 'Reviews'),
-                      Tab(text: 'Logistics'),
+                ],
+              ),
+            ],
+          ),
+          body: SafeArea(
+            top: false,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                    child: SizedBox(
+                      height: (MediaQuery.sizeOf(context).height * 0.34)
+                          .clamp(240.0, 340.0)
+                          .toDouble(),
+                      child: ClipRRect(
+                        borderRadius: DesignTokens.borderRadiusLg,
+                        child: _ImageCarousel(
+                          controller: _pageController,
+                          pageIndex: _pageIndex,
+                          images: imageUris,
+                          onPageChanged: (i) => setState(() => _pageIndex = i),
+                          onTap: imageUris.isEmpty
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => _ImageGalleryScreen(
+                                      images: imageUris,
+                                      initialIndex: _pageIndex,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  sliver: SliverList.list(
+                    children: [
+                      Text(
+                        item.name,
+                        style: DesignTokens.textTitle.copyWith(fontSize: 26),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        unitPrice.toUgx(),
+                        style: DesignTokens.textTitle.copyWith(
+                          fontSize: 28,
+                          color: DesignTokens.brandPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _Pill(
+                            label: item.publishedOnline
+                                ? 'Online'
+                                : 'In my shop',
+                            color: item.publishedOnline
+                                ? DesignTokens.brandAccent
+                                : DesignTokens.grayDark,
+                          ),
+                          if (stockEnabled)
+                            _Pill(
+                              label: isOutOfStock
+                                  ? 'Out of stock'
+                                  : isLowStock
+                                  ? 'Low stock · ${stockNow.formatCommas()} left'
+                                  : '${stockNow.formatCommas()} in stock',
+                              color: isOutOfStock
+                                  ? DesignTokens.error
+                                  : isLowStock
+                                  ? DesignTokens.warning
+                                  : DesignTokens.brandPrimary,
+                            ),
+                          if (!stockEnabled)
+                            const _Pill(
+                              label: 'Stock tracking off',
+                              color: DesignTokens.grayDark,
+                            ),
+                        ],
+                      ),
+                      if (_hasVariants(stocks)) ...[
+                        const SizedBox(height: 20),
+                        Text(
+                          'Choose an option',
+                          style: DesignTokens.textBodyBold,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _sortedStocks(stocks).map((s) {
+                            final value = s.variant;
+                            final label = value.trim().isEmpty
+                                ? 'Default'
+                                : value.replaceAll('-', ' • ');
+                            return ChoiceChip(
+                              selected: value == _selectedVariant,
+                              label: Text(label),
+                              onSelected: (_) =>
+                                  setState(() => _selectedVariant = value),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                      if ((item.description ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        _Section(
+                          title: 'About this product',
+                          child: ServiceDescriptionArticle(
+                            html: item.description!.trim(),
+                          ),
+                        ),
+                      ],
+                      if (wholesaleRanges(
+                        item.wholesaleRangesJson,
+                      ).isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _Section(
+                          title: 'Wholesale prices',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final range in wholesaleRanges(
+                                item.wholesaleRangesJson,
+                              ))
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 3,
+                                  ),
+                                  child: Text(
+                                    '${range['min_qty']}–${range['max_qty']} items · ${(double.tryParse('${range['price']}') ?? 0).toUgx()} each',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (productDetails.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _Section(
+                          title: 'Product details',
+                          child: Column(
+                            children: [
+                              for (final row in productDetails)
+                                _SpecRow(label: row.$1, value: row.$2),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (item.publishedOnline &&
+                          deliveryDetails.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _Section(
+                          title: 'Delivery information',
+                          child: Column(
+                            children: [
+                              for (final row in deliveryDetails)
+                                _SpecRow(label: row.$1, value: row.$2),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: DesignTokens.paddingScreen,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(item.name, style: DesignTokens.textTitle),
-                        if (wholesaleRanges(
-                          item.wholesaleRangesJson,
-                        ).isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Wholesale prices per item',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          for (final range in wholesaleRanges(
-                            item.wholesaleRangesJson,
-                          ))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Text(
-                                '${range['min_qty']}–${range['max_qty']} items: ${(double.tryParse('${range['price']}') ?? 0).toUgx()} each',
-                              ),
-                            ),
-                        ],
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        Row(
-                          children: [
-                            Text(
-                              unitPrice.toUgx(),
-                              style: DesignTokens.textTitle.copyWith(
-                                color: DesignTokens.brandPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: DesignTokens.spaceSm),
-                            if (isLowStock)
-                              _Pill(
-                                label: 'LOW STOCK',
-                                color: DesignTokens.warning,
-                              ),
-                            if (isFastMoving)
-                              _Pill(
-                                label: 'FAST MOVING',
-                                color: DesignTokens.info,
-                              ),
-                            if (isOutOfStock)
-                              _Pill(
-                                label: 'OUT OF STOCK',
-                                color: DesignTokens.error,
-                              ),
-                            if (item.publishedOnline)
-                              _Pill(
-                                label: 'ONLINE',
-                                color: DesignTokens.brandAccent,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: DesignTokens.spaceSm),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 18,
-                              color: DesignTokens.grayMedium,
-                            ),
-                            const SizedBox(width: DesignTokens.spaceXs),
-                            Text(
-                              stockEnabled
-                                  ? 'Stock: ${stockNow.formatCommas()}'
-                                  : 'Stock tracking off',
-                              style: DesignTokens.textSmall,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: DesignTokens.spaceMd),
-                        if (_hasVariants(stocks)) ...[
-                          Text('Variants', style: DesignTokens.textSmallBold),
-                          const SizedBox(height: DesignTokens.spaceXs),
-                          Wrap(
-                            spacing: DesignTokens.spaceSm,
-                            runSpacing: DesignTokens.spaceSm,
-                            children: _sortedStocks(stocks).map((s) {
-                              final value = s.variant;
-                              final label = value.trim().isEmpty
-                                  ? 'Default'
-                                  : value.replaceAll('-', ' • ');
-                              return ChoiceChip(
-                                selected: value == _selectedVariant,
-                                label: Text(label),
-                                onSelected: (_) {
-                                  setState(() {
-                                    _selectedVariant = value;
-                                    _qty = 1;
-                                  });
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
               ],
-              body: TabBarView(
-                children: [
-                  _OverviewTab(item: item),
-                  _SpecsTab(item: item, stocks: stocks),
-                  _ReviewsTab(item: item),
-                  _LogisticsTab(item: item),
-                ],
-              ),
-            ),
-            bottomNavigationBar: SafeArea(
-              top: false,
-              child: Container(
-                padding: DesignTokens.paddingMd,
-                decoration: BoxDecoration(
-                  color: DesignTokens.surfaceWhite,
-                  boxShadow: DesignTokens.shadowMd,
-                ),
-                child: Row(
-                  children: [
-                    _QtyStepper(
-                      qty: _qty,
-                      max: stockEnabled && stockNow > 0 ? stockNow : null,
-                      onChanged: (v) => setState(() => _qty = v),
-                    ),
-                    const SizedBox(width: DesignTokens.spaceMd),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Total', style: DesignTokens.textSmall),
-                          Text(
-                            total.toUgx(),
-                            style: DesignTokens.textBodyBold.copyWith(
-                              color: DesignTokens.brandPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: DesignTokens.spaceMd),
-                    ElevatedButton(
-                      onPressed: isOutOfStock
-                          ? null
-                          : () {
-                              final cart = ref.read(
-                                cartControllerProvider.notifier,
-                              );
-                              final String? msg;
-                              if (_hasVariants(stocks) &&
-                                  _selectedVariant.trim().isNotEmpty) {
-                                msg = cart.addItemVariant(
-                                  item: item,
-                                  variant: _selectedVariant,
-                                  price: unitPrice,
-                                  availableStock: stockNow,
-                                  quantity: _qty,
-                                );
-                              } else {
-                                msg = cart.addItem(
-                                  item: item,
-                                  quantity: _qty,
-                                  availableStock: stockEnabled
-                                      ? stockNow
-                                      : null,
-                                );
-                              }
-                              if (!context.mounted) return;
-                              if (msg != null) {
-                                ScaffoldMessenger.of(
-                                  context,
-                                ).showSnackBar(SnackBar(content: Text(msg)));
-                                return;
-                              }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Added $_qty × ${item.name} to cart',
-                                  ),
-                                ),
-                              );
-                              context.go('/home/checkout');
-                            },
-                      child: const Text('Add to cart'),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         );
@@ -458,8 +406,8 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
     }
 
     add(stock?.imageUrl);
-    add(item.thumbnailUrl);
     add(item.imageUrl);
+    add(item.thumbnailUrl);
 
     for (final g in _decodeStringList(item.galleryUrls)) {
       add(g);
@@ -479,136 +427,6 @@ class _ProductPreviewScreenState extends ConsumerState<ProductPreviewScreen> {
     } catch (_) {
       return const [];
     }
-  }
-}
-
-class _OverviewTab extends StatelessWidget {
-  const _OverviewTab({required this.item});
-  final Item item;
-
-  @override
-  Widget build(BuildContext context) {
-    final desc = (item.description ?? '').trim();
-    final tags = (item.tags ?? '').trim();
-    return ListView(
-      padding: DesignTokens.paddingScreen,
-      children: [
-        _Section(
-          title: 'Description',
-          child: desc.isEmpty
-              ? const Text('No description yet.')
-              : ServiceDescriptionArticle(html: desc),
-        ),
-        if (tags.isNotEmpty) ...[
-          const SizedBox(height: DesignTokens.spaceMd),
-          _Section(
-            title: 'Tags',
-            child: Wrap(
-              spacing: DesignTokens.spaceSm,
-              runSpacing: DesignTokens.spaceSm,
-              children: tags
-                  .split(',')
-                  .map((t) => t.trim())
-                  .where((t) => t.isNotEmpty)
-                  .map(
-                    (t) => Chip(
-                      label: Text(t, style: DesignTokens.textSmall),
-                      backgroundColor: DesignTokens.grayLight.withValues(
-                        alpha: 0.3,
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
-        const SizedBox(height: DesignTokens.spaceMd),
-        _Section(
-          title: 'Online status',
-          child: Text(
-            item.publishedOnline ? 'Published online' : 'Not published online',
-            style: DesignTokens.textBody,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SpecsTab extends StatelessWidget {
-  const _SpecsTab({required this.item, required this.stocks});
-  final Item item;
-  final List<ItemStock> stocks;
-
-  @override
-  Widget build(BuildContext context) {
-    final variantCount = stocks
-        .where((s) => s.variant.trim().isNotEmpty)
-        .length;
-    return ListView(
-      padding: DesignTokens.paddingScreen,
-      children: [
-        _SpecRow(label: 'SKU', value: item.sku),
-        _SpecRow(label: 'Barcode', value: item.barcode),
-        _SpecRow(
-          label: 'Category',
-          value: item.categoryName ?? item.categoryId,
-        ),
-        _SpecRow(label: 'Brand', value: item.brandName ?? item.brandId),
-        _SpecRow(label: 'Unit', value: item.unit),
-        _SpecRow(label: 'Weight (kg)', value: item.weight?.toString()),
-        _SpecRow(
-          label: 'Variants',
-          value: variantCount == 0 ? 'None' : '$variantCount',
-        ),
-      ],
-    );
-  }
-}
-
-class _ReviewsTab extends StatelessWidget {
-  const _ReviewsTab({required this.item});
-  final Item item;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: DesignTokens.paddingScreen,
-      children: [
-        _Section(
-          title: 'Reviews',
-          child: Text(
-            'Reviews will appear here once the product is live and customers start buying.',
-            style: DesignTokens.textBody,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LogisticsTab extends StatelessWidget {
-  const _LogisticsTab({required this.item});
-  final Item item;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: DesignTokens.paddingScreen,
-      children: [
-        _SpecRow(
-          label: 'Min purchase qty',
-          value: item.minPurchaseQty.toString(),
-        ),
-        _SpecRow(label: 'Shipping days', value: item.shippingDays?.toString()),
-        _SpecRow(label: 'Shipping fee', value: item.shippingFee?.toUgx()),
-        _SpecRow(label: 'Refundable', value: item.refundable ? 'Yes' : 'No'),
-        _SpecRow(
-          label: 'Cash on delivery',
-          value: item.cashOnDelivery ? 'Yes' : 'No',
-        ),
-      ],
-    );
   }
 }
 
@@ -646,22 +464,17 @@ class _SpecRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = value?.trim();
-    return Container(
-      margin: const EdgeInsets.only(bottom: DesignTokens.spaceSm),
-      padding: DesignTokens.paddingMd,
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
-        borderRadius: DesignTokens.borderRadiusMd,
-        boxShadow: DesignTokens.shadowSm,
-      ),
+    if (v == null || v.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: DesignTokens.textBodyBold)),
+          Expanded(child: Text(label, style: DesignTokens.textBodyMuted)),
           const SizedBox(width: DesignTokens.spaceSm),
           Flexible(
             child: Text(
-              (v == null || v.isEmpty) ? '—' : v,
-              style: DesignTokens.textBodyMuted,
+              v,
+              style: DesignTokens.textBodyBold,
               textAlign: TextAlign.right,
             ),
           ),
@@ -695,40 +508,6 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _QtyStepper extends StatelessWidget {
-  const _QtyStepper({required this.qty, required this.onChanged, this.max});
-
-  final int qty;
-  final int? max;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final canDec = qty > 1;
-    final canInc = max == null ? true : qty < max!;
-    return Container(
-      decoration: BoxDecoration(
-        color: DesignTokens.grayLight.withValues(alpha: 0.25),
-        borderRadius: DesignTokens.borderRadiusLg,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            onPressed: canDec ? () => onChanged(qty - 1) : null,
-            icon: const Icon(Icons.remove),
-          ),
-          Text('$qty', style: DesignTokens.textBodyBold),
-          IconButton(
-            onPressed: canInc ? () => onChanged(qty + 1) : null,
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ImageCarousel extends StatelessWidget {
   const _ImageCarousel({
     required this.controller,
@@ -748,7 +527,7 @@ class _ImageCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImages = images.isNotEmpty;
     return Container(
-      color: DesignTokens.surface,
+      color: DesignTokens.surfaceWhite,
       child: hasImages
           ? Stack(
               children: [
@@ -765,57 +544,53 @@ class _ImageCarousel extends StatelessWidget {
                         final file = isNetwork ? null : File(uri);
                         final fileExists = file != null && file.existsSync();
                         return Padding(
-                          padding: const EdgeInsets.only(
-                            left: DesignTokens.spaceMd,
-                            right: DesignTokens.spaceMd,
-                            bottom: 44,
-                            top: 12,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: DesignTokens.borderRadiusLg,
-                            child: isNetwork
-                                ? OfflineCachedImage(
-                                    imageUrl: uri,
-                                    fit: BoxFit.cover,
-                                    placeholder: _imagePlaceholder(),
-                                    errorWidget: _imagePlaceholder(),
-                                  )
-                                : (fileExists
-                                      ? Image.file(file, fit: BoxFit.cover)
-                                      : _imagePlaceholder()),
-                          ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 44),
+                          child: isNetwork
+                              ? OfflineCachedImage(
+                                  imageUrl: uri,
+                                  fit: BoxFit.contain,
+                                  placeholder: _imagePlaceholder(),
+                                  errorWidget: _imagePlaceholder(),
+                                )
+                              : (fileExists
+                                    ? Image.file(file, fit: BoxFit.contain)
+                                    : _imagePlaceholder()),
                         );
                       },
                     ),
                   ),
                 ),
                 if (images.length > 1) ...[
-                  Positioned(
-                    left: 8,
-                    top: 110,
-                    child: _ArrowButton(
-                      icon: Icons.chevron_left,
-                      onTap: () {
-                        if (!controller.hasClients) return;
-                        controller.previousPage(
-                          duration: DesignTokens.durationFast,
-                          curve: Curves.easeOut,
-                        );
-                      },
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _ArrowButton(
+                        icon: Icons.chevron_left,
+                        onTap: () {
+                          if (!controller.hasClients) return;
+                          controller.previousPage(
+                            duration: DesignTokens.durationFast,
+                            curve: Curves.easeOut,
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  Positioned(
-                    right: 8,
-                    top: 110,
-                    child: _ArrowButton(
-                      icon: Icons.chevron_right,
-                      onTap: () {
-                        if (!controller.hasClients) return;
-                        controller.nextPage(
-                          duration: DesignTokens.durationFast,
-                          curve: Curves.easeOut,
-                        );
-                      },
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _ArrowButton(
+                        icon: Icons.chevron_right,
+                        onTap: () {
+                          if (!controller.hasClients) return;
+                          controller.nextPage(
+                            duration: DesignTokens.durationFast,
+                            curve: Curves.easeOut,
+                          );
+                        },
+                      ),
                     ),
                   ),
                   Positioned(

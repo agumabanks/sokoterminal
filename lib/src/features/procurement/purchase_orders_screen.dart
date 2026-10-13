@@ -29,7 +29,11 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    // Defer to after the first frame: _load() mutates the POS session
+    // provider, which Riverpod forbids while the tree is building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_load());
+    });
   }
 
   @override

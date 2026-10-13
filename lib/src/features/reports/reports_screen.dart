@@ -771,10 +771,15 @@ class _ReportRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: isBold ? DesignTokens.textBodyBold : DesignTokens.textBody,
+          Flexible(
+            child: Text(
+              label,
+              style: isBold ? DesignTokens.textBodyBold : DesignTokens.textBody,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
+          const SizedBox(width: DesignTokens.spaceSm),
           Text(
             '${value.toStringAsFixed(0)} /=',
             style: (isBold ? DesignTokens.textBodyBold : DesignTokens.textBody)

@@ -445,14 +445,15 @@ class _InboxTile extends ConsumerWidget {
       InboxType.all => DesignTokens.brandPrimary,
     };
 
-    return Container(
-      decoration: BoxDecoration(
-        color: DesignTokens.surfaceWhite,
+    return Material(
+      color: DesignTokens.surfaceWhite,
+      elevation: 1,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: DesignTokens.borderRadiusMd,
-        boxShadow: DesignTokens.shadowSm,
-        border: item.pendingSync
-            ? Border.all(color: DesignTokens.warning.withValues(alpha: 0.4))
-            : null,
+        side: item.pendingSync
+            ? BorderSide(color: DesignTokens.warning.withValues(alpha: 0.4))
+            : BorderSide.none,
       ),
       child: ListTile(
         leading: CircleAvatar(

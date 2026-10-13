@@ -10,6 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/app_providers.dart';
+import 'selling_coverage_card.dart';
+import 'coverage_rules.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/db/app_database.dart';
 import '../../core/settings/business_profile_cache.dart';
 import '../../core/sync/sync_service.dart';
@@ -39,6 +42,7 @@ class _DeliverySettingsScreenState
 
   bool _enabled = false;
   double _radiusKm = 5;
+  Map<String, dynamic>? _sellingCoverage;
   String _pricingMode = 'flat';
   double _previewDistance = 3;
   bool _locating = false;
@@ -138,6 +142,9 @@ class _DeliverySettingsScreenState
         return;
       }
       final source = profile ?? defaults;
+      _sellingCoverage = source['selling_coverage'] is Map
+          ? Map<String, dynamic>.from(source['selling_coverage'] as Map)
+          : null;
 
       _enabled = (source['enabled'] == true);
       _radiusKm = (_toDouble(source['radius_km']) ?? _maxRadiusKm)
@@ -204,6 +211,13 @@ class _DeliverySettingsScreenState
   }
 
   Future<void> _save() async {
+    final coverageMessage = coverageError(_sellingCoverage);
+    if (coverageMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(coverageMessage)));
+      return;
+    }
     final originLabel = _originLabelCtrl.text.trim();
     final originLat = _tryParseDouble(_originLatCtrl.text.trim());
     final originLng = _tryParseDouble(_originLngCtrl.text.trim());
@@ -277,6 +291,7 @@ class _DeliverySettingsScreenState
     try {
       final payload = <String, dynamic>{
         'enabled': _enabled,
+        'selling_coverage': _sellingCoverage,
         'pricing_mode': _pricingMode,
         'radius_km': _radiusKm.clamp(_minRadiusKm, _maxRadiusKm),
         'base_fee': baseFee,
@@ -348,6 +363,9 @@ class _DeliverySettingsScreenState
         _toDouble(deliveryProfile['origin_lng']) ??
         profile.deliveryPickupLongitude;
 
+    _sellingCoverage = deliveryProfile['selling_coverage'] is Map
+        ? Map<String, dynamic>.from(deliveryProfile['selling_coverage'] as Map)
+        : null;
     _enabled =
         _resolveBool(deliveryProfile['enabled']) ?? profile.selfDeliveryActive;
     _radiusKm =
@@ -399,6 +417,7 @@ class _DeliverySettingsScreenState
     final existing = await db.getBusinessProfile();
     final payload = <String, dynamic>{
       'enabled': enabled,
+      'selling_coverage': _sellingCoverage,
       'pricing_mode': pricingMode,
       'radius_km': radiusKm,
       'base_fee': baseFee,
@@ -545,6 +564,22 @@ class _DeliverySettingsScreenState
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
                 if (_refreshing) const LinearProgressIndicator(),
+                SellingCoverageCard(
+                  value: _sellingCoverage,
+                  origin:
+                      _tryParseDouble(_originLatCtrl.text) != null &&
+                          _tryParseDouble(_originLngCtrl.text) != null
+                      ? LatLng(
+                          _tryParseDouble(_originLatCtrl.text)!,
+                          _tryParseDouble(_originLngCtrl.text)!,
+                        )
+                      : null,
+                  onChanged: (value) =>
+                      setState(() => _sellingCoverage = value),
+                ),
+                const Text(
+                  'Your selling area controls who can buy online. Delivery fees and rider distance are separate.',
+                ),
                 const Text(
                   'You handle nearby deliveries. Soko delivery options are shown at checkout for customers outside your area.',
                 ),

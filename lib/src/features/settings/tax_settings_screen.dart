@@ -216,7 +216,11 @@ class _TaxSettingsScreenState extends ConsumerState<TaxSettingsScreen> {
           ),
         ],
       ),
-      child: child,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: DesignTokens.borderRadiusMd,
+        child: child,
+      ),
     );
   }
 }

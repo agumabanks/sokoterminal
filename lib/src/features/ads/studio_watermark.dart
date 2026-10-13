@@ -138,7 +138,7 @@ Future<Uint8List> _loadWatermarkBytes({
     // Treat as local file path.
     final file = File(source);
     if (!file.existsSync()) throw StateError('Logo file not found: $source');
-    return file.readAsBytes();
+    return await file.readAsBytes();
   } catch (_) {
     // Always fall back to the bundled Soko logo.
     return (await rootBundle.load(

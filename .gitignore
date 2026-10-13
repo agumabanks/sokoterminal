@@ -54,3 +54,4 @@ app.*.map.json
 /android/app/*.jks
 /android/app/*.keystore
 *.hprof
+releases/

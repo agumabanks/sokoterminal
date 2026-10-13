@@ -588,14 +588,15 @@ class _SplashStatus extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Stage dots
+          // Stage dots. Connectors flex so the row always fits the box
+          // instead of overflowing on narrow phones.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _StageDot(label: 'Session', state: _dotState(0)),
-              _StageConnector(complete: stage > 0),
+              Flexible(child: _StageConnector(complete: stage > 0)),
               _StageDot(label: 'Catalog', state: _dotState(1)),
-              _StageConnector(complete: stage > 1),
+              Flexible(child: _StageConnector(complete: stage > 1)),
               _StageDot(label: 'POS', state: _dotState(2)),
             ],
           ),
@@ -717,7 +718,6 @@ class _StageConnector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40,
       height: 1,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       color: complete

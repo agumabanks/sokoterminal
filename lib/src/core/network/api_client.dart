@@ -425,7 +425,7 @@ class ApiClient {
       final newToken = response.data?['access_token'];
       if (newToken != null && newToken is String && newToken.isNotEmpty) {
         if (await _secureStorage.readAccessToken() != attemptedToken) {
-          return finish(false);
+          return await finish(false);
         }
         await _secureStorage.writeAccessToken(newToken);
         final expiresAt = DateTime.tryParse(
@@ -440,10 +440,10 @@ class ApiClient {
         debugPrint(
           '[HTTP] Token refreshed successfully (${newToken.length} chars)',
         );
-        return finish(true);
+        return await finish(true);
       }
       debugPrint('[HTTP] Token refresh returned no token');
-      return finish(false);
+      return await finish(false);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 &&
@@ -451,10 +451,10 @@ class ApiClient {
         await _markCloudAuthRequired();
       }
       debugPrint('[HTTP] Token refresh failed: HTTP $status');
-      return finish(false);
+      return await finish(false);
     } catch (e) {
       debugPrint('[HTTP] Token refresh error: $e');
-      return finish(false);
+      return await finish(false);
     }
   }
 

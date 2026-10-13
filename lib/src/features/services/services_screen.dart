@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_providers.dart';
@@ -369,7 +370,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                                   horizontal: DesignTokens.spaceMd,
                                 ),
                                 physics: _servicesScrollPhysics,
-                                cacheExtent: 640,
+                                scrollCacheExtent:
+                                    const ScrollCacheExtent.pixels(640),
                                 gridDelegate:
                                     const SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 2,
@@ -395,7 +397,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                                   horizontal: DesignTokens.spaceMd,
                                 ),
                                 physics: _servicesScrollPhysics,
-                                cacheExtent: 720,
+                                scrollCacheExtent:
+                                    const ScrollCacheExtent.pixels(720),
                                 itemCount: filtered.length,
                                 itemBuilder: (context, index) {
                                   final service = filtered[index];

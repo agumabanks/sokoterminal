@@ -53,6 +53,7 @@ class _MeScreenState extends ConsumerState<MeScreen> {
     _ToolSection(
       title: 'GROW',
       tools: [
+        _ToolItem(Icons.insights_outlined, 'Analytics', '/home/more/analytics'),
         _ToolItem(Icons.auto_awesome_outlined, 'Soko Studio', '/home/more/ads'),
         _ToolItem(Icons.confirmation_number_outlined, 'Coupons', '/home/more/coupons'),
         _ToolItem(Icons.sms_outlined, 'Bulk SMS', '/home/more/bulk-sms'),

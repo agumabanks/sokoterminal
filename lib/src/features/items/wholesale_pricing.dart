@@ -75,96 +75,99 @@ class WholesaleEditor extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Colors.black12),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Wholesale pricing'),
-          subtitle: const Text('Set lower prices for larger orders.'),
-          value: enabled,
-          onChanged: onToggle,
-        ),
-        if (enabled) ...[
-          const Text(
-            'Price is per item. Orders outside these ranges use your normal selling price.',
+    child: Material(
+      color: Colors.transparent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Wholesale pricing'),
+            subtitle: const Text('Set lower prices for larger orders.'),
+            value: enabled,
+            onChanged: onToggle,
           ),
-          for (var i = 0; i < ranges.length; i++)
-            Padding(
-              key: ObjectKey(ranges[i]),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text('Range ${i + 1}')),
-                      IconButton(
-                        tooltip: 'Remove range',
-                        onPressed: () {
-                          ranges.removeAt(i);
-                          onChanged();
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      for (final key in ['min_qty', 'max_qty'])
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: TextFormField(
-                              initialValue: '${ranges[i][key] ?? ''}',
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Color(0xFFF5F7F6),
-                                border: OutlineInputBorder(),
-                                labelText: key == 'min_qty'
-                                    ? 'From quantity'
-                                    : 'To quantity',
+          if (enabled) ...[
+            const Text(
+              'Price is per item. Orders outside these ranges use your normal selling price.',
+            ),
+            for (var i = 0; i < ranges.length; i++)
+              Padding(
+                key: ObjectKey(ranges[i]),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text('Range ${i + 1}')),
+                        IconButton(
+                          tooltip: 'Remove range',
+                          onPressed: () {
+                            ranges.removeAt(i);
+                            onChanged();
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        for (final key in ['min_qty', 'max_qty'])
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: TextFormField(
+                                initialValue: '${ranges[i][key] ?? ''}',
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Color(0xFFF5F7F6),
+                                  border: OutlineInputBorder(),
+                                  labelText: key == 'min_qty'
+                                      ? 'From quantity'
+                                      : 'To quantity',
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: (v) =>
+                                    ranges[i][key] = int.tryParse(v),
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              onChanged: (v) =>
-                                  ranges[i][key] = int.tryParse(v),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    initialValue: '${ranges[i]['price'] ?? ''}',
-                    decoration: const InputDecoration(
-                      labelText: 'Price per item (UGX)',
-                      filled: true,
-                      fillColor: Color(0xFFF5F7F6),
-                      border: OutlineInputBorder(),
+                      ],
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      initialValue: '${ranges[i]['price'] ?? ''}',
+                      decoration: const InputDecoration(
+                        labelText: 'Price per item (UGX)',
+                        filled: true,
+                        fillColor: Color(0xFFF5F7F6),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      onChanged: (v) => ranges[i]['price'] = double.tryParse(v),
                     ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                    ],
-                    onChanged: (v) => ranges[i]['price'] = double.tryParse(v),
-                  ),
-                ],
+                  ],
+                ),
               ),
+            TextButton.icon(
+              onPressed: () {
+                ranges.add({});
+                onChanged();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add quantity range'),
             ),
-          TextButton.icon(
-            onPressed: () {
-              ranges.add({});
-              onChanged();
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add quantity range'),
-          ),
+          ],
         ],
-      ],
+      ),
     ),
   );
 }

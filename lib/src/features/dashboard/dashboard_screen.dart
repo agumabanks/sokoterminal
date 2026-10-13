@@ -254,10 +254,15 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                     Row(
                       children: [
-                        Text(
-                          'Run your business',
-                          style: DesignTokens.textTitle,
+                        Flexible(
+                          child: Text(
+                            'Run your business',
+                            style: DesignTokens.textTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: DesignTokens.spaceSm),
                         const Spacer(),
                         Text(
                           'Today',

@@ -5,16 +5,16 @@ Fill this file before every Play submission.
 ## Build Under Review
 
 - App: `Soko Seller Terminal`
-- Build date (UTC): `YYYY-MM-DD`
-- Version name/code: `x.y.z+N`
-- Environment/API: `https://.../api/`
+- Build date (UTC): `2026-09-29`
+- Version name/code: `2.0.8+2033`
+- Environment/API: `https://soko24.co/api/`
 
 ## Reviewer Test Account
 
-- Login phone (international format): `+256XXXXXXXXX`
-- Password: `********`
-- PIN (if enabled): `******`
-- Last verified with `bash scripts/verify_play_reviewer_login.sh`: `YYYY-MM-DD`
+- Login phone (international format): `+256700000024`
+- Password: `482917`
+- PIN (if enabled): `482917`
+- Last verified with `bash scripts/verify_play_reviewer_login.sh`: `2026-09-29`
 
 ## Reviewer Steps
 
